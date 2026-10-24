@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
@@ -11,6 +11,16 @@ import { vendorPaths } from "./main/vendor";
 if (process.env.KARATE_KID_USER_DATA) app.setPath("userData", process.env.KARATE_KID_USER_DATA);
 
 let win: BrowserWindow | null = null;
+
+// One instance per userData folder: a second one would kill the first one's run as an orphan
+// and share its run folders. It hands over to the first window instead.
+const primary = app.requestSingleInstanceLock();
+if (!primary) app.quit();
+app.on("second-instance", () => {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
 
 const emit = (e: AppEvent) => {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
@@ -28,6 +38,13 @@ const createWindow = () => {
       nodeIntegration: false,
       sandbox: true,
     },
+  });
+
+  // The window only ever shows the app's own page.
+  const contents = win.webContents;
+  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  contents.on("will-navigate", (e) => {
+    if (e.url !== contents.getURL()) e.preventDefault();
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -48,6 +65,9 @@ const handle = (channel: string, fn: (...args: unknown[]) => Promise<void> | voi
   });
 
 app.whenReady().then(async () => {
+  if (!primary) return;
+  // No menu: its Reload would drop the window's view of a live run.
+  Menu.setApplicationMenu(null);
   const dataDir = app.getPath("userData");
   const vendor = vendorPaths(
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
