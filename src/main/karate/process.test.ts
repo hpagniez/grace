@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { copyFixture } from "../../../test/fixtures/copy";
 import { vendorPaths } from "../vendor";
 import { buildArgs, detectLayout } from "./command";
-import { killOrphan, spawnKarate, type KarateProcess } from "./process";
+import { killOrphan, spawnKarate, within, type KarateProcess } from "./process";
 
 const { java, jar, jreDir } = vendorPaths(path.resolve("vendor"));
 const temps: string[] = [];
@@ -79,6 +79,41 @@ describe("spawnKarate", () => {
     );
     expect(left.toLowerCase()).not.toContain(path.resolve(jreDir).toLowerCase());
     await p.kill(); // already gone: must not throw
+  });
+});
+
+describe("spawnKarate kill", () => {
+  it("gives up waiting when the process does not end", { timeout: 60_000 }, async () => {
+    // The child starts a detached grandchild that keeps its pipes open, then exits:
+    // taskkill finds no process and `exit` cannot resolve until the grandchild ends.
+    const script = [
+      "const { spawn } = require('node:child_process');",
+      "const g = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'],",
+      "  { stdio: 'inherit', detached: true, windowsHide: true });",
+      "console.log(g.pid); g.unref();",
+    ].join("\n");
+    const lines: string[] = [];
+    const p = spawnKarate(process.execPath, ["-e", script], tmpdir(), (l) => lines.push(...l), 200);
+    const end = Date.now() + 20_000;
+    while ((lines.length === 0 || alive(p.pid)) && Date.now() < end) await sleep(100);
+    const grandchild = Number(lines[0]);
+    try {
+      expect(alive(p.pid)).toBe(false);
+      const t0 = Date.now();
+      await p.kill();
+      expect(Date.now() - t0).toBeLessThan(10_000);
+      expect(await within(p.exit, 100)).toBe(false); // still open: kill() returned anyway
+    } finally {
+      process.kill(grandchild);
+    }
+    expect(await p.exit).toBe(0);
+  });
+});
+
+describe("within", () => {
+  it("tells whether a promise settles in time", async () => {
+    expect(await within(Promise.resolve(), 50)).toBe(true);
+    expect(await within(new Promise(() => {}), 50)).toBe(false);
   });
 });
 

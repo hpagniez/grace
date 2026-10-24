@@ -15,14 +15,34 @@ const run = (file: string, args: string[]) =>
     execFile(file, args, { windowsHide: true }, (_err, stdout) => resolve(String(stdout ?? ""))),
   );
 
-const taskkill = (pid: number) => run("taskkill", ["/PID", String(pid), "/T", "/F"]);
+// Full paths: a taskkill.exe or powershell.exe earlier on PATH must not be run instead.
+const system32 = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
+const TASKKILL = path.join(system32, "taskkill.exe");
+const POWERSHELL = path.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
-/** Never uses a shell. Lines are flushed to `onLines` every 100 ms and once more before `exit` resolves. */
+const taskkill = (pid: number) => run(TASKKILL, ["/PID", String(pid), "/T", "/F"]);
+
+/** True if `p` settles within `ms`. */
+export const within = (p: Promise<unknown>, ms: number) =>
+  new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms);
+    const done = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    p.then(done, done);
+  });
+
+/**
+ * Never uses a shell. Lines are flushed to `onLines` every 100 ms and once more before `exit` resolves.
+ * `kill()` gives up after `killWaitMs` twice (taskkill, then child.kill), so quitting never hangs.
+ */
 export function spawnKarate(
   java: string,
   args: string[],
   cwd: string,
   onLines: (lines: string[]) => void,
+  killWaitMs = 5000,
 ): KarateProcess {
   const child = spawn(java, args, {
     cwd,
@@ -69,7 +89,9 @@ export function spawnKarate(
     async kill() {
       if (exited) return;
       if (child.pid !== undefined) await taskkill(child.pid);
-      await exit;
+      if (await within(exit, killWaitMs)) return;
+      child.kill();
+      await within(exit, killWaitMs);
     },
   };
 }
@@ -89,7 +111,7 @@ export async function killOrphan(pidFile: string, jreDir: string): Promise<void>
     const pid = Number(text);
     // pid is a validated integer, so interpolating it into the command is safe.
     const exePath = (
-      await run("powershell", [
+      await run(POWERSHELL, [
         "-NoProfile",
         "-NonInteractive",
         "-Command",

@@ -5,7 +5,7 @@ import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
 import { buildArgs, detectLayout, selectionTargets } from "./karate/command";
 import { JsonlTail, readAllEvents } from "./karate/events";
-import { spawnKarate, type KarateProcess } from "./karate/process";
+import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
 import { buildTree, findNode, leafKeys, parseRefId, resolveNode, rowLines } from "./karate/tree";
 import type { VendorPaths } from "./vendor";
@@ -110,9 +110,10 @@ export class Runner {
     return this.last;
   }
 
+  /** Bounded to 10 s: the app quits after it whatever happens. */
   async dispose(): Promise<void> {
     this.cancelled = true;
-    await this.proc?.kill();
+    if (this.proc) await within(this.proc.kill(), 10_000);
     rmSync(this.pidFile, { force: true });
   }
 
