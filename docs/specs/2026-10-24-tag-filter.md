@@ -62,7 +62,8 @@ How the app knows which tests match:
 ### R1. Tag chips
 
 - A filter bar sits between the toolbar and the tree. It shows one chip per tag found on the tree's scenarios and rows (their full tag sets, so feature, outline and `Examples:` tags appear), sorted by name, shown with `@`.
-- Only tags that `-t` can select get a chip. Karate splits `-t` on commas and turns it into JavaScript without escaping (probe, Karate 2.1.4): a `,` in a tag makes Karate run other tests, and `'` or `(` fail the run with exit 3, included or excluded. So a tag holding whitespace, `,`, `'` or `(`, or starting with `@` or `~`, has no chip. It still shows next to its scenario's name, and its scenario still runs when the filter is off or it matches through another tag. Value tags such as `@owner=bob` are chips like any other: `-t=@owner=bob` selects exactly the tests tagged `@owner=bob`.
+- Only tags that `-t` can select get a chip. Karate splits `-t` on commas and turns it into JavaScript without escaping (probe, Karate 2.1.4): a `,` in a tag makes Karate run other tests, `'` or `(` fail the run with exit 3, included or excluded, and `\` is read as a JavaScript escape (`b\` fails to parse, `a
+b` never matches itself). So a tag holding whitespace, `,`, `'`, `(` or `\`, or starting with `@` or `~`, has no chip. It still shows next to its scenario's name, and its scenario still runs when the filter is off or it matches through another tag. Value tags such as `@owner=bob` are chips like any other: `-t=@owner=bob` selects exactly the tests tagged `@owner=bob`.
 - The bar is hidden when the project has no tags.
 - Clicking a chip cycles it: **off → include → exclude → off**. Include is shown green, exclude red and struck through, off neutral.
 - A **Clear** control sets every chip to off. It shows only when a chip is not off.
@@ -221,7 +222,7 @@ Feature: Tag filter
 Also automated (Vitest):
 - The matching function: OR across included, any excluded removes, empty filter matches all, containers match through any leaf.
 - `-t` building, including include-only, exclude-only and both, all in the attached `-t=` form.
-- Which tags can be chips: whitespace, `,`, `'`, `(`, a leading `@` or `~` are left out, and a saved or sent filter holding one is rejected.
+- Which tags can be chips: whitespace, `,`, `'`, `(`, `\`, a leading `@` or `~` are left out, and a saved or sent filter holding one is rejected.
 - Run targets under a filter: suite, folder, feature, full outline (every row's line), full outline with a dynamic row (the outline's line), partial outline (`file:L1:L2`), partial outline with a dynamic row.
 - Run end: a `SUITE_EXIT` scenario count above `total` produces the "more than selected" notice.
 - Settings: load and save of the per-project filter, keeping `lastProject` and other projects, a malformed file or entry read as no filter, and a read error other than a missing or malformed file failing the save without touching the file.

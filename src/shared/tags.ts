@@ -23,7 +23,7 @@ export const filterOn = (f: TagFilter): boolean => f.include.length > 0 || f.exc
  * Whether `-t` can select the tag. Karate splits `-t` on commas and turns it into JS without
  * escaping (`'` and `(` fail the run); a leading `@` or `~` would change the expression.
  */
-export const filterable = (tag: string): boolean => /^[^\s,'(@~][^\s,'(]*$/.test(tag);
+export const filterable = (tag: string): boolean => /^[^\s,'(\\@~][^\s,'(\\]*$/.test(tag);
 
 /** A test matches when it has any included tag (or none are included) and no excluded tag. */
 export const matches = (tags: string[], f: TagFilter): boolean =>
