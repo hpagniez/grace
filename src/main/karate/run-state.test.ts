@@ -83,10 +83,23 @@ describe("RunState", () => {
   it("finish with SUITE_EXIT carries the summary", () => {
     const state = newState();
     state.apply(events("run-clean.jsonl"));
-    expect(state.finish(1, false, true).at(-1)).toMatchObject({
+    const out = state.finish(1, false, true);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
       outcome: "finished",
       reportAvailable: true,
       summary: { scenarioCount: 9, scenariosPassed: 8, scenariosFailed: 1 },
     });
+  });
+
+  it("finish marks selected tests Karate never ended as not run", () => {
+    const run = events("run-clean.jsonl");
+    const enter = run.find((e) => e.type === "SCENARIO_ENTER" && e.data.callDepth === 0)!;
+    const state = newState();
+    state.apply([enter, run.find((e) => e.type === "SUITE_EXIT")!]);
+    const out = state.finish(0, false, true);
+    expect(updatesOf(out)).toEqual(state.keys.map((key) => ({ key, status: "notRun" })));
+    expect(out.at(-1)).toEqual({ type: "notice", message: "Karate ran 0 of 9 selected tests" });
+    expect(out.find((e) => e.type === "runFinished")).toMatchObject({ outcome: "finished" });
   });
 });

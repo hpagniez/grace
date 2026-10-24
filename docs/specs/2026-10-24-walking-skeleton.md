@@ -103,7 +103,7 @@ Where the run logic lives (spawning Java, reading the event file, building the t
   - `done` counts depth-0 `SCENARIO_EXIT` events (Karate emits no progress event). `total` comes from the pre-run discovery (R3).
 - Status changes reach the window within about 0.5 s of Karate writing them.
 - End of run:
-  - exit 0 or 1 with a `SUITE_EXIT` event → "Finished" with Karate's summary
+  - exit 0 or 1 with a `SUITE_EXIT` event → "Finished" with Karate's summary. Selected tests that never got a `SCENARIO_EXIT` become "not run", and the app says "Karate ran <n> of <total> selected tests".
   - Cancel → "Cancelled"; scenarios still running become "interrupted"
   - exit 2 or 3, or the process ended without `SUITE_EXIT` → "Run failed", and the console keeps Karate's output for diagnosis
 

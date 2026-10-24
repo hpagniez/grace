@@ -71,13 +71,22 @@ export class RunState {
         ? "finished"
         : "failed";
     const out: AppEvent[] = [];
-    if (outcome !== "finished") {
-      const updates: ScenarioUpdate[] = [...this.status]
-        .filter(([, s]) => s === "running")
-        .map(([key]) => ({ key, status: "interrupted" }));
-      if (updates.length) out.push({ type: "scenarios", updates });
-    }
+    // A finished suite ran everything it was going to: a selected test with no SCENARIO_EXIT did not run.
+    const unended =
+      outcome === "finished"
+        ? this.keys.filter((k) => (this.status.get(k) ?? "running") === "running")
+        : [...this.status].filter(([, s]) => s === "running").map(([k]) => k);
+    const status = outcome === "finished" ? "notRun" : "interrupted";
+    if (unended.length)
+      out.push({ type: "scenarios", updates: unended.map((key) => ({ key, status })) });
     out.push({ type: "runFinished", outcome, exitCode, summary: this.summary, reportAvailable });
+    if (outcome === "finished" && unended.length) {
+      const ran = this.keys.length - unended.length;
+      out.push({
+        type: "notice",
+        message: `Karate ran ${ran} of ${this.keys.length} selected tests`,
+      });
+    }
     return out;
   }
 }
