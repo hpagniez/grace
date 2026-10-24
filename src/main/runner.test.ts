@@ -146,6 +146,16 @@ describe("Runner discovery", () => {
     ]);
   });
 
+  it("replay restores a window that loads during discovery", T, async () => {
+    const { runner } = setup();
+    expect(runner.replay()).toEqual([{ type: "busy", busy: false }]);
+    const opening = runner.open(fixture("clean"));
+    // The window may load before the first project event: it still learns the runner is busy.
+    expect(runner.replay()).toEqual([{ type: "busy", busy: true }]);
+    await opening;
+    expect(runner.replay()).toEqual([runner.current(), { type: "busy", busy: false }]);
+  });
+
   it("cancel during open keeps the project open before", T, async () => {
     const { runner, all, events } = setup();
     expect(await runner.open(fixture("clean"))).toBe(true);

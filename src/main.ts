@@ -75,8 +75,7 @@ app.whenReady().then(async () => {
   const runner = new Runner({ vendor, dataDir, emit });
 
   handle(CH.ready, () => {
-    const current = runner.current();
-    if (current) emit(current);
+    for (const e of runner.replay()) emit(e);
   });
   handle(CH.open, async () => {
     const r = await dialog.showOpenDialog({ properties: ["openDirectory"] });

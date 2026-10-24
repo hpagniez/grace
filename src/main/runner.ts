@@ -110,6 +110,12 @@ export class Runner {
     return this.last;
   }
 
+  /** What a window that just loaded needs: events sent before it subscribed are lost. */
+  replay(): AppEvent[] {
+    const busy: AppEvent = { type: "busy", busy: this.busy };
+    return this.last ? [this.last, busy] : [busy];
+  }
+
   /** Bounded to 10 s: the app quits after it whatever happens. */
   async dispose(): Promise<void> {
     this.cancelled = true;
