@@ -1,13 +1,15 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppEvent, ScenarioUpdate } from "../../shared/events";
+import { NO_FILTER } from "../../shared/tags";
 import { readAllEvents } from "./events";
 import { RunState } from "./run-state";
 import { buildTree } from "./tree";
 
 const events = (name: string) => readAllEvents(path.resolve("test/fixtures/events", name));
 const tree = buildTree(events("dryrun-clean.jsonl"), "tests");
-const newState = () => new RunState(tree, tree);
+const newState = () => new RunState(tree, tree, NO_FILTER);
+const smokeNotWip = { ...NO_FILTER, include: ["smoke"], exclude: ["wip"] };
 const updatesOf = (out: AppEvent[]): ScenarioUpdate[] =>
   out.flatMap((e) => (e.type === "scenarios" ? e.updates : []));
 
@@ -101,5 +103,24 @@ describe("RunState", () => {
     expect(updatesOf(out)).toEqual(state.keys.map((key) => ({ key, status: "notRun" })));
     expect(out.at(-1)).toEqual({ type: "notice", message: "Karate ran 0 of 9 selected tests" });
     expect(out.find((e) => e.type === "runFinished")).toMatchObject({ outcome: "finished" });
+  });
+
+  it("keys are the matching leaves", () => {
+    expect(new RunState(tree, tree, smokeNotWip).keys).toHaveLength(2);
+  });
+
+  it("warns when Karate ran more than selected", () => {
+    const state = new RunState(tree, tree, smokeNotWip);
+    state.apply(events("run-clean.jsonl"));
+    expect(state.finish(1, false, true).at(-1)).toEqual({
+      type: "notice",
+      message: "Karate ran 9 tests, more than the 2 selected",
+    });
+  });
+
+  it("no over-run notice for a matching count", () => {
+    const state = newState();
+    state.apply(events("run-clean.jsonl"));
+    expect(state.finish(1, false, true).some((e) => e.type === "notice")).toBe(false);
   });
 });

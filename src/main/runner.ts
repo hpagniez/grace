@@ -240,7 +240,7 @@ export class Runner {
 
     this.report = null;
     const outDir = this.outDir("run");
-    const state = new RunState(tree, node);
+    const state = new RunState(tree, node, NO_FILTER);
     const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
     const proc = this.spawn(outDir, false, targets, (lines) =>
       this.o.emit({ type: "console", lines }),
