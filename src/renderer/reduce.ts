@@ -1,5 +1,6 @@
 import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
 import type { Status, TestNode } from "../shared/model";
+import { NO_FILTER, type FilterState } from "../shared/tags";
 
 export interface RunView {
   active: boolean;
@@ -23,11 +24,16 @@ export interface AppState {
   run: RunView;
   notice: string | null;
   selected: string | null;
+  /** The open project's tag filter, as main holds it; changes only when main says so. */
+  filter: FilterState;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
 }
 
 export const CONSOLE_LIMIT = 10_000;
+
+// A fresh copy: a store draft must never write through to the shared constant.
+const noFilter = (): FilterState => ({ ...NO_FILTER, include: [], exclude: [] });
 
 const idleRun = (): RunView => ({
   active: false,
@@ -53,6 +59,7 @@ export function initialState(): AppState {
     run: idleRun(),
     notice: null,
     selected: null,
+    filter: noFilter(),
     busy: false,
   };
 }
@@ -69,7 +76,14 @@ export function reduce(s: AppState, e: AppEvent): void {
   switch (e.type) {
     case "project": {
       if (!e.project || e.project.root !== s.project?.root) {
-        Object.assign(s, { statuses: {}, results: {}, steps: {}, selected: null, run: idleRun() });
+        Object.assign(s, {
+          statuses: {},
+          results: {},
+          steps: {},
+          selected: null,
+          run: idleRun(),
+          filter: noFilter(), // main's `filter` event follows
+        });
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
       const before = byKey(s.tree);
@@ -125,6 +139,9 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.run.summary = e.summary;
       s.run.reportAvailable = e.reportAvailable;
       s.busy = false; // nothing follows a run; avoids "Preparing…" until the busy event arrives
+      break;
+    case "filter":
+      s.filter = e.filter;
       break;
     case "busy":
       s.busy = e.busy;

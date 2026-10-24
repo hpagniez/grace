@@ -2,6 +2,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { TestNode } from "../shared/model";
+import { NO_FILTER } from "../shared/tags";
 import { readAllEvents } from "../main/karate/events";
 import { RunState } from "../main/karate/run-state";
 import { buildTree, leafKeys } from "../main/karate/tree";
@@ -44,7 +45,7 @@ describe("reduce", () => {
   it("replays a whole run: done 9, passed 8, failed 1, outcome finished", () => {
     const s = initialState();
     apply(s, project(), started());
-    const rs = new RunState(tree, tree);
+    const rs = new RunState(tree, tree, NO_FILTER);
     apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
     expect(s.run).toMatchObject({
       active: false,
@@ -113,7 +114,7 @@ describe("reduce", () => {
   it("project event for another folder resets the run view", () => {
     const s = initialState();
     apply(s, project(), started());
-    const rs = new RunState(tree, tree);
+    const rs = new RunState(tree, tree, NO_FILTER);
     apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
     s.selected = keys[0];
     const runView = () => {
@@ -161,7 +162,7 @@ describe("reduce", () => {
     apply(s, { type: "busy", busy: false });
     expect(s.busy).toBe(false);
     apply(s, project(), { type: "busy", busy: true }, started());
-    apply(s, ...new RunState(tree, tree).finish(1, true, false));
+    apply(s, ...new RunState(tree, tree, NO_FILTER).finish(1, true, false));
     expect(s.busy).toBe(false);
   });
 

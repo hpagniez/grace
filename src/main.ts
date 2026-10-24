@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
+import { parseFilterState } from "./shared/tags";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
 import { loadLastProject, saveLastProject } from "./main/settings";
@@ -89,6 +90,14 @@ app.whenReady().then(async () => {
       return;
     }
     await runner.run(key);
+  });
+  handle(CH.filter, (f) => {
+    const filter = parseFilterState(f);
+    if (!filter) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    runner.setFilter(filter);
   });
   handle(CH.cancel, () => runner.cancel());
   handle(CH.report, async () => {
