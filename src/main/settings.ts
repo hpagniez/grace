@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
 
 const file = (dataDir: string) => path.join(dataDir, "settings.json");
@@ -65,12 +66,98 @@ export function loadProjectFilter(dataDir: string, root: string): FilterState {
   return { ...NO_FILTER, include: [], exclude: [] };
 }
 
-export function saveProjectFilter(dataDir: string, root: string, f: FilterState): void {
+const isObject = (x: unknown): x is Record<string, unknown> =>
+  typeof x === "object" && x !== null && !Array.isArray(x);
+
+/** Changes one project's entry and keeps its other fields; an entry that is not an object starts fresh. */
+function updateEntry(
+  dataDir: string,
+  root: string,
+  change: (entry: Record<string, unknown>) => void,
+): void {
   update(dataDir, (s) => {
-    const projects = s.projects;
-    s.projects = {
-      ...(typeof projects === "object" && projects !== null ? projects : {}),
-      [root]: f,
-    };
+    const projects = isObject(s.projects) ? s.projects : {};
+    const old = Object.hasOwn(projects, root) ? projects[root] : null;
+    const entry = isObject(old) ? { ...old } : {};
+    change(entry);
+    s.projects = { ...projects, [root]: entry };
+  });
+}
+
+export function saveProjectFilter(dataDir: string, root: string, f: FilterState): void {
+  updateEntry(dataDir, root, (e) => {
+    e.include = f.include;
+    e.exclude = f.exclude;
+    e.hideNonMatching = f.hideNonMatching;
+  });
+}
+
+/** A saved property: a plain value, or a secret as base64 ciphertext. */
+export type StoredRow = { name: string; value: string } | { name: string; secret: string };
+
+export interface StoredLists {
+  shared: StoredRow[];
+  byEnv: Record<string, StoredRow[]>;
+}
+
+export interface EnvSettings {
+  env: string | null;
+  properties: StoredLists;
+}
+
+export const emptyEnvSettings = (): EnvSettings => ({
+  env: null,
+  properties: { shared: [], byEnv: {} },
+});
+
+/** A row needs a valid name and exactly one of a plain value that Java can take or a non-empty secret. */
+function parseStoredRow(x: unknown): StoredRow | null {
+  if (!isObject(x)) return null;
+  const { name, value, secret } = x;
+  if (typeof name !== "string" || propertyNameError(name)) return null;
+  if (typeof value === "string" && secret === undefined)
+    return propertyValueError(value) ? null : { name, value };
+  if (typeof secret === "string" && secret !== "" && value === undefined) return { name, secret };
+  return null;
+}
+
+// Array.from, not map: it turns the holes of a sparse array into dropped rows.
+const parseStoredRows = (x: unknown): StoredRow[] =>
+  Array.isArray(x) ? Array.from(x, parseStoredRow).filter((r) => r !== null) : [];
+
+function parseEnvSettings(entry: unknown): EnvSettings {
+  const out = emptyEnvSettings();
+  if (!isObject(entry)) return out;
+  const { env, properties } = entry;
+  if (typeof env === "string" && validEnvName(env)) out.env = env;
+  if (!isObject(properties)) return out;
+  out.properties.shared = parseStoredRows(properties.shared);
+  if (isObject(properties.byEnv))
+    for (const [name, rows] of Object.entries(properties.byEnv))
+      if (validEnvName(name) && Array.isArray(rows))
+        out.properties.byEnv[name] = parseStoredRows(rows);
+  return out;
+}
+
+/**
+ * The saved environment and run properties of a project. Malformed parts read as missing and an
+ * unreadable file as no environment, so it never throws.
+ */
+export function loadProjectEnv(dataDir: string, root: string): EnvSettings {
+  try {
+    const { projects } = read(dataDir);
+    return parseEnvSettings(
+      isObject(projects) && Object.hasOwn(projects, root) ? projects[root] : null,
+    );
+  } catch {
+    return emptyEnvSettings();
+  }
+}
+
+export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): void {
+  updateEntry(dataDir, root, (e) => {
+    if (s.env === null) delete e.env;
+    else e.env = s.env;
+    e.properties = s.properties;
   });
 }

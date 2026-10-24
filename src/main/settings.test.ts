@@ -3,7 +3,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_FILTER, type FilterState } from "../shared/tags";
-import { loadLastProject, loadProjectFilter, saveLastProject, saveProjectFilter } from "./settings";
+import {
+  emptyEnvSettings,
+  loadLastProject,
+  loadProjectEnv,
+  loadProjectFilter,
+  saveLastProject,
+  saveProjectEnv,
+  saveProjectFilter,
+  type EnvSettings,
+} from "./settings";
 
 // Set to an error code to make every readFileSync fail with it, like a file another program holds.
 const readFails = vi.hoisted(() => ({ code: null as string | null }));
@@ -122,6 +131,150 @@ describe("settings", () => {
       f.include.push("smoke");
       expect(NO_FILTER.include).toEqual([]);
       expect(loadProjectFilter(tmp(), "x").include).toEqual([]);
+    });
+  });
+
+  describe("environment and run properties", () => {
+    const filter: FilterState = { include: ["smoke"], exclude: ["wip"], hideNonMatching: true };
+    const env: EnvSettings = {
+      env: "qa",
+      properties: {
+        shared: [{ name: "timeout", value: "5000" }],
+        byEnv: {
+          qa: [
+            { name: "timeout", value: "9000" },
+            { name: "api.token", secret: "djEwYmFzZTY0" },
+          ],
+        },
+      },
+    };
+    const writeEntry = (data: string, entry: unknown, root = "x") =>
+      writeFileSync(
+        path.join(data, "settings.json"),
+        JSON.stringify({ projects: { [root]: entry } }),
+      );
+
+    it("env settings round-trip", () => {
+      const data = tmp();
+      saveProjectEnv(data, "proj-one", env);
+      expect(loadProjectEnv(data, "proj-one")).toEqual(env);
+      expect(loadProjectEnv(data, "proj-two")).toEqual(emptyEnvSettings());
+    });
+
+    it("saving the filter keeps env and properties", () => {
+      const data = tmp();
+      saveProjectEnv(data, "x", env);
+      saveProjectFilter(data, "x", filter);
+      expect(loadProjectEnv(data, "x")).toEqual(env);
+      expect(loadProjectFilter(data, "x")).toEqual(filter);
+    });
+
+    it("saving env keeps the filter", () => {
+      const data = tmp();
+      saveProjectFilter(data, "x", filter);
+      saveProjectEnv(data, "x", env);
+      expect(loadProjectFilter(data, "x")).toEqual(filter);
+      expect(loadProjectEnv(data, "x")).toEqual(env);
+    });
+
+    it("an entry from the tag-filter version loads as no environment", () => {
+      const data = tmp();
+      writeEntry(data, filter);
+      expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+    });
+
+    it("malformed rows are dropped, good rows kept", () => {
+      const data = tmp();
+      const good = { name: "good", value: "1" };
+      writeEntry(data, {
+        env: "qa",
+        properties: {
+          shared: [
+            good,
+            { name: "both", value: "1", secret: "abc" },
+            { name: "karate.env", value: "dev" },
+            { name: "num", value: 5 },
+            { name: "empty", secret: "" },
+            { name: "multi", value: "a\nb" },
+            { name: "wide", value: "café" },
+            { value: "no name" },
+            "text",
+            null,
+            { name: "secret", secret: "abc" },
+          ],
+          byEnv: {
+            qa: [good],
+            dev: "not an array",
+            "bad name!": [good],
+            nothing: [{ name: 1 }],
+          },
+        },
+      });
+      expect(loadProjectEnv(data, "x")).toEqual({
+        env: "qa",
+        properties: {
+          shared: [good, { name: "secret", secret: "abc" }],
+          byEnv: { qa: [good], nothing: [] },
+        },
+      });
+    });
+
+    it("a bad env, bad lists and unsafe keys read as missing", () => {
+      const data = tmp();
+      const settings = path.join(data, "settings.json");
+      writeEntry(data, { env: "not valid!", properties: { shared: "x", byEnv: [] } });
+      expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+      writeEntry(data, { env: 5, properties: "x" });
+      expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+      writeEntry(data, "text");
+      expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+      writeFileSync(
+        settings,
+        '{"projects":{"x":{"properties":{"byEnv":{"__proto__":[{"name":"a","value":"1"}]}}}}}',
+      );
+      const loaded = loadProjectEnv(data, "x");
+      expect(Object.keys(loaded.properties.byEnv)).toEqual([]);
+      expect(Object.getPrototypeOf(loaded.properties.byEnv)).toBe(Object.prototype);
+      writeFileSync(settings, "{not json");
+      expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+    });
+
+    it("a sparse row list loses only its holes", () => {
+      const data = tmp();
+      writeFileSync(
+        path.join(data, "settings.json"),
+        '{"projects":{"x":{"properties":{"shared":[{"name":"a","value":"1"},null,{"name":"b","value":"2"}]}}}}',
+      );
+      expect(loadProjectEnv(data, "x").properties.shared.map((r) => r.name)).toEqual(["a", "b"]);
+    });
+
+    it("env null is omitted from the file", () => {
+      const data = tmp();
+      saveProjectEnv(data, "x", env);
+      saveProjectEnv(data, "x", { ...env, env: null });
+      const entry = JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8")).projects.x;
+      expect(Object.hasOwn(entry, "env")).toBe(false);
+      expect(entry.properties).toEqual(env.properties);
+      expect(loadProjectEnv(data, "x").env).toBeNull();
+    });
+
+    it("loadProjectEnv does not throw when the file cannot be read", () => {
+      const data = tmp();
+      saveProjectEnv(data, "x", env);
+      readFails.code = "EBUSY";
+      try {
+        expect(loadProjectEnv(data, "x")).toEqual(emptyEnvSettings());
+        expect(() => saveProjectEnv(data, "x", env)).toThrow("EBUSY");
+      } finally {
+        readFails.code = null;
+      }
+    });
+
+    it("the empty settings are a fresh object each call", () => {
+      const e = emptyEnvSettings();
+      e.properties.shared.push({ name: "a", value: "1" });
+      e.properties.byEnv.qa = [];
+      expect(emptyEnvSettings()).toEqual({ env: null, properties: { shared: [], byEnv: {} } });
     });
   });
 });
