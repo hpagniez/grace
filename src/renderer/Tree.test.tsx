@@ -31,6 +31,7 @@ const tree = (): TestNode =>
       node("folder", "d:tests", "tests", {
         children: [
           node("feature", "f:tests/basic.feature", "basic API checks", {
+            file: "tests/basic.feature",
             children: [
               node("scenario", "s:tests/basic.feature#1", "passing hello", {
                 line: 6,
@@ -40,6 +41,7 @@ const tree = (): TestNode =>
             ],
           }),
           node("feature", "f:tests/outline.feature", "outline with examples", {
+            file: "tests/outline.feature",
             children: [
               node("outline", "o:tests/outline.feature#1", "add <a> and <b>", {
                 children: [row(1, "add 1 and 2"), row(2, "add 2 and 3")],
@@ -121,6 +123,19 @@ describe("main screen", () => {
     expect(names).toContain("Run failing match");
     expect(names).toContain("Run tests");
     expect(names.every((n) => n?.startsWith("Run "))).toBe(true);
+  });
+
+  it("labels a feature with its file name, then its title", () => {
+    const { load } = setup();
+    load();
+    const feature = screen
+      .getAllByTestId("tree-node")
+      .find((n) => n.dataset.key === "f:tests/basic.feature")!;
+    expect(feature.textContent).toContain("basic.feature");
+    expect(feature.textContent!.indexOf("basic.feature")).toBeLessThan(
+      feature.textContent!.indexOf("basic API checks"),
+    );
+    expect(screen.getByRole("button", { name: "Run basic.feature" })).toBeTruthy();
   });
 
   it("selects a node by clicking its label", () => {

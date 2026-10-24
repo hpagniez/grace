@@ -1,3 +1,4 @@
+// Never run unit tests and e2e tests at the same time: ourJavaPids() counts every java.exe from vendor\jre.
 import {
   test as base,
   expect,

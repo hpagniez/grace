@@ -16,6 +16,9 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
   const hasKids = () => props.node.children.length > 0;
   const status = () => deriveStatus(props.node, props.ctx.state.statuses);
   const selected = () => props.ctx.state.selected === props.node.key;
+  // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
+  const isFeature = () => props.node.kind === "feature";
+  const label = () => (isFeature() ? props.node.file.split("/").pop()! : props.node.name);
   return (
     <li
       role="treeitem"
@@ -32,7 +35,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
         <button
           type="button"
           class="w-4 shrink-0 text-xs text-zinc-500"
-          aria-label={`${open() ? "Collapse" : "Expand"} ${props.node.name}`}
+          aria-label={`${open() ? "Collapse" : "Expand"} ${label()}`}
           tabindex={hasKids() ? 0 : -1}
           style={hasKids() ? "" : "visibility:hidden"}
           onClick={() => setOpen(!open())}
@@ -48,7 +51,10 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
           class="min-w-0 flex-1 truncate text-left text-sm"
           onClick={() => props.ctx.select(props.node.key)}
         >
-          {props.node.name}
+          {label()}
+          <Show when={isFeature() && props.node.name !== label()}>
+            <span class="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{props.node.name}</span>
+          </Show>
         </button>
         <For each={props.node.tags}>
           {(tag) => (
@@ -60,7 +66,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
         <button
           type="button"
           data-testid="run-node"
-          aria-label={`Run ${props.node.name}`}
+          aria-label={`Run ${label()}`}
           class="shrink-0 rounded px-1.5 text-xs text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-30 dark:text-green-400 dark:hover:bg-green-900/40"
           disabled={props.ctx.state.run.active}
           onClick={() => void props.ctx.api.run(props.node.key)}

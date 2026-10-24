@@ -1,5 +1,14 @@
 import path from "node:path";
-import { emptyProject, expect, launch, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  emptyProject,
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 test("Open a project and see its tests", async () => {
   const dir = project("clean");
@@ -11,9 +20,10 @@ test("Open a project and see its tests", async () => {
   await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 2000 });
   await expect(nodeByKey(win, "d:tests")).toContainText("tests");
   for (const f of ["basic", "outline", "slow"]) {
-    await expect(
-      win.locator(`li:has(> [data-key="d:tests"]) [data-key="f:tests/${f}.feature"]`),
-    ).toBeVisible();
+    const feature = win.locator(`li:has(> [data-key="d:tests"]) [data-key="f:tests/${f}.feature"]`);
+    await expect(feature).toBeVisible();
+    await expect(feature).toContainText(`${f}.feature`);
+    await expect(node(win, `${f}.feature`)).toHaveAttribute("data-key", `f:tests/${f}.feature`);
   }
   const outline = nodeByKey(win, "o:tests/outline.feature#1");
   await expect(outline).toContainText("add <a> and <b>");
