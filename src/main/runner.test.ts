@@ -170,6 +170,8 @@ describe("Runner runs", () => {
     expect(done.summary).toMatchObject({ scenariosPassed: 8, scenariosFailed: 1 });
     expect(runner.reportPath()).not.toBeNull();
     expect(existsSync(runner.reportPath()!)).toBe(true);
+    await runner.open(fixture("maven"));
+    expect(runner.reportPath()).toBeNull();
   });
 
   it("runs one outline row", T, async () => {

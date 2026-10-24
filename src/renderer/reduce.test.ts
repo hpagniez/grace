@@ -16,6 +16,7 @@ const project = (t: TestNode | null = tree): AppEvent => ({
   tree: t,
   error: null,
 });
+const other = { root: "D:/q", layout: "standalone" } as const;
 const started = (ks: string[] = keys): AppEvent => ({
   type: "runStarted",
   selection: tree.key,
@@ -80,6 +81,50 @@ describe("reduce", () => {
     expect(s.results["gone"]).toBeUndefined();
     expect(s.steps["gone"]).toBeUndefined();
     expect(s.notice).toBeNull();
+  });
+
+  it("project event drops the status of a key that now names another test", () => {
+    const s = initialState();
+    apply(s, project());
+    const [same, moved] = keys;
+    for (const k of [same, moved]) {
+      s.statuses[k] = "failed";
+      s.results[k] = { error: "boom" };
+      s.steps[k] = [];
+    }
+    s.selected = moved;
+    // a scenario inserted above shifts section numbers: `moved` is now another scenario
+    const shifted = structuredClone(tree);
+    const rename = (n: TestNode) => {
+      if (n.key === moved) n.name = "inserted";
+      n.children.forEach(rename);
+    };
+    rename(shifted);
+    apply(s, project(shifted));
+    expect(s.statuses[same]).toBe("failed");
+    expect(s.results[same]).toEqual({ error: "boom" });
+    expect(s.steps[same]).toEqual([]);
+    expect(s.statuses[moved]).toBeUndefined();
+    expect(s.results[moved]).toBeUndefined();
+    expect(s.steps[moved]).toBeUndefined();
+    expect(s.selected).toBeNull();
+  });
+
+  it("project event for another folder resets the run view", () => {
+    const s = initialState();
+    apply(s, project(), started());
+    const rs = new RunState(tree, tree);
+    apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
+    s.selected = keys[0];
+    const runView = () => {
+      const { statuses, results, steps, selected, run } = s;
+      return { statuses, results, steps, selected, run };
+    };
+    const reset = { statuses: {}, results: {}, steps: {}, selected: null, run: initialState().run };
+    apply(s, { ...(project() as Extract<AppEvent, { type: "project" }>), project: other });
+    expect(runView()).toEqual(reset);
+    apply(s, started(), { type: "project", project: null, tree: null, error: "Folder not found" });
+    expect(runView()).toEqual(reset);
   });
 
   it("project event keeps a selection that still exists and clears one that is gone", () => {

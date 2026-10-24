@@ -54,9 +54,10 @@ export function initialState(): AppState {
   };
 }
 
-function collectKeys(n: TestNode, out: Set<string>): Set<string> {
-  out.add(n.key);
-  for (const c of n.children) collectKeys(c, out);
+function byKey(n: TestNode | null, out = new Map<string, TestNode>()): Map<string, TestNode> {
+  if (!n) return out;
+  out.set(n.key, n);
+  for (const c of n.children) byKey(c, out);
   return out;
 }
 
@@ -64,14 +65,24 @@ function collectKeys(n: TestNode, out: Set<string>): Set<string> {
 export function reduce(s: AppState, e: AppEvent): void {
   switch (e.type) {
     case "project": {
+      if (!e.project || e.project.root !== s.project?.root) {
+        Object.assign(s, { statuses: {}, results: {}, steps: {}, selected: null, run: idleRun() });
+      }
+      // A key only says where a test sits: inserting a scenario gives the next one its key.
+      const before = byKey(s.tree);
+      const after = byKey(e.tree);
+      const same = (key: string) => {
+        const a = before.get(key);
+        const b = after.get(key);
+        return !!a && !!b && a.kind === b.kind && a.name === b.name;
+      };
+      if (s.selected && !same(s.selected)) s.selected = null;
+      for (const map of [s.statuses, s.results, s.steps] as Record<string, unknown>[])
+        for (const key of Object.keys(map)) if (!same(key)) delete map[key];
       s.project = e.project;
       s.tree = e.tree;
       s.error = e.error;
       s.notice = null;
-      const live = e.tree ? collectKeys(e.tree, new Set()) : new Set<string>();
-      if (s.selected && !live.has(s.selected)) s.selected = null;
-      for (const map of [s.statuses, s.results, s.steps] as Record<string, unknown>[])
-        for (const key of Object.keys(map)) if (!live.has(key)) delete map[key];
       break;
     }
     case "runStarted":

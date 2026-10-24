@@ -79,6 +79,7 @@ export class Runner {
         return;
       }
       this.project = { root, layout: detectLayout(root).layout };
+      this.report = null; // a report of the project open before
       await this.discover();
     });
   }

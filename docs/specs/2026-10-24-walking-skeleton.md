@@ -89,7 +89,7 @@ Where the run logic lives (spawning Java, reading the event file, building the t
 - One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled.
 - Every run first repeats the full discovery dry run of R2 (users edit features in their own editor, so the tree may be stale). Then:
   - exit 3 → show the error, do not run
-  - the tree is rebuilt. Nodes whose key still exists keep their status; new nodes start as "not run"; removed nodes disappear.
+  - the tree is rebuilt. Nodes whose key still exists with the same kind and name keep their status, result and steps; other nodes start as "not run" (a scenario inserted above shifts keys, so a key alone does not identify a test); removed nodes disappear. Opening a different folder clears all statuses, the run view and the report.
   - the clicked node is found in the new tree: first by key if the name is unchanged, else by feature path + name if exactly one node matches (scenarios inserted above shift section numbers). If neither finds it, do not run: show "This test changed; the tree was refreshed" so the user can click again. This prevents running a different scenario than the one clicked.
   - the run's command line uses the lines from the new tree
   - `total` = scenarios and rows under the node in the new tree. Zero → show "Nothing to run", do not run.
