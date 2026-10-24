@@ -86,7 +86,7 @@ Where the run logic lives (spawning Java, reading the event file, building the t
   - scenario: `feature.feature:LINE` with the scenario's line
   - outline: `feature.feature:LINE` with the outline's line (runs all its rows)
   - outline row: `feature.feature:LINE` where LINE = the line of the row in the feature file (see "Outline row lines" below). A row whose line cannot be found (dynamic Examples such as `| read('rows.json') |`) does not run: show "Run the outline to run its rows".
-- One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled.
+- One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled. The same holds during every discovery dry run (open, Refresh, and the one before a run), with Open and Refresh disabled too and "Preparing…" in the progress section. Cancel during an open or a Refresh keeps the project and tree from before and says "Cancelled"; a cancelled open does not become the saved last folder.
 - Every run first repeats the full discovery dry run of R2 (users edit features in their own editor, so the tree may be stale). Then:
   - exit 3 → show the error, do not run
   - the tree is rebuilt. Nodes whose key still exists with the same kind and name keep their status, result and steps; other nodes start as "not run" (a scenario inserted above shifts keys, so a key alone does not identify a test); removed nodes disappear. Opening a different folder clears all statuses, the run view and the report.

@@ -23,6 +23,8 @@ export interface AppState {
   run: RunView;
   notice: string | null;
   selected: string | null;
+  /** The Runner holds its one-at-a-time slot: discovering, or running. */
+  busy: boolean;
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -51,6 +53,7 @@ export function initialState(): AppState {
     run: idleRun(),
     notice: null,
     selected: null,
+    busy: false,
   };
 }
 
@@ -121,6 +124,10 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.run.outcome = e.outcome;
       s.run.summary = e.summary;
       s.run.reportAvailable = e.reportAvailable;
+      s.busy = false; // nothing follows a run; avoids "Preparing…" until the busy event arrives
+      break;
+    case "busy":
+      s.busy = e.busy;
       break;
     case "notice":
       s.notice = e.message;

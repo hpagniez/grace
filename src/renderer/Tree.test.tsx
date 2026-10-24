@@ -164,6 +164,22 @@ describe("main screen", () => {
     expect(screen.getByTestId("run-outcome").textContent).toBe("Running…");
   });
 
+  it("shows discovery as busy: actions off, Cancel on, Preparing…", () => {
+    const { send, load } = setup();
+    load();
+    send({ type: "busy", busy: true });
+    for (const id of ["run-all-button", "open-button", "refresh-button"])
+      expect(button(id).disabled).toBe(true);
+    for (const b of screen.getAllByTestId("run-node"))
+      expect((b as HTMLButtonElement).disabled).toBe(true);
+    expect(button("cancel-button").disabled).toBe(false);
+    expect(screen.getByTestId("run-outcome").textContent).toBe("Preparing…");
+    send({ type: "busy", busy: false });
+    expect(button("run-all-button").disabled).toBe(false);
+    expect(button("cancel-button").disabled).toBe(true);
+    expect(screen.getByTestId("run-outcome").textContent).toBe("");
+  });
+
   it("disables Run all without a tree or without leaves, and says why", () => {
     const { send } = setup();
     expect(button("run-all-button").disabled).toBe(true);

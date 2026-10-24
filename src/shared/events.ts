@@ -43,4 +43,6 @@ export type AppEvent =
       summary: Summary | null;
       reportAvailable: boolean;
     }
-  | { type: "notice"; message: string };
+  | { type: "notice"; message: string }
+  /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
+  | { type: "busy"; busy: boolean };

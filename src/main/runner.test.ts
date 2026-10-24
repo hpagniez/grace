@@ -137,10 +137,50 @@ describe("Runner discovery", () => {
   it("open on a missing folder emits an error", T, async () => {
     const { runner, events } = setup();
     const missing = path.join(tmpdir(), "kk-does-not-exist");
-    await runner.open(missing);
+    expect(await runner.open(missing)).toBe(false);
     expect(events).toEqual([
+      { type: "busy", busy: true },
       { type: "project", project: null, tree: null, error: `Folder not found: ${missing}` },
+      { type: "busy", busy: false },
     ]);
+  });
+
+  it("cancel during open keeps the project open before", T, async () => {
+    const { runner, all, events } = setup();
+    expect(await runner.open(fixture("clean"))).toBe(true);
+    const before = runner.current();
+    const opening = runner.open(fixture("maven"));
+    await runner.cancel();
+    expect(await opening).toBe(false);
+    expect(all("project").at(-1)).toEqual(before);
+    expect(runner.current()).toBe(before);
+    expect(all("notice").map((n) => n.message)).toEqual(["Cancelled"]);
+    expect(events.at(-1)).toEqual({ type: "busy", busy: false });
+    // the restored project is the one that runs
+    await runner.run("s:tests/basic.feature#1");
+    expect(all("runStarted")).toHaveLength(1);
+  });
+
+  it("cancel during the first open leaves no project", T, async () => {
+    const { runner, all } = setup();
+    const opening = runner.open(fixture("clean"));
+    await runner.cancel();
+    expect(await opening).toBe(false);
+    expect(all("project")).toEqual([{ type: "project", project: null, tree: null, error: null }]);
+    expect(runner.current()).toBeNull();
+    await runner.refresh(); // no project: nothing to refresh
+    expect(all("busy")).toHaveLength(2);
+  });
+
+  it("cancel during refresh keeps the tree", T, async () => {
+    const { runner, all } = setup();
+    await runner.open(fixture("clean"));
+    const before = runner.current();
+    const refreshing = runner.refresh();
+    await runner.cancel();
+    await refreshing;
+    expect(all("project").at(-1)).toEqual(before);
+    expect(all("notice").map((n) => n.message)).toEqual(["Cancelled"]);
   });
 
   it("opens a project whose path has spaces and accents", T, async () => {

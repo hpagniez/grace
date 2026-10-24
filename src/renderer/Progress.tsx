@@ -32,7 +32,13 @@ export function Progress(props: { state: AppState }) {
     run().active ? tickedMillis() : (run().summary?.durationMillis ?? tickedMillis());
   const pct = (n: number) => (run().total > 0 ? Math.min(100, (n / run().total) * 100) : 0);
   const outcome = () =>
-    run().active ? "Running…" : run().outcome ? OUTCOME_TEXT[run().outcome!] : "";
+    run().active
+      ? "Running…"
+      : props.state.busy
+        ? "Preparing…"
+        : run().outcome
+          ? OUTCOME_TEXT[run().outcome!]
+          : "";
 
   return (
     <section class="border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">

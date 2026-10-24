@@ -153,6 +153,18 @@ describe("reduce", () => {
     expect(s.console[0]).toBe("l500");
   });
 
+  it("busy follows the runner, and a finished run ends it", () => {
+    const s = initialState();
+    expect(s.busy).toBe(false);
+    apply(s, { type: "busy", busy: true });
+    expect(s.busy).toBe(true);
+    apply(s, { type: "busy", busy: false });
+    expect(s.busy).toBe(false);
+    apply(s, project(), { type: "busy", busy: true }, started());
+    apply(s, ...new RunState(tree, tree).finish(1, true, false));
+    expect(s.busy).toBe(false);
+  });
+
   it("notice sets the notice", () => {
     const s = initialState();
     apply(s, { type: "notice", message: "hi" });

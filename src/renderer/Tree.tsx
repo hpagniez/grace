@@ -68,7 +68,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
           data-testid="run-node"
           aria-label={`Run ${label()}`}
           class="shrink-0 rounded px-1.5 text-xs text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-30 dark:text-green-400 dark:hover:bg-green-900/40"
-          disabled={props.ctx.state.run.active}
+          disabled={props.ctx.state.run.active || props.ctx.state.busy}
           onClick={() => void props.ctx.api.run(props.node.key)}
         >
           ▶

@@ -61,8 +61,7 @@ app.whenReady().then(async () => {
   handle(CH.open, async () => {
     const r = await dialog.showOpenDialog({ properties: ["openDirectory"] });
     if (r.canceled || !r.filePaths[0]) return;
-    await runner.open(r.filePaths[0]);
-    saveLastProject(dataDir, r.filePaths[0]);
+    if (await runner.open(r.filePaths[0])) saveLastProject(dataDir, r.filePaths[0]);
   });
   handle(CH.refresh, () => runner.refresh());
   handle(CH.run, async (key) => {

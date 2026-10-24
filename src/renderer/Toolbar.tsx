@@ -10,7 +10,8 @@ const primary = `${base} border-green-700 bg-green-600 text-white hover:bg-green
 
 export function Toolbar(props: { state: AppState; api: Api }) {
   const active = () => props.state.run.active;
-  const canRunAll = () => !active() && !!props.state.tree && leaves(props.state.tree).length > 0;
+  const busy = () => active() || props.state.busy;
+  const canRunAll = () => !busy() && !!props.state.tree && leaves(props.state.tree).length > 0;
   return (
     <header class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
       <div class="flex min-w-0 flex-1 items-baseline gap-2">
@@ -31,7 +32,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <button
         data-testid="open-button"
         class={btn}
-        disabled={active()}
+        disabled={busy()}
         onClick={() => void props.api.openProject()}
       >
         Open…
@@ -39,7 +40,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <button
         data-testid="refresh-button"
         class={btn}
-        disabled={active()}
+        disabled={busy()}
         onClick={() => void props.api.refresh()}
       >
         Refresh
@@ -55,7 +56,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <button
         data-testid="cancel-button"
         class={btn}
-        disabled={!active()}
+        disabled={!busy()}
         onClick={() => void props.api.cancel()}
       >
         Cancel

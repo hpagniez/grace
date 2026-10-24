@@ -65,7 +65,9 @@ export class Runner {
     this.pidFile = path.join(o.dataDir, "running.pid");
   }
 
-  async open(root: string): Promise<void> {
+  /** True only if the folder is now the open project. */
+  async open(root: string): Promise<boolean> {
+    let opened = false;
     await this.guarded(async () => {
       root = path.resolve(root);
       if (!isDir(root)) {
@@ -78,14 +80,16 @@ export class Runner {
         });
         return;
       }
-      this.project = { root, layout: detectLayout(root).layout };
+      const report = this.report;
       this.report = null; // a report of the project open before
-      await this.discover();
+      opened = await this.rediscover({ root, layout: detectLayout(root).layout });
+      if (!opened) this.report = report;
     });
+    return opened;
   }
 
   async refresh(): Promise<void> {
-    if (this.project) await this.guarded(() => this.discover());
+    if (this.project) await this.guarded(() => this.rediscover(this.project!));
   }
 
   async run(key: string): Promise<void> {
@@ -124,11 +128,25 @@ export class Runner {
     }
     this.busy = true;
     this.cancelled = false;
+    this.o.emit({ type: "busy", busy: true });
     try {
       await work();
     } finally {
       this.busy = false;
+      this.o.emit({ type: "busy", busy: false });
     }
+  }
+
+  /** Discovery of open and refresh. Cancel puts the project and tree from before back and re-sends them. */
+  private async rediscover(project: Project): Promise<boolean> {
+    const before = { project: this.project, tree: this.tree };
+    this.project = project;
+    await this.discover();
+    if (!this.cancelled) return true;
+    ({ project: this.project, tree: this.tree } = before);
+    this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
+    this.o.emit({ type: "notice", message: "Cancelled" });
+    return false;
   }
 
   /** Empties and returns `<dataDir>/projects/<hash>/<kind>`, so no file of an earlier spawn is ever read. */
