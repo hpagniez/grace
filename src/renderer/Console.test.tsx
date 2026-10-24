@@ -1,7 +1,11 @@
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
+import type { AppEvent } from "../shared/events";
+import type { Api } from "../shared/ipc";
 import { Console } from "./Console";
+import { CONSOLE_LIMIT } from "./reduce";
+import { createAppStore } from "./store";
 
 afterEach(cleanup);
 
@@ -20,6 +24,33 @@ function setup() {
 }
 
 describe("Console", () => {
+  it("keeps following once the store holds the line cap", () => {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: async () => {},
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    } as unknown as Api;
+    const store = createAppStore(api);
+    render(() => <Console lines={store.state.console} />);
+    const el = screen.getByTestId("console");
+    // scrollHeight grows with the newest line number, not with the array length
+    Object.defineProperty(el, "scrollHeight", {
+      get: () => (Number(store.state.console.at(-1)?.slice(1) ?? -1) + 1) * 10,
+    });
+    Object.defineProperty(el, "clientHeight", { value: 100 });
+    let n = 0;
+    const append = (count: number) => {
+      emit({ type: "console", lines: Array.from({ length: count }, () => `l${n++}`) });
+      flush();
+    };
+    append(CONSOLE_LIMIT);
+    append(10);
+    expect(store.state.console).toHaveLength(CONSOLE_LIMIT);
+    expect(el.scrollTop).toBe((CONSOLE_LIMIT + 10) * 10);
+    append(5);
+    expect(el.scrollTop).toBe((CONSOLE_LIMIT + 15) * 10);
+  });
+
   it("styles ERROR and WARN lines", () => {
     const { add } = setup();
     add("plain", "12:00 [main] ERROR boom", "12:00 [main] WARN careful");

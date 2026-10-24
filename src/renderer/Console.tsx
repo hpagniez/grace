@@ -12,7 +12,8 @@ export function Console(props: { lines: string[] }) {
     pinned = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
   };
   createEffect(
-    () => props.lines.length,
+    // the array is replaced on every append; its length stops changing at the line cap
+    () => props.lines,
     () => {
       if (pinned) el.scrollTop = el.scrollHeight;
     },
