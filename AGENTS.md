@@ -52,7 +52,13 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
 
 ## Stack
 
-Decided in [ADR 0001](docs/decisions/0001-solid-router-spa-without-tanstack-start.md): Electron + SolidJS 2 RC + TanStack Router (no TanStack Start) + Tailwind CSS v4, packaged with Electron Forge. Pin exact versions (no `^`) and upgrade the Solid set together.
+Decided in [ADR 0001](docs/decisions/0001-solid-router-spa-without-tanstack-start.md): Electron + SolidJS 2 RC + TanStack Router (no TanStack Start) + Tailwind CSS v4, packaged with Electron Forge. Pin exact versions (no `^`) and upgrade the Solid set together. The [stack spike](docs/research/2026-10-24-stack-spike/README.md) proved this set builds and packages on Windows; copy its configs when scaffolding.
+
+- Scaffold with `npx create-electron-app@8.0.1 init <dir> --template=vite --typescript`, then strip the `^` ranges it writes.
+- `@kobalte/core` alpha needs `"overrides": { "@kobalte/core": { "solid-js": "$solid-js", "@solidjs/web": "$@solidjs/web" } }`.
+- `npm ls` exits 1 (`ELSPROBLEMS`) because `@tanstack/solid-router@2.0.0-rc.9` declares unused Solid-1 peers. Expected; not a broken install.
+- Keep `contextIsolation` on, `nodeIntegration` off, `sandbox` on. The renderer reaches Node only through the typed preload API.
+- Forge dev reloads the renderer once after start: main-process code that runs per page load must be idempotent.
 
 ### Solid 2 rules
 
@@ -61,6 +67,7 @@ Most training data is Solid 1. Do not write Solid 1 code:
 - Import the renderer from `@solidjs/web`, not `solid-js/web`. Stores come from `solid-js`, not `solid-js/store`. `jsxImportSource` is `@solidjs/web`. Vite plugin is `@solidjs/vite-plugin`, not `vite-plugin-solid`.
 - No `createResource`: use an async `createMemo`. `Suspense` → `Loading`, `ErrorBoundary` → `Errored`.
 - `onMount` → `onSettled`. `createEffect` takes a tracked compute function and an untracked apply function. No `on`, no `batch` (use `flush()`).
+- A write that feeds an async memo is held until the memo resolves (dev warning `SILENT_HOLD`). Show stale values with `isPending`, `latest` or `<Loading on>`.
 - Store setters receive a draft; no path setters, no `produce`. `mergeProps` → `merge`, `splitProps` → `omit`, `unwrap` → `snapshot`.
 - `Index` → `<For keyed={false}>`; `For` children receive accessors. `Context.Provider` → the context itself.
 - No `use:` directives, `classList`, `on:`, `attr:`, `bool:`. Use `onClick`, not `onclick`.
@@ -69,12 +76,13 @@ Source: https://v2.solidjs.com/migration/from-solid-1
 
 ## Karate integration rules
 
-Full detail and evidence: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#19-integration-surface-for-a-gui).
+Full detail: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#19-integration-surface-for-a-gui). Where they disagree, the [CLI spike](docs/research/2026-10-24-karate-cli-spike/README.md) wins: it ran Karate 2.1.4 for real. Its `samples/` are real event-stream fixtures.
 
-- Spawn `karate run` (or `java -jar karate-<ver>.jar run`) from the Electron main process only. Pass an absolute `-o` and an explicit `-w`.
-- Always add `-f html,karate:jsonl` and tail `<output>/karate-json/karate-events.jsonl` for live progress. Filter `callDepth == 0` to build the test tree.
+- Spawn from the Electron main process only, without a shell: `java -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -jar karate-<ver>.jar run --no-color -w <root> -o <absolute> -f html,karate:jsonl ...` with `cwd` = project root. Relative paths resolve from the process cwd, not `-w`.
+- Remove `KARATE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS` from the child environment; they override the app's values.
+- Tail `<output>/karate-json/karate-events.jsonl` for live progress. There is no `PROGRESS` event: count depth-0 `SCENARIO_EXIT` against the dry-run total. Filter `callDepth == 0` for the test tree. Key nodes by feature + `refId` (slugs collide). Check `skipped` before `passed` (dry run sets both). Ignore `OUTLINE_ENTER.numExamples`.
 - `-D` is dry run, `-p` is the pom file, `-n` is the scenario-name filter. Do not invent flags; check `RunCommand.java`.
-- Exit codes: `0` pass, `1` test failures, `2` config error, `3` runtime error.
-- Remove `KARATE_OPTIONS` from the child environment; it overrides the app's values.
-- On Windows, kill the whole process tree (`taskkill /T /F`); `child.kill()` can leave the JVM running.
-- OSS Karate v2 has no debug server. Step-level and HTTP live events need our own Java `RunListener` passed with `--listener`.
+- Tags: `@a`, `~@a`, `@a,@b` (OR), repeated `-t` (AND), or Karate JS `anyOf('@a','@b') && not('@c')`. `(@a or @b) and not @c` fails with exit 3.
+- Exit codes: `0` pass, `1` test failures (also after `taskkill`), `2` usage error, `3` parse or runtime error (one broken feature aborts the whole run). A missing path, unknown `-e` or unmatched `-n` exit `0` silently: preflight with a dry run and warn on 0 scenarios.
+- On Windows, cancel with `taskkill /PID <pid> /T /F` and record "cancelled" in the app. `child.kill()` leaves the JVM running when spawned through a shell or launcher.
+- HTTP request/response detail exists only as text in step logs inside `FEATURE_EXIT`. OSS Karate v2 has no debug server. Live step and HTTP events need our own Java `RunListener` passed with `--listener`.
