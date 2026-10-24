@@ -1,4 +1,5 @@
 import "./index.css";
 import { render } from "@solidjs/web";
+import { App } from "./renderer/App";
 
-render(() => <main>karate-kid</main>, document.getElementById("root")!);
+render(() => <App api={window.api} />, document.getElementById("root")!);
