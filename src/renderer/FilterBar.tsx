@@ -16,6 +16,8 @@ const HINT = {
   include: "Included. Click to exclude.",
   exclude: "Excluded. Click to clear.",
 } as const;
+// Colour and strike-through are invisible to screen readers: the state goes in the name.
+const SPOKEN = { off: "not filtered", include: "included", exclude: "excluded" } as const;
 
 /** Tag chips for the open project. The window never edits the filter itself: main echoes it back. */
 export function FilterBar(props: { state: AppState; api: Api }) {
@@ -49,6 +51,7 @@ export function FilterBar(props: { state: AppState; api: Api }) {
               data-state={stateOf(tag)}
               class={CHIP[stateOf(tag)]}
               title={HINT[stateOf(tag)]}
+              aria-label={`@${tag}, ${SPOKEN[stateOf(tag)]}`}
               disabled={locked()}
               onClick={() => void props.api.setFilter(cycleTag(plain(), tag))}
             >
@@ -72,10 +75,13 @@ export function FilterBar(props: { state: AppState; api: Api }) {
           >
             Clear
           </button>
-          <span data-testid="tag-counter" class="text-xs text-zinc-600 dark:text-zinc-400">
-            {counter()}
-          </span>
         </Show>
+        {/* Always mounted: a live region added together with its text is often not announced. */}
+        <span role="status" class="text-xs text-zinc-600 dark:text-zinc-400">
+          <Show when={filterOn(filter())}>
+            <span data-testid="tag-counter">{counter()}</span>
+          </Show>
+        </span>
         <label class="ml-auto flex items-center gap-1 text-xs">
           <input
             type="checkbox"

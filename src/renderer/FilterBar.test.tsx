@@ -68,7 +68,9 @@ describe("filter bar", () => {
     expect(chips.map((c) => c.textContent)).toEqual(["@slow", "@smoke", "@wip"]);
     expect(chips.map((c) => c.dataset.tag)).toEqual(["slow", "smoke", "wip"]);
     expect(chips.map((c) => c.dataset.state)).toEqual(["off", "off", "off"]);
-    expect(screen.getByRole("button", { name: "@smoke" })).toBe(chip("smoke"));
+    expect(screen.getByRole("button", { name: "@smoke, not filtered" })).toBe(chip("smoke"));
+    // A live region must exist before its text changes, or screen readers miss the first count.
+    expect(screen.getByRole("status").textContent).toBe("");
     expect(chips.every((c) => c.tagName === "BUTTON" && c.getAttribute("type") === "button")).toBe(
       true,
     );
@@ -108,6 +110,8 @@ describe("filter bar", () => {
     expect(chip("smoke").className).toContain("border-green-600");
     expect(chip("wip").className).toContain("border-red-600");
     expect(chip("wip").className).toContain("line-through");
+    expect(screen.getByRole("button", { name: "@smoke, included" })).toBe(chip("smoke"));
+    expect(screen.getByRole("button", { name: "@wip, excluded" })).toBe(chip("wip"));
     fireEvent.click(screen.getByTestId("tag-clear"));
     expect(api.setFilter).toHaveBeenCalledWith({ include: [], exclude: [], hideNonMatching: true });
   });
@@ -116,6 +120,7 @@ describe("filter bar", () => {
     const { send, load } = setup();
     load(smokeNotWip());
     expect(screen.getByTestId("tag-counter").textContent).toBe("2 of 9 tests match");
+    expect(screen.getByRole("status").textContent).toBe("2 of 9 tests match");
     const matching = ["s:tests/basic.feature#1", "s:tests/slow.feature#2"];
     for (const n of screen.getAllByTestId("tree-node")) {
       const match = matching.includes(n.dataset.key!);
