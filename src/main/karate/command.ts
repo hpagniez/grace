@@ -24,11 +24,14 @@ export function detectLayout(root: string): ProjectLayout {
   return { layout, classpath: dirs, featureRoots: dirs };
 }
 
-/** `-t` arguments: included tags in one OR group, each excluded tag its own (AND). */
+/**
+ * `-t` arguments: included tags in one OR group, each excluded tag its own (AND). Attached as
+ * `-t=…`: picocli reads a separate argument starting with `@` as an argument file from the cwd.
+ */
 export function tagArgs(f: TagFilter): string[] {
   return [
-    ...(f.include.length ? ["-t", f.include.map((t) => `@${t}`).join(",")] : []),
-    ...f.exclude.flatMap((t) => ["-t", `~@${t}`]),
+    ...(f.include.length ? [`-t=${f.include.map((t) => `@${t}`).join(",")}`] : []),
+    ...f.exclude.map((t) => `-t=~@${t}`),
   ];
 }
 
