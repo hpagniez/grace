@@ -22,6 +22,33 @@ Status: documentation only. No app code yet, so no build or test commands yet.
 - A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
 - Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
 
+## Git workflow
+
+Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
+
+### Commits
+
+[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>)<!>: <subject>`.
+
+- Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- Scope is optional: the area touched (`docs`, `runner`, `ui`, `ipc`, `deps`). Reuse an existing scope before inventing one.
+- Subject: imperative, lower case, no trailing period, 72 characters max.
+- Breaking change: `!` after the scope, plus a `BREAKING CHANGE:` footer.
+- One logical change per commit. A spec or feature commit includes its `docs/features.md` row update.
+
+### Branches (git flow)
+
+| Branch | Cut from | Merges into | Notes |
+|---|---|---|---|
+| `main` | | | Released code only. Tagged `vX.Y.Z` (SemVer). |
+| `develop` | `main` | | Integration branch. |
+| `feature/<topic>` | `develop` | `develop` | Via PR. Kebab-case topic. |
+| `release/X.Y.Z` | `develop` | `main` and `develop` | Version bump and fixes only. Tag on `main`. |
+| `hotfix/X.Y.Z` | `main` | `main` and `develop` | Urgent fix to a released version. |
+
+- Merge with `--no-ff`.
+- Never commit directly to `main` or `develop`, and never force-push them. Agents work on a `feature/*` branch.
+
 ## Stack
 
 Decided in [ADR 0001](docs/decisions/0001-solid-router-spa-without-tanstack-start.md): Electron + SolidJS 2 RC + TanStack Router (no TanStack Start) + Tailwind CSS v4, packaged with Electron Forge. Pin exact versions (no `^`) and upgrade the Solid set together.
