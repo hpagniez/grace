@@ -19,6 +19,7 @@ async function startSlowRun() {
   await expect(node(win, "slow loop")).toHaveAttribute("data-status", "running", {
     timeout: 30_000,
   });
+  expect(ourJavaPids().length).toBeGreaterThan(0); // the leak check below must see a live run
   return { app, win };
 }
 
