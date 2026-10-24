@@ -14,6 +14,7 @@ Status: documentation only. No app code yet, so no build or test commands yet.
 | [docs/research/](docs/research/) | Dated research notes with sources |
 | [docs/decisions/](docs/decisions/) | Decision records (MADR 4.0 minimal) |
 | `docs/specs/` | Design specs, one per feature, written just before building it |
+| `docs/plans/` | Implementation plans, one per spec, task by task (overrides the superpowers default `docs/superpowers/plans/`) |
 
 ## Doc rules
 
