@@ -1,9 +1,9 @@
 import { cpSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const projects = join(dirname(fileURLToPath(import.meta.url)), "projects");
+// __dirname, not import.meta: Playwright loads this file as CommonJS, Vitest provides __dirname too.
+const projects = join(__dirname, "projects");
 
 /** Copies a fixture project to a fresh temp dir and returns it. `broken` = `clean` plus broken/syntax.feature. */
 export function copyFixture(name: "clean" | "broken" | "maven"): string {

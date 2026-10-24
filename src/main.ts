@@ -7,6 +7,9 @@ import { Runner } from "./main/runner";
 import { loadLastProject, saveLastProject } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
 
+// End-to-end tests give each app instance its own settings and run folders.
+if (process.env.KARATE_KID_USER_DATA) app.setPath("userData", process.env.KARATE_KID_USER_DATA);
+
 let win: BrowserWindow | null = null;
 
 const emit = (e: AppEvent) => {
