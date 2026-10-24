@@ -190,10 +190,12 @@ describe("Runner runs", () => {
     const oldKey = byName(last("project").tree!, "failing match").key;
     const file = path.join(root, "tests", "basic.feature");
     const text = readFileSync(file, "utf8");
-    writeFileSync(
-      file,
-      text.replace("@smoke\r\n", "Scenario: inserted first\r\n  * def y = 2\r\n\r\n@smoke\r\n"),
+    const edited = text.replace(
+      /@smoke\r?\n/,
+      (m) => `Scenario: inserted first\n  * def y = 2\n\n${m}`,
     );
+    expect(edited).not.toBe(text);
+    writeFileSync(file, edited);
     await runner.run(oldKey);
     expect(all("project")).toHaveLength(2);
     const tree = last("project").tree!;
@@ -234,6 +236,18 @@ describe("Runner runs", () => {
     expect(all("runStarted")).toHaveLength(1);
     expect(all("project")).toHaveLength(2); // open + the first run's re-discovery
     expect(last("runFinished").outcome).toBe("cancelled");
+  });
+
+  it("cancel during the pre-run discovery runs nothing", T, async () => {
+    const { runner, all } = setup();
+    await runner.open(fixture("clean"));
+    const run = runner.run("d:"); // its dry run is spawned before run() first awaits
+    await runner.cancel();
+    await run;
+    expect(all("runStarted")).toHaveLength(0);
+    expect(all("runFinished")).toHaveLength(0);
+    expect(all("notice").map((n) => n.message)).toEqual(["Run cancelled"]);
+    expect(ourJava()).toBe(false);
   });
 
   it("cancel interrupts and leaves no java", T, async () => {

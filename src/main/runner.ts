@@ -32,8 +32,6 @@ export class Runner {
   private tree: TestNode | null = null;
   private last: Extract<AppEvent, { type: "project" }> | null = null;
   private busy = false;
-  /** True from spawn to exit of a run (not a dry run): what cancel() may kill. */
-  private running = false;
   private proc: KarateProcess | null = null;
   private cancelled = false;
   private report: string | null = null;
@@ -77,8 +75,8 @@ export class Runner {
   }
 
   async cancel(): Promise<void> {
-    if (!this.proc || !this.running) return;
-    this.cancelled = true;
+    if (!this.proc) return;
+    this.cancelled = true; // also stops a run whose pre-run dry run is going
     await this.proc.kill();
   }
 
@@ -107,6 +105,7 @@ export class Runner {
       return;
     }
     this.busy = true;
+    this.cancelled = false;
     try {
       await work();
     } finally {
@@ -151,6 +150,7 @@ export class Runner {
       const proc = this.spawn(outDir, true, featureRoots, (l) => lines.push(...l));
       const code = await proc.exit;
       this.proc = null;
+      if (this.cancelled) return null; // killed on purpose: keep the last tree
       if (code !== 0) {
         error = dryRunError(lines);
       } else {
@@ -172,6 +172,10 @@ export class Runner {
   private async runGuarded(key: string): Promise<void> {
     const old = this.tree && findNode(this.tree, key);
     const tree = await this.discover();
+    if (this.cancelled) {
+      this.o.emit({ type: "notice", message: "Run cancelled" });
+      return;
+    }
     if (!tree) return;
     const node = old ? resolveNode(tree, old) : findNode(tree, key);
     if (!node) {
@@ -186,14 +190,12 @@ export class Runner {
     }
 
     this.report = null;
-    this.cancelled = false;
     const outDir = this.outDir("run");
     const state = new RunState(tree, node);
     const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
     const proc = this.spawn(outDir, false, targets, (lines) =>
       this.o.emit({ type: "console", lines }),
     );
-    this.running = true;
     if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
     this.o.emit({
       type: "runStarted",
@@ -218,7 +220,6 @@ export class Runner {
     const code = await proc.exit;
     clearInterval(timer);
     poll();
-    this.running = false;
     this.proc = null;
     rmSync(this.pidFile, { force: true });
 
