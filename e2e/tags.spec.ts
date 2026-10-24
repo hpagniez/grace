@@ -204,6 +204,8 @@ test("The filter survives a restart", async () => {
   await expect(chip(first.win, "smoke")).toBeVisible({ timeout: 15_000 });
   await clickChip(first.win, "smoke", "include");
   await hideNonMatching(first.win);
+  // the checkbox ticks on click; the tree hides only once main has saved and echoed the filter
+  await expect(nodeByKey(first.win, OUTLINE_FEATURE)).toHaveCount(0);
 
   // one app per user-data folder: close it before the second starts
   await first.app.close();
