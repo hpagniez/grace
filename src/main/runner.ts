@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import path from "node:path";
 import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
+import { NO_FILTER } from "../shared/tags";
 import { buildArgs, detectLayout, selectionTargets } from "./karate/command";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
@@ -174,7 +175,7 @@ export class Runner {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
     const { classpath } = detectLayout(root);
-    const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets });
+    const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets, tags: [] });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
 
@@ -231,8 +232,8 @@ export class Runner {
       return;
     }
     const { root } = this.project!;
-    const targets = selectionTargets(node, root, detectLayout(root).featureRoots);
-    if (leafKeys(node).length === 0 || targets.length === 0) {
+    const targets = selectionTargets(node, root, detectLayout(root).featureRoots, NO_FILTER);
+    if (leafKeys(node).length === 0 || !targets?.length) {
       this.o.emit({ type: "notice", message: "Nothing to run" });
       return;
     }

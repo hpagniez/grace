@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TestNode } from "../../shared/model";
-import { buildArgs, childEnv, detectLayout, selectionTargets } from "./command";
+import { NO_FILTER } from "../../shared/tags";
+import { buildArgs, childEnv, detectLayout, selectionTargets, tagArgs } from "./command";
 
 const dirs: string[] = [];
 function project(files: string[], folders: string[] = []): string {
@@ -58,20 +59,69 @@ describe("selectionTargets", () => {
   const roots = [path.join(root, "src", "test", "java")];
   const abs = path.join(root, "tests", "a.feature");
   it("maps each node kind", () => {
-    expect(selectionTargets(node("folder", "", null), root, roots)).toEqual(roots);
-    expect(selectionTargets(node("folder", "tests", null), root, roots)).toEqual([
+    expect(selectionTargets(node("folder", "", null), root, roots, NO_FILTER)).toEqual(roots);
+    expect(selectionTargets(node("folder", "tests", null), root, roots, NO_FILTER)).toEqual([
       path.join(root, "tests"),
     ]);
-    expect(selectionTargets(node("feature", "tests/a.feature", null), root, roots)).toEqual([abs]);
+    expect(
+      selectionTargets(node("feature", "tests/a.feature", null), root, roots, NO_FILTER),
+    ).toEqual([abs]);
     for (const kind of ["scenario", "outline", "row"] as const)
-      expect(selectionTargets(node(kind, "tests/a.feature", 12), root, roots)).toEqual([
+      expect(selectionTargets(node(kind, "tests/a.feature", 12), root, roots, NO_FILTER)).toEqual([
         `${abs}:12`,
       ]);
+  });
+
+  describe("outline targets under a filter", () => {
+    const row = (line: number | null, tag: string): TestNode => ({
+      ...node("row", "tests/a.feature", line),
+      tags: [tag],
+    });
+    const outline = (r9Line: number | null = 9): TestNode => ({
+      ...node("outline", "tests/a.feature", 5),
+      children: [row(r9Line, "fast"), row(10, "fast"), row(11, "slow")],
+    });
+    const f = (...include: string[]) => ({ include, exclude: [] });
+    it("lists the matching rows' lines in one target", () => {
+      expect(selectionTargets(outline(), root, roots, f("fast"))).toEqual([`${abs}:9:10`]);
+    });
+    it("runs the whole outline when every row matches", () => {
+      expect(selectionTargets(outline(), root, roots, f("fast", "slow"))).toEqual([`${abs}:5`]);
+    });
+    it("is null when a matching row has no line", () => {
+      expect(selectionTargets(outline(null), root, roots, f("fast"))).toBeNull();
+    });
+  });
+});
+
+describe("tagArgs", () => {
+  it("is empty when the filter is off", () => {
+    expect(tagArgs({ include: [], exclude: [] })).toEqual([]);
+  });
+  it("joins included tags in one -t and gives each excluded tag its own", () => {
+    expect(tagArgs({ include: ["smoke", "api"], exclude: ["wip", "slow"] })).toEqual([
+      "-t",
+      "@smoke,@api",
+      "-t",
+      "~@wip",
+      "-t",
+      "~@slow",
+    ]);
+  });
+  it("omits the include group when nothing is included", () => {
+    expect(tagArgs({ include: [], exclude: ["wip"] })).toEqual(["-t", "~@wip"]);
   });
 });
 
 describe("buildArgs", () => {
-  const o = { jar: "k.jar", classpath: ["c1", "c2"], root: "R", outDir: "O", targets: ["t1"] };
+  const o = {
+    jar: "k.jar",
+    classpath: ["c1", "c2"],
+    root: "R",
+    outDir: "O",
+    targets: ["t1"],
+    tags: [],
+  };
   const base = [
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
@@ -92,6 +142,10 @@ describe("buildArgs", () => {
   it("builds the exact command line", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "t1"]);
     expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "t1"]);
+  });
+  it("puts the tag arguments just before the targets", () => {
+    const tags = ["-t", "@smoke"];
+    expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([...base, "-D", ...tags, "t1"]);
   });
 });
 
