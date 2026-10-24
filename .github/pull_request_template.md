@@ -40,6 +40,7 @@ Tick what applies. Strike out (~~text~~) or write "N/A: <reason>" for items that
 - [ ] `npm run package`, then `npx playwright test` passes
 - [ ] `npm run typecheck` passes
 - [ ] `npm run lint` passes (oxlint + oxfmt)
+- [ ] CI green: `checks` and `test` (e2e ran after ready for review)
 - [ ] Ran the app and checked the change by hand (`npm start`)
 
 <!-- Paste the test summary lines. If a test was skipped or is flaky, say which and why. -->

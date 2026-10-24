@@ -65,6 +65,22 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
 - Never commit directly to `main` or `develop`, and never force-push them. Agents work on a `feature/*` branch.
 
+### Pull requests and CI
+
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+
+- `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
+- Open PRs as drafts while working. Mark ready for review when done: that runs the e2e suite.
+- Merge only when `checks` and `test` are green. Nothing enforces it.
+
+| Workflow | When | What it runs |
+|---|---|---|
+| `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
+| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | `npm test`; `npm run e2e` too unless the PR is a draft |
+| `release` | Push of a `vX.Y.Z` tag | Tag must match `package.json`; `npm run make`; GitHub Release with the zip |
+
+Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not update the JRE and Karate pins in `scripts/fetch-vendor.mjs`.
+
 ## Subagents
 
 When the main agent dispatches subagents (implementers, reviewers, explorers), it picks the model per task. Never leave the model unset: an unset model inherits the main agent's model.
