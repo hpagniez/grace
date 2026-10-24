@@ -47,6 +47,7 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
 | `hotfix/X.Y.Z` | `main` | `main` and `develop` | Urgent fix to a released version. |
 
 - Merge with `--no-ff`.
+- After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
 - Never commit directly to `main` or `develop`, and never force-push them. Agents work on a `feature/*` branch.
 
 ## Stack
