@@ -19,6 +19,12 @@ const MAX_TAG_LENGTH = 200;
 
 export const filterOn = (f: TagFilter): boolean => f.include.length > 0 || f.exclude.length > 0;
 
+/**
+ * Whether `-t` can select the tag. Karate splits `-t` on commas and turns it into JS without
+ * escaping (`'` and `(` fail the run); a leading `@` or `~` would change the expression.
+ */
+export const filterable = (tag: string): boolean => /^[^\s,'(@~][^\s,'(]*$/.test(tag);
+
 /** A test matches when it has any included tag (or none are included) and no excluded tag. */
 export const matches = (tags: string[], f: TagFilter): boolean =>
   (f.include.length === 0 || tags.some((t) => f.include.includes(t))) &&
@@ -30,11 +36,12 @@ export function matchingLeaves(n: TestNode, f: TagFilter): TestNode[] {
   return n.children.flatMap((c) => matchingLeaves(c, f));
 }
 
-/** Sorted union of the tags of every scenario and row. */
+/** Sorted union of the filterable tags of every scenario and row. */
 export function projectTags(tree: TestNode): string[] {
   const tags = new Set<string>();
   const walk = (n: TestNode) => {
-    if (n.kind === "scenario" || n.kind === "row") n.tags.forEach((t) => tags.add(t));
+    if (n.kind === "scenario" || n.kind === "row")
+      n.tags.filter(filterable).forEach((t) => tags.add(t));
     n.children.forEach(walk);
   };
   walk(tree);
@@ -63,7 +70,7 @@ export const pruneFilter = (f: FilterState, tags: string[]): FilterState => ({
 const tagList = (x: unknown): x is string[] =>
   Array.isArray(x) &&
   x.length <= MAX_TAGS &&
-  x.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH);
+  x.every((t) => typeof t === "string" && filterable(t) && t.length <= MAX_TAG_LENGTH);
 
 /** Validates untrusted input (IPC, settings file). */
 export function parseFilterState(x: unknown): FilterState | null {

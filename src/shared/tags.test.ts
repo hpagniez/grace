@@ -4,6 +4,7 @@ import {
   NO_FILTER,
   chipTags,
   cycleTag,
+  filterable,
   filterOn,
   matches,
   matchingLeaves,
@@ -115,6 +116,20 @@ describe("chips", () => {
     expect(projectTags(tree())).toEqual(["slow", "smoke", "wip"]);
   });
 
+  it("filterable accepts only tags -t can select", () => {
+    for (const t of ["smoke", "owner=bob", 'd"x', "r)x", "b\\x", "a@b", "a~b"])
+      expect(filterable(t), t).toBe(true);
+    for (const t of ["", "a b", "a\tb", "owner=bob,alice", "q'x", "p(x", "@x", "~x"])
+      expect(filterable(t), t).toBe(false);
+  });
+
+  it("projectTags skips tags -t cannot select", () => {
+    const t = node("folder", "d:", "root", {
+      children: [scenario(1, "odd", ["smoke", "owner=bob,alice", "q'x", "p(x", "owner=bob"])],
+    });
+    expect(projectTags(t)).toEqual(["owner=bob", "smoke"]);
+  });
+
   it("chipTags keeps a filtered tag the tree lost", () => {
     expect(chipTags(tree(), { include: ["gone"], exclude: [] })).toContain("gone");
     expect(chipTags(null, { include: ["b"], exclude: ["a"] })).toEqual(["a", "b"]);
@@ -155,6 +170,11 @@ describe("filter state", () => {
       { ...ok, include: Array.from({ length: 501 }, (_, i) => `t${i}`) },
       { ...ok, include: ["a"], exclude: ["a"] },
       { ...ok, hideNonMatching: "yes" },
+      { ...ok, include: ["a,b"] },
+      { ...ok, exclude: ["q'x"] },
+      { ...ok, exclude: ["p(x"] },
+      { ...ok, include: ["@a"] },
+      { ...ok, include: ["a b"] },
     ];
     for (const x of bad) expect(parseFilterState(x), JSON.stringify(x)).toBeNull();
   });
