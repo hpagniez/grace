@@ -1,5 +1,5 @@
-import { contextBridge } from 'electron';
+import { contextBridge } from "electron";
 
 const api = {};
 
-contextBridge.exposeInMainWorld('api', api);
+contextBridge.exposeInMainWorld("api", api);

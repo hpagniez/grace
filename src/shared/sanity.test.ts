@@ -1,3 +1,3 @@
-import { expect, test } from 'vitest';
+import { expect, test } from "vitest";
 
-test('vitest runs', () => expect(1 + 1).toBe(2));
+test("vitest runs", () => expect(1 + 1).toBe(2));

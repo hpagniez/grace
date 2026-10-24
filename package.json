@@ -1,6 +1,5 @@
 {
   "name": "karate-kid",
-  "productName": "karate-kid",
   "version": "1.0.0",
   "private": true,
   "description": "Free desktop test-suite runner for Karate",
@@ -20,6 +19,10 @@
     "e2e": "npm run package && npx electron --version && playwright test",
     "vendor": "node scripts/fetch-vendor.mjs",
     "fixtures": "node scripts/capture-fixtures.mjs"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.18",
+    "solid-js": "2.0.0-rc.18"
   },
   "devDependencies": {
     "@electron-forge/cli": "8.0.1",
@@ -41,8 +44,5 @@
     "vite": "8.3.5",
     "vitest": "5.0.5"
   },
-  "dependencies": {
-    "@solidjs/web": "2.0.0-rc.18",
-    "solid-js": "2.0.0-rc.18"
-  }
+  "productName": "karate-kid"
 }

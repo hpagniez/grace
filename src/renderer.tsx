@@ -1,4 +1,4 @@
-import './index.css';
-import { render } from '@solidjs/web';
+import "./index.css";
+import { render } from "@solidjs/web";
 
-render(() => <main>karate-kid</main>, document.getElementById('root')!);
+render(() => <main>karate-kid</main>, document.getElementById("root")!);
