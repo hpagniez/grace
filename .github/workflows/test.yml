@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -43,5 +44,12 @@ jobs:
       - run: npm run vendor
       # one job runs both suites in turn: their Java leak checks must not overlap (AGENTS.md)
       - run: npm test
+      # the event's draft flag is stale when a push and "ready for review" land together; ask GitHub now
+      - id: pr
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "draft=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .draft)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
       - run: npm run e2e
-        if: ${{ !github.event.pull_request.draft }}
+        if: ${{ steps.pr.outputs.draft != 'true' }}
