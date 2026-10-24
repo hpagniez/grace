@@ -1,6 +1,6 @@
 import type { Api } from "../shared/ipc";
 import type { AppState } from "./reduce";
-import { leaves } from "./nodes";
+import { matchingLeaves } from "../shared/tags";
 
 const LAYOUT_LABEL = { maven: "Maven", gradle: "Gradle", standalone: "Standalone" } as const;
 
@@ -11,7 +11,10 @@ const primary = `${base} border-green-700 bg-green-600 text-white hover:bg-green
 export function Toolbar(props: { state: AppState; api: Api }) {
   const active = () => props.state.run.active;
   const busy = () => active() || props.state.busy;
-  const canRunAll = () => !busy() && !!props.state.tree && leaves(props.state.tree).length > 0;
+  const canRunAll = () =>
+    !busy() &&
+    !!props.state.tree &&
+    matchingLeaves(props.state.tree, props.state.filter).length > 0;
   return (
     <header class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
       <div class="flex min-w-0 flex-1 items-baseline gap-2">

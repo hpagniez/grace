@@ -2,6 +2,7 @@ import { onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { Console } from "./Console";
 import { Details } from "./Details";
+import { FilterBar } from "./FilterBar";
 import { Progress } from "./Progress";
 import { Toolbar } from "./Toolbar";
 import { Tree } from "./Tree";
@@ -14,6 +15,7 @@ export function App(props: { api: Api }) {
     <div class="flex h-screen flex-col bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
       <Toolbar state={state} api={props.api} />
       <Progress state={state} />
+      <FilterBar state={state} api={props.api} />
       <Show when={state.notice}>
         <div
           data-testid="notice"

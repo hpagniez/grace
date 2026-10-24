@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
+import { NO_FILTER } from "../shared/tags";
 import { CONSOLE_LIMIT } from "./reduce";
 import { createAppStore } from "./store";
 
@@ -79,5 +80,64 @@ describe("createAppStore", () => {
     cb({ type: "project", project, tree: tree(node("s:a#1")), error: null });
     flush();
     expect(Object.keys(store.state.statuses)).toEqual(["s:a#1"]);
+  });
+
+  describe("tag filter", () => {
+    const project = { root: "D:/p", layout: "standalone" } as const;
+    const setup = () => {
+      let cb: (e: AppEvent) => void = () => {};
+      const api = {
+        ready: async () => {},
+        onEvent: (f: (e: AppEvent) => void) => ((cb = f), () => {}),
+      } as unknown as Api;
+      const store = createAppStore(api);
+      return {
+        store,
+        send: (e: AppEvent) => {
+          cb(e);
+          flush();
+        },
+      };
+    };
+    const filter = { include: ["smoke"], exclude: ["wip"], hideNonMatching: true };
+    const open = (root: string = project.root): AppEvent => ({
+      type: "project",
+      project: { ...project, root },
+      tree: null,
+      error: null,
+    });
+
+    it("starts with no filter", () => {
+      expect(setup().store.state.filter).toEqual(NO_FILTER);
+    });
+
+    it("filter event replaces the filter", () => {
+      const { store, send } = setup();
+      send(open());
+      send({ type: "filter", filter });
+      expect(store.state.filter).toEqual(filter);
+      send({ type: "filter", filter: { include: [], exclude: ["slow"], hideNonMatching: false } });
+      expect(store.state.filter).toEqual({
+        include: [],
+        exclude: ["slow"],
+        hideNonMatching: false,
+      });
+    });
+
+    it("opening another project resets the filter", () => {
+      const { store, send } = setup();
+      send(open());
+      send({ type: "filter", filter });
+      send(open()); // a refresh keeps it
+      expect(store.state.filter).toEqual(filter);
+      send(open("D:/q"));
+      expect(store.state.filter).toEqual(NO_FILTER);
+      send({ type: "filter", filter });
+      send({ type: "project", project: null, tree: null, error: "Folder not found" });
+      expect(store.state.filter).toEqual(NO_FILTER);
+      // the store holds its own copy, never the shared constant
+      expect(store.state.filter).not.toBe(NO_FILTER);
+      expect(NO_FILTER).toEqual({ include: [], exclude: [], hideNonMatching: false });
+    });
   });
 });
