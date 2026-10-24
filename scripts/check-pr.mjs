@@ -37,12 +37,11 @@ function main() {
   if (branch) errors.push(branch);
   // Dependabot writes its own commit headers, often over 72 characters
   if (!HEAD_REF.startsWith("dependabot/")) {
+    // commits already on develop were checked in their own PR; a release PR into main carries them all
     const log = execFileSync(
       "git",
-      ["log", "--no-merges", "--format=%s", `${BASE_SHA}..${HEAD_SHA}`],
-      {
-        encoding: "utf8",
-      },
+      ["log", "--no-merges", "--format=%s", HEAD_SHA, "--not", BASE_SHA, "origin/develop"],
+      { encoding: "utf8" },
     );
     for (const header of log.split("\n").filter(Boolean)) {
       const err = commitError(header);
