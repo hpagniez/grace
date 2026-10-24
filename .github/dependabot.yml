@@ -1,0 +1,32 @@
+# Monthly dependency updates into develop (ADR 0007). Security updates always target the default branch (develop).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: develop
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      # AGENTS.md: upgrade the Solid set together
+      solid:
+        patterns: ["solid-js", "@solidjs/*", "@tanstack/solid-router", "@kobalte/core"]
+      electron-forge:
+        patterns: ["@electron-forge/*", "@electron/*"]
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: develop
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]

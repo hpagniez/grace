@@ -6,16 +6,14 @@ export function extractSteps(
 ): { refId: string; steps: Step[] }[] {
   return (featureExitData.scenarioResults ?? []).map((sc: Record<string, any>) => ({
     refId: sc.refId,
-    steps: (sc.stepResults ?? []).map(
-      (r: Record<string, any>): Step => ({
-        keyword: r.step.prefix,
-        text: `${r.step.keyword} ${r.step.text}`,
-        line: r.step.line,
-        status: r.result.status,
-        millis: r.result.millis,
-        background: Boolean(r.step.background),
-        log: r.stepLog ?? null,
-      }),
-    ),
+    steps: (sc.stepResults ?? []).map((r: Record<string, any>): Step => ({
+      keyword: r.step.prefix,
+      text: `${r.step.keyword} ${r.step.text}`,
+      line: r.step.line,
+      status: r.result.status,
+      millis: r.result.millis,
+      background: Boolean(r.step.background),
+      log: r.stepLog ?? null,
+    })),
   }));
 }
