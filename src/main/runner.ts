@@ -238,7 +238,16 @@ export class Runner {
     const proc = this.spawn(outDir, false, targets, (lines) =>
       this.o.emit({ type: "console", lines }),
     );
-    if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
+    try {
+      if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
+    } catch (err) {
+      // without the pid file a crash of the app would leave this JVM running: do not run
+      await proc.kill();
+      this.proc = null;
+      for (const e of state.finish(null, false, false)) this.o.emit(e);
+      this.o.emit({ type: "notice", message: (err as Error).message });
+      return;
+    }
     this.o.emit({
       type: "runStarted",
       selection: node.key,

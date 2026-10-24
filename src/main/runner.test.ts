@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -344,6 +345,22 @@ describe("Runner runs", () => {
     const outside = (m: Map<string, string>) =>
       new Map([...m].filter(([p]) => !p.split("/").includes("karate-temp")));
     expect(outside(after)).toEqual(outside(before));
+  });
+
+  it("a pid file that cannot be written fails the run and leaves no java", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    await runner.open(fixture("clean"));
+    const pidFile = path.join(dataDir, "running.pid");
+    mkdirSync(pidFile); // writing a file there fails
+    try {
+      await runner.run("f:tests/slow.feature");
+      expect(last("runFinished")).toMatchObject({ outcome: "failed", reportAvailable: false });
+      expect(last("notice").message).toContain("EISDIR");
+      expect(all("runStarted")).toHaveLength(0);
+      expect(ourJava()).toBe(false);
+    } finally {
+      rmSync(pidFile, { recursive: true, force: true });
+    }
   });
 
   it("dispose kills a run and removes the pid file", T, async () => {
