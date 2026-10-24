@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,7 +59,7 @@ async function writeSanitised(eventFile, name, fixtureRoot) {
   const lines = (await readFile(eventFile, "utf8")).split("\n").filter(Boolean);
   const cleaned = lines.map((line) => {
     for (const [from, to] of subs) line = line.replaceAll(from, to);
-    if (/hugop|AppData/i.test(line))
+    if (/AppData/i.test(line) || line.toLowerCase().includes(basename(homedir()).toLowerCase()))
       throw new Error(`personal path left in ${name}: ${line.slice(0, 200)}`);
     JSON.parse(line);
     return line;
