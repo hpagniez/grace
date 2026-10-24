@@ -36,9 +36,11 @@ export function tagArgs(f: TagFilter): string[] {
 }
 
 /**
- * Run targets for a node. A `file:LINE` target bypasses `-t`, so an outline under a filter lists
- * its matching rows' lines instead. Null when that is impossible: a matching row has no line
- * (dynamic Examples) or no row matches.
+ * Run targets for a node. A `file:LINE` target bypasses `-t` and `@ignore`, so an outline under a
+ * filter lists its matching rows' lines, even when every row matches: the outline's own line would
+ * also run rows the dry run does not list. Only when a row has no line (dynamic Examples) and every
+ * row matches does it fall back to the outline's line. Null when a matching row has no line and
+ * not every row matches, or when no row matches.
  */
 export function selectionTargets(
   node: TestNode,
@@ -50,9 +52,10 @@ export function selectionTargets(
   const abs = path.join(root, ...node.file.split("/"));
   if (node.kind === "outline" && filterOn(f)) {
     const hits = matchingLeaves(node, f);
-    if (hits.length === matchingLeaves(node, NO_FILTER).length) return [`${abs}:${node.line}`];
     const lines = hits.map((r) => r.line);
-    return lines.length === 0 || lines.includes(null) ? null : [`${abs}:${lines.join(":")}`];
+    if (hits.length === 0) return null;
+    if (!lines.includes(null)) return [`${abs}:${lines.join(":")}`];
+    return hits.length === matchingLeaves(node, NO_FILTER).length ? [`${abs}:${node.line}`] : null;
   }
   return node.kind === "folder" || node.kind === "feature" ? [abs] : [`${abs}:${node.line}`];
 }

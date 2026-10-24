@@ -19,3 +19,9 @@ Scenario Outline: speed <n>
   Examples:
     | n |
     | 3 |
+
+  # not listed by a dry run, so it must never run
+  @ignore
+  Examples:
+    | n |
+    | 4 |

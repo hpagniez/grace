@@ -85,11 +85,19 @@ describe("selectionTargets", () => {
     it("lists the matching rows' lines in one target", () => {
       expect(selectionTargets(outline(), root, roots, f("fast"))).toEqual([`${abs}:9:10`]);
     });
-    it("runs the whole outline when every row matches", () => {
-      expect(selectionTargets(outline(), root, roots, f("fast", "slow"))).toEqual([`${abs}:5`]);
+    it("lists every row's line when every row matches (the outline line would run @ignore rows)", () => {
+      expect(selectionTargets(outline(), root, roots, f("fast", "slow"))).toEqual([
+        `${abs}:9:10:11`,
+      ]);
+    });
+    it("falls back to the outline line when every row matches and one has no line", () => {
+      expect(selectionTargets(outline(null), root, roots, f("fast", "slow"))).toEqual([`${abs}:5`]);
     });
     it("is null when a matching row has no line", () => {
       expect(selectionTargets(outline(null), root, roots, f("fast"))).toBeNull();
+    });
+    it("is null when no row matches", () => {
+      expect(selectionTargets(outline(), root, roots, f("other"))).toBeNull();
     });
   });
 });

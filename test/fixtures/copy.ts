@@ -8,7 +8,8 @@ const projects = join(__dirname, "projects");
 /**
  * Copies a fixture project to a fresh temp dir and returns it. `broken` = `clean` plus broken/syntax.feature.
  * `edge` = outline tables with comment and blank lines, and a dynamic Examples table.
- * `tags` = feature, outline and Examples tags on one outline and one scenario.
+ * `tags` = feature, outline and Examples tags on one outline and one scenario, an `@ignore` Examples
+ * block, and a `fast/` folder named like a tag.
  */
 export function copyFixture(name: "clean" | "broken" | "maven" | "edge" | "tags"): string {
   const dest = mkdtempSync(join(tmpdir(), `kk-${name}-`));
