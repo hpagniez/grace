@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
@@ -7,7 +7,7 @@ import { buildArgs, detectLayout, selectionTargets } from "./karate/command";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
-import { buildTree, findNode, leafKeys, resolveNode } from "./karate/tree";
+import { buildTree, findNode, leafKeys, parseRefId, resolveNode, rowLines } from "./karate/tree";
 import type { VendorPaths } from "./vendor";
 
 const BUSY = "A run is already in progress";
@@ -24,6 +24,23 @@ const isDir = (p: string) => {
 function dryRunError(lines: string[]): string {
   const hits = lines.filter((l) => l.includes("Exception") || l.includes("feature"));
   return (hits.length ? hits : lines.slice(-20)).join("\n");
+}
+
+/**
+ * Sets each row's line from its feature file; null when the table has no such row (dynamic
+ * Examples), since running a guessed line could run another row or nothing.
+ */
+function setRowLines(tree: TestNode, root: string): void {
+  const texts = new Map<string, string>();
+  const walk = (n: TestNode) => {
+    if (n.kind === "row") {
+      const { example, line } = parseRefId(n.refId!);
+      if (!texts.has(n.file)) texts.set(n.file, readFileSync(path.join(root, n.file), "utf8"));
+      n.line = rowLines(texts.get(n.file)!, line)[example! - 1] ?? null;
+    }
+    n.children.forEach(walk);
+  };
+  walk(tree);
 }
 
 /** Owns the project, its test tree and the one Karate process (dry run or run) at a time. */
@@ -159,6 +176,7 @@ export class Runner {
             readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")),
             rootName,
           );
+          setRowLines(tree, project.root);
         } catch (err) {
           error = (err as Error).message;
         }
@@ -180,6 +198,10 @@ export class Runner {
     const node = old ? resolveNode(tree, old) : findNode(tree, key);
     if (!node) {
       this.o.emit({ type: "notice", message: "This test changed; the tree was refreshed" });
+      return;
+    }
+    if (node.kind === "row" && node.line === null) {
+      this.o.emit({ type: "notice", message: "Run the outline to run its rows" });
       return;
     }
     const { root } = this.project!;

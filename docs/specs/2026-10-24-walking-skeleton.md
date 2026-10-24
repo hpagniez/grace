@@ -85,7 +85,7 @@ Where the run logic lives (spawning Java, reading the event file, building the t
   - folder or feature: its absolute path
   - scenario: `feature.feature:LINE` with the scenario's line
   - outline: `feature.feature:LINE` with the outline's line (runs all its rows)
-  - outline row: `feature.feature:LINE` where LINE = the row's `line` (its `Examples:` line) + 2 + `exampleIndex`
+  - outline row: `feature.feature:LINE` where LINE = the line of the row in the feature file (see "Outline row lines" below). A row whose line cannot be found (dynamic Examples such as `| read('rows.json') |`) does not run: show "Run the outline to run its rows".
 - One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled.
 - Every run first repeats the full discovery dry run of R2 (users edit features in their own editor, so the tree may be stale). Then:
   - exit 3 → show the error, do not run
@@ -153,6 +153,10 @@ All runs and dry runs go through the main process, never through a shell:
 - Remove `KARATE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS` from the child's environment.
 - Output dir: `<app data>\projects\<hash of project path>\run` for runs and `...\dryrun` for dry runs. Delete its contents before each spawn, so no report or event file from an earlier run is ever read or opened. `-B false` turns off report backups, since there is no run history yet.
 - `<resources>` is `vendor\` in the repo during development and `process.resourcesPath` in the packaged app.
+
+### Outline row lines
+
+A row's events give its `Examples:` line (in `refId` and `line`) and its index within that table, not its own line. After each discovery the app reads the feature file: from the line after `Examples:`, it skips blank lines and `#` lines, takes the first `|` line as the header, then collects the following `|` lines (still skipping blank and `#` lines) until the first other line. The row's line is the entry at its index in that table. If there is no such entry (a dynamic table, or fewer table lines than row events), the row's line is null and the row cannot be run on its own. Adding 2 + the index to the `Examples:` line is wrong as soon as a table holds a blank or commented-out line.
 
 ### Reading the event file
 

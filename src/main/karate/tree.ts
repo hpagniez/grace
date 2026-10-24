@@ -49,6 +49,7 @@ function sortFolders(folder: TestNode): void {
  * An outline node appears with its first row (the section number only exists on the rows);
  * an outline with no rows is dropped. A row's key number is its 1-based position in the
  * outline across all Examples tables, because refId examples restart per table.
+ * Row lines are left null: the Runner fills them from the feature file with `rowLines`.
  * Folders come first, then features, each sorted by path; scenarios keep file order.
  */
 export function buildTree(events: KarateEvent[], rootName: string): TestNode {
@@ -108,13 +109,32 @@ export function buildTree(events: KarateEvent[], rootName: string): TestNode {
           `s:${feature.file}#${section}.${outline.children.length + 1}`,
           d.name,
           feature.file,
-          { ...base, line: d.line + 2 + d.exampleIndex }, // d.line is the Examples: line
+          { ...base, line: null },
         ),
       );
     }
   }
   sortFolders(root);
   return root;
+}
+
+/**
+ * Line numbers (1-based) of the data rows of the Examples table whose `Examples:` keyword is on
+ * `examplesLine`. Blank and `#` lines are skipped; the first `|` line is the header; the table ends
+ * at the first other line. A dynamic table (`| read('rows.json') |`) has no data rows.
+ */
+export function rowLines(featureText: string, examplesLine: number): number[] {
+  const lines = featureText.split(/\r?\n/);
+  const rows: number[] = [];
+  let header = false;
+  for (let i = examplesLine; i < lines.length; i++) {
+    const t = lines[i].trim(); // lines[i] is line i + 1
+    if (t === "" || t.startsWith("#")) continue;
+    if (!t.startsWith("|")) break;
+    if (header) rows.push(i + 1);
+    header = true;
+  }
+  return rows;
 }
 
 export function findNode(tree: TestNode, key: string): TestNode | null {

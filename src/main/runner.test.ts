@@ -44,7 +44,7 @@ function setup() {
   return { runner, events, dataDir, all, last };
 }
 
-function fixture(name: "clean" | "broken" | "maven"): string {
+function fixture(name: "clean" | "broken" | "maven" | "edge"): string {
   const d = copyFixture(name);
   temps.push(d);
   return d;
@@ -181,6 +181,29 @@ describe("Runner runs", () => {
       keys: ["s:tests/outline.feature#1.2"],
     });
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
+  it("runs the row clicked when its table has comment and blank lines", T, async () => {
+    const { runner, all, last } = setup();
+    await runner.open(fixture("edge"));
+    const key = "s:tests/rows.feature#1.2";
+    await runner.run(key);
+    expect(last("runStarted")).toMatchObject({ keys: [key], total: 1 });
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+    const finals = all("scenarios")
+      .flatMap((e) => e.updates)
+      .filter((u) => u.status !== "running");
+    expect(finals).toMatchObject([{ key, status: "passed" }]);
+  });
+
+  it("refuses a row of a dynamic Examples table", T, async () => {
+    const { runner, all, last } = setup();
+    await runner.open(fixture("edge"));
+    const rows = byName(last("project").tree!, "dynamic <a>").children;
+    expect(rows.map((r) => r.line)).toEqual([null, null]);
+    await runner.run(rows[0].key);
+    expect(last("notice").message).toBe("Run the outline to run its rows");
+    expect(all("runStarted")).toHaveLength(0);
   });
 
   it("re-discovers before running", T, async () => {

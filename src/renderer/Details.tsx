@@ -64,7 +64,7 @@ function Leaf(props: { node: TestNode; state: AppState }) {
         <span data-testid="details-status">{STATUS_LABEL[status()]}</span>
       </p>
       <p class="font-mono text-sm text-zinc-500" data-testid="details-location">
-        {`${props.node.file}:${props.node.line}`}
+        {props.node.line === null ? props.node.file : `${props.node.file}:${props.node.line}`}
       </p>
       <Show when={result()?.durationMillis !== undefined}>
         <p class="text-sm" data-testid="details-duration">

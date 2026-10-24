@@ -1,8 +1,17 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { readAllEvents, type KarateEvent } from "./events";
 import type { TestNode } from "../../shared/model";
-import { buildTree, findNode, leafIndex, leafKeys, parseRefId, resolveNode } from "./tree";
+import {
+  buildTree,
+  findNode,
+  leafIndex,
+  leafKeys,
+  parseRefId,
+  resolveNode,
+  rowLines,
+} from "./tree";
 
 const events = (name: string) => readAllEvents(path.resolve("test/fixtures/events", name));
 const clean = () => events("dryrun-clean.jsonl");
@@ -62,7 +71,7 @@ describe("buildTree", () => {
     expect(row).toMatchObject({
       key: "s:tests/outline.feature#1.2",
       kind: "row",
-      line: 10,
+      line: null, // the Runner reads row lines from the feature file
       refId: "[1.2:7]",
     });
   });
@@ -76,8 +85,15 @@ describe("buildTree", () => {
     ]);
     const rows = feature.children[1].children;
     expect(rows).toHaveLength(7);
-    // first table: Examples at 13 -> 15..19; second table: Examples at 22 -> 24, 25
-    expect(rows.map((r) => r.line)).toEqual([15, 16, 17, 18, 19, 24, 25]);
+    expect(rows.map((r) => r.refId)).toEqual([
+      "[2.1:13]",
+      "[2.2:13]",
+      "[2.3:13]",
+      "[2.4:13]",
+      "[2.5:13]",
+      "[2.1:22]",
+      "[2.2:22]",
+    ]);
     expect(rows[5].key).toBe("s:extra/outline-sizes.feature#2.6");
     expect(rows[6].key).toBe("s:extra/outline-sizes.feature#2.7");
     const keys = leafKeys(tree);
@@ -88,6 +104,27 @@ describe("buildTree", () => {
   it("keeps scenario tags", () => {
     const node = findNode(buildTree(clean(), "clean"), "s:tests/basic.feature#2")!;
     expect(node).toMatchObject({ name: "failing match", tags: ["wip"], line: 15, refId: "[2:15]" });
+  });
+});
+
+describe("rowLines", () => {
+  const text = (file: string) => readFileSync(path.resolve("test/fixtures/projects", file), "utf8");
+
+  it("takes the rows after the header", () => {
+    expect(rowLines(text("clean/tests/outline.feature"), 7)).toEqual([9, 10, 11]);
+  });
+
+  it("skips comment and blank lines inside the table", () => {
+    expect(rowLines(text("edge/tests/rows.feature"), 7)).toEqual([10, 12, 13]);
+  });
+
+  it("finds no rows in a dynamic Examples table", () => {
+    expect(rowLines(text("edge/tests/rows.feature"), 18)).toEqual([]);
+  });
+
+  it("reads CRLF files and stops at the next keyword", () => {
+    const crlf = ["Examples:", "| a |", "| 1 |", "Scenario: x", "| 2 |", ""].join("\r\n");
+    expect(rowLines(crlf, 1)).toEqual([3]);
   });
 });
 
