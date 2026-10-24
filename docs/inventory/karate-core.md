@@ -482,6 +482,8 @@ All items from D/getting-started/whats-new-v2 and D/getting-started/migration-fr
 
 ## 19. Integration surface for a GUI
 
+> **Corrected by a real run:** the [Karate CLI spike](../research/2026-10-24-karate-cli-spike/README.md#corrections-to-the-inventory) found several points below wrong (no `PROGRESS` event, colour not auto-off, boolean tag syntax, paths resolve from cwd, no mock admin stop). Trust the spike where they differ.
+
 How an Electron app can drive Karate OSS without commercial parts.
 
 1. **Spawn the process.** Use either `karate run ...` (the launcher must be installed; it manages the JRE and jar) or, for full control, `java [-Dprop=..] -jar karate-<ver>.jar run ...` with a bundled or detected Java 21+.
