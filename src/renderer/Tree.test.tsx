@@ -62,6 +62,7 @@ function setup() {
     run: vi.fn(async () => {}),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
+    setFilter: vi.fn(async () => {}),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);

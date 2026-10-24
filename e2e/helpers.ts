@@ -37,7 +37,7 @@ export const test = base.extend<{ cleanup: void }>({
 export { expect };
 
 /** A fresh copy of a fixture project, deleted after the test. */
-export function project(name: "clean" | "broken" | "maven"): string {
+export function project(name: "clean" | "broken" | "maven" | "tags"): string {
   const dir = copyFixture(name);
   dirs.push(dir);
   return dir;
@@ -46,9 +46,11 @@ export function project(name: "clean" | "broken" | "maven"): string {
 /** An empty folder, deleted after the test. */
 export const emptyProject = () => tempDir("kk-empty-");
 
-/** Starts the built app (`.vite/build`) with its own fresh userData folder. */
-export async function launch(): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
-  const userData = tempDir("kk-userdata-");
+/** Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the first app before). */
+export async function launch(
+  userDataDir?: string,
+): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
+  const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
     env: { ...process.env, KARATE_KID_USER_DATA: userData },
