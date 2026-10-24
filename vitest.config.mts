@@ -6,6 +6,8 @@ const exclude = ["docs/**", "node_modules/**", "out/**", ".vite/**", "e2e/**", "
 
 export default defineConfig({
   test: {
+    // real-Java test files must not overlap: process tests scan every java.exe
+    fileParallelism: false,
     projects: [
       {
         test: { name: "node", include: ["**/*.test.ts"], exclude, environment: "node" },
