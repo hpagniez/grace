@@ -148,32 +148,42 @@ describe("parsePropertiesEdit", () => {
     });
   });
 
-  it("rejects bad shapes", () => {
-    const bad: unknown[] = [
-      null,
-      "x",
-      [],
-      {},
-      { shared: {}, byEnv: {} },
-      { shared: [], byEnv: [] },
-      { shared: [], byEnv: { qa: {} } },
-      { shared: [{ value: "1", secret: false }], byEnv: {} },
-      { shared: [{ name: "a", value: 1, secret: false }], byEnv: {} },
-      { shared: [{ name: "a", value: "1" }], byEnv: {} },
-      { shared: [{ name: "a", secret: false, keep: true }], byEnv: {} },
-      { shared: [{ name: "a", secret: true, keep: false }], byEnv: {} },
-      { shared: [plain("a", "x".repeat(MAX_VALUE_LENGTH + 1))], byEnv: {} },
-      { shared: [plain("a".repeat(201), "1")], byEnv: {} },
-      { shared: [], byEnv: { "../x": [] } },
-      JSON.parse('{"shared":[],"byEnv":{"__proto__":[]}}'),
-      { shared: Array.from({ length: 501 }, (_, i) => plain(`p${i}`, "1")), byEnv: {} },
-      { shared: [], byEnv: { qa: Array.from({ length: 501 }, (_, i) => plain(`p${i}`, "1")) } },
-      {
-        shared: [],
-        byEnv: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`e${i}`, []])),
-      },
-    ];
-    for (const x of bad) expect(parsePropertiesEdit(x)).toBeNull();
+  // an array with holes, as structured clone keeps them
+  const sparse = (length: number) => Object.assign([], { length });
+  const rows501 = Array.from({ length: 501 }, (_, i) => plain(`p${i}`, "1"));
+  const bad: Record<string, unknown> = {
+    null: null,
+    "a string": "x",
+    "an array": [],
+    "an empty object": {},
+    "shared not an array": { shared: {}, byEnv: {} },
+    "byEnv an array": { shared: [], byEnv: [] },
+    "an environment list not an array": { shared: [], byEnv: { qa: {} } },
+    "a row without a name": { shared: [{ value: "1", secret: false }], byEnv: {} },
+    "a non-string value": { shared: [{ name: "a", value: 1, secret: false }], byEnv: {} },
+    "a row without secret": { shared: [{ name: "a", value: "1" }], byEnv: {} },
+    "keep on a non-secret row": { shared: [{ name: "a", secret: false, keep: true }], byEnv: {} },
+    "keep false": { shared: [{ name: "a", secret: true, keep: false }], byEnv: {} },
+    "a 10,001-character value": {
+      shared: [plain("a", "x".repeat(MAX_VALUE_LENGTH + 1))],
+      byEnv: {},
+    },
+    "a 201-character name": { shared: [plain("a".repeat(201), "1")], byEnv: {} },
+    "an invalid environment name": { shared: [], byEnv: { "../x": [] } },
+    "an own __proto__ environment": JSON.parse('{"shared":[],"byEnv":{"__proto__":[]}}'),
+    "501 shared rows": { shared: rows501, byEnv: {} },
+    "501 environment rows": { shared: [], byEnv: { qa: rows501 } },
+    "101 environments": {
+      shared: [],
+      byEnv: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`e${i}`, []])),
+    },
+    "a sparse shared list": { shared: sparse(1), byEnv: {} },
+    "a sparse environment list": { shared: [], byEnv: { qa: sparse(2) } },
+    "a sparse list after structured clone": structuredClone({ shared: sparse(3), byEnv: {} }),
+  };
+
+  it.each(Object.entries(bad))("rejects %s", (_name, x) => {
+    expect(parsePropertiesEdit(x)).toBeNull();
   });
 
   it("accepts the limits themselves", () => {
