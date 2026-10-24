@@ -1,9 +1,20 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_FILTER, type FilterState } from "../shared/tags";
 import { loadLastProject, loadProjectFilter, saveLastProject, saveProjectFilter } from "./settings";
+
+// Set to an error code to make every readFileSync fail with it, like a file another program holds.
+const readFails = vi.hoisted(() => ({ code: null as string | null }));
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  const readFileSync = ((...args: Parameters<typeof fs.readFileSync>) => {
+    if (readFails.code) throw Object.assign(new Error(readFails.code), { code: readFails.code });
+    return fs.readFileSync(...args);
+  }) as typeof fs.readFileSync;
+  return { ...fs, readFileSync };
+});
 
 const temps: string[] = [];
 const tmp = () => {
@@ -87,6 +98,23 @@ describe("settings", () => {
       writeFileSync(path.join(data, "settings.json"), "{not json");
       saveProjectFilter(data, "x", a);
       expect(loadProjectFilter(data, "x")).toEqual(a);
+    });
+
+    it("a file that cannot be read fails the save and stays as it was", () => {
+      const data = tmp();
+      const settings = path.join(data, "settings.json");
+      const before = JSON.stringify({ lastProject: "p", projects: { x: a } });
+      writeFileSync(settings, before);
+      readFails.code = "EBUSY";
+      try {
+        expect(() => saveProjectFilter(data, "y", b)).toThrow("EBUSY");
+        expect(() => saveLastProject(data, "q")).toThrow("EBUSY");
+        expect(loadProjectFilter(data, "x")).toEqual(NO_FILTER);
+        expect(loadLastProject(data)).toBeNull();
+      } finally {
+        readFails.code = null;
+      }
+      expect(readFileSync(settings, "utf8")).toBe(before);
     });
 
     it("the returned no-filter is a copy", () => {

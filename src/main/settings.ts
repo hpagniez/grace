@@ -16,14 +16,21 @@ export function loadLastProject(dataDir: string): string | null {
   }
 }
 
-/** The whole settings file; an unreadable or non-object file reads as empty. */
+/**
+ * The whole settings file; a missing, non-JSON or non-object file reads as empty. Any other read
+ * error throws, so a save never overwrites a file it could not read (a transient EBUSY, say).
+ */
 function read(dataDir: string): Record<string, unknown> {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(readFileSync(file(dataDir), "utf8"));
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
+    parsed = JSON.parse(readFileSync(file(dataDir), "utf8"));
+  } catch (err) {
+    if (err instanceof SyntaxError || (err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw err;
   }
+  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
 }
 
 /** Read-modify-write, so one key never drops the others. */
@@ -40,14 +47,22 @@ export function saveLastProject(dataDir: string, root: string): void {
   });
 }
 
-/** The saved tag filter of a project, or no filter if none is saved or the entry is malformed. */
+/**
+ * The saved tag filter of a project, or no filter if none is saved, the entry is malformed or the
+ * file cannot be read. Never throws.
+ */
 export function loadProjectFilter(dataDir: string, root: string): FilterState {
-  const { projects } = read(dataDir);
-  const entry =
-    typeof projects === "object" && projects !== null
-      ? parseFilterState((projects as Record<string, unknown>)[root])
-      : null;
-  return entry ?? { ...NO_FILTER, include: [], exclude: [] };
+  try {
+    const { projects } = read(dataDir);
+    const entry =
+      typeof projects === "object" && projects !== null
+        ? parseFilterState((projects as Record<string, unknown>)[root])
+        : null;
+    if (entry) return entry;
+  } catch {
+    // unreadable: no filter
+  }
+  return { ...NO_FILTER, include: [], exclude: [] };
 }
 
 export function saveProjectFilter(dataDir: string, root: string, f: FilterState): void {
