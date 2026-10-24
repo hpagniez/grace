@@ -100,16 +100,16 @@ describe("tagArgs", () => {
   });
   it("joins included tags in one -t and gives each excluded tag its own", () => {
     expect(tagArgs({ include: ["smoke", "api"], exclude: ["wip", "slow"] })).toEqual([
-      "-t",
-      "@smoke,@api",
-      "-t",
-      "~@wip",
-      "-t",
-      "~@slow",
+      "-t=@smoke,@api",
+      "-t=~@wip",
+      "-t=~@slow",
     ]);
   });
   it("omits the include group when nothing is included", () => {
-    expect(tagArgs({ include: [], exclude: ["wip"] })).toEqual(["-t", "~@wip"]);
+    expect(tagArgs({ include: [], exclude: ["wip"] })).toEqual(["-t=~@wip"]);
+  });
+  it("attaches every value, so no argument starts with @ (picocli argument files)", () => {
+    expect(tagArgs({ include: ["fast"], exclude: [] })).toEqual(["-t=@fast"]);
   });
 });
 
@@ -144,7 +144,7 @@ describe("buildArgs", () => {
     expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "t1"]);
   });
   it("puts the tag arguments just before the targets", () => {
-    const tags = ["-t", "@smoke"];
+    const tags = ["-t=@smoke"];
     expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([...base, "-D", ...tags, "t1"]);
   });
 });
