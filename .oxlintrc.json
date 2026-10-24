@@ -1,0 +1,11 @@
+{
+  "ignorePatterns": [
+    "docs/**",
+    "node_modules/**",
+    "out/**",
+    ".vite/**",
+    ".superpowers/**",
+    "vendor/**",
+    "test/fixtures/projects/**"
+  ]
+}

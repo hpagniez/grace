@@ -1,0 +1,7 @@
+node_modules/
+out/
+.vite/
+vendor/
+test-results/
+playwright-report/
+.superpowers/

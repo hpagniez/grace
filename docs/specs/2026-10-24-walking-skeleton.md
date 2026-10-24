@@ -85,11 +85,11 @@ Where the run logic lives (spawning Java, reading the event file, building the t
   - folder or feature: its absolute path
   - scenario: `feature.feature:LINE` with the scenario's line
   - outline: `feature.feature:LINE` with the outline's line (runs all its rows)
-  - outline row: `feature.feature:LINE` where LINE = the row's `line` (its `Examples:` line) + 2 + `exampleIndex`
-- One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled.
+  - outline row: `feature.feature:LINE` where LINE = the line of the row in the feature file (see "Outline row lines" below). A row whose line cannot be found (dynamic Examples such as `| read('rows.json') |`) does not run: show "Run the outline to run its rows".
+- One run at a time. While a run is going, Run buttons are disabled and **Cancel** is enabled. The same holds during every discovery dry run (open, Refresh, and the one before a run), with Open and Refresh disabled too and "Preparing…" in the progress section. Cancel during an open or a Refresh keeps the project and tree from before and says "Cancelled"; a cancelled open does not become the saved last folder.
 - Every run first repeats the full discovery dry run of R2 (users edit features in their own editor, so the tree may be stale). Then:
   - exit 3 → show the error, do not run
-  - the tree is rebuilt. Nodes whose key still exists keep their status; new nodes start as "not run"; removed nodes disappear.
+  - the tree is rebuilt. Nodes whose key still exists with the same kind and name keep their status, result and steps; other nodes start as "not run" (a scenario inserted above shifts keys, so a key alone does not identify a test); removed nodes disappear. Opening a different folder clears all statuses, the run view and the report.
   - the clicked node is found in the new tree: first by key if the name is unchanged, else by feature path + name if exactly one node matches (scenarios inserted above shift section numbers). If neither finds it, do not run: show "This test changed; the tree was refreshed" so the user can click again. This prevents running a different scenario than the one clicked.
   - the run's command line uses the lines from the new tree
   - `total` = scenarios and rows under the node in the new tree. Zero → show "Nothing to run", do not run.
@@ -103,7 +103,7 @@ Where the run logic lives (spawning Java, reading the event file, building the t
   - `done` counts depth-0 `SCENARIO_EXIT` events (Karate emits no progress event). `total` comes from the pre-run discovery (R3).
 - Status changes reach the window within about 0.5 s of Karate writing them.
 - End of run:
-  - exit 0 or 1 with a `SUITE_EXIT` event → "Finished" with Karate's summary
+  - exit 0 or 1 with a `SUITE_EXIT` event → "Finished" with Karate's summary. Selected tests that never got a `SCENARIO_EXIT` become "not run", and the app says "Karate ran <n> of <total> selected tests".
   - Cancel → "Cancelled"; scenarios still running become "interrupted"
   - exit 2 or 3, or the process ended without `SUITE_EXIT` → "Run failed", and the console keeps Karate's output for diagnosis
 
@@ -153,6 +153,10 @@ All runs and dry runs go through the main process, never through a shell:
 - Remove `KARATE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS` from the child's environment.
 - Output dir: `<app data>\projects\<hash of project path>\run` for runs and `...\dryrun` for dry runs. Delete its contents before each spawn, so no report or event file from an earlier run is ever read or opened. `-B false` turns off report backups, since there is no run history yet.
 - `<resources>` is `vendor\` in the repo during development and `process.resourcesPath` in the packaged app.
+
+### Outline row lines
+
+A row's events give its `Examples:` line (in `refId` and `line`) and its index within that table, not its own line. After each discovery the app reads the feature file: from the line after `Examples:`, it skips blank lines and `#` lines, takes the first `|` line as the header, then collects the following `|` lines (still skipping blank and `#` lines) until the first other line. The row's line is the entry at its index in that table. If there is no such entry (a dynamic table, or fewer table lines than row events), the row's line is null and the row cannot be run on its own. Adding 2 + the index to the `Examples:` line is wrong as soon as a table holds a blank or commented-out line.
 
 ### Reading the event file
 

@@ -9,15 +9,15 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 
 | ID | Feature | Priority | Status | Karate surface | Spec |
 |---|---|---|---|---|---|
-| F01 | Browse test tree: folders, features, scenarios, outline examples | must | specced | dry run `-D -f karate:jsonl`, filter `callDepth == 0`, key by feature + `refId` section (no line) | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F02 | Run a feature, scenario or single example row | must | specced | `karate run file.feature:LINE` | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F03 | Run a folder or the whole suite | must | specced | `karate run <paths>` | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F01 | Browse test tree: folders, features, scenarios, outline examples | must | done | dry run `-D -f karate:jsonl`, filter `callDepth == 0`, key by feature + `refId` section (no line) | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F02 | Run a feature, scenario or single example row | must | done | `karate run file.feature:LINE` | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F03 | Run a folder or the whole suite | must | done | `karate run <paths>` | [spec](specs/2026-10-24-walking-skeleton.md) |
 | F04 | Run by tag: tag browser, include/exclude | must | idea | `-t` (repeat = AND, `,` = OR, `~` = NOT, or JS `anyOf`/`allOf`/`not`); tags from dry run | — |
-| F05 | Live progress: per-node pass/fail, counts | must | specced | tail `karate-events.jsonl`; count depth-0 `SCENARIO_EXIT` vs dry-run total (no `PROGRESS` event) | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F06 | Live console log, ERROR/WARN highlighted | must | specced | child stdout + stderr (logs are on stderr); `--no-color`, UTF-8 via `-Dstdout.encoding` | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F07 | Failure details: error, location, step list with step logs | must | specced | `SCENARIO_EXIT.error` (starts with `path.feature:line`), `FEATURE_EXIT.data` | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F05 | Live progress: per-node pass/fail, counts | must | done | tail `karate-events.jsonl`; count depth-0 `SCENARIO_EXIT` vs dry-run total (no `PROGRESS` event) | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F06 | Live console log, ERROR/WARN highlighted | must | done | child stdout + stderr (logs are on stderr); `--no-color`, UTF-8 via `-Dstdout.encoding` | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F07 | Failure details: error, location, step list with step logs | must | done | `SCENARIO_EXIT.error` (starts with `path.feature:line`), `FEATURE_EXIT.data` | [spec](specs/2026-10-24-walking-skeleton.md) |
 | F08 | Environment switcher + extra system properties | must | idea | list `karate-config-*.js`; `-e`; `-D` props via `java -Dk=v` | — |
-| F09 | Open the generated HTML report | must | specced | `<output>/karate-summary.html` opened in the default browser | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F09 | Open the generated HTML report | must | done | `<output>/karate-summary.html` opened in the default browser | [spec](specs/2026-10-24-walking-skeleton.md) |
 | F10 | Run history: past runs, re-run, re-run failed only | should | idea | `karate-reports_yyyyMMdd_HHmmss` folders (`-B`); failed lines → `file:LINE` | — |
 | F11 | HTTP inspector per step: request, response, headers, timing | should | idea | `FEATURE_EXIT.data` step logs after the run; live needs our own `RunListener` | — |
 | F12 | Thread count and stop/kill run | should | idea | `-T`; kill process tree (Windows: `taskkill /T /F`, exits 1, so the app tracks "cancelled") | — |

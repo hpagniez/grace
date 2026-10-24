@@ -2,7 +2,20 @@
 
 karate-kid is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents.
 
-Status: documentation only. No app code yet, so no build or test commands yet.
+## Commands
+
+Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads the bundled JRE and Karate jar into `vendor/`).
+
+| Command | What it does |
+|---|---|
+| `npm start` | Run the app in dev mode |
+| `npm test` | Unit tests (Vitest) |
+| `npm run e2e` | Package the app, then run the Playwright end-to-end tests |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | oxlint and oxfmt check |
+| `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
+
+Never run `npm test` and `npm run e2e` at the same time: their Java leak checks scan every `java.exe` under `vendor/jre` and see each other's processes.
 
 ## Docs map
 
@@ -14,6 +27,7 @@ Status: documentation only. No app code yet, so no build or test commands yet.
 | [docs/research/](docs/research/) | Dated research notes with sources |
 | [docs/decisions/](docs/decisions/) | Decision records (MADR 4.0 minimal) |
 | `docs/specs/` | Design specs, one per feature, written just before building it |
+| `docs/checks/` | Dated check records of the packaged app: what was run, on which machine, the result, and what still needs a person |
 | `docs/plans/` | Implementation plans, one per spec, task by task (overrides the superpowers default `docs/superpowers/plans/`) |
 
 ## Doc rules
@@ -73,7 +87,7 @@ Most training data is Solid 1. Do not write Solid 1 code:
 - `onMount` → `onSettled`. `createEffect` takes a tracked compute function and an untracked apply function. No `on`, no `batch` (use `flush()`).
 - A write that feeds an async memo is held until the memo resolves (dev warning `SILENT_HOLD`). Show stale values with `isPending`, `latest` or `<Loading on>`.
 - Store setters receive a draft; no path setters, no `produce`. `mergeProps` → `merge`, `splitProps` → `omit`, `unwrap` → `snapshot`.
-- `Index` → `<For keyed={false}>`; `For` children receive accessors. `Context.Provider` → the context itself.
+- `Index` → `<For keyed={false}>`. Default (keyed) `For` children get `(item, index)` with `item` the raw value and `index` an accessor. With `keyed={false}` they get `item` as an accessor and `index` as a plain number. `Context.Provider` → the context itself.
 - No `use:` directives, `classList`, `on:`, `attr:`, `bool:`. Use `onClick`, not `onclick`.
 
 Source: https://v2.solidjs.com/migration/from-solid-1
@@ -82,7 +96,7 @@ Source: https://v2.solidjs.com/migration/from-solid-1
 
 Full detail: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#19-integration-surface-for-a-gui). Where they disagree, the [CLI spike](docs/research/2026-10-24-karate-cli-spike/README.md) wins: it ran Karate 2.1.4 for real. Its `samples/` are real event-stream fixtures.
 
-- Spawn from the Electron main process only, without a shell: `java -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -jar karate-<ver>.jar run --no-color -w <root> -o <absolute> -f html,karate:jsonl ...` with `cwd` = project root. Relative paths resolve from the process cwd, not `-w`.
+- Spawn from the Electron main process only, without a shell: `java -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "<karate.jar>;<project classpath roots>" io.karatelabs.Main run --no-color -w <root> -o <absolute> -f html,karate:jsonl ...` with `cwd` = project root. Relative paths resolve from the process cwd, not `-w`.
 - Remove `KARATE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS` from the child environment; they override the app's values.
 - Tail `<output>/karate-json/karate-events.jsonl` for live progress. There is no `PROGRESS` event: count depth-0 `SCENARIO_EXIT` against the dry-run total. Filter `callDepth == 0` for the test tree. Key nodes by feature + `refId` (slugs collide). Check `skipped` before `passed` (dry run sets both). Ignore `OUTLINE_ENTER.numExamples`.
 - `-D` is dry run, `-p` is the pom file, `-n` is the scenario-name filter. Do not invent flags; check `RunCommand.java`.

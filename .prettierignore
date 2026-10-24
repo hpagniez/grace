@@ -1,0 +1,10 @@
+docs/
+node_modules/
+out/
+.vite/
+.superpowers/
+vendor/
+package-lock.json
+.github/
+*.md
+test/fixtures/
