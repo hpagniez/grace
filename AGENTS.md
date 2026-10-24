@@ -1,0 +1,52 @@
+# AGENTS.md
+
+karate-kid is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents.
+
+Status: documentation only. No app code yet, so no build or test commands yet.
+
+## Docs map
+
+| Path | What it holds |
+|---|---|
+| [docs/features.md](docs/features.md) | Backlog: what the app does, priority, status, how it gets the data from Karate |
+| [docs/inventory/karate-core.md](docs/inventory/karate-core.md) | Every open-source Karate v2 feature, tagged by GUI use; §19 = how the app drives Karate |
+| [docs/inventory/commercial.md](docs/inventory/commercial.md) | What Karate Labs' paid tools offer, and the gaps |
+| [docs/research/](docs/research/) | Dated research notes with sources |
+| [docs/decisions/](docs/decisions/) | Decision records (MADR 4.0 minimal) |
+| `docs/specs/` | Design specs, one per feature, written just before building it |
+
+## Doc rules
+
+- Design specs go in `docs/specs/YYYY-MM-DD-<topic>.md` (this overrides the superpowers default `docs/superpowers/specs/`). Write requirements, then acceptance criteria in Gherkin.
+- When a spec is written or a feature ships, update its row in `docs/features.md` in the same change.
+- A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
+- Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
+
+## Stack
+
+Decided in [ADR 0001](docs/decisions/0001-solid-router-spa-without-tanstack-start.md): Electron + SolidJS 2 RC + TanStack Router (no TanStack Start) + Tailwind CSS v4, packaged with Electron Forge. Pin exact versions (no `^`) and upgrade the Solid set together.
+
+### Solid 2 rules
+
+Most training data is Solid 1. Do not write Solid 1 code:
+
+- Import the renderer from `@solidjs/web`, not `solid-js/web`. Stores come from `solid-js`, not `solid-js/store`. `jsxImportSource` is `@solidjs/web`. Vite plugin is `@solidjs/vite-plugin`, not `vite-plugin-solid`.
+- No `createResource`: use an async `createMemo`. `Suspense` → `Loading`, `ErrorBoundary` → `Errored`.
+- `onMount` → `onSettled`. `createEffect` takes a tracked compute function and an untracked apply function. No `on`, no `batch` (use `flush()`).
+- Store setters receive a draft; no path setters, no `produce`. `mergeProps` → `merge`, `splitProps` → `omit`, `unwrap` → `snapshot`.
+- `Index` → `<For keyed={false}>`; `For` children receive accessors. `Context.Provider` → the context itself.
+- No `use:` directives, `classList`, `on:`, `attr:`, `bool:`. Use `onClick`, not `onclick`.
+
+Source: https://v2.solidjs.com/migration/from-solid-1
+
+## Karate integration rules
+
+Full detail and evidence: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#19-integration-surface-for-a-gui).
+
+- Spawn `karate run` (or `java -jar karate-<ver>.jar run`) from the Electron main process only. Pass an absolute `-o` and an explicit `-w`.
+- Always add `-f html,karate:jsonl` and tail `<output>/karate-json/karate-events.jsonl` for live progress. Filter `callDepth == 0` to build the test tree.
+- `-D` is dry run, `-p` is the pom file, `-n` is the scenario-name filter. Do not invent flags; check `RunCommand.java`.
+- Exit codes: `0` pass, `1` test failures, `2` config error, `3` runtime error.
+- Remove `KARATE_OPTIONS` from the child environment; it overrides the app's values.
+- On Windows, kill the whole process tree (`taskkill /T /F`); `child.kill()` can leave the JVM running.
+- OSS Karate v2 has no debug server. Step-level and HTTP live events need our own Java `RunListener` passed with `--listener`.
