@@ -7,6 +7,7 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: ["vendor/jre", "vendor/karate.jar", "vendor/licenses"],
   },
   rebuildConfig: {},
   makers: [new MakerZIP({}, ["win32"])],
