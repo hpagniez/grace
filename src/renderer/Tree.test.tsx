@@ -180,6 +180,25 @@ describe("main screen", () => {
     expect(screen.getByTestId("run-outcome").textContent).toBe("");
   });
 
+  it("labels an unnamed scenario by its line", () => {
+    const { send } = setup();
+    const unnamed = node("scenario", "s:tests/x.feature#1", null as unknown as string, {
+      line: 3,
+    });
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: node("folder", "d:", "p", {
+        children: [node("feature", "f:tests/x.feature", "x", { children: [unnamed] })],
+      }),
+      error: null,
+    });
+    expect(screen.getByRole("button", { name: "Run Scenario at line 3" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Scenario at line 3"));
+    flush();
+    expect(screen.getByRole("heading").textContent).toBe("Scenario at line 3");
+  });
+
   it("disables Run all without a tree or without leaves, and says why", () => {
     const { send } = setup();
     expect(button("run-all-button").disabled).toBe(true);

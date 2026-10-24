@@ -2,7 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
-import { findNode, formatMillis, leaves, STATUS_DOT, STATUS_LABEL } from "./nodes";
+import { findNode, formatMillis, leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
 
 const STEP_DOT: Record<string, string> = {
@@ -58,7 +58,7 @@ function Leaf(props: { node: TestNode; state: AppState }) {
   const steps = () => props.state.steps[props.node.key];
   return (
     <>
-      <h2 class="text-lg font-semibold">{props.node.name}</h2>
+      <h2 class="text-lg font-semibold">{nodeName(props.node)}</h2>
       <p class="flex items-center gap-2 text-sm">
         <span class={`size-2.5 rounded-full ${STATUS_DOT[status()]}`} />
         <span data-testid="details-status">{STATUS_LABEL[status()]}</span>

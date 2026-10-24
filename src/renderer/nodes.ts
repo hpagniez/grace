@@ -9,6 +9,9 @@ export const findNode = (n: TestNode, key: string): TestNode | null => {
   return null;
 };
 
+/** A node's name; Karate gives an unnamed `Scenario:` a null name. */
+export const nodeName = (n: TestNode): string => n.name || `Scenario at line ${n.line}`;
+
 /** Scenarios and rows at or under `n`. */
 export const leaves = (n: TestNode): TestNode[] =>
   n.kind === "scenario" || n.kind === "row" ? [n] : n.children.flatMap(leaves);

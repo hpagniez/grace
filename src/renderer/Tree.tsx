@@ -2,7 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
-import { leaves, STATUS_DOT, STATUS_LABEL } from "./nodes";
+import { leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
 
 interface Ctx {
@@ -18,7 +18,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
   const selected = () => props.ctx.state.selected === props.node.key;
   // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
   const isFeature = () => props.node.kind === "feature";
-  const label = () => (isFeature() ? props.node.file.split("/").pop()! : props.node.name);
+  const label = () => (isFeature() ? props.node.file.split("/").pop()! : nodeName(props.node));
   return (
     <li
       role="treeitem"
