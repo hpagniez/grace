@@ -117,9 +117,10 @@ describe("chips", () => {
   });
 
   it("filterable accepts only tags -t can select", () => {
-    for (const t of ["smoke", "owner=bob", 'd"x', "r)x", "b\\x", "a@b", "a~b"])
+    for (const t of ["smoke", "owner=bob", 'd"x', "r)x", "a@b", "a~b"])
       expect(filterable(t), t).toBe(true);
-    for (const t of ["", "a b", "a\tb", "owner=bob,alice", "q'x", "p(x", "@x", "~x"])
+    // Karate reads `\` as a JS escape: `b\` fails to parse, `a\nb` never matches itself.
+    for (const t of ["", "a b", "a\tb", "owner=bob,alice", "q'x", "p(x", "@x", "~x", "b\\x", "b\\"])
       expect(filterable(t), t).toBe(false);
   });
 
