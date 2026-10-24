@@ -1,0 +1,21 @@
+@feat
+Feature: tagged outline
+
+@other
+Scenario: other
+  * match 1 == 1
+
+@ol
+Scenario Outline: speed <n>
+  * match <n> == <n>
+
+  @fast
+  Examples:
+    | n |
+    | 1 |
+    | 2 |
+
+  @slow
+  Examples:
+    | n |
+    | 3 |
