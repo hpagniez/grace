@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import solid from "@solidjs/vite-plugin";
 
 // spike tests under docs/ are reference only; e2e/ belongs to Playwright
-const exclude = ["docs/**", "node_modules/**", "out/**", ".vite/**", "e2e/**"];
+const exclude = ["docs/**", "node_modules/**", "out/**", ".vite/**", "e2e/**", ".superpowers/**"];
 
 export default defineConfig({
   test: {

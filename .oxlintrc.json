@@ -5,6 +5,7 @@
     "out/**",
     ".vite/**",
     ".superpowers/**",
-    "vendor/**"
+    "vendor/**",
+    "test/fixtures/projects/**"
   ]
 }

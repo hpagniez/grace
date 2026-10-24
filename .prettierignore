@@ -7,3 +7,4 @@ vendor/
 package-lock.json
 .github/
 *.md
+test/fixtures/

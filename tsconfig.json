@@ -13,5 +13,5 @@
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web"
   },
-  "include": ["src/**/*", "*.ts", "*.mts"]
+  "include": ["src/**/*", "scripts/**/*", "test/**/*", "e2e/**/*", "*.ts", "*.mts"]
 }
