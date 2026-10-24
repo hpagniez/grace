@@ -1,10 +1,11 @@
 import type { AppEvent, ScenarioUpdate, Summary } from "../../shared/events";
 import type { Status, TestNode } from "../../shared/model";
+import { matchingLeaves, type TagFilter } from "../../shared/tags";
 import type { KarateEvent } from "./events";
 import { extractSteps } from "./steps";
-import { leafIndex, leafKeys } from "./tree";
+import { leafIndex } from "./tree";
 
-/** Turns Karate events into status updates for the scenarios and rows of one selection. */
+/** Turns Karate events into status updates for the scenarios and rows of one selection that match the filter. */
 export class RunState {
   readonly keys: string[];
   private readonly index: Map<string, TestNode>;
@@ -12,8 +13,8 @@ export class RunState {
   private summary: Summary | null = null;
   private suiteExit = false;
 
-  constructor(tree: TestNode, selection: TestNode) {
-    this.keys = leafKeys(selection);
+  constructor(tree: TestNode, selection: TestNode, filter: TagFilter) {
+    this.keys = matchingLeaves(selection, filter).map((n) => n.key);
     this.index = leafIndex(tree);
   }
 
@@ -85,6 +86,12 @@ export class RunState {
       out.push({
         type: "notice",
         message: `Karate ran ${ran} of ${this.keys.length} selected tests`,
+      });
+    }
+    if (outcome === "finished" && this.summary && this.summary.scenarioCount > this.keys.length) {
+      out.push({
+        type: "notice",
+        message: `Karate ran ${this.summary.scenarioCount} tests, more than the ${this.keys.length} selected`,
       });
     }
     return out;
