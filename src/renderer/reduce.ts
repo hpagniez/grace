@@ -69,6 +69,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.error = e.error;
       s.notice = null;
       const live = e.tree ? collectKeys(e.tree, new Set()) : new Set<string>();
+      if (s.selected && !live.has(s.selected)) s.selected = null;
       for (const map of [s.statuses, s.results, s.steps] as Record<string, unknown>[])
         for (const key of Object.keys(map)) if (!live.has(key)) delete map[key];
       break;

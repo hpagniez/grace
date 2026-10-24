@@ -82,6 +82,20 @@ describe("reduce", () => {
     expect(s.notice).toBeNull();
   });
 
+  it("project event keeps a selection that still exists and clears one that is gone", () => {
+    const s = initialState();
+    apply(s, project());
+    s.selected = keys[0];
+    apply(s, project());
+    expect(s.selected).toBe(keys[0]);
+    s.selected = "gone";
+    apply(s, project());
+    expect(s.selected).toBeNull();
+    s.selected = keys[0];
+    apply(s, project(null));
+    expect(s.selected).toBeNull();
+  });
+
   it("console keeps the last 10000 lines", () => {
     const s = initialState();
     const chunk = (from: number, to: number): AppEvent => ({
