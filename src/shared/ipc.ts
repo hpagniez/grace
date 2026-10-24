@@ -1,5 +1,6 @@
 // Shared by main, preload and renderer: keep this file free of Node imports.
 import type { AppEvent } from "./events";
+import type { FilterState } from "./tags";
 
 export const CH = {
   ready: "app:ready",
@@ -8,6 +9,7 @@ export const CH = {
   run: "run:start",
   cancel: "run:cancel",
   report: "report:open",
+  filter: "filter:set",
   event: "app:event",
 } as const;
 
@@ -18,5 +20,6 @@ export interface Api {
   run(key: string): Promise<void>;
   cancel(): Promise<void>;
   openReport(): Promise<void>;
+  setFilter(f: FilterState): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }

@@ -3,12 +3,20 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import path from "node:path";
 import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
-import { NO_FILTER } from "../shared/tags";
-import { buildArgs, detectLayout, selectionTargets } from "./karate/command";
+import {
+  matches,
+  matchingLeaves,
+  NO_FILTER,
+  projectTags,
+  pruneFilter,
+  type FilterState,
+} from "../shared/tags";
+import { buildArgs, detectLayout, selectionTargets, tagArgs } from "./karate/command";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
-import { buildTree, findNode, leafKeys, parseRefId, resolveNode, rowLines } from "./karate/tree";
+import { buildTree, findNode, parseRefId, resolveNode, rowLines } from "./karate/tree";
+import { loadProjectFilter, saveProjectFilter } from "./settings";
 import type { VendorPaths } from "./vendor";
 
 const BUSY = "A run is already in progress";
@@ -44,11 +52,12 @@ function setRowLines(tree: TestNode, root: string): void {
   walk(tree);
 }
 
-/** Owns the project, its test tree and the one Karate process (dry run or run) at a time. */
+/** Owns the project, its test tree, its tag filter and the one Karate process (dry run or run) at a time. */
 export class Runner {
   private project: Project | null = null;
   private tree: TestNode | null = null;
   private last: Extract<AppEvent, { type: "project" }> | null = null;
+  private filter: FilterState = { ...NO_FILTER, include: [], exclude: [] };
   private busy = false;
   private proc: KarateProcess | null = null;
   private cancelled = false;
@@ -83,14 +92,29 @@ export class Runner {
       }
       const report = this.report;
       this.report = null; // a report of the project open before
-      opened = await this.rediscover({ root, layout: detectLayout(root).layout });
+      opened = await this.rediscover(
+        { root, layout: detectLayout(root).layout },
+        loadProjectFilter(this.o.dataDir, root),
+      );
       if (!opened) this.report = report;
     });
     return opened;
   }
 
   async refresh(): Promise<void> {
-    if (this.project) await this.guarded(() => this.rediscover(this.project!));
+    if (this.project) await this.guarded(() => this.rediscover(this.project!, this.filter));
+  }
+
+  /** Refused while busy (the filter in force is re-sent); ignored with no project. */
+  setFilter(f: FilterState): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      this.sendFilter();
+      return;
+    }
+    if (!this.project) return;
+    this.storeFilter({ ...f, include: [...f.include], exclude: [...f.exclude] });
+    this.sendFilter();
   }
 
   async run(key: string): Promise<void> {
@@ -114,7 +138,7 @@ export class Runner {
   /** What a window that just loaded needs: events sent before it subscribed are lost. */
   replay(): AppEvent[] {
     const busy: AppEvent = { type: "busy", busy: this.busy };
-    return this.last ? [this.last, busy] : [busy];
+    return this.last ? [this.last, { type: "filter", filter: this.filter }, busy] : [busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
@@ -127,6 +151,23 @@ export class Runner {
   private publish(e: Extract<AppEvent, { type: "project" }>) {
     this.last = e;
     this.o.emit(e);
+  }
+
+  private sendFilter() {
+    this.o.emit({ type: "filter", filter: this.filter });
+  }
+
+  /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
+  private storeFilter(f: FilterState) {
+    this.filter = f;
+    try {
+      saveProjectFilter(this.o.dataDir, this.project!.root, f);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `The filter could not be saved: ${(err as Error).message}`,
+      });
+    }
   }
 
   private async guarded(work: () => Promise<unknown>): Promise<void> {
@@ -145,14 +186,30 @@ export class Runner {
     }
   }
 
-  /** Discovery of open and refresh. Cancel puts the project and tree from before back and re-sends them. */
-  private async rediscover(project: Project): Promise<boolean> {
+  /**
+   * Discovery of open and refresh, then `filter` without the tags the new tree lacks (a failed dry
+   * run drops nothing). Cancel puts the project and tree from before back and re-sends them and
+   * the filter, which it leaves unchanged.
+   */
+  private async rediscover(project: Project, filter: FilterState): Promise<boolean> {
     const before = { project: this.project, tree: this.tree };
     this.project = project;
-    await this.discover();
-    if (!this.cancelled) return true;
+    const tree = await this.discover();
+    if (!this.cancelled) {
+      this.filter = filter;
+      const pruned = tree && pruneFilter(filter, projectTags(tree));
+      if (
+        pruned &&
+        (pruned.include.length !== filter.include.length ||
+          pruned.exclude.length !== filter.exclude.length)
+      )
+        this.storeFilter(pruned);
+      this.sendFilter();
+      return true;
+    }
     ({ project: this.project, tree: this.tree } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
+    this.sendFilter();
     this.o.emit({ type: "notice", message: "Cancelled" });
     return false;
   }
@@ -175,7 +232,9 @@ export class Runner {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
     const { classpath } = detectLayout(root);
-    const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets, tags: [] });
+    // discovery lists every test; a run gets the filter
+    const tags = dryRun ? [] : tagArgs(this.filter);
+    const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets, tags });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
 
@@ -231,16 +290,27 @@ export class Runner {
       this.o.emit({ type: "notice", message: "Run the outline to run its rows" });
       return;
     }
-    const { root } = this.project!;
-    const targets = selectionTargets(node, root, detectLayout(root).featureRoots, NO_FILTER);
-    if (leafKeys(node).length === 0 || !targets?.length) {
+    // The filter as saved, not pruned: a vanished included tag shrinks the run, never widens it.
+    const filter = this.filter;
+    if ((node.kind === "scenario" || node.kind === "row") && !matches(node.tags, filter)) {
+      this.o.emit({ type: "notice", message: "This test no longer matches the filter" });
+      return;
+    }
+    if (matchingLeaves(node, filter).length === 0) {
       this.o.emit({ type: "notice", message: "Nothing to run" });
+      return;
+    }
+    const { root } = this.project!;
+    const targets = selectionTargets(node, root, detectLayout(root).featureRoots, filter);
+    if (!targets) {
+      // a matching row of a partly matching outline has no line (dynamic Examples)
+      this.o.emit({ type: "notice", message: "Clear the filter to run this outline" });
       return;
     }
 
     this.report = null;
     const outDir = this.outDir("run");
-    const state = new RunState(tree, node, NO_FILTER);
+    const state = new RunState(tree, node, filter);
     const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
     const proc = this.spawn(outDir, false, targets, (lines) =>
       this.o.emit({ type: "console", lines }),
