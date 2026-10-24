@@ -273,7 +273,6 @@ Also automated (Vitest):
 
 - Component structure, styling, exact IPC names, how the combo and dialog are built with the project's existing components.
 - Exact wording of hints and validation messages beyond the ones quoted above.
-- How the ANSI code page is determined and used for writing the argument file, and whether non-ASCII values work at all; if they cannot be passed exactly, they are rejected (R3), and the spec records which.
 - Whether the progress section shows the environment as text or a badge.
 
 Resolved by the builder check (2026-10-25), as the spec author's calls: results are cleared on an environment change; a typed environment applies on Enter or blur, reverts on cancel, sticks on a parse error; reserved names are Karate's own `karate.*` keys plus JVM namespaces; `@env` suggestions come from the feature files; no separate list of recently used environments; masking covers URL-encoded and JSON-escaped forms but not text folded into base64; values must be printable ASCII (U+0020 to U+007E), because Java reads the argument file in the Windows ANSI code page and only ASCII is identical in every code page, so any other character is rejected with "This value cannot be passed to Java exactly."

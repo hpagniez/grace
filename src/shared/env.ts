@@ -100,7 +100,7 @@ const parseRow = (x: unknown): RowEdit | null => {
 
 const parseRows = (x: unknown): RowEdit[] | null => {
   if (!Array.isArray(x) || x.length > MAX_ROWS) return null;
-  const rows = x.map(parseRow);
+  const rows = Array.from(x, parseRow); // not x.map: it skips holes in a sparse array
   return rows.every((r) => r !== null) ? rows : null;
 };
 
