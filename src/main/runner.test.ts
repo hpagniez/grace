@@ -462,6 +462,18 @@ describe("Runner tag filter", () => {
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 2, scenariosPassed: 2 });
   });
 
+  it("does not run an outline's @ignore rows when every listed row matches", T, async () => {
+    const { runner, all, last } = setup();
+    await runner.open(fixture("tags"));
+    const outline = byName(last("project").tree!, "speed <n>");
+    expect(outline.children).toHaveLength(3); // the @ignore Examples row is not listed
+    runner.setFilter(filter(["ol"]));
+    await runner.run(outline.key);
+    expect(last("runStarted").total).toBe(3);
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 3, scenariosPassed: 3 });
+    expect(all("notice")).toHaveLength(0);
+  });
+
   it("refuses a clicked test that no longer matches", T, async () => {
     const { runner, all, last } = setup();
     const root = fixture("clean");
