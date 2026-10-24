@@ -62,6 +62,7 @@ How the app knows which tests match:
 ### R1. Tag chips
 
 - A filter bar sits between the toolbar and the tree. It shows one chip per tag found on the tree's scenarios and rows (their full tag sets, so feature, outline and `Examples:` tags appear), sorted by name, shown with `@`.
+- Only tags that `-t` can select get a chip. Karate splits `-t` on commas and turns it into JavaScript without escaping (probe, Karate 2.1.4): a `,` in a tag makes Karate run other tests, and `'` or `(` fail the run with exit 3, included or excluded. So a tag holding whitespace, `,`, `'` or `(`, or starting with `@` or `~`, has no chip. It still shows next to its scenario's name, and its scenario still runs when the filter is off or it matches through another tag. Value tags such as `@owner=bob` are chips like any other: `-t=@owner=bob` selects exactly the tests tagged `@owner=bob`.
 - The bar is hidden when the project has no tags.
 - Clicking a chip cycles it: **off → include → exclude → off**. Include is shown green, exclude red and struck through, off neutral.
 - A **Clear** control sets every chip to off. It shows only when a chip is not off.
@@ -86,8 +87,8 @@ How the app knows which tests match:
 - What each ▶ runs while the filter is on:
   - suite, folder or feature: its targets as today, plus the filter as `-t` (see "Building `-t`"). Only matching tests run.
   - a matching scenario or row: `file.feature:LINE` as today. It matches, so the bypass of `-t` changes nothing.
-  - an outline whose rows all match: `file.feature:LINE` with the outline's line, as today.
-  - an outline whose rows match only in part: `file.feature:L1:L2…` with the lines of its matching rows. If any matching row has no line (dynamic Examples), the outline cannot be run under this filter: show "Clear the filter to run this outline".
+  - an outline: `file.feature:L1:L2…` with the lines of its matching rows, even when every row matches. `file.feature:LINE` bypasses `@ignore` as it bypasses `-t`, so the outline's own line would also run rows the dry run does not list (an `@ignore` `Examples:` block).
+  - an outline with a matching row that has no line (dynamic Examples): if every row matches, `file.feature:LINE` with the outline's line, the only way to run it; otherwise it cannot be run under this filter: show "Clear the filter to run this outline".
 - The pre-run discovery of walking skeleton R3 is unchanged, then:
   - the saved filter is applied to the new tree as it is. A tag that vanished since the last Open or Refresh is not dropped here: an included tag that no longer exists matches nothing, so the run shrinks ("Nothing to run" or "This test no longer matches the filter") and never widens past what the person saw.
   - the clicked node is found in the new tree as today. If it no longer matches, do not run: show "This test no longer matches the filter".
@@ -103,20 +104,22 @@ How the app knows which tests match:
 ### R6. Saved filter
 
 - The filter (included and excluded tags) and the Hide non-matching toggle are saved per project folder in the app's `settings.json`, next to the last opened project, and restored when that folder is opened again.
-- A change is saved when it is made.
+- A change is saved when it is made. Saves are not debounced: a chip click writes one small file, which has not been a problem.
 
 ## Design decisions already made
 
 ### Building `-t`
 
-From the chips: all included tags in one `-t`, joined with commas (OR); each excluded tag in its own `-t ~@tag` (repeated `-t` = AND).
+From the chips: all included tags in one `-t`, joined with commas (OR); each excluded tag in its own `-t=~@tag` (repeated `-t` = AND).
 
 ```
-include smoke, api; exclude wip, slow  →  -t @smoke,@api -t ~@wip -t ~@slow
-include none;       exclude wip        →  -t ~@wip
+include smoke, api; exclude wip, slow  →  -t=@smoke,@api -t=~@wip -t=~@slow
+include none;       exclude wip        →  -t=~@wip
 ```
 
 This is exactly R2's rule in Karate's syntax, using only forms the spike verified. No `-t` when the filter is off. `-t` goes in `buildArgs` before the targets.
+
+Each value is attached with `=`, in one argument. Karate parses its command line with picocli, which reads a separate argument starting with `@` as an argument file from the process cwd, the project root. With a file or folder named `smoke` there, `-t @smoke` fails (`Could not read argument file @smoke`, exit 1), or a file's contents become arguments (a file holding `~@wip` turns `-t @file` into `-t ~@wip`). picocli never expands `-t=@smoke` (probe, Karate 2.1.4).
 
 ### Where the filter lives
 
@@ -137,13 +140,13 @@ This is exactly R2's rule in Karate's syntax, using only forms the spike verifie
 }
 ```
 
-Tags are stored without `@`, like the tree. Writing one key must keep the others (today `saveLastProject` overwrites the whole file). An unreadable or malformed file, or a malformed entry, reads as no filter.
+Tags are stored without `@`, like the tree. Writing one key must keep the others (today `saveLastProject` overwrites the whole file). A missing or malformed file, or a malformed entry, reads as no filter. A file that exists but cannot be read (a transient `EBUSY`, say) also reads as no filter, but a save then fails with a notice instead of overwriting it.
 
 ## Acceptance criteria
 
 Test projects:
 - The **clean sample project** of the walking skeleton. Its tags: `passing hello` @smoke, `failing match` @wip, `calls helper feature` none, `smoke but wip` @smoke @wip (all in `basic.feature`); `slow loop` @slow, `smoke and slow` @smoke @slow (`slow.feature`); the 3 outline rows none. 9 tests.
-- A new **tags sample project**: one feature tagged `@feat` with an outline `@ol` whose two `Examples:` blocks are tagged `@fast` (2 rows) and `@slow` (1 row), and one plain scenario tagged `@other`. All pass.
+- A new **tags sample project**: one feature tagged `@feat` with an outline `@ol` whose `Examples:` blocks are tagged `@fast` (2 rows), `@slow` (1 row) and `@ignore` (1 row, which the dry run does not list and no run may run), and one plain scenario tagged `@other`. All pass. A folder named `fast` at its root makes a bare `-t @fast` fail.
 
 Every scenario is automated with Playwright against the built app, each on a fresh copy of its fixture, like the walking skeleton.
 
@@ -217,16 +220,17 @@ Feature: Tag filter
 
 Also automated (Vitest):
 - The matching function: OR across included, any excluded removes, empty filter matches all, containers match through any leaf.
-- `-t` building, including include-only, exclude-only and both.
-- Run targets under a filter: suite, folder, feature, full outline, partial outline (`file:L1:L2`), partial outline with a dynamic row.
+- `-t` building, including include-only, exclude-only and both, all in the attached `-t=` form.
+- Which tags can be chips: whitespace, `,`, `'`, `(`, a leading `@` or `~` are left out, and a saved or sent filter holding one is rejected.
+- Run targets under a filter: suite, folder, feature, full outline (every row's line), full outline with a dynamic row (the outline's line), partial outline (`file:L1:L2`), partial outline with a dynamic row.
 - Run end: a `SUITE_EXIT` scenario count above `total` produces the "more than selected" notice.
-- Settings: load and save of the per-project filter, keeping `lastProject` and other projects, and a malformed file or entry read as no filter.
-- A Node test with the bundled Java: on the tags sample project, dry runs with `-t @fast`, `-t @fast,@other` and `-t ~@slow` select exactly the tests the matching function picks from the unfiltered tree.
+- Settings: load and save of the per-project filter, keeping `lastProject` and other projects, a malformed file or entry read as no filter, and a read error other than a missing or malformed file failing the save without touching the file.
+- A Node test with the bundled Java: on the tags sample project, dry runs with `-t=@fast`, `-t=@fast,@other` and `-t=~@slow` select exactly the tests the matching function picks from the unfiltered tree.
+- A Node test with the bundled Java: on the tags sample project with `@ol` included, running the outline runs its 3 listed rows, not the `@ignore` row.
 
 ## Left to the builder
 
 - Component structure, styling, exact IPC names, and how the store holds the filter.
 - Exact wording of the counter, empty states and notices.
-- Whether tags with values (`@owner=bob`) work with `-t @owner=bob`. If they do, they are chips like any other; if not, leave them out of the chips and say so in this spec.
-- Debouncing saves if chip clicks write the file too often.
-- Checking that `file.feature:L1:L2` with two outline-row lines runs exactly those rows (the spike verified multi-line selection for scenarios only). The "Part of an outline matches" scenario covers it.
+
+Resolved while building: value tags are chips (R1); saves are not debounced (R6); `file.feature:L1:L2` with outline-row lines runs exactly those rows ("Part of an outline matches" and the `@ignore` Node test).
