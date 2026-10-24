@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Layout, TestNode } from "../../shared/model";
+import { filterOn, matchingLeaves, NO_FILTER, type TagFilter } from "../../shared/tags";
 
 export interface ProjectLayout {
   layout: Layout;
@@ -23,9 +24,33 @@ export function detectLayout(root: string): ProjectLayout {
   return { layout, classpath: dirs, featureRoots: dirs };
 }
 
-export function selectionTargets(node: TestNode, root: string, featureRoots: string[]): string[] {
+/** `-t` arguments: included tags in one OR group, each excluded tag its own (AND). */
+export function tagArgs(f: TagFilter): string[] {
+  return [
+    ...(f.include.length ? ["-t", f.include.map((t) => `@${t}`).join(",")] : []),
+    ...f.exclude.flatMap((t) => ["-t", `~@${t}`]),
+  ];
+}
+
+/**
+ * Run targets for a node. A `file:LINE` target bypasses `-t`, so an outline under a filter lists
+ * its matching rows' lines instead. Null when that is impossible: a matching row has no line
+ * (dynamic Examples) or no row matches.
+ */
+export function selectionTargets(
+  node: TestNode,
+  root: string,
+  featureRoots: string[],
+  f: TagFilter,
+): string[] | null {
   if (node.kind === "folder" && node.file === "") return featureRoots;
   const abs = path.join(root, ...node.file.split("/"));
+  if (node.kind === "outline" && filterOn(f)) {
+    const hits = matchingLeaves(node, f);
+    if (hits.length === matchingLeaves(node, NO_FILTER).length) return [`${abs}:${node.line}`];
+    const lines = hits.map((r) => r.line);
+    return lines.length === 0 || lines.includes(null) ? null : [`${abs}:${lines.join(":")}`];
+  }
   return node.kind === "folder" || node.kind === "feature" ? [abs] : [`${abs}:${node.line}`];
 }
 
@@ -35,6 +60,7 @@ export function buildArgs(o: {
   root: string;
   outDir: string;
   dryRun: boolean;
+  tags: string[];
   targets: string[];
 }): string[] {
   return [
@@ -54,6 +80,7 @@ export function buildArgs(o: {
     "-f",
     "html,karate:jsonl",
     ...(o.dryRun ? ["-D"] : []),
+    ...o.tags,
     ...o.targets,
   ];
 }
