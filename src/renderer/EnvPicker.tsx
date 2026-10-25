@@ -14,7 +14,9 @@ export const INVALID_ENV =
 export function EnvPicker(props: { state: AppState; api: Api }) {
   const view = () => props.state.env; // the reducer keeps it null with no project
   const locked = () => props.state.run.active || props.state.busy;
-  const shown = () => view()?.env ?? (view() ? NONE : "");
+  // No environment is an empty box with a placeholder: Chromium narrows the datalist popup to the
+  // options that match the text in the box, so "(none)" as a value would hide every suggestion.
+  const shown = () => view()?.env ?? "";
   const [text, setText] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
 
@@ -53,6 +55,7 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}
+          placeholder={view() ? NONE : undefined}
           value={text()}
           aria-invalid={error() ? "true" : undefined}
           aria-describedby={error() ? "env-error" : hint() ? "env-hint" : undefined}
