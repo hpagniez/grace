@@ -388,8 +388,10 @@ export class Runner {
     try {
       tree = await this.discover();
     } catch (err) {
-      // nothing was sent yet: the next run must not use an environment the window does not show
+      // the next run must not use an environment the window does not show, and the window may
+      // still show the name it sent
       ({ project: this.project, tree: this.tree, envs: this.envs } = before);
+      this.o.emit(this.envEvent());
       throw err;
     }
     if (!this.cancelled) {
