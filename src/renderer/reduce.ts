@@ -1,5 +1,6 @@
 import type { EnvView } from "../shared/env";
 import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
+import type { HistoryEntry } from "../shared/history";
 import type { Status, TestNode } from "../shared/model";
 import { NO_FILTER, type FilterState } from "../shared/tags";
 
@@ -13,6 +14,8 @@ export interface RunView {
   outcome: RunOutcome | null;
   summary: Summary | null;
   reportAvailable: boolean;
+  /** The run folder's name, the key of its entry in the history. */
+  runId: string | null;
   /** The environment the run in progress, or the last run, used. */
   env: string | null;
 }
@@ -33,6 +36,10 @@ export interface AppState {
   env: EnvView | null;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
+  /** The open project's listed runs, newest first, as main sends them. */
+  history: HistoryEntry[];
+  /** The tab shown in the bottom panel. */
+  panel: "console" | "history";
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -50,6 +57,7 @@ const idleRun = (): RunView => ({
   outcome: null,
   summary: null,
   reportAvailable: false,
+  runId: null,
   env: null,
 });
 
@@ -68,6 +76,8 @@ export function initialState(): AppState {
     filter: noFilter(),
     env: null,
     busy: false,
+    history: [],
+    panel: "console",
   };
 }
 
@@ -91,6 +101,7 @@ export function reduce(s: AppState, e: AppEvent): void {
           run: idleRun(),
           filter: noFilter(), // main's `filter` event follows
           env: null, // and its `environment` event
+          history: [], // main's `history` follows a project that opens
         });
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
@@ -111,7 +122,15 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     }
     case "runStarted":
-      s.run = { ...idleRun(), active: true, total: e.total, startedAt: e.startedAt, env: e.env };
+      s.run = {
+        ...idleRun(),
+        active: true,
+        total: e.total,
+        startedAt: e.startedAt,
+        runId: e.runId,
+        env: e.env,
+      };
+      s.panel = "console";
       for (const key of e.keys) {
         s.statuses[key] = "pending";
         delete s.results[key];
@@ -150,6 +169,12 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "filter":
       s.filter = e.filter;
+      break;
+    case "history":
+      s.history = e.runs;
+      // the toolbar Report opens a run's report: it needs the run to still be listed with one
+      if (!e.runs.some((r) => r.id === s.run.runId && r.reportAvailable))
+        s.run.reportAvailable = false;
       break;
     case "environment":
       if (!s.project) break; // main can still hold the previous project's view

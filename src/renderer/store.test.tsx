@@ -63,6 +63,7 @@ describe("createAppStore", () => {
     cb({
       type: "runStarted",
       selection: "f:a.feature",
+      runId: "20261025-120000-000",
       keys: ["s:a#1", "s:a#2"],
       total: 2,
       startedAt: 1,

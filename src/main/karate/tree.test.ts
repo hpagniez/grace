@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { readAllEvents, type KarateEvent } from "./events";
+import type { StoredTest } from "../../shared/history";
 import type { TestNode } from "../../shared/model";
 import {
   buildTree,
@@ -10,6 +11,7 @@ import {
   leafKeys,
   parseRefId,
   resolveNode,
+  resolveTests,
   rowLines,
 } from "./tree";
 
@@ -159,5 +161,44 @@ describe("resolveNode", () => {
   it("returns null when the scenario is gone", () => {
     const gone = clean().filter((e) => e.data.name !== "failing match");
     expect(resolveNode(buildTree(gone, "clean"), oldNode())).toBeNull();
+  });
+});
+
+describe("resolveTests", () => {
+  const F = "tests/a.feature";
+  const leaf = (
+    kind: TestNode["kind"],
+    key: string,
+    name: string,
+    line: number | null,
+    children: TestNode[] = [],
+  ): TestNode => ({ key, kind, name, file: F, line, refId: null, tags: [], children });
+  const tree = leaf("folder", "d:", "x", null, [
+    leaf("feature", `f:${F}`, "a", null, [
+      leaf("scenario", `s:${F}#1`, "other", 3),
+      leaf("scenario", `s:${F}#2`, "moved", 8), // was #1 before "other" was added above it
+      leaf("scenario", `s:${F}#3`, "stays", 14),
+      leaf("outline", `o:${F}#4`, "dyn <n>", 20, [leaf("row", `s:${F}#4.1`, "dyn 1", null)]),
+      leaf("scenario", `s:${F}#5`, "twin", 30),
+      leaf("scenario", `s:${F}#6`, "twin", 36),
+    ]),
+  ]);
+  const stored = (kind: StoredTest["kind"], key: string, name: string, line: number | null) =>
+    ({ kind, file: F, refId: "[1:1]", name, line, key, status: "failed" }) satisfies StoredTest;
+
+  it("finds moved and same-key tests, counts missing and dynamic", () => {
+    const tests = [
+      stored("scenario", `s:${F}#3`, "stays", 14), // same key
+      stored("scenario", `s:${F}#9`, "gone", 50), // deleted
+      stored("row", `s:${F}#4.1`, "dyn 1", null), // row of a dynamic Examples table
+      // Its key matches neither twin: a same-key hit would pass before the ambiguity check.
+      stored("scenario", `s:${F}#7`, "twin", 40),
+      stored("scenario", `s:${F}#1`, "moved", 3), // key shifted, name kept
+      stored("scenario", `s:${F}#3`, "stays", 14), // again: found once
+    ];
+    const { found, missing, dynamic } = resolveTests(tree, tests);
+    expect(found.map((n) => n.key)).toEqual([`s:${F}#2`, `s:${F}#3`]); // tree order
+    expect(missing).toBe(2);
+    expect(dynamic).toBe(1);
   });
 });

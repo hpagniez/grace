@@ -2,85 +2,30 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import {
+  addProperty,
+  chooseEnv,
   emptyProject,
   expect,
   launch,
   node,
+  openEnv,
+  openEnvWith,
   openProject,
+  openProperties,
+  openWithSecret,
   ourJavaCommandLines,
   ourJavaPids,
   project,
+  runAlways,
+  saved,
+  saveProperties,
+  scopeItem,
+  SECRET,
   test,
 } from "./helpers";
 
-const SECRET = "s3cret-token-123";
-
-/** The settings entry of the project, as main saved it. */
-const saved = (userData: string, dir: string) => {
-  try {
-    return JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8")).projects?.[
-      path.resolve(dir)
-    ];
-  } catch {
-    return undefined; // not written yet, or caught mid-write
-  }
-};
-
-/** Opens the env sample project and waits for its tree. */
-async function openEnv(extraEnv?: Record<string, string>) {
-  const dir = project("env");
-  const { app, win, userData } = await launch(undefined, extraEnv);
-  await openProject(app, dir);
-  await expect(node(win, "always")).toBeVisible({ timeout: 15_000 });
-  return { dir, app, win, userData };
-}
-
-/** Types the environment and presses Enter. Waits until main has saved it. */
-async function chooseEnv(win: Page, userData: string, dir: string, name: string) {
-  const input = win.getByTestId("env-input");
-  await input.fill(name);
-  await input.press("Enter");
-  await expect.poll(() => saved(userData, dir)?.env, { timeout: 30_000 }).toBe(name);
-}
-
-/** The env sample project, open with this environment. */
-async function openEnvWith(env: string) {
-  const opened = await openEnv();
-  await chooseEnv(opened.win, opened.userData, opened.dir, env);
-  return opened;
-}
-
 const input = (win: Page) => win.getByTestId("env-input");
 const consoleText = (win: Page) => win.getByTestId("console");
-
-async function openProperties(win: Page) {
-  await win.getByTestId("properties-button").click();
-  await expect(win.getByTestId("properties-dialog")).toBeVisible();
-}
-
-const scopeItem = (win: Page, scope: string) =>
-  win.locator(`[data-testid=scope-item][data-scope="${scope}"]`);
-
-/** Adds a row to the list of `scope` ("" is All environments) in the open dialog. */
-async function addProperty(win: Page, scope: string, name: string, value: string, secret = false) {
-  await scopeItem(win, scope).click();
-  await win.getByTestId("add-property").click();
-  const row = win.getByTestId("property-row").last();
-  await row.getByTestId("prop-name").fill(name);
-  if (secret) await row.getByTestId("prop-secret").check();
-  await row.getByTestId("prop-value").fill(value);
-}
-
-async function saveProperties(win: Page) {
-  await win.getByTestId("save-properties").click();
-  await expect(win.getByTestId("properties-dialog")).toBeHidden();
-}
-
-/** Runs "always" and waits for the run to finish. */
-async function runAlways(win: Page) {
-  await node(win, "always").getByTestId("run-node").click();
-  await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 45_000 });
-}
 
 test("Suggestions come from overlay files and env tags", async () => {
   const { win } = await openEnv();
@@ -179,18 +124,6 @@ test("Shared and environment properties, environment wins", async () => {
   await expect(consoleText(win)).not.toContainText("timeout = 9000");
   await expect(win.getByTestId("run-env")).toHaveText("");
 });
-
-/** The env sample project in "qa" with the secret "api.token" saved for it. */
-async function openWithSecret() {
-  const opened = await openEnvWith("qa");
-  await openProperties(opened.win);
-  await addProperty(opened.win, "qa", "api.token", SECRET, true);
-  await saveProperties(opened.win);
-  await expect
-    .poll(() => saved(opened.userData, opened.dir)?.properties?.byEnv?.qa)
-    .toEqual([{ name: "api.token", secret: expect.any(String) }]);
-  return opened;
-}
 
 test("A secret is used but never shown", async () => {
   test.setTimeout(90_000);

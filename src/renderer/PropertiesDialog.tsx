@@ -31,7 +31,7 @@ interface Row {
 const field =
   "min-w-0 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800";
 const SECRETS_NOTE =
-  "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask.";
+  "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask. Run history keeps the reports of the last 20 runs; Clear history deletes them.";
 
 let nextId = 0;
 const rowsOf = (scope: string, list: RowView[]): Row[] =>

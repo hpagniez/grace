@@ -1,3 +1,4 @@
+import type { StoredTest } from "../../shared/history";
 import type { TestNode } from "../../shared/model";
 import type { KarateEvent } from "./events";
 
@@ -163,7 +164,10 @@ export function leafIndex(tree: TestNode): Map<string, TestNode> {
 }
 
 /** Finds `old` again after a re-discovery: same key and name, else the one same-kind node of that name in the same feature. Refuses to guess. */
-export function resolveNode(tree: TestNode, old: TestNode): TestNode | null {
+export function resolveNode(
+  tree: TestNode,
+  old: Pick<TestNode, "key" | "kind" | "file" | "name">,
+): TestNode | null {
   const same = findNode(tree, old.key);
   if (same && same.name === old.name) return same;
   const matches: TestNode[] = [];
@@ -173,4 +177,31 @@ export function resolveNode(tree: TestNode, old: TestNode): TestNode | null {
   };
   walk(tree);
   return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Finds stored tests again in a re-discovered tree with `resolveNode`. `found` holds each test once,
+ * in tree order. A test that is gone or ambiguous counts as `missing`; a found one with no line (a row
+ * of a dynamic Examples table) cannot be targeted alone and counts as `dynamic`.
+ */
+export function resolveTests(
+  tree: TestNode,
+  tests: StoredTest[],
+): { found: TestNode[]; missing: number; dynamic: number } {
+  const hits = new Set<TestNode>();
+  let missing = 0;
+  let dynamic = 0;
+  for (const t of tests) {
+    const n = resolveNode(tree, t);
+    if (!n) missing++;
+    else if (n.line === null) dynamic++;
+    else hits.add(n);
+  }
+  const found: TestNode[] = [];
+  const walk = (n: TestNode) => {
+    if (hits.has(n)) found.push(n);
+    n.children.forEach(walk);
+  };
+  walk(tree);
+  return { found, missing, dynamic };
 }
