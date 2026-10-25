@@ -1,4 +1,5 @@
 // Shared by main, preload and renderer: keep this file free of Node imports.
+import type { PropertiesEdit } from "./env";
 import type { AppEvent } from "./events";
 import type { FilterState } from "./tags";
 
@@ -11,6 +12,7 @@ export const CH = {
   report: "report:open",
   filter: "filter:set",
   env: "env:set",
+  properties: "properties:save",
   event: "app:event",
 } as const;
 
@@ -23,5 +25,6 @@ export interface Api {
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
   setEnv(name: string | null): Promise<void>;
+  saveProperties(edit: PropertiesEdit): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }
