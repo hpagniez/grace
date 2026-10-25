@@ -3,8 +3,10 @@ import path from "node:path";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
+import { safeStorageBox } from "./main/secrets";
 import { loadLastProject, saveLastProject } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
 
@@ -73,7 +75,7 @@ app.whenReady().then(async () => {
   const vendor = vendorPaths(
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
   );
-  const runner = new Runner({ vendor, dataDir, emit });
+  const runner = new Runner({ vendor, dataDir, secrets: safeStorageBox(), emit });
 
   handle(CH.ready, () => {
     for (const e of runner.replay()) emit(e);
@@ -99,6 +101,13 @@ app.whenReady().then(async () => {
     }
     runner.setFilter(filter);
   });
+  handle(CH.env, async (name) => {
+    if (name !== null && (typeof name !== "string" || name.length > 64)) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await runner.setEnv(name);
+  });
   handle(CH.cancel, () => runner.cancel());
   handle(CH.report, async () => {
     const report = runner.reportPath();
@@ -121,6 +130,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error(err);
   }
+  removeLeftoverArgFiles(dataDir);
   createWindow();
   try {
     const last = loadLastProject(dataDir);

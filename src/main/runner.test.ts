@@ -22,7 +22,8 @@ import { readAllEvents } from "./karate/events";
 import { spawnKarate } from "./karate/process";
 import { buildTree, leafKeys } from "./karate/tree";
 import { Runner } from "./runner";
-import { loadProjectFilter } from "./settings";
+import { fakeSecretBox, type SecretBox } from "./secrets";
+import { loadProjectEnv, loadProjectFilter, saveProjectEnv } from "./settings";
 import { vendorPaths } from "./vendor";
 
 const vendor = vendorPaths(path.resolve("vendor"));
@@ -38,10 +39,13 @@ afterEach(async () => {
 
 type Of<K extends AppEvent["type"]> = Extract<AppEvent, { type: K }>;
 
-function setup(dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"))) {
+function setup(
+  dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-")),
+  secrets: SecretBox = fakeSecretBox(),
+) {
   temps.push(dataDir);
   const events: AppEvent[] = [];
-  const runner = new Runner({ vendor, dataDir, emit: (e) => events.push(e) });
+  const runner = new Runner({ vendor, dataDir, secrets, emit: (e) => events.push(e) });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
     events.filter((e): e is Of<K> => e.type === type);
@@ -49,7 +53,7 @@ function setup(dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"))) {
   return { runner, events, dataDir, all, last };
 }
 
-function fixture(name: "clean" | "broken" | "maven" | "edge" | "tags"): string {
+function fixture(name: "clean" | "broken" | "maven" | "edge" | "tags" | "env"): string {
   const d = copyFixture(name);
   temps.push(d);
   return d;
@@ -151,7 +155,7 @@ describe("Runner discovery", () => {
   });
 
   it("replay restores a window that loads during discovery", T, async () => {
-    const { runner } = setup();
+    const { runner, last } = setup();
     expect(runner.replay()).toEqual([{ type: "busy", busy: false }]);
     const opening = runner.open(fixture("clean"));
     // The window may load before the first project event: it still learns the runner is busy.
@@ -160,6 +164,7 @@ describe("Runner discovery", () => {
     expect(runner.replay()).toEqual([
       runner.current(),
       { type: "filter", filter: NO_FILTER },
+      last("environment"),
       { type: "busy", busy: false },
     ]);
   });
@@ -531,6 +536,7 @@ describe("Runner tag filter", () => {
     expect(second.runner.replay()).toEqual([
       second.runner.current(),
       saved,
+      second.last("environment"),
       { type: "busy", busy: false },
     ]);
   });
@@ -585,6 +591,208 @@ describe("Runner tag filter", () => {
       const expected = ids(matchingLeaves(tree, f));
       expect(expected).toHaveLength(count);
       expect(ids(matchingLeaves(await dryRunTree(root, f), NO_FILTER))).toEqual(expected);
+    }
+  });
+});
+
+describe("Runner environment", () => {
+  const names = (tree: TestNode | null) =>
+    tree ? matchingLeaves(tree, NO_FILTER).map((n) => n.name) : [];
+  const printed = (events: AppEvent[]) =>
+    events.flatMap((e) => (e.type === "console" ? e.lines : []));
+  /** Event types after `from`, without the busy events. */
+  const typesAfter = (events: AppEvent[], from: number) =>
+    events
+      .slice(from)
+      .map((e) => e.type)
+      .filter((t) => t !== "busy");
+
+  it("suggestions from overlays and tags", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    expect(last("environment").view).toMatchObject({
+      env: null,
+      suggestions: ["prod", "qa"],
+      overlays: ["qa"],
+    });
+    expect(typesAfter(events, 0)).toEqual(["project", "filter", "environment"]);
+  });
+
+  it("setEnv rediscovers", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    expect(names(last("project").tree)).not.toContain("qa only");
+    expect(names(last("project").tree)).toContain("not prod");
+    const from = events.length;
+    await runner.setEnv("qa");
+    expect(typesAfter(events, from)).toEqual(["project", "filter", "environment"]);
+    expect(names(last("project").tree)).toContain("qa only");
+    expect(last("environment").view.env).toBe("qa");
+    // the tag of a scenario prod lacks is pruned, as after a Refresh
+    runner.setFilter({ include: ["env=qa"], exclude: [], hideNonMatching: false });
+    await runner.setEnv("prod");
+    const tree = last("project").tree;
+    expect(names(tree)).not.toContain("qa only");
+    expect(names(tree)).not.toContain("not prod");
+    expect(last("filter").filter).toEqual(NO_FILTER);
+    expect(loadProjectFilter(dataDir, root)).toEqual(NO_FILTER);
+  });
+
+  it("a run uses -e", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("karate.env = qa"))).toBe(true);
+    expect(last("runStarted").env).toBe("qa");
+    expect(runner.reportPath()).not.toBeNull();
+    // a result from qa is not the state of prod
+    await runner.setEnv("prod");
+    expect(runner.reportPath()).toBeNull();
+  });
+
+  it("setEnv saves and open restores", T, async () => {
+    const first = setup();
+    const root = fixture("env");
+    const properties = {
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: { qa: [{ name: "api.token", secret: fakeSecretBox().encrypt("tok-123") }] },
+    };
+    saveProjectEnv(first.dataDir, root, { env: null, properties });
+    await first.runner.open(root);
+    await first.runner.setEnv("qa");
+    expect(loadProjectEnv(first.dataDir, root)).toEqual({ env: "qa", properties });
+    await first.runner.dispose();
+    const second = setup(first.dataDir);
+    await second.runner.open(root);
+    expect(second.last("environment").view.env).toBe("qa");
+    expect(names(second.last("project").tree)).toContain("qa only");
+    expect(second.runner.replay()).toEqual([
+      second.runner.current(),
+      { type: "filter", filter: NO_FILTER },
+      second.last("environment"),
+      { type: "busy", busy: false },
+    ]);
+  });
+
+  it("the view shows secret rows without their values", T, async () => {
+    const root = fixture("env");
+    const dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"));
+    const token = fakeSecretBox().encrypt("tok-123");
+    saveProjectEnv(dataDir, root, {
+      env: null,
+      properties: {
+        shared: [{ name: "timeout", value: "5000" }],
+        byEnv: {
+          qa: [
+            { name: "api.token", secret: token },
+            { name: "broken", secret: "Zm9v" },
+          ],
+          toString: [],
+        },
+      },
+    });
+    const { runner, last } = setup(dataDir);
+    await runner.open(root);
+    const { view } = last("environment");
+    expect(view.suggestions).toEqual(["prod", "qa", "toString"]);
+    expect(view.secretsAvailable).toBe(true);
+    expect(view.properties).toEqual({
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: {
+        qa: [
+          { name: "api.token", secret: true, state: "set" },
+          { name: "broken", secret: true, state: "unreadable" },
+        ],
+        toString: [],
+      },
+    });
+    expect(JSON.stringify(view)).not.toMatch(/tok-123|Zm9v/);
+    expect(JSON.stringify(view)).not.toContain(token);
+
+    const off = setup(dataDir, fakeSecretBox(false));
+    await off.runner.open(root);
+    const unavailable = off.last("environment").view;
+    expect(unavailable.secretsAvailable).toBe(false);
+    expect(unavailable.properties.byEnv.qa[0]).toEqual({
+      name: "api.token",
+      secret: true,
+      state: "unreadable",
+    });
+  });
+
+  it("cancel during setEnv restores the previous environment", T, async () => {
+    const { runner, events, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    const before = runner.current();
+    const view = last("environment");
+    const from = events.length;
+    const switching = runner.setEnv("prod");
+    await runner.cancel();
+    await switching;
+    expect(typesAfter(events, from)).toEqual(["project", "filter", "environment", "notice"]);
+    expect(all("project").at(-1)).toEqual(before);
+    expect(last("environment")).toEqual(view);
+    expect(last("notice").message).toBe("Cancelled");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+    // the restored environment is the one discovery uses
+    await runner.refresh();
+    expect(names(last("project").tree)).toContain("qa only");
+  });
+
+  it("a parse error still applies and saves the environment", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("broken");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    expect(last("project").error).toContain("syntax.feature");
+    expect(last("environment").view.env).toBe("qa");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+  });
+
+  it("invalid env name is refused", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    for (const name of ["bad name", "-Dx=1", "", "a".repeat(65)]) {
+      await runner.setEnv(name);
+      expect(last("notice").message).toBe("Invalid environment name");
+    }
+    await runner.setEnv(null); // the same environment: nothing to do
+    expect(all("project")).toHaveLength(1);
+    expect(last("environment").view.env).toBeNull();
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+  });
+
+  it("setEnv while busy gets the busy notice", T, async () => {
+    const { runner, all, last } = setup();
+    await runner.open(fixture("env"));
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    await runner.setEnv("qa");
+    expect(last("notice").message).toBe("A run is already in progress");
+    await runner.cancel();
+    await run;
+    expect(all("environment")).toHaveLength(1);
+    expect(last("environment").view.env).toBeNull();
+  });
+
+  it("KARATE_ENV in the parent environment is ignored", T, async () => {
+    const saved = process.env.KARATE_ENV;
+    process.env.KARATE_ENV = "prod";
+    try {
+      const { runner, events, last } = setup();
+      await runner.open(fixture("env"));
+      expect(names(last("project").tree)).toContain("not prod");
+      await runner.run(byName(last("project").tree!, "always").key);
+      expect(printed(events).some((l) => l.includes("karate.env = null"))).toBe(true);
+      expect(last("runStarted").env).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.KARATE_ENV;
+      else process.env.KARATE_ENV = saved;
     }
   });
 });

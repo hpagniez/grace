@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { sortedUnique, validEnvName, type RowView } from "../shared/env";
 import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
 import {
@@ -12,11 +13,21 @@ import {
   type FilterState,
 } from "../shared/tags";
 import { buildArgs, detectLayout, selectionTargets, tagArgs } from "./karate/command";
+import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
 import { buildTree, findNode, parseRefId, resolveNode, rowLines } from "./karate/tree";
-import { loadProjectFilter, saveProjectFilter } from "./settings";
+import type { SecretBox } from "./secrets";
+import {
+  emptyEnvSettings,
+  loadProjectEnv,
+  loadProjectFilter,
+  saveProjectEnv,
+  saveProjectFilter,
+  type EnvSettings,
+  type StoredRow,
+} from "./settings";
 import type { VendorPaths } from "./vendor";
 
 const BUSY = "A run is already in progress";
@@ -52,12 +63,19 @@ function setRowLines(tree: TestNode, root: string): void {
   walk(tree);
 }
 
-/** Owns the project, its test tree, its tag filter and the one Karate process (dry run or run) at a time. */
+/**
+ * Owns the project, its test tree, its tag filter, its environment and run properties, and the one
+ * Karate process (dry run or run) at a time.
+ */
 export class Runner {
   private project: Project | null = null;
   private tree: TestNode | null = null;
   private last: Extract<AppEvent, { type: "project" }> | null = null;
   private filter: FilterState = { ...NO_FILTER, include: [], exclude: [] };
+  private envs: EnvSettings = emptyEnvSettings();
+  /** Environments of overlay files and env tags, scanned at each discovery of open, refresh and setEnv. */
+  private overlays: string[] = [];
+  private tagEnvs: string[] = [];
   private busy = false;
   private proc: KarateProcess | null = null;
   private cancelled = false;
@@ -68,6 +86,7 @@ export class Runner {
     private readonly o: {
       vendor: VendorPaths;
       dataDir: string;
+      secrets: SecretBox;
       emit: (e: AppEvent) => void;
       pollMs?: number;
     },
@@ -95,6 +114,7 @@ export class Runner {
       opened = await this.rediscover(
         { root, layout: detectLayout(root).layout },
         loadProjectFilter(this.o.dataDir, root),
+        loadProjectEnv(this.o.dataDir, root),
       );
       if (!opened) this.report = report;
     });
@@ -102,7 +122,34 @@ export class Runner {
   }
 
   async refresh(): Promise<void> {
-    if (this.project) await this.guarded(() => this.rediscover(this.project!, this.filter));
+    if (this.project)
+      await this.guarded(() => this.rediscover(this.project!, this.filter, this.envs));
+  }
+
+  /**
+   * Re-discovers with the new environment (env tags change which tests exist). It is saved once that
+   * discovery ends, also on a parse error; a cancel keeps the environment before and saves nothing.
+   */
+  async setEnv(name: string | null): Promise<void> {
+    if (!this.project) return;
+    await this.guarded(async () => {
+      if (name !== null && !validEnvName(name)) {
+        this.o.emit({ type: "notice", message: "Invalid environment name" });
+        return;
+      }
+      if (name === this.envs.env) return;
+      const envs = { ...this.envs, env: name };
+      if (!(await this.rediscover(this.project!, this.filter, envs))) return;
+      this.report = null; // a result from another environment
+      try {
+        saveProjectEnv(this.o.dataDir, this.project!.root, envs);
+      } catch (err) {
+        this.o.emit({
+          type: "notice",
+          message: `The environment could not be saved: ${(err as Error).message}`,
+        });
+      }
+    });
   }
 
   /** Refused while busy (the filter in force is re-sent); ignored with no project. */
@@ -138,7 +185,9 @@ export class Runner {
   /** What a window that just loaded needs: events sent before it subscribed are lost. */
   replay(): AppEvent[] {
     const busy: AppEvent = { type: "busy", busy: this.busy };
-    return this.last ? [this.last, { type: "filter", filter: this.filter }, busy] : [busy];
+    return this.last
+      ? [this.last, { type: "filter", filter: this.filter }, this.envEvent(), busy]
+      : [busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
@@ -155,6 +204,40 @@ export class Runner {
 
   private sendFilter() {
     this.o.emit({ type: "filter", filter: this.filter });
+  }
+
+  /** A secret row carries only whether it can be decrypted, never its value. */
+  private envEvent(): AppEvent {
+    const { secrets } = this.o;
+    const { env, properties } = this.envs;
+    const row = (r: StoredRow): RowView =>
+      "secret" in r
+        ? {
+            name: r.name,
+            secret: true,
+            state: secrets.available() && secrets.decrypt(r.secret) !== null ? "set" : "unreadable",
+          }
+        : r;
+    return {
+      type: "environment",
+      view: {
+        env,
+        suggestions: sortedUnique([
+          this.overlays,
+          this.tagEnvs,
+          Object.keys(properties.byEnv),
+          env === null ? [] : [env],
+        ]),
+        overlays: this.overlays,
+        properties: {
+          shared: properties.shared.map(row),
+          byEnv: Object.fromEntries(
+            Object.entries(properties.byEnv).map(([e, rows]) => [e, rows.map(row)]),
+          ),
+        },
+        secretsAvailable: secrets.available(),
+      },
+    };
   }
 
   /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
@@ -187,13 +270,18 @@ export class Runner {
   }
 
   /**
-   * Discovery of open and refresh, then `filter` without the tags the new tree lacks (a failed dry
-   * run drops nothing). Cancel puts the project and tree from before back and re-sends them and
-   * the filter, which it leaves unchanged.
+   * Discovery of open, refresh and setEnv with `envs`, then `filter` without the tags the new tree
+   * lacks (a failed dry run drops nothing), then `environment`. Cancel puts the project, tree and
+   * environment from before back and re-sends them and the filter, which it leaves unchanged.
    */
-  private async rediscover(project: Project, filter: FilterState): Promise<boolean> {
-    const before = { project: this.project, tree: this.tree };
+  private async rediscover(
+    project: Project,
+    filter: FilterState,
+    envs: EnvSettings,
+  ): Promise<boolean> {
+    const before = { project: this.project, tree: this.tree, envs: this.envs };
     this.project = project;
+    this.envs = envs;
     const tree = await this.discover();
     if (!this.cancelled) {
       this.filter = filter;
@@ -205,11 +293,16 @@ export class Runner {
       )
         this.storeFilter(pruned);
       this.sendFilter();
+      const { classpath, featureRoots } = detectLayout(project.root);
+      this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
+      this.tagEnvs = featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
+      this.o.emit(this.envEvent());
       return true;
     }
-    ({ project: this.project, tree: this.tree } = before);
+    ({ project: this.project, tree: this.tree, envs: this.envs } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
     this.sendFilter();
+    this.o.emit(this.envEvent());
     this.o.emit({ type: "notice", message: "Cancelled" });
     return false;
   }
@@ -242,7 +335,7 @@ export class Runner {
       dryRun,
       targets,
       tags,
-      env: null,
+      env: this.envs.env,
       argFile: null,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
@@ -341,6 +434,7 @@ export class Runner {
       keys: state.keys,
       total: state.keys.length,
       startedAt: Date.now(),
+      env: this.envs.env,
     });
 
     // A bad event line or malformed data is fatal: the run's status can no longer be trusted.

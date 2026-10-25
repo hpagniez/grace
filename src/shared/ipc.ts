@@ -10,6 +10,7 @@ export const CH = {
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
+  env: "env:set",
   event: "app:event",
 } as const;
 
@@ -21,5 +22,6 @@ export interface Api {
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
+  setEnv(name: string | null): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }

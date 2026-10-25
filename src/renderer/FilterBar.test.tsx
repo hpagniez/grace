@@ -30,6 +30,7 @@ function setup() {
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
+    setEnv: vi.fn(async () => {}),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -212,7 +213,14 @@ describe("filter bar", () => {
     expect(controls().every((c) => c.disabled)).toBe(true);
     send({ type: "busy", busy: false });
     expect(controls().some((c) => c.disabled)).toBe(false);
-    send({ type: "runStarted", selection: "d:", keys: [], total: 2, startedAt: Date.now() });
+    send({
+      type: "runStarted",
+      selection: "d:",
+      keys: [],
+      total: 2,
+      startedAt: Date.now(),
+      env: null,
+    });
     expect(controls().every((c) => c.disabled)).toBe(true);
   });
 

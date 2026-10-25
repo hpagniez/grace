@@ -66,6 +66,7 @@ describe("createAppStore", () => {
       keys: ["s:a#1", "s:a#2"],
       total: 2,
       startedAt: 1,
+      env: null,
     });
     for (const [from, to] of [
       [0, 4000],
