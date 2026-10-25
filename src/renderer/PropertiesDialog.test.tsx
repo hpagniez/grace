@@ -42,7 +42,7 @@ function setup() {
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
     setEnv: vi.fn(async () => {}),
-    saveProperties: vi.fn(async (_edit: PropertiesEdit) => {}),
+    saveProperties: vi.fn(async (_edit: PropertiesEdit): Promise<boolean> => true),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -116,7 +116,13 @@ const addRow = (name: string, value = "v") => {
   return i;
 };
 const save = () => screen.getByTestId("save-properties") as HTMLButtonElement;
+const cancel = () => screen.getByTestId("cancel-properties") as HTMLButtonElement;
 const errorOf = (i: number) => within(rows()[i]).queryByTestId("row-error")?.textContent;
+/** Lets main's answer to Save arrive. */
+const settle = async () => {
+  await new Promise((r) => setTimeout(r, 0));
+  flush();
+};
 
 afterEach(cleanup);
 
@@ -248,7 +254,7 @@ describe("properties dialog", () => {
     expect(save().disabled).toBe(false);
   });
 
-  it("Save, Cancel and Escape drop the draft, so a typed secret does not linger", () => {
+  it("Save, Cancel and Escape drop the draft, so a typed secret does not linger", async () => {
     const { api, load } = setup();
     load(saved);
     const draft = () => JSON.stringify(drafts.at(-1));
@@ -270,7 +276,7 @@ describe("properties dialog", () => {
       openDialog();
       typeSecret();
       close();
-      flush();
+      await settle();
       expect(drafts.at(-1)).toHaveLength(0);
       expect(draft()).not.toContain("s3cret-token-123");
     }
@@ -292,6 +298,92 @@ describe("properties dialog", () => {
       secret: true,
       keep: true,
     });
+  });
+
+  it("Save keeps the draft until main has applied it", async () => {
+    const { api, load } = setup();
+    load(saved);
+    let answer!: (applied: boolean) => void;
+    api.saveProperties.mockImplementation(() => new Promise<boolean>((r) => (answer = r)));
+    openDialog();
+    choose("qa");
+    const i = addRow("fresh.token", "s3cret-token-123");
+    fireEvent.click(inRow(i, "prop-secret"));
+    flush();
+    fireEvent.click(save());
+    flush();
+    // waiting for main: it can be neither cancelled nor sent again
+    expect(save().disabled).toBe(true);
+    expect(save().textContent).toBe("Saving…");
+    expect(cancel().disabled).toBe(true);
+    // refused (main's notice says why): the dialog stays, with the typed secret
+    answer(false);
+    await settle();
+    expect(dialog().open).toBe(true);
+    expect(inRow(i, "prop-value").value).toBe("s3cret-token-123");
+    expect(save().disabled).toBe(false);
+    expect(save().textContent).toBe("Save");
+    expect(cancel().disabled).toBe(false);
+    // a call that fails too
+    api.saveProperties.mockImplementationOnce(async () => {
+      throw new Error("gone");
+    });
+    fireEvent.click(save());
+    await settle();
+    expect(dialog().open).toBe(true);
+    expect(inRow(i, "prop-value").value).toBe("s3cret-token-123");
+    expect(save().disabled).toBe(false);
+    // applied: it closes and drops the draft
+    fireEvent.click(save());
+    flush();
+    expect(dialog().open).toBe(true);
+    answer(true);
+    await settle();
+    expect(dialog().open).toBe(false);
+    expect(drafts.at(-1)).toHaveLength(0);
+    expect(api.saveProperties).toHaveBeenCalledTimes(3);
+  });
+
+  it("a list of more than 500 rows blocks Save", () => {
+    const { load } = setup();
+    const many = Array.from({ length: 501 }, (_, i) => ({ name: `p${i}`, value: "v" }));
+    load({ properties: { shared: many, byEnv: {} } });
+    openDialog();
+    expect(errorOf(499)).toBeUndefined();
+    expect(errorOf(500)).toBe("At most 500 properties per list");
+    expect(scope("").dataset.invalid).toBe("true");
+    expect(save().disabled).toBe(true);
+    fireEvent.click(within(rows()[0]).getByTestId("prop-delete"));
+    flush();
+    expect(screen.queryByTestId("row-error")).toBeNull();
+    expect(save().disabled).toBe(false);
+  });
+
+  it("a 101st environment is refused", () => {
+    const { load } = setup();
+    const byEnv = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`e${i}`, []]));
+    load({ env: "dev", properties: { shared: [], byEnv } });
+    openDialog();
+    const field = screen.getByTestId("add-env-input");
+    typeIn(field, "e100");
+    fireEvent.click(screen.getByTestId("add-env"));
+    flush();
+    expect(screen.getByTestId("add-env-error").textContent).toBe("At most 100 environments");
+    expect(screen.getAllByTestId("scope-item")).toHaveLength(102); // All environments, e0-e99, dev
+    // nor by the first row of the current environment, which has no list yet
+    choose("dev");
+    typeIn(field, "");
+    expect(screen.queryByTestId("add-env-error")).toBeNull();
+    fireEvent.click(screen.getByTestId("add-property"));
+    flush();
+    expect(rows()).toHaveLength(0);
+    expect(screen.getByTestId("add-env-error").textContent).toBe("At most 100 environments");
+    // an environment that has a list can still be chosen
+    typeIn(field, "e5");
+    fireEvent.click(screen.getByTestId("add-env"));
+    flush();
+    expect(screen.queryByTestId("add-env-error")).toBeNull();
+    expect(scope("e5").getAttribute("aria-current")).toBe("true");
   });
 
   it("secret shows dots and Replace, never a value", () => {
@@ -387,13 +479,13 @@ describe("properties dialog", () => {
     expect(errorOf(i)).toBe("Too long");
   });
 
-  it("save sends keep for an untouched secret and the new value after Replace", () => {
+  it("save sends keep for an untouched secret and the new value after Replace", async () => {
     const { api, load, send } = setup();
     load(saved);
     openDialog();
     choose("qa");
     fireEvent.click(save());
-    flush();
+    await settle();
     expect(dialog().open).toBe(false);
     expect(api.saveProperties).toHaveBeenCalledTimes(1);
     expect(api.saveProperties).toHaveBeenLastCalledWith({
@@ -460,7 +552,7 @@ describe("properties dialog", () => {
     expect(edit.byEnv.qa[1]).toEqual({ name: "api.token", value: "plain", secret: false });
   });
 
-  it("payload is structured-cloneable", () => {
+  it("payload is structured-cloneable", async () => {
     const { api, load } = setup();
     load(saved);
     openDialog();
@@ -470,6 +562,7 @@ describe("properties dialog", () => {
     flush();
     typeIn(inRow(1, "prop-value"), "new-secret");
     fireEvent.click(save());
+    await settle();
     openDialog();
     fireEvent.click(save());
     expect(api.saveProperties).toHaveBeenCalledTimes(2);

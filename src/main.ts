@@ -58,11 +58,14 @@ const createWindow = () => {
   }
 };
 
-/** Handlers never reject to the renderer: a failed Runner call becomes a notice. */
-const handle = (channel: string, fn: (...args: unknown[]) => Promise<void> | void) =>
+/**
+ * Handlers never reject to the renderer: a failed Runner call becomes a notice and resolves
+ * undefined. Otherwise the handler's return value is the answer.
+ */
+const handle = (channel: string, fn: (...args: unknown[]) => unknown) =>
   ipcMain.handle(channel, async (_e, ...args) => {
     try {
-      await fn(...args);
+      return await fn(...args);
     } catch (err) {
       emit({ type: "notice", message: err instanceof Error ? err.message : String(err) });
     }
@@ -113,9 +116,9 @@ app.whenReady().then(async () => {
     const edit = parsePropertiesEdit(e);
     if (!edit) {
       emit({ type: "notice", message: "Invalid request" });
-      return;
+      return false;
     }
-    runner.saveProperties(edit);
+    return runner.saveProperties(edit);
   });
   handle(CH.cancel, () => runner.cancel());
   handle(CH.report, async () => {

@@ -25,6 +25,7 @@ export interface Api {
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
   setEnv(name: string | null): Promise<void>;
-  saveProperties(edit: PropertiesEdit): Promise<void>;
+  /** True once main applied the edit; false if it refused it (a notice says why). */
+  saveProperties(edit: PropertiesEdit): Promise<boolean>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }
