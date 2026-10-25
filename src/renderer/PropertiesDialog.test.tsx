@@ -581,7 +581,7 @@ describe("properties dialog", () => {
     fireEvent.click(inRow(1, "prop-secret"));
     flush();
     expect(screen.getByTestId("secrets-note").textContent).toBe(
-      "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask.",
+      "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask. Run history keeps the reports of the last 20 runs; Clear history deletes them.",
     );
     expect(inRow(1, "prop-value").type).toBe("password");
     fireEvent.click(inRow(1, "prop-secret"));
