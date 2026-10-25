@@ -1,0 +1,48 @@
+{
+  "name": "karate-kid",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Free desktop test-suite runner for Karate",
+  "keywords": [],
+  "license": "MIT",
+  "author": "Tusquito",
+  "main": ".vite/build/main.cjs",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "release": "electron-forge release",
+    "lint": "oxlint && oxfmt --check",
+    "lint:fix": "oxlint --fix && oxfmt --write",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "npm run package && npx electron --version && playwright test",
+    "vendor": "node scripts/fetch-vendor.mjs",
+    "fixtures": "node scripts/capture-fixtures.mjs"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.18",
+    "solid-js": "2.0.0-rc.18"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-zip": "8.0.1",
+    "@electron-forge/plugin-auto-unpack-natives": "8.0.1",
+    "@electron-forge/plugin-fuses": "8.0.1",
+    "@electron-forge/plugin-vite": "8.0.1",
+    "@electron/fuses": "2.1.3",
+    "@playwright/test": "1.64.1",
+    "@solidjs/testing-library": "1.0.0-rc.2",
+    "@solidjs/vite-plugin": "3.0.0-next.51",
+    "@tailwindcss/vite": "4.3.3",
+    "electron": "45.0.0",
+    "jsdom": "30.1.3",
+    "oxfmt": "0.74.0",
+    "oxlint": "1.89.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "productName": "karate-kid"
+}
