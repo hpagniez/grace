@@ -67,7 +67,9 @@ describe("environment combo", () => {
   it("suggestions and none", () => {
     const { load } = setup();
     load({ suggestions: ["prod", "qa"] });
-    expect(input().value).toBe("(none)");
+    // no environment is an empty box: Chromium narrows the list to options matching the text in it
+    expect(input().value).toBe("");
+    expect(input().placeholder).toBe("(none)");
     expect(options()).toEqual(["(none)", "prod", "qa"]);
     expect(screen.getByRole("combobox", { name: "Env" })).toBe(input());
     expect(screen.queryByTestId("env-hint")).toBeNull();
@@ -77,6 +79,7 @@ describe("environment combo", () => {
   it("is empty and disabled with no project", () => {
     const { send, load, view } = setup();
     expect(input().value).toBe("");
+    expect(input().placeholder).toBe("");
     expect(input().disabled).toBe(true);
     // main can still hold the previous project's view after "Folder not found"
     send({ type: "environment", view: view({ env: "qa" }) });
@@ -123,6 +126,14 @@ describe("environment combo", () => {
     expect(api.setEnv).toHaveBeenCalledTimes(2);
   });
 
+  it("picking (none) from the list clears the environment", () => {
+    const { api, load } = setup();
+    load({ env: "qa", suggestions: ["qa"] });
+    expect(input().value).toBe("qa");
+    fireEvent.input(input(), { target: { value: "(none)" }, inputType: "insertReplacementText" });
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
   it("does not call main when nothing changed", () => {
     const { api, load } = setup();
     load({ env: "qa" });
@@ -161,7 +172,7 @@ describe("environment combo", () => {
     enter();
     expect(screen.getByTestId("env-error")).toBeTruthy();
     send({ type: "environment", view: view({ env: null }) });
-    expect(input().value).toBe("(none)");
+    expect(input().value).toBe("");
     expect(screen.queryByTestId("env-error")).toBeNull();
   });
 

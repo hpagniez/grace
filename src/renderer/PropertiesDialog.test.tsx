@@ -6,6 +6,21 @@ import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
 
+// Every array store the app creates is the dialog's draft rows: this lets a test look inside it.
+const drafts = vi.hoisted(() => [] as unknown[][]);
+vi.mock("solid-js", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("solid-js")>();
+  const createStore = mod.createStore as unknown as (...args: unknown[]) => unknown[];
+  return {
+    ...mod,
+    createStore: (init: unknown, ...rest: unknown[]) => {
+      const store = createStore(init, ...rest);
+      if (Array.isArray(init)) drafts.push(store[0] as unknown[]);
+      return store;
+    },
+  };
+});
+
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
@@ -202,6 +217,80 @@ describe("properties dialog", () => {
         ],
         staging: [{ name: "a.b", value: "v", secret: false }],
       },
+    });
+  });
+
+  it("rows added under the current environment, which has no list yet, are saved", () => {
+    const { api, load } = setup();
+    load(saved); // current environment dev, lists qa and prod only
+    openDialog();
+    choose("dev");
+    expect((screen.getByTestId("delete-env") as HTMLButtonElement).disabled).toBe(true);
+    addRow("dev.only", "1");
+    expect((screen.getByTestId("delete-env") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save());
+    const edit = api.saveProperties.mock.calls[0][0];
+    expect(edit.byEnv.dev).toEqual([{ name: "dev.only", value: "1", secret: false }]);
+    expect(Object.keys(edit.byEnv)).toEqual(["qa", "prod", "dev"]);
+  });
+
+  it("an invalid row under the current environment blocks Save and marks its scope", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    choose("dev");
+    addRow("karate.env");
+    expect(errorOf(0)).toBe("Reserved name");
+    expect(scope("dev").dataset.invalid).toBe("true");
+    expect(save().disabled).toBe(true);
+    fireEvent.click(within(rows()[0]).getByTestId("prop-delete"));
+    flush();
+    expect(save().disabled).toBe(false);
+  });
+
+  it("Save, Cancel and Escape drop the draft, so a typed secret does not linger", () => {
+    const { api, load } = setup();
+    load(saved);
+    const draft = () => JSON.stringify(drafts.at(-1));
+    const typeSecret = () => {
+      choose("qa");
+      const i = addRow("fresh.token", "s3cret-token-123");
+      fireEvent.click(inRow(i, "prop-secret"));
+      flush();
+      expect(draft()).toContain("s3cret-token-123");
+    };
+    for (const close of [
+      () => fireEvent.click(save()),
+      () => fireEvent.click(screen.getByTestId("cancel-properties")),
+      () => {
+        dialog().removeAttribute("open"); // Escape: the browser closes it and fires `close`
+        fireEvent(dialog(), new Event("close"));
+      },
+    ]) {
+      openDialog();
+      typeSecret();
+      close();
+      flush();
+      expect(drafts.at(-1)).toHaveLength(0);
+      expect(draft()).not.toContain("s3cret-token-123");
+    }
+    // Save still sent the typed value: dropping the draft must not touch the payload
+    expect(api.saveProperties.mock.calls[0][0].byEnv.qa.at(-1)).toEqual({
+      name: "fresh.token",
+      value: "s3cret-token-123",
+      secret: true,
+    });
+    // and the next dialog starts from main's view again
+    openDialog();
+    choose("qa");
+    expect(
+      rows().map((r) => (within(r).getByTestId("prop-name") as HTMLInputElement).value),
+    ).toEqual(["timeout", "api.token"]);
+    fireEvent.click(save());
+    expect(api.saveProperties.mock.lastCall![0].byEnv.qa[1]).toEqual({
+      name: "api.token",
+      secret: true,
+      keep: true,
     });
   });
 

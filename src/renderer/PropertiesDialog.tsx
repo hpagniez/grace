@@ -107,9 +107,18 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setOpen(true);
     dialog.showModal();
   };
+  // Closing drops the draft, so a typed secret does not linger in the window's memory.
+  const drop = () => {
+    setOpen(false);
+    setRows((d) => void d.splice(0, d.length));
+    setLists([]);
+    setScope("");
+    setNewEnv("");
+    setEnvError(null);
+  };
   const close = () => {
     dialog.close();
-    setOpen(false);
+    drop();
   };
 
   const addEnv = () => {
@@ -132,6 +141,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setScope("");
   };
   const addRow = () => {
+    // the current environment is listed before it has a list: the first row creates it
+    if (scope() !== "" && !lists().includes(scope())) setLists([...lists(), scope()]);
     setRows(
       (d) =>
         void d.push({
@@ -176,7 +187,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
         data-testid="properties-dialog"
         aria-labelledby="properties-title"
         class="m-auto w-[48rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-        onClose={() => setOpen(false)}
+        onClose={() => dialog.open || drop()} // Escape; not a late event after a reopen
       >
         <Show when={open()}>
           <h2 id="properties-title" class="mb-3 text-base font-semibold">
