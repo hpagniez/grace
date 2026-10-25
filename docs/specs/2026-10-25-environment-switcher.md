@@ -76,7 +76,7 @@ Editor layout (mockups compared in the brainstorm):
 ### R1. Environment picker
 
 - The toolbar has an **Env** combo box next to the project path. Its value is the project's environment. With no environment the box is empty and shows the placeholder "(none)" (a "(none)" value would make the browser narrow the suggestions to nothing).
-- The person can type any name or pick a suggestion. Suggestions, de-duplicated and sorted:
+- The person can type any name or pick a suggestion. The list starts with "(none)", then the suggestions, de-duplicated and sorted:
   - `<env>` of every `karate-config-<env>.js` in the project's classpath roots and in the project folder itself (walking skeleton R1 layouts);
   - every value of `@env=` and `@envnot=` tags written in the project's feature files (`@env=dev,qa` gives `dev` and `qa`). Main reads them from the files under the feature roots, not from the tree, because the tree only holds the scenarios of the current environment (builder check);
   - every environment that has a property list (R3);
