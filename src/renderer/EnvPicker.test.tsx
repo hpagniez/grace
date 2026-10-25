@@ -52,8 +52,17 @@ const type = (value: string) => {
   fireEvent.input(input(), { target: { value } });
   flush();
 };
-const enter = () => {
-  fireEvent.keyDown(input(), { key: "Enter" });
+const press = (key: string) => {
+  fireEvent.keyDown(input(), { key });
+  flush();
+};
+const enter = () => press("Enter");
+const focus = () => {
+  fireEvent.focus(input());
+  flush();
+};
+const blur = () => {
+  fireEvent.blur(input());
   flush();
 };
 const options = () =>
@@ -159,6 +168,44 @@ describe("environment combo", () => {
     expect(input().value).toBe("qa");
     fireEvent.input(input(), { target: { value: "qa" }, inputType: "insertReplacementText" });
     expect(input().value).toBe("qa");
+  });
+
+  it("focus empties the box so the list offers every name", () => {
+    const { api, load } = setup();
+    load({ env: "qa", suggestions: ["prod", "qa"] });
+    focus();
+    // Chromium narrows the list to the options that match the text in the box
+    expect(input().value).toBe("");
+    expect(input().placeholder).toBe("qa");
+    // leaving, Enter or Escape without typing keeps the environment
+    blur();
+    expect(input().value).toBe("qa");
+    focus();
+    enter();
+    expect(input().value).toBe("qa");
+    focus();
+    press("Escape");
+    expect(input().value).toBe("qa");
+    expect(api.setEnv).not.toHaveBeenCalled();
+    focus();
+    fireEvent.input(input(), { target: { value: "prod" }, inputType: "insertReplacementText" });
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith("prod");
+  });
+
+  it("after focus, a cleared box means none and Escape drops the typing", () => {
+    const { api, load } = setup();
+    load({ env: "qa" });
+    focus();
+    type("pr");
+    type("");
+    blur();
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith(null);
+    focus();
+    type("prod");
+    press("Escape");
+    expect(input().value).toBe("qa");
+    blur();
+    expect(api.setEnv).toHaveBeenCalledOnce();
   });
 
   it("invalid name shows error and does not call setEnv", () => {
