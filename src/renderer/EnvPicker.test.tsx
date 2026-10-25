@@ -192,6 +192,22 @@ describe("environment combo", () => {
     expect(screen.queryByTestId("env-hint")).toBeNull();
   });
 
+  it("sends one change: Electron blurs the box it disables", () => {
+    const { api, send, load } = setup();
+    load({ env: "qa", suggestions: ["prod", "qa"] });
+    type("prod");
+    enter();
+    send({ type: "busy", busy: true });
+    fireEvent.blur(input());
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith("prod");
+    // nothing reaches main while it is busy
+    type("staging");
+    enter();
+    fireEvent.input(input(), { target: { value: "qa" }, inputType: "insertReplacementText" });
+    fireEvent.blur(input());
+    expect(api.setEnv).toHaveBeenCalledOnce();
+  });
+
   it("disabled while busy", () => {
     const { send, load } = setup();
     load({ env: "qa" });
