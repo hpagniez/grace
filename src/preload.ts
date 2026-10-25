@@ -11,6 +11,7 @@ const api: Api = {
   openReport: () => ipcRenderer.invoke(CH.report),
   setFilter: (f) => ipcRenderer.invoke(CH.filter, f),
   setEnv: (name) => ipcRenderer.invoke(CH.env, name),
+  saveProperties: (edit) => ipcRenderer.invoke(CH.properties, edit),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

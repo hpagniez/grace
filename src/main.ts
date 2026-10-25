@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
+import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
@@ -107,6 +108,14 @@ app.whenReady().then(async () => {
       return;
     }
     await runner.setEnv(name);
+  });
+  handle(CH.properties, (e) => {
+    const edit = parsePropertiesEdit(e);
+    if (!edit) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    runner.saveProperties(edit);
   });
   handle(CH.cancel, () => runner.cancel());
   handle(CH.report, async () => {

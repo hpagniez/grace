@@ -1,7 +1,17 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { sortedUnique, validEnvName, type RowView } from "../shared/env";
+import {
+  editErrors,
+  effectiveRows,
+  propertyValueError,
+  sortedUnique,
+  validEnvName,
+  type PlainRow,
+  type PropertiesEdit,
+  type RowEdit,
+  type RowView,
+} from "../shared/env";
 import type { AppEvent, Project } from "../shared/events";
 import type { TestNode } from "../shared/model";
 import {
@@ -12,12 +22,14 @@ import {
   pruneFilter,
   type FilterState,
 } from "../shared/tags";
+import { writeArgFile } from "./karate/argfile";
 import { buildArgs, detectLayout, selectionTargets, tagArgs } from "./karate/command";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
 import { buildTree, findNode, parseRefId, resolveNode, rowLines } from "./karate/tree";
+import { makeMasker } from "./mask";
 import type { SecretBox } from "./secrets";
 import {
   emptyEnvSettings,
@@ -26,6 +38,7 @@ import {
   saveProjectEnv,
   saveProjectFilter,
   type EnvSettings,
+  type StoredLists,
   type StoredRow,
 } from "./settings";
 import type { VendorPaths } from "./vendor";
@@ -44,6 +57,32 @@ const isDir = (p: string) => {
 function dryRunError(lines: string[]): string {
   const hits = lines.filter((l) => l.includes("Exception") || l.includes("feature"));
   return (hits.length ? hits : lines.slice(-20)).join("\n");
+}
+
+/** The event with every secret value in its run text replaced; events of other types carry no run text. */
+function masked(e: AppEvent, mask: (text: string) => string): AppEvent {
+  switch (e.type) {
+    case "console":
+      return { ...e, lines: e.lines.map(mask) };
+    case "scenarios":
+      return {
+        ...e,
+        updates: e.updates.map((u) => (u.error === undefined ? u : { ...u, error: mask(u.error) })),
+      };
+    case "steps":
+      return {
+        ...e,
+        steps: e.steps.map((s) => ({
+          ...s,
+          text: mask(s.text), // an outline row's step text holds its Examples values
+          log: s.log === null ? null : mask(s.log),
+        })),
+      };
+    case "notice":
+      return { ...e, message: mask(e.message) }; // an invalid event line can be quoted in it
+    default:
+      return e;
+  }
 }
 
 /**
@@ -167,6 +206,59 @@ export class Runner {
     this.sendFilter();
   }
 
+  /**
+   * Replaces the run properties with a validated edit; a `keep` row keeps the ciphertext of the saved
+   * secret of the same scope and name. Applied even if it cannot be saved, as the filter is.
+   */
+  saveProperties(edit: PropertiesEdit): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      return;
+    }
+    if (!this.project) return;
+    const { secrets } = this.o;
+    const { shared, byEnv } = this.envs.properties;
+    const cipher = (scope: string | null, name: string): string | null => {
+      const rows = scope === null ? shared : Object.hasOwn(byEnv, scope) ? byEnv[scope] : [];
+      const row = rows.find((r) => r.name === name);
+      return row && "secret" in row ? row.secret : null;
+    };
+    const error = editErrors(edit, (scope, name) => cipher(scope, name) !== null)[0];
+    if (error) {
+      this.o.emit({ type: "notice", message: `Properties not saved: ${error}` });
+      return;
+    }
+    const all = [edit.shared, ...Object.values(edit.byEnv)].flat();
+    if (!secrets.available() && all.some((r) => r.secret && !("keep" in r))) {
+      this.o.emit({ type: "notice", message: "Secret storage is not available on this system" });
+      return;
+    }
+    const stored = (scope: string | null, rows: RowEdit[]): StoredRow[] =>
+      rows.map((r) =>
+        "keep" in r
+          ? { name: r.name, secret: cipher(scope, r.name)! }
+          : r.secret
+            ? { name: r.name, secret: secrets.encrypt(r.value) }
+            : { name: r.name, value: r.value },
+      );
+    const properties: StoredLists = {
+      shared: stored(null, edit.shared),
+      byEnv: Object.fromEntries(
+        Object.entries(edit.byEnv).map(([e, rows]) => [e, stored(e, rows)]),
+      ),
+    };
+    this.envs = { ...this.envs, properties };
+    try {
+      saveProjectEnv(this.o.dataDir, this.project.root, this.envs);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `The properties could not be saved: ${(err as Error).message}`,
+      });
+    }
+    this.o.emit(this.envEvent());
+  }
+
   async run(key: string): Promise<void> {
     if (this.project) await this.guarded(() => this.runGuarded(key));
   }
@@ -209,7 +301,14 @@ export class Runner {
     this.o.emit({ type: "filter", filter: this.filter });
   }
 
-  /** A secret row carries only whether it can be decrypted, never its value. */
+  /** The plain value of a saved secret; null if it cannot be decrypted or Java cannot take it exactly. */
+  private readSecret(cipher: string): string | null {
+    const { secrets } = this.o;
+    const value = secrets.available() ? secrets.decrypt(cipher) : null;
+    return value !== null && propertyValueError(value) === null ? value : null;
+  }
+
+  /** A secret row carries only whether it can be read, never its value. */
   private envEvent(): AppEvent {
     const { secrets } = this.o;
     const { env, properties } = this.envs;
@@ -218,7 +317,7 @@ export class Runner {
         ? {
             name: r.name,
             secret: true,
-            state: secrets.available() && secrets.decrypt(r.secret) !== null ? "set" : "unreadable",
+            state: this.readSecret(r.secret) !== null ? "set" : "unreadable",
           }
         : r;
     return {
@@ -317,10 +416,15 @@ export class Runner {
     return false;
   }
 
+  /** `<dataDir>/projects/<hash>`: the run folders and the argument file of the project. */
+  private projectDir(): string {
+    const hash = createHash("sha1").update(this.project!.root).digest("hex").slice(0, 12);
+    return path.join(this.o.dataDir, "projects", hash);
+  }
+
   /** Empties and returns `<dataDir>/projects/<hash>/<kind>`, so no file of an earlier spawn is ever read. */
   private outDir(kind: "run" | "dryrun"): string {
-    const hash = createHash("sha1").update(this.project!.root).digest("hex").slice(0, 12);
-    const dir = path.join(this.o.dataDir, "projects", hash, kind);
+    const dir = path.join(this.projectDir(), kind);
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
     mkdirSync(dir, { recursive: true });
     return dir;
@@ -331,6 +435,7 @@ export class Runner {
     dryRun: boolean,
     targets: string[],
     onLines: (l: string[]) => void,
+    argFile: string | null = null,
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
@@ -346,7 +451,7 @@ export class Runner {
       targets,
       tags,
       env: this.envs.env,
-      argFile: null,
+      argFile,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
@@ -386,6 +491,34 @@ export class Runner {
     return tree;
   }
 
+  /**
+   * The run's properties (R4) with secrets decrypted, and the secret values to mask; null, after a
+   * notice, if a secret cannot be read.
+   */
+  private runProperties(): { rows: PlainRow[]; secrets: string[] } | null {
+    const { env, properties } = this.envs;
+    const rows: PlainRow[] = [];
+    const secrets: string[] = [];
+    for (const r of effectiveRows(properties.shared, properties.byEnv, env)) {
+      if (!("secret" in r)) {
+        rows.push(r);
+        continue;
+      }
+      const value = this.readSecret(r.secret);
+      if (value === null) {
+        const scope = properties.shared.includes(r) ? "All environments" : env;
+        this.o.emit({
+          type: "notice",
+          message: `Secret ${r.name} (${scope}) can't be read. Replace it in Properties.`,
+        });
+        return null;
+      }
+      rows.push({ name: r.name, value });
+      secrets.push(value);
+    }
+    return { rows, secrets };
+  }
+
   private async runGuarded(key: string): Promise<void> {
     const old = this.tree && findNode(this.tree, key);
     const tree = await this.discover();
@@ -421,59 +554,74 @@ export class Runner {
       return;
     }
 
+    const props = this.runProperties();
+    if (!props) return;
+
     this.report = null;
-    const outDir = this.outDir("run");
-    const state = new RunState(tree, node, filter);
-    const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
-    const proc = this.spawn(outDir, false, targets, (lines) =>
-      this.o.emit({ type: "console", lines }),
-    );
+    const outDir = this.outDir("run"); // creates the project folder the argument file goes in
+    const argFile = props.rows.length ? path.join(this.projectDir(), "run-args.txt") : null;
+    const mask = makeMasker(props.secrets);
+    const emit = (e: AppEvent) => this.o.emit(masked(e, mask));
     try {
-      if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
-    } catch (err) {
-      // without the pid file a crash of the app would leave this JVM running: do not run
-      await proc.kill();
-      this.proc = null;
-      for (const e of state.finish(null, false, false)) this.o.emit(e);
-      this.o.emit({ type: "notice", message: (err as Error).message });
-      return;
-    }
-    this.o.emit({
-      type: "runStarted",
-      selection: node.key,
-      keys: state.keys,
-      total: state.keys.length,
-      startedAt: Date.now(),
-      env: this.envs.env,
-    });
-
-    // A bad event line or malformed data is fatal: the run's status can no longer be trusted.
-    let fatal = null as Error | null; // assigned in poll(); keeps TS from narrowing it to null
-    const poll = () => {
-      if (fatal) return;
+      if (argFile) writeArgFile(argFile, props.rows);
+      const state = new RunState(tree, node, filter);
+      const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
+      const proc = this.spawn(
+        outDir,
+        false,
+        targets,
+        (lines) => emit({ type: "console", lines }),
+        argFile,
+      );
       try {
-        for (const e of state.apply(tail.read())) this.o.emit(e);
+        if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
       } catch (err) {
-        fatal = err as Error;
-        void proc.kill();
+        // without the pid file a crash of the app would leave this JVM running: do not run
+        await proc.kill();
+        this.proc = null;
+        for (const e of state.finish(null, false, false)) emit(e);
+        emit({ type: "notice", message: (err as Error).message });
+        return;
       }
-    };
-    const timer = setInterval(poll, this.o.pollMs ?? 100);
-    const code = await proc.exit;
-    clearInterval(timer);
-    poll();
-    this.proc = null;
-    rmSync(this.pidFile, { force: true });
+      emit({
+        type: "runStarted",
+        selection: node.key,
+        keys: state.keys,
+        total: state.keys.length,
+        startedAt: Date.now(),
+        env: this.envs.env,
+      });
 
-    const report = path.join(outDir, "karate-summary.html");
-    // exit code null forces outcome 'failed'
-    for (let e of state.finish(fatal ? null : code, this.cancelled && !fatal, false)) {
-      if (e.type === "runFinished") {
-        this.report = e.outcome === "finished" && existsSync(report) ? report : null;
-        e = { ...e, reportAvailable: this.report !== null };
+      // A bad event line or malformed data is fatal: the run's status can no longer be trusted.
+      let fatal = null as Error | null; // assigned in poll(); keeps TS from narrowing it to null
+      const poll = () => {
+        if (fatal) return;
+        try {
+          for (const e of state.apply(tail.read())) emit(e);
+        } catch (err) {
+          fatal = err as Error;
+          void proc.kill();
+        }
+      };
+      const timer = setInterval(poll, this.o.pollMs ?? 100);
+      const code = await proc.exit;
+      clearInterval(timer);
+      poll();
+      this.proc = null;
+      rmSync(this.pidFile, { force: true });
+
+      const report = path.join(outDir, "karate-summary.html");
+      // exit code null forces outcome 'failed'
+      for (let e of state.finish(fatal ? null : code, this.cancelled && !fatal, false)) {
+        if (e.type === "runFinished") {
+          this.report = e.outcome === "finished" && existsSync(report) ? report : null;
+          e = { ...e, reportAvailable: this.report !== null };
+        }
+        emit(e);
       }
-      this.o.emit(e);
+      if (fatal) emit({ type: "notice", message: fatal.message });
+    } finally {
+      if (argFile) rmSync(argFile, { force: true });
     }
-    if (fatal) this.o.emit({ type: "notice", message: fatal.message });
   }
 }
