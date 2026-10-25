@@ -85,6 +85,7 @@ Editor layout (mockups compared in the brainstorm):
 - If the chosen name has no `karate-config-<name>.js`, a hint under the combo says "No karate-config-<name>.js found. Fine if karate-config.js handles it." It is a hint, not an error.
 - Choosing "(none)", typing it, or clearing the box means no environment.
 - A typed name takes effect on Enter or when the box loses focus; a picked suggestion takes effect at once. Typing alone changes nothing.
+- Focusing the box empties it and shows the current environment as the placeholder, because the browser narrows the suggestions to the text in the box. Leaving the box, Enter or Escape without typing keeps the environment; Escape also drops what was typed.
 - Changing the environment re-runs discovery (walking skeleton R2) with the new environment, because `@env`/`@envnot` tags change which tests exist. The tag filter is pruned as after a Refresh (tag filter R5).
   - The new environment is saved and used once that discovery ends, also when it ends with a parse error (exit 3: the tree area shows the error, as today).
   - Cancelling that discovery puts the previous environment, tree and filter back, and nothing is saved.

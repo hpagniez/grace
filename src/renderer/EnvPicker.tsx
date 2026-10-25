@@ -16,9 +16,17 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
   const locked = () => props.state.run.active || props.state.busy;
   // No environment is an empty box with a placeholder: Chromium narrows the datalist popup to the
   // options that match the text in the box, so "(none)" as a value would hide every suggestion.
+  // For the same reason focus empties the box, with the environment as its placeholder.
   const shown = () => view()?.env ?? "";
   const [text, setText] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
+  let typed = false; // since focus: leaving an untouched box puts the environment back
+
+  const restore = () => {
+    typed = false;
+    setText(shown());
+    setError(null);
+  };
 
   // Every new view resets the box, so a refused change never leaves a name the runner is not using.
   createEffect(
@@ -42,8 +50,9 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
     const next = name === "" || name === NONE ? null : name;
     if (next !== null && !validEnvName(next)) setError(INVALID_ENV);
     else if (next !== (view()?.env ?? null)) void props.api.setEnv(next);
-    else setText(shown()); // nothing sent, so no view comes back to reset the box
+    else restore(); // nothing sent, so no view comes back to reset the box
   };
+  const leave = (value: string) => (typed ? commit(value) : restore());
 
   return (
     <div class="flex flex-col">
@@ -57,21 +66,27 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}
-          placeholder={view() ? NONE : undefined}
+          placeholder={view() ? shown() || NONE : undefined}
           value={text()}
           aria-invalid={error() ? "true" : undefined}
           aria-describedby={error() ? "env-error" : hint() ? "env-hint" : undefined}
-          onFocus={(e) => e.currentTarget.select()} // so typing replaces, and the list shows every name
+          onFocus={() => {
+            typed = false;
+            setText("");
+            setError(null);
+          }}
           onInput={(e) => {
+            typed = true;
             setText(e.currentTarget.value);
             setError(null);
             // A pick from the list arrives as a replacement; typing alone changes nothing.
             if (e.inputType === "insertReplacementText") commit(e.currentTarget.value);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") commit(e.currentTarget.value);
+            if (e.key === "Enter") leave(e.currentTarget.value);
+            else if (e.key === "Escape") restore();
           }}
-          onBlur={(e) => commit(e.currentTarget.value)}
+          onBlur={(e) => leave(e.currentTarget.value)}
         />
       </label>
       <datalist id="env-suggestions">
