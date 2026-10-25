@@ -55,6 +55,40 @@ describe("RunState", () => {
     expect(steps.filter((e) => e.key.startsWith("s:tests/basic.feature#"))).toHaveLength(4);
   });
 
+  it("emits calls when a feature ends", () => {
+    const out = newState().apply(events("run-clean.jsonl"));
+    const callsOf = (key: string) => out.find((e) => e.type === "calls" && e.key === key);
+    const basic = out.flatMap((e) =>
+      (e.type === "steps" || e.type === "calls") && e.key.startsWith("s:tests/basic.feature#")
+        ? [e]
+        : [],
+    );
+    expect(callsOf("s:tests/basic.feature#1")).toMatchObject({
+      calls: [{ method: "GET", url: expect.stringContaining("/hello"), status: 200 }],
+    });
+    expect(callsOf("s:tests/basic.feature#3")).toMatchObject({
+      calls: [{ method: "POST", status: 201, via: "tests/common/create-user.feature:8" }],
+    });
+    expect(callsOf("s:tests/basic.feature#4")).toEqual({
+      type: "calls",
+      key: "s:tests/basic.feature#4",
+      calls: [],
+    });
+    expect(basic.filter((e) => e.type === "calls")).toHaveLength(4);
+    // each calls event comes right after the steps event of the same key
+    out.forEach((e, i) => {
+      if (e.type === "calls") expect(out[i - 1]).toMatchObject({ type: "steps", key: e.key });
+    });
+  });
+
+  it("emits no calls for called features", () => {
+    const out = newState().apply(events("run-clean.jsonl"));
+    const keys = out.flatMap((e) => (e.type === "calls" ? [e.key] : []));
+    expect(keys.some((k) => k.includes("common/create-user") || k.includes("start-mock"))).toBe(
+      false,
+    );
+  });
+
   // The spike sample (taskkill during tests/slow.feature) has the same slow.feature refIds as the clean tree.
   it("finish after cancel interrupts running scenarios", () => {
     const state = newState();
