@@ -18,7 +18,7 @@ export function makeMasker(values: string[]): (text: string) => string {
 }
 
 // Identifiers the window matches events and tests on, never run text: masking them would break it.
-const EXACT = new Set(["type", "key", "keys", "selection", "status", "outcome", "env"]);
+const EXACT = new Set(["type", "key", "keys", "selection", "runId", "status", "outcome", "env"]);
 
 /**
  * The event with every string in it masked, at any depth, except the fields in EXACT: run text a

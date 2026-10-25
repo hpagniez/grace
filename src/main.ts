@@ -4,6 +4,7 @@ import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
@@ -143,6 +144,7 @@ app.whenReady().then(async () => {
     console.error(err);
   }
   removeLeftoverArgFiles(dataDir);
+  removeLeftoverRuns(dataDir);
   createWindow();
   try {
     const last = loadLastProject(dataDir);

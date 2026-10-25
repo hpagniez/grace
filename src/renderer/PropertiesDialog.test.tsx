@@ -668,7 +668,15 @@ describe("properties dialog", () => {
     send({ type: "busy", busy: true });
     expect(button().disabled).toBe(true);
     send({ type: "busy", busy: false });
-    send({ type: "runStarted", selection: "d:", keys: [], total: 1, startedAt: 1, env: null });
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261025-120000-000",
+      keys: [],
+      total: 1,
+      startedAt: 1,
+      env: null,
+    });
     expect(button().disabled).toBe(true);
   });
 });
