@@ -297,7 +297,7 @@ test("An unreadable secret blocks runs", async () => {
   await expect(win.getByTestId("run-outcome")).toHaveText("");
   await expect(win.getByTestId("progress-text")).toHaveText("0 / 0");
   await expect(node(win, "always")).toHaveAttribute("data-status", "notRun");
-  // the refusal came before any JVM launched (the pre-run dry run has ended)
+  // refused before the pre-run dry run: no JVM launched
   await expect.poll(ourJavaPids).toEqual([]);
 
   await openProperties(win);

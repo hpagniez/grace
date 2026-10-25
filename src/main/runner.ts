@@ -522,6 +522,9 @@ export class Runner {
   }
 
   private async runGuarded(key: string): Promise<void> {
+    // The rows depend on the environment and the saved lists only: refuse before any JVM starts.
+    const props = this.runProperties();
+    if (!props) return;
     const old = this.tree && findNode(this.tree, key);
     const tree = await this.discover();
     if (this.cancelled) {
@@ -555,9 +558,6 @@ export class Runner {
       this.o.emit({ type: "notice", message: "Clear the filter to run this outline" });
       return;
     }
-
-    const props = this.runProperties();
-    if (!props) return;
 
     this.report = null;
     const outDir = this.outDir("run"); // creates the project folder the argument file goes in
