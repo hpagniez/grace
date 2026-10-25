@@ -90,6 +90,25 @@ const rowButtons = ["history-report", "history-rerun", "history-rerun-failed"] a
 const toolbarRerunFailed = () => screen.getByTestId("rerun-failed-button") as HTMLButtonElement;
 const clear = () => screen.getByTestId("clear-history") as HTMLButtonElement;
 const confirm = () => screen.getByTestId("clear-history-dialog") as HTMLDialogElement;
+const report = () => screen.getByTestId("report-button") as HTMLButtonElement;
+const RUN = "20261025-150000-000";
+const started = (): AppEvent => ({
+  type: "runStarted",
+  selection: "d:",
+  runId: RUN,
+  keys: [],
+  total: 0,
+  startedAt: at(25, 15, 0),
+  env: null,
+});
+// the toolbar Report is enabled after a finished run whose report exists
+const finished = (): AppEvent => ({
+  type: "runFinished",
+  outcome: "finished",
+  exitCode: 0,
+  summary: null,
+  reportAvailable: true,
+});
 
 describe("durationLabel", () => {
   it("shows Xs under a minute and Xm YYs from a minute", () => {
@@ -114,6 +133,10 @@ describe("bottom panel tabs", () => {
     expect(screen.queryByTestId("history")).toBeNull();
     expect(screen.queryByTestId("clear-history")).toBeNull();
     showHistory();
+    // a tablist holds tabs only: Clear history sits beside it
+    const tablist = screen.getByRole("tablist");
+    expect([...tablist.children].map((c) => c.getAttribute("role"))).toEqual(["tab", "tab"]);
+    expect(tablist.contains(clear())).toBe(false);
     expect(screen.getByTestId("tab-history").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("history")).toBeTruthy();
     expect(screen.queryByTestId("console")).toBeNull();
@@ -271,11 +294,14 @@ describe("history actions", () => {
 
   it("all actions are disabled while busy", () => {
     const { send, load } = setup();
-    load(entry("a"), entry("b"));
+    send(started());
+    send(finished()); // the toolbar Report is enabled, so only the busy rule can disable it
+    load(entry(RUN), entry("b"));
     showHistory();
     const all = () => [
       ...rows().flatMap((_, i) => rowButtons.map((id) => inRow(i, id))),
       toolbarRerunFailed(),
+      report(),
       clear(),
     ];
     expect(all().every((b) => !b.disabled)).toBe(true);
@@ -284,15 +310,7 @@ describe("history actions", () => {
     send({ type: "busy", busy: false });
     expect(all().every((b) => !b.disabled)).toBe(true);
     // a run in progress: the runner is busy too, but the rule holds on its own
-    send({
-      type: "runStarted",
-      selection: "d:",
-      runId: "20261025-150000-000",
-      keys: [],
-      total: 0,
-      startedAt: at(25, 15, 0),
-      env: null,
-    });
+    send(started());
     showHistory(); // switching tabs stays possible
     expect(rows()).toHaveLength(2);
     expect(all().every((b) => b.disabled)).toBe(true);
@@ -323,6 +341,45 @@ describe("Clear history", () => {
     click(screen.getByTestId("clear-history-confirm"));
     expect(api.clearHistory).toHaveBeenCalledOnce();
     expect(confirm().open).toBe(false);
+  });
+
+  it("words the confirmation for one run in the singular", () => {
+    const { load } = setup();
+    load(entry("a"));
+    showHistory();
+    click(clear());
+    expect(
+      within(confirm()).getByText("Delete the 1 run of this project and its report?"),
+    ).toBeTruthy();
+  });
+
+  it("ignores a close event that arrives while the dialog is open again", () => {
+    const { load } = setup();
+    load(entry("a"), entry("b"));
+    showHistory();
+    click(clear());
+    confirm().dispatchEvent(new Event("close")); // late: the dialog was reopened meanwhile
+    flush();
+    expect(screen.queryByText(/Delete the/)).not.toBeNull();
+    confirm().removeAttribute("open"); // Escape
+    confirm().dispatchEvent(new Event("close"));
+    flush();
+    expect(screen.queryByText(/Delete the/)).toBeNull();
+  });
+
+  it("disables the toolbar Report and Re-run failed once the history is empty", () => {
+    const { send, load } = setup();
+    send(started());
+    send(finished());
+    load(entry(RUN));
+    expect(report().disabled).toBe(false);
+    expect(toolbarRerunFailed().disabled).toBe(false);
+    showHistory();
+    click(clear());
+    click(screen.getByTestId("clear-history-confirm"));
+    load(); // main answers Delete with the empty list
+    expect(report().disabled).toBe(true);
+    expect(toolbarRerunFailed().disabled).toBe(true);
   });
 
   it("is disabled with no runs", () => {

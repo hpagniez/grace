@@ -78,7 +78,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <button
         data-testid="report-button"
         class={btn}
-        disabled={active() || !props.state.run.reportAvailable}
+        disabled={busy() || !props.state.run.reportAvailable}
         onClick={() => void props.api.openReport()}
       >
         Report
