@@ -300,7 +300,7 @@ export class Runner {
       return;
     }
     if (!this.project) return;
-    this.report = null; // the toolbar Report's folder is gone
+    // the toolbar Report stays: reportPath() checks the file, which a held folder can keep
     if (!removeRuns(this.projectDir()))
       this.o.emit({ type: "notice", message: "Some runs could not be deleted" });
     this.o.emit(this.historyEvent());
@@ -314,9 +314,10 @@ export class Runner {
   }
 
   async cancel(): Promise<void> {
-    if (!this.proc) return;
-    this.cancelled = true; // also stops a run whose pre-run dry run is going
-    await this.proc.kill();
+    if (!this.busy) return;
+    // also between two JVMs of one operation: each start checks it (a re-run's switch, then its run)
+    this.cancelled = true;
+    await this.proc?.kill();
   }
 
   reportPath(): string | null {
@@ -521,8 +522,8 @@ export class Runner {
     targets: string[],
     env: string | null,
     onLines: (l: string[]) => void,
-    argFile: string | null = null,
-    filter: FilterState = NO_FILTER,
+    argFile: string | null,
+    filter: FilterState, // required: a run that forgot it would run unfiltered
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
@@ -555,7 +556,15 @@ export class Runner {
     } else {
       const outDir = this.dryRunDir();
       const lines: string[] = [];
-      const proc = this.spawn(outDir, true, featureRoots, env, (l) => lines.push(...l));
+      const proc = this.spawn(
+        outDir,
+        true,
+        featureRoots,
+        env,
+        (l) => lines.push(...l),
+        null,
+        NO_FILTER,
+      );
       const code = await proc.exit;
       this.proc = null;
       if (this.cancelled) return null; // killed on purpose: keep the last tree
@@ -625,6 +634,7 @@ export class Runner {
     );
     this.sendFilter();
     if (switching && !this.tree) return; // a parse error: the environment is switched, nothing runs
+    // A cancel after the switch's dry run stops runTarget before its JVM, once the filter shown is saved.
     const { selection, tests, failedOf, startedAt } = record;
     await this.runTarget(
       failedOnly
@@ -641,15 +651,18 @@ export class Runner {
    * saved, not pruned: a vanished included tag shrinks the run, never widens it.
    */
   private async runTarget(target: RunTarget, filter: FilterState): Promise<void> {
+    const runCancelled = () => {
+      if (this.cancelled) this.o.emit({ type: "notice", message: "Run cancelled" });
+      return this.cancelled;
+    };
+    // a cancel or dispose before the pre-run discovery, e.g. after a re-run's switch: start no JVM
+    if (runCancelled()) return;
     const env = this.envs.env;
     // The rows depend on the environment and the saved lists only: refuse before any JVM starts.
     const props = this.runProperties(env);
     if (!props) return;
     const tree = await this.discover(env);
-    if (this.cancelled) {
-      this.o.emit({ type: "notice", message: "Run cancelled" });
-      return;
-    }
+    if (runCancelled()) return;
     if (!tree) return;
     const notice = (message: string) => this.o.emit({ type: "notice", message });
     const { root } = this.project!;
