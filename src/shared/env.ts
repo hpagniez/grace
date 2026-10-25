@@ -5,9 +5,9 @@ export const ENV_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const PROPERTY_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,199}$/;
 export const MAX_VALUE_LENGTH = 10_000;
 
+export const MAX_ROWS = 500;
+export const MAX_ENVS = 100;
 const MAX_NAME_LENGTH = 200;
-const MAX_ROWS = 500;
-const MAX_ENVS = 100;
 
 /** System properties Karate 2.1.4 reads (found by scanning the bundled jar); a run property must not replace them. */
 export const RESERVED_KARATE_KEYS: readonly string[] = [

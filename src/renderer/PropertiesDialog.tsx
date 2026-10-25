@@ -1,5 +1,7 @@
 import { createMemo, createSignal, createStore, flush, For, Show } from "solid-js";
 import {
+  MAX_ENVS,
+  MAX_ROWS,
   propertyNameError,
   propertyValueError,
   validEnvName,
@@ -42,11 +44,16 @@ const rowsOf = (scope: string, list: RowView[]): Row[] =>
     saved: "secret" in r ? r.state : null,
   }));
 
-/** The Properties… button and its dialog. Edits live in a draft that Save sends and Cancel drops. */
+/**
+ * The Properties… button and its dialog. Edits live in a draft that Save sends and Cancel drops; it
+ * is dropped on Save only once main says it applied it, so a refused save loses nothing.
+ */
 export function PropertiesDialog(props: { state: AppState; api: Api }) {
   let dialog!: HTMLDialogElement;
   let list!: HTMLUListElement;
+  let session = 0; // each opening; an answer to an earlier one is ignored
   const [open, setOpen] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
   const [rows, setRows] = createStore<Row[]>([]);
   /** Environments that have a list in the draft. */
   const [lists, setLists] = createSignal<string[]>([]);
@@ -68,17 +75,22 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     const key = (r: Row) => `${r.scope}\0${r.name}`;
     const count = new Map<string, number>();
     rows.forEach((r) => count.set(key(r), (count.get(key(r)) ?? 0) + 1));
+    const place = new Map<string, number>(); // rows of each list so far
     return new Map(
-      rows.map((r) => [
-        r.id,
-        (r.name === "" ? "Enter a name" : propertyNameError(r.name)) ??
-          (count.get(key(r))! > 1 ? "Duplicate name" : null) ??
-          (r.saved
-            ? null
-            : r.secret && r.value === ""
-              ? "Enter the secret value"
-              : propertyValueError(r.value)),
-      ]),
+      rows.map((r) => {
+        place.set(r.scope, (place.get(r.scope) ?? 0) + 1);
+        return [
+          r.id,
+          (place.get(r.scope)! > MAX_ROWS ? `At most ${MAX_ROWS} properties per list` : null) ??
+            (r.name === "" ? "Enter a name" : propertyNameError(r.name)) ??
+            (count.get(key(r))! > 1 ? "Duplicate name" : null) ??
+            (r.saved
+              ? null
+              : r.secret && r.value === ""
+                ? "Enter the secret value"
+                : propertyValueError(r.value)),
+        ];
+      }),
     );
   });
   const invalidScopes = createMemo(
@@ -104,6 +116,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setScope("");
     setNewEnv("");
     setEnvError(null);
+    session++;
+    setSaving(false);
     setOpen(true);
     dialog.showModal();
   };
@@ -121,13 +135,23 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     drop();
   };
 
+  /** Gives `name` a list in the draft; false, saying why, if main would refuse one more. */
+  const ensureList = (name: string) => {
+    if (lists().includes(name)) return true;
+    if (lists().length >= MAX_ENVS) {
+      setEnvError(`At most ${MAX_ENVS} environments`);
+      return false;
+    }
+    setLists([...lists(), name]);
+    return true;
+  };
   const addEnv = () => {
     const name = newEnv().trim();
     if (!validEnvName(name)) {
       setEnvError(INVALID_ENV);
       return;
     }
-    if (!lists().includes(name)) setLists([...lists(), name]);
+    if (!ensureList(name)) return;
     setScope(name);
     setNewEnv("");
     setEnvError(null);
@@ -142,7 +166,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
   };
   const addRow = () => {
     // the current environment is listed before it has a list: the first row creates it
-    if (scope() !== "" && !lists().includes(scope())) setLists([...lists(), scope()]);
+    if (scope() !== "" && !ensureList(scope())) return;
     setRows(
       (d) =>
         void d.push({
@@ -169,6 +193,20 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
             : { name: r.name, value: r.value, secret: r.secret },
         );
     return { shared: of(""), byEnv: Object.fromEntries(lists().map((e) => [e, of(e)])) };
+  };
+
+  const save = async () => {
+    const mine = session;
+    setSaving(true);
+    let applied = false;
+    try {
+      applied = (await props.api.saveProperties(edit())) === true;
+    } catch {
+      // refused like a false answer; main's notice says why
+    }
+    if (mine !== session) return; // closed and opened again meanwhile
+    if (applied) close();
+    else setSaving(false);
   };
 
   return (
@@ -415,15 +453,18 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
               type="button"
               data-testid="save-properties"
               class={primary}
-              disabled={[...errors().values()].some(Boolean)}
-              onClick={() => {
-                void props.api.saveProperties(edit());
-                close();
-              }}
+              disabled={saving() || [...errors().values()].some(Boolean)}
+              onClick={() => void save()}
             >
-              Save
+              {saving() ? "Saving…" : "Save"}
             </button>
-            <button type="button" data-testid="cancel-properties" class={btn} onClick={close}>
+            <button
+              type="button"
+              data-testid="cancel-properties"
+              class={btn}
+              disabled={saving()}
+              onClick={close}
+            >
               Cancel
             </button>
           </div>

@@ -189,14 +189,15 @@ export class Runner {
 
   /**
    * Replaces the run properties with a validated edit; a `keep` row keeps the ciphertext of the saved
-   * secret of the same scope and name. Applied even if it cannot be saved, as the filter is.
+   * secret of the same scope and name. Applied even if it cannot be saved, as the filter is. True
+   * once applied; false, after a notice, if refused, so the window keeps its draft.
    */
-  saveProperties(edit: PropertiesEdit): void {
+  saveProperties(edit: PropertiesEdit): boolean {
     if (this.busy) {
       this.o.emit({ type: "notice", message: BUSY });
-      return;
+      return false;
     }
-    if (!this.project) return;
+    if (!this.project) return false;
     const { secrets } = this.o;
     const { shared, byEnv } = this.envs.properties;
     const cipher = (scope: string | null, name: string): string | null => {
@@ -207,12 +208,12 @@ export class Runner {
     const error = editErrors(edit, (scope, name) => cipher(scope, name) !== null)[0];
     if (error) {
       this.o.emit({ type: "notice", message: `Properties not saved: ${error}` });
-      return;
+      return false;
     }
     const all = [edit.shared, ...Object.values(edit.byEnv)].flat();
     if (!secrets.available() && all.some((r) => r.secret && !("keep" in r))) {
       this.o.emit({ type: "notice", message: "Secret storage is not available on this system" });
-      return;
+      return false;
     }
     const stored = (scope: string | null, rows: RowEdit[]): StoredRow[] =>
       rows.map((r) =>
@@ -238,6 +239,7 @@ export class Runner {
       });
     }
     this.o.emit(this.envEvent());
+    return true;
   }
 
   async run(key: string): Promise<void> {

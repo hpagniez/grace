@@ -108,7 +108,8 @@ Editor layout (mockups compared in the brainstorm):
   - names starting with `java.`, `jdk.` or `sun.`;
   - `user.dir`, `user.home`, `file.encoding`, `native.encoding`, `stdout.encoding`, `stderr.encoding`, `line.separator`, `path.separator`.
 - Value rules: at most 10,000 characters; no line breaks; it must survive the trip through the argument file unchanged (see "The argument file"). A value that cannot is rejected on its row with "This value cannot be passed to Java exactly."
-- Edits apply on **Save**; **Cancel** discards them. Save is refused while any row is invalid. The dialog cannot be opened while the runner is busy.
+- Edits apply on **Save**; **Cancel** discards them. Save is refused while any row is invalid. The dialog cannot be opened while the runner is busy. The dialog closes only once main has applied the save; if main refuses it, the dialog stays open with the edits and a notice says why.
+- A list holds at most 500 rows and there are at most 100 environment lists: a row past the 500th shows "At most 500 properties per list" and blocks Save; a 101st list is refused with "At most 100 environments".
 - An environment list can be deleted with its rows.
 
 ### R4. Effective properties of a run

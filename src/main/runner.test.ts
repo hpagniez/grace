@@ -946,7 +946,7 @@ describe("Runner properties", () => {
     const { runner, events, last, dataDir } = setup();
     await runner.open(fixture("env"));
     mkdirSync(path.join(dataDir, "settings.json")); // writing a file there fails
-    runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} });
+    expect(runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} })).toBe(true); // applied, though not saved
     expect(last("notice").message).toContain("The properties could not be saved");
     expect(last("environment").view.properties.shared).toEqual([
       { name: "timeout", value: "5000" },
@@ -968,7 +968,7 @@ describe("Runner properties", () => {
     expect(lines[0]).toContain(`@${argFile(dataDir, root)}`);
     expect(lines[0]).not.toContain(SECRET);
     // a save while busy is refused
-    runner.saveProperties({ shared: [], byEnv: {} });
+    expect(runner.saveProperties({ shared: [], byEnv: {} })).toBe(false);
     expect(last("notice").message).toBe("A run is already in progress");
     expect(loadProjectEnv(dataDir, root)).toEqual(saved);
     await run;
@@ -1093,10 +1093,11 @@ describe("Runner properties", () => {
       byEnv: {},
     });
     const cipher = fakeSecretBox().encrypt(SECRET);
-    runner.saveProperties({
+    const applied = runner.saveProperties({
       shared: [keep("api.token"), plain("timeout", "6000")],
       byEnv: { qa: [] },
     });
+    expect(applied).toBe(true);
     expect(all("notice")).toHaveLength(0);
     expect(loadProjectEnv(dataDir, root).properties).toEqual({
       shared: [
@@ -1121,7 +1122,7 @@ describe("Runner properties", () => {
       [{ shared: [keep("timeout")], byEnv: {} }, "All environments: timeout"],
     ];
     for (const [edit, row] of cases) {
-      runner.saveProperties(edit);
+      expect(runner.saveProperties(edit)).toBe(false);
       expect(last("notice").message).toBe(`Properties not saved: ${row}: No saved secret to keep`);
     }
     expect(loadProjectEnv(dataDir, root)).toEqual(saved);
@@ -1131,6 +1132,7 @@ describe("Runner properties", () => {
   it("reserved names and bad values are refused", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");
+    expect(runner.saveProperties({ shared: [], byEnv: {} })).toBe(false); // no project
     await runner.open(root);
     const views = all("environment").length;
     const cases: [PropertiesEdit, string][] = [
@@ -1144,7 +1146,7 @@ describe("Runner properties", () => {
       [{ shared: [plain("a", "1"), plain("a", "2")], byEnv: {} }, "a: Duplicate name"],
     ];
     for (const [edit, error] of cases) {
-      runner.saveProperties(edit);
+      expect(runner.saveProperties(edit)).toBe(false);
       expect(last("notice").message).toBe(`Properties not saved: All environments: ${error}`);
     }
     expect(all("environment")).toHaveLength(views);
@@ -1152,11 +1154,13 @@ describe("Runner properties", () => {
 
     const off = setup(undefined, fakeSecretBox(false));
     await off.runner.open(root);
-    off.runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} });
+    expect(off.runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} })).toBe(
+      false,
+    );
     expect(off.last("notice").message).toBe("Secret storage is not available on this system");
     expect(existsSync(path.join(off.dataDir, "settings.json"))).toBe(false);
     // plain rows still save
-    off.runner.saveProperties({ shared: [plain("timeout", "1")], byEnv: {} });
+    expect(off.runner.saveProperties({ shared: [plain("timeout", "1")], byEnv: {} })).toBe(true);
     expect(loadProjectEnv(off.dataDir, root).properties.shared).toEqual([
       { name: "timeout", value: "1" },
     ]);
