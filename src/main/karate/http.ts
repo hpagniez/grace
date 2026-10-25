@@ -23,8 +23,7 @@ const bodyOf = (lines: string[]) => (lines.length ? lines.join("\n") : null);
 
 /**
  * The calls one step log holds (spec R1). Karate's format is not a contract: the tests run on recorded logs.
- * Requests and responses are read in order, one after the other, as Karate writes them; the number `N`
- * only tells a call's header lines from its body.
+ * A response attaches to the request with the same number `N`, wherever it sits in the log.
  */
 export function parseStepLog(log: string): LoggedCall[] {
   const lines = log.split(/\r?\n/);
@@ -32,52 +31,61 @@ export function parseStepLog(log: string): LoggedCall[] {
   let end = lines.length;
   if (end >= 2 && SUMMARY_STATUS.test(lines[end - 1]) && SUMMARY_REQUEST.test(lines[end - 2]))
     end -= 2;
-  // A `request:` line inside a body is body text: it starts a call only before a `N > ` line.
+  // A marker line inside a body is body text: `request:` starts a call only before a `N > ` line,
+  // and `response time in milliseconds` starts a response only before a `N < ` line.
   const startsCall = (i: number) =>
     lines[i] === "request:" && i + 1 < end && /^\d+ > /.test(lines[i + 1]);
+  const startsResponse = (i: number) =>
+    i + 1 < end && RESPONSE_TIME.test(lines[i]) && RESPONSE_LINE.test(lines[i + 1]);
 
-  const calls: LoggedCall[] = [];
+  const requests: { n: string; call: LoggedCall }[] = [];
   for (let i = 0; i < end;) {
-    if (!startsCall(i)) {
-      i++;
-      continue;
-    }
-    const [, n, method, url] = REQUEST_LINE.exec(lines[i + 1])!;
-    const call: LoggedCall = {
-      method,
-      url,
-      requestHeaders: [],
-      requestBody: null,
-      status: null,
-      responseHeaders: [],
-      responseBody: null,
-      millis: null,
-      attempt: null,
-    };
-    i += 2;
-    for (let h; i < end && (h = header(lines[i], `${n} > `)); i++) call.requestHeaders.push(h);
-    const request: string[] = [];
-    while (i < end && !startsCall(i) && !RESPONSE_TIME.test(lines[i])) request.push(lines[i++]);
-    if (request.at(-1) === "") request.pop();
-    call.requestBody = bodyOf(request);
-
-    const time = i < end ? RESPONSE_TIME.exec(lines[i]) : null;
-    const status = time && i + 1 < end ? RESPONSE_LINE.exec(lines[i + 1]) : null;
-    if (status) {
-      call.millis = Number(time![1]);
-      call.status = Number(status[2]);
+    if (startsCall(i)) {
+      const [, n, method, url] = REQUEST_LINE.exec(lines[i + 1])!;
+      const call: LoggedCall = {
+        method,
+        url,
+        requestHeaders: [],
+        requestBody: null,
+        status: null,
+        responseHeaders: [],
+        responseBody: null,
+        millis: null,
+        attempt: null,
+      };
       i += 2;
-      for (let h; i < end && (h = header(lines[i], `${status[1]} < `)); i++)
-        call.responseHeaders.push(h);
-      const response: string[] = [];
-      while (i < end && !startsCall(i)) response.push(lines[i++]);
-      while (response.at(-1) === "") response.pop();
-      call.responseBody = bodyOf(response);
-    } else if (i < end && startsCall(i)) {
-      continue; // no response, then another request: a followed redirect, not a call
+      for (let h; i < end && (h = header(lines[i], `${n} > `)); i++) call.requestHeaders.push(h);
+      const body: string[] = [];
+      while (i < end && !startsCall(i) && !startsResponse(i)) body.push(lines[i++]);
+      if (body.at(-1) === "") body.pop();
+      call.requestBody = bodyOf(body);
+      requests.push({ n, call });
+    } else if (startsResponse(i)) {
+      const millis = Number(RESPONSE_TIME.exec(lines[i])![1]);
+      const [, n, status] = RESPONSE_LINE.exec(lines[i + 1])!;
+      const headers: HttpHeader[] = [];
+      i += 2;
+      for (let h; i < end && (h = header(lines[i], `${n} < `)); i++) headers.push(h);
+      const body: string[] = [];
+      while (i < end && !startsCall(i) && !startsResponse(i)) body.push(lines[i++]);
+      while (body.at(-1) === "") body.pop();
+      // A response with no request of its number has no call to join: Karate never writes one.
+      const request = requests.find((r) => r.n === n && r.call.status === null);
+      if (request)
+        Object.assign(request.call, {
+          status: Number(status),
+          responseHeaders: headers,
+          responseBody: bodyOf(body),
+          millis,
+        });
+    } else {
+      i++;
     }
-    calls.push(call);
   }
+  // An unanswered request with another request after it is a followed redirect, not a call.
+  const calls = requests
+    .filter((r, k) => r.call.status !== null || k === requests.length - 1)
+    .map((r) => r.call);
   if (calls.length > 1) calls.forEach((c, k) => (c.attempt = { n: k + 1, of: calls.length }));
   return calls;
 }
