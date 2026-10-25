@@ -623,7 +623,16 @@ export class Runner {
       }
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
-      if (argFile) rmSync(argFile, { force: true });
+      // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
+      // 24.15 does not, so the unit tests cover only the notice). A failure must not replace the run's outcome.
+      try {
+        if (argFile) rmSync(argFile, { force: true, maxRetries: 5 });
+      } catch (err) {
+        emit({
+          type: "notice",
+          message: `The run's argument file could not be deleted; the app deletes it when it next starts. ${(err as Error).message}`,
+        });
+      }
     }
   }
 }
