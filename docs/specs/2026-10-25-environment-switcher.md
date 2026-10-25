@@ -75,7 +75,7 @@ Editor layout (mockups compared in the brainstorm):
 
 ### R1. Environment picker
 
-- The toolbar has an **Env** combo box next to the project path. Its value is the project's environment, or "(none)".
+- The toolbar has an **Env** combo box next to the project path. Its value is the project's environment. With no environment the box is empty and shows the placeholder "(none)" (a "(none)" value would make the browser narrow the suggestions to nothing).
 - The person can type any name or pick a suggestion. Suggestions, de-duplicated and sorted:
   - `<env>` of every `karate-config-<env>.js` in the project's classpath roots and in the project folder itself (walking skeleton R1 layouts);
   - every value of `@env=` and `@envnot=` tags written in the project's feature files (`@env=dev,qa` gives `dev` and `qa`). Main reads them from the files under the feature roots, not from the tree, because the tree only holds the scenarios of the current environment (builder check);
@@ -83,7 +83,7 @@ Editor layout (mockups compared in the brainstorm):
   - the current environment.
 - A name must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`. An invalid name is not applied and the combo says why.
 - If the chosen name has no `karate-config-<name>.js`, a hint under the combo says "No karate-config-<name>.js found. Fine if karate-config.js handles it." It is a hint, not an error.
-- Choosing "(none)" or clearing the box means no environment.
+- Choosing "(none)", typing it, or clearing the box means no environment.
 - A typed name takes effect on Enter or when the box loses focus; a picked suggestion takes effect at once. Typing alone changes nothing.
 - Changing the environment re-runs discovery (walking skeleton R2) with the new environment, because `@env`/`@envnot` tags change which tests exist. The tag filter is pruned as after a Refresh (tag filter R5).
   - The new environment is saved and used once that discovery ends, also when it ends with a parse error (exit 3: the tree area shows the error, as today).
@@ -182,7 +182,7 @@ Feature: Environment switcher and run properties
 
   Scenario: Suggestions come from overlay files and env tags
     When I open the env sample project
-    Then the Env combo shows "(none)"
+    Then the Env combo is empty and shows the placeholder "(none)"
     And its suggestions are "prod" and "qa"
 
   Scenario: Changing the environment updates the tree
