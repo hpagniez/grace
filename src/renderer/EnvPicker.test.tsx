@@ -257,6 +257,9 @@ describe("environment combo", () => {
     expect(input().getAttribute("aria-describedby")).toBe(screen.getByTestId("env-hint").id);
     send({ type: "environment", view: view({ env: "qa", overlays: ["qa"] }) });
     expect(screen.queryByTestId("env-hint")).toBeNull();
+    // Windows finds karate-config-QA.js for -e qa
+    send({ type: "environment", view: view({ env: "qa", overlays: ["QA"] }) });
+    expect(screen.queryByTestId("env-hint")).toBeNull();
     send({ type: "environment", view: view({ env: null, overlays: [] }) });
     expect(screen.queryByTestId("env-hint")).toBeNull();
     // typing alone does not change the hint: the chosen environment does

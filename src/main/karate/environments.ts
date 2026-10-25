@@ -5,13 +5,16 @@ import { envTagValues, sortedUnique, validEnvName } from "../../shared/env";
 
 const SKIPPED_DIRS = new Set(["node_modules", "target", "build", ".git"]);
 
-/** `<env>` of every `karate-config-<env>.js` directly inside each folder. */
+/**
+ * `<env>` of every `karate-config-<env>.js` directly inside each folder, as written. Case-insensitive:
+ * on Windows Karate loads `Karate-Config-QA.js` for `-e QA`.
+ */
 export function overlayEnvs(dirs: string[]): string[] {
   return sortedUnique(
     dirs.map((dir) => {
       try {
         return readdirSync(dir).flatMap((file) => {
-          const env = /^karate-config-(.+)\.js$/.exec(file)?.[1];
+          const env = /^karate-config-(.+)\.js$/i.exec(file)?.[1];
           return env !== undefined && validEnvName(env) ? [env] : [];
         });
       } catch {

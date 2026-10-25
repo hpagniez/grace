@@ -41,9 +41,10 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
     },
   );
 
+  // Case-insensitive, as Windows finds the overlay file.
   const hint = () => {
     const env = view()?.env;
-    return env && !view()!.overlays.includes(env)
+    return env && !view()!.overlays.some((o) => o.toLowerCase() === env.toLowerCase())
       ? `No karate-config-${env}.js found. Fine if karate-config.js handles it.`
       : null;
   };
