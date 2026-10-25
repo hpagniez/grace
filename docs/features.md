@@ -18,7 +18,7 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F07 | Failure details: error, location, step list with step logs | must | done | `SCENARIO_EXIT.error` (starts with `path.feature:line`), `FEATURE_EXIT.data` | [spec](specs/2026-10-24-walking-skeleton.md) |
 | F08 | Environment switcher + run properties per environment, with encrypted secrets | must | done | `-e` on dry runs and runs; suggestions from `karate-config-<env>.js` and `@env`/`@envnot` tags; `-D` props via a `java @file` argument file; secrets in Electron `safeStorage` | [spec](specs/2026-10-25-environment-switcher.md) |
 | F09 | Open the generated HTML report | must | done | `<output>/karate-summary.html` opened in the default browser | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F10 | Run history: list of past runs (date, environment, tags, counts, duration), open a past run's results and report, re-run it, re-run failed only | should | idea | keep each run's output folder (`-B` timestamped `karate-reports_yyyyMMdd_HHmmss`, or our own per-run `-o`) plus a small run summary; failed scenarios → `file:LINE` args. See [notes](#f10-run-history) | — |
+| F10 | Run history: History tab listing the last 20 runs (date, environment, tags, what ran, counts, duration), open a past run's report, re-run it on its environment and tags, re-run failed only | should | specced | own `-o` folder per run plus an app-written `run.json` ([ADR 0010](decisions/0010-run-history-one-folder-per-run.md)); failed tests → `file:L1:L2` args per file | [spec](specs/2026-10-25-run-history.md) |
 | F11 | HTTP inspector per step: method, URL, status, request and response headers and bodies, timing; pretty JSON/XML, copy as cURL | should | idea | after the run: parse the HTTP text in `FEATURE_EXIT.data` step logs; live: our own `RunListener` (shared with F14). See [notes](#f11-http-inspector) | — |
 | F12 | Thread count: choose how many scenarios run in parallel, saved per project (Cancel already ships, see F32) | should | idea | `-T <n>`; progress already counts depth-0 `SCENARIO_EXIT`, so it holds with parallel runs; console lines interleave across threads | — |
 | F13 | Project setup: Maven, Gradle, standalone jar, karate CLI | should | idea | `karate doctor --json`; `karate-pom.json` as project file | — |
@@ -45,14 +45,6 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 ## Idea notes
 
 Starting points for the larger ideas. The spec, written just before building, decides.
-
-### F10 Run history
-
-- Store each run under the app's data folder: its output folder (HTML report, `karate-events.jsonl`) and a summary file (start time, duration, environment, tag filter, paths run, counts, exit code or "cancelled").
-- A history list per project, newest first. Selecting a run shows its tree results, failures and console from the stored files, without running Karate.
-- Re-run repeats the same paths, environment and tags. Re-run failed only passes the failed scenarios as `file:LINE` arguments (outline examples by their example line).
-- Keep the last N runs per project (a setting) and delete older folders, since reports grow fast.
-- Feeds F15 (trends and flaky tests).
 
 ### F11 HTTP inspector
 
