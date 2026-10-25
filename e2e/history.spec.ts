@@ -331,8 +331,13 @@ test("Only the 20 newest runs are kept", async () => {
 });
 
 test("Clear history", async () => {
-  test.setTimeout(60_000);
-  const { win, dir, userData } = await openClean(3);
+  test.setTimeout(90_000);
+  const { win, dir, userData } = await openClean(2);
+  // a run that finishes in this session enables the toolbar Report; a failed one, Re-run failed
+  await node(win, "failing match").getByTestId("run-node").click();
+  await expect(tab(win)).toHaveText("History (3)", { timeout: 60_000 });
+  await expect(win.getByTestId("run-outcome")).toHaveText("Finished");
+  await expect(win.getByTestId("report-button")).toBeEnabled();
   await expect(win.getByTestId("rerun-failed-button")).toHaveText("Re-run failed (1)");
   await expect(win.getByTestId("rerun-failed-button")).toBeEnabled();
 
