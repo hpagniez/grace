@@ -421,6 +421,8 @@ describe("Runner tag filter", () => {
       dryRun: true,
       tags: tagArgs(f),
       targets: featureRoots,
+      env: null,
+      argFile: null,
     });
     expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
     return buildTree(readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")), "x");
