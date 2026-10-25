@@ -796,6 +796,23 @@ describe("Runner environment", () => {
     expect(last("environment").view.env).toBeNull();
   });
 
+  it("a change refused during a discovery re-sends the environment in force", T, async () => {
+    const { runner, events, all, last } = setup();
+    await runner.open(fixture("env"));
+    const switching = runner.setEnv("qa");
+    await until(() => all("busy").at(-1)?.busy === true);
+    const from = events.length;
+    await runner.setEnv("prod");
+    // the window must not show the environment still being discovered
+    expect(typesAfter(events, from)).toEqual(["notice", "environment"]);
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(last("environment").view.env).toBeNull();
+    const replayed = runner.replay().find((e): e is Of<"environment"> => e.type === "environment");
+    expect(replayed?.view.env).toBeNull();
+    await switching;
+    expect(last("environment").view.env).toBe("qa");
+  });
+
   it("a discovery that throws keeps the environment before", T, async () => {
     const { runner, events, last, dataDir } = setup();
     const root = fixture("env");
