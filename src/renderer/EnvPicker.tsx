@@ -79,8 +79,10 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
             typed = true;
             setText(e.currentTarget.value);
             setError(null);
-            // A pick from the list arrives as a replacement; typing alone changes nothing.
-            if (e.inputType === "insertReplacementText") commit(e.currentTarget.value);
+            // A pick from the list arrives as a replacement, or in Electron 45 as a plain Event;
+            // typing (an InputEvent) alone changes nothing.
+            if (!(e instanceof InputEvent) || e.inputType === "insertReplacementText")
+              commit(e.currentTarget.value);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") leave(e.currentTarget.value);
