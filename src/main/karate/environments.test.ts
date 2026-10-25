@@ -58,6 +58,12 @@ describe("overlayEnvs", () => {
     expect(overlayEnvs([root])).toEqual(["ok"]);
   });
 
+  it("matches the file name case-insensitively and keeps the environment as written", () => {
+    const root = tmp();
+    put(root, { "Karate-Config-QA.js": "", "KARATE-CONFIG-dev.JS": "" });
+    expect(overlayEnvs([root])).toEqual(["QA", "dev"]);
+  });
+
   it("skips folders that do not exist", () => {
     const root = tmp();
     put(root, { "karate-config-qa.js": "" });
