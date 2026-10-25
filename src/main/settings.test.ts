@@ -11,6 +11,7 @@ import {
   saveLastProject,
   saveProjectEnv,
   saveProjectFilter,
+  skippedProperties,
   type EnvSettings,
 } from "./settings";
 
@@ -217,6 +218,79 @@ describe("settings", () => {
           byEnv: { qa: [good], nothing: [] },
         },
       });
+      // only the rows of lists that load are named
+      expect(skippedProperties(data, "x")).toEqual([
+        "All environments: both",
+        "All environments: karate.env",
+        "All environments: num",
+        "All environments: empty",
+        "All environments: multi",
+        "All environments: wide",
+        "All environments: (no name)",
+        "All environments: (no name)",
+        "All environments: (no name)",
+        "nothing: (no name)",
+      ]);
+    });
+
+    it("rejected rows are named, and a save keeps them while their list exists", () => {
+      const data = tmp();
+      const settings = path.join(data, "settings.json");
+      const good = { name: "good", value: "1" };
+      const reserved = { name: "java.home", value: "C:/jdk" };
+      const wide = { name: "greeting", secret: "abc", value: "h\u00e9llo" };
+      writeEntry(data, {
+        include: ["smoke"],
+        properties: {
+          shared: [good, reserved],
+          byEnv: { qa: [wide, good], dev: [{ value: "x" }] },
+        },
+      });
+      expect(loadProjectEnv(data, "x").properties).toEqual({
+        shared: [good],
+        byEnv: { qa: [good], dev: [] },
+      });
+      expect(skippedProperties(data, "x")).toEqual([
+        "All environments: java.home",
+        "qa: greeting",
+        "dev: (no name)",
+      ]);
+      // after the new rows of each list still there; the rows of the deleted dev list go with it
+      const fresh = { name: "fresh", value: "2" };
+      saveProjectEnv(data, "x", {
+        env: "qa",
+        properties: { shared: [fresh], byEnv: { qa: [good], prod: [fresh] } },
+      });
+      const entry = JSON.parse(readFileSync(settings, "utf8")).projects.x;
+      expect(entry).toEqual({
+        include: ["smoke"],
+        env: "qa",
+        properties: {
+          shared: [fresh, reserved],
+          byEnv: { qa: [good, wide], prod: [fresh] },
+        },
+      });
+      expect(skippedProperties(data, "x")).toEqual(["All environments: java.home", "qa: greeting"]);
+      // a save never copies a valid row of the file
+      saveProjectEnv(data, "x", emptyEnvSettings());
+      expect(JSON.parse(readFileSync(settings, "utf8")).projects.x.properties).toEqual({
+        shared: [reserved],
+        byEnv: {},
+      });
+    });
+
+    it("skippedProperties never throws", () => {
+      const data = tmp();
+      expect(skippedProperties(data, "x")).toEqual([]);
+      writeEntry(data, { properties: { shared: [{ name: "java.home", value: "x" }] } });
+      readFails.code = "EBUSY";
+      try {
+        expect(skippedProperties(data, "x")).toEqual([]);
+      } finally {
+        readFails.code = null;
+      }
+      writeFileSync(path.join(data, "settings.json"), "{not json");
+      expect(skippedProperties(data, "x")).toEqual([]);
     });
 
     it("a bad env, bad lists and unsafe keys read as missing", () => {

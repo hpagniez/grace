@@ -37,6 +37,7 @@ import {
   loadProjectFilter,
   saveProjectEnv,
   saveProjectFilter,
+  skippedProperties,
   type EnvSettings,
   type StoredLists,
   type StoredRow,
@@ -124,12 +125,18 @@ export class Runner {
       }
       const report = this.report;
       this.report = null; // a report of the project open before
+      const skipped = skippedProperties(this.o.dataDir, root);
       opened = await this.rediscover(
         { root, layout: detectLayout(root).layout },
         loadProjectFilter(this.o.dataDir, root),
         loadProjectEnv(this.o.dataDir, root),
       );
       if (!opened) this.report = report;
+      else if (skipped.length)
+        this.o.emit({
+          type: "notice",
+          message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
+        });
     });
     return opened;
   }

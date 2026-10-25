@@ -139,25 +139,71 @@ function parseEnvSettings(entry: unknown): EnvSettings {
   return out;
 }
 
+/** The saved entry of a project, as written; null if none. Throws if the file cannot be read. */
+function savedEntry(dataDir: string, root: string): unknown {
+  const { projects } = read(dataDir);
+  return isObject(projects) && Object.hasOwn(projects, root) ? projects[root] : null;
+}
+
 /**
  * The saved environment and run properties of a project. Malformed parts read as missing and an
  * unreadable file as no environment, so it never throws.
  */
 export function loadProjectEnv(dataDir: string, root: string): EnvSettings {
   try {
-    const { projects } = read(dataDir);
-    return parseEnvSettings(
-      isObject(projects) && Object.hasOwn(projects, root) ? projects[root] : null,
-    );
+    return parseEnvSettings(savedEntry(dataDir, root));
   } catch {
     return emptyEnvSettings();
   }
 }
 
+/** The rows of a saved list that the rules of today reject, as written. */
+const rejectedRows = (x: unknown): unknown[] =>
+  Array.isArray(x) ? x.filter((r) => parseStoredRow(r) === null) : [];
+
+/**
+ * `<scope>: <name>` of each rejected row in a list that loads (`(no name)` if it has none), never
+ * its value: it may be a secret. Never throws.
+ */
+export function skippedProperties(dataDir: string, root: string): string[] {
+  try {
+    const entry = savedEntry(dataDir, root);
+    const properties = isObject(entry) && isObject(entry.properties) ? entry.properties : {};
+    const byEnv = isObject(properties.byEnv) ? properties.byEnv : {};
+    const named = (scope: string, rows: unknown) =>
+      rejectedRows(rows).map(
+        (r) =>
+          `${scope}: ${isObject(r) && typeof r.name === "string" && r.name ? r.name : "(no name)"}`,
+      );
+    return [
+      ...named("All environments", properties.shared),
+      ...Object.entries(byEnv).flatMap(([env, rows]) =>
+        validEnvName(env) ? named(env, rows) : [],
+      ),
+    ];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Saves the environment and the lists. The rows of the file that the rules of today reject stay after
+ * the new rows of their list while that list exists, so a newer rule never erases them.
+ */
 export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): void {
   updateEntry(dataDir, root, (e) => {
     if (s.env === null) delete e.env;
     else e.env = s.env;
-    e.properties = s.properties;
+    const old = isObject(e.properties) ? e.properties : {};
+    const oldByEnv = isObject(old.byEnv) ? old.byEnv : {};
+    e.properties = {
+      shared: [...s.properties.shared, ...rejectedRows(old.shared)],
+      byEnv: Object.fromEntries(
+        Object.entries(s.properties.byEnv).map(([env, rows]) => [
+          env,
+          [...rows, ...rejectedRows(Object.hasOwn(oldByEnv, env) ? oldByEnv[env] : null)],
+        ]),
+      ),
+    };
   });
 }
