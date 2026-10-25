@@ -234,7 +234,17 @@ export class Runner {
     const { classpath } = detectLayout(root);
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(this.filter);
-    const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets, tags });
+    const args = buildArgs({
+      jar,
+      classpath,
+      root,
+      outDir,
+      dryRun,
+      targets,
+      tags,
+      env: null,
+      argFile: null,
+    });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
 

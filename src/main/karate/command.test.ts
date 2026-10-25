@@ -129,6 +129,8 @@ describe("buildArgs", () => {
     outDir: "O",
     targets: ["t1"],
     tags: [],
+    env: null,
+    argFile: null,
   };
   const base = [
     "-Dstdout.encoding=UTF-8",
@@ -155,6 +157,18 @@ describe("buildArgs", () => {
     const tags = ["-t=@smoke"];
     expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([...base, "-D", ...tags, "t1"]);
   });
+  it("puts the argument file first and -e after -f", () => {
+    expect(buildArgs({ ...o, dryRun: false, env: "qa", argFile: "A.txt" })).toEqual([
+      "@A.txt",
+      ...base,
+      "-e",
+      "qa",
+      "t1",
+    ]);
+  });
+  it("without env or argFile is unchanged", () => {
+    expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "t1"]);
+  });
 });
 
 describe("childEnv", () => {
@@ -168,5 +182,10 @@ describe("childEnv", () => {
     };
     expect(childEnv(env)).toEqual({ PATH: "p" });
     expect(Object.keys(env)).toHaveLength(5);
+  });
+  it("strips KARATE_ENV and karate_config_dir", () => {
+    expect(childEnv({ PATH: "p", KARATE_ENV: "prod", karate_config_dir: "x" })).toEqual({
+      PATH: "p",
+    });
   });
 });
