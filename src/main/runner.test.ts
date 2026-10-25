@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
-import { once } from "node:events";
 import {
   closeSync,
   cpSync,
@@ -17,6 +16,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { copyFixture } from "../../test/fixtures/copy";
+import { holdFolder } from "../../test/hold";
 import type { PropertiesEdit, RowEdit } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { RunRecord, StoredTest } from "../shared/history";
@@ -1811,18 +1811,13 @@ describe("Runner history", () => {
 
     // a process running inside a run folder holds it
     const [held] = folders(dataDir, root);
-    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], {
-      cwd: path.join(projectDir(dataDir, root), "runs", held),
-      stdio: "ignore",
-    });
-    await once(holder, "spawn");
+    const release = await holdFolder(path.join(projectDir(dataDir, root), "runs", held));
     try {
       runner.clearHistory();
       expect(last("notice").message).toBe("Some runs could not be deleted");
       expect(folders(dataDir, root)).toEqual([held]);
     } finally {
-      holder.kill();
-      await once(holder, "exit");
+      await release();
     }
 
     const notices = all("notice").length;

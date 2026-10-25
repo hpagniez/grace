@@ -1,9 +1,8 @@
-import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { once } from "node:events";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { holdFolder } from "../../test/hold";
 import { HISTORY_LIMIT, type RunRecord } from "../shared/history";
 import { NO_FILTER } from "../shared/tags";
 import {
@@ -65,18 +64,10 @@ const record = (startedAt: number, extra: Partial<RunRecord> = {}): RunRecord =>
  * come after run.json, so that a recursive delete removes run.json before it fails. (An open file
  * holds nothing: Node deletes with POSIX semantics on Windows 11.) Returns the release.
  */
-async function hold(runDir: string, inSubfolder: boolean): Promise<() => Promise<void>> {
+function hold(runDir: string, inSubfolder: boolean): Promise<() => Promise<void>> {
   const dir = inSubfolder ? path.join(runDir, "zz-held") : runDir;
   mkdirSync(dir, { recursive: true });
-  const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], {
-    cwd: dir,
-    stdio: "ignore",
-  });
-  await once(holder, "spawn");
-  return async () => {
-    holder.kill();
-    await once(holder, "exit");
-  };
+  return holdFolder(dir);
 }
 
 /** `runs/<id>` with the given `run.json` text (none: no file). */
