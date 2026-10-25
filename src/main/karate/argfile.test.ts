@@ -150,15 +150,27 @@ describe("argument file through Java", () => {
 
 describe("target file through Java", () => {
   it(
-    "runs exactly the targets of the file, in a path with a space and é",
+    "runs exactly the targets of the file, in paths with a space and é",
     { timeout: 120_000 },
     async () => {
       const root = mkdtempSync(path.join(tmpdir(), "kk hist é-"));
       temps.push(root);
-      cpSync(copyFixture("edge"), root, { recursive: true });
-      // the rows `| 1 |` and `| 3 |` of the outline `add <a>` (rows.feature lines 10 and 13)
-      const targetFile = path.join(tmp(), "run-targets.txt");
-      writeTargetFile(targetFile, [`${path.join(root, "tests", "rows.feature")}:10:13`]);
+      const copy = copyFixture("edge");
+      temps.push(copy);
+      cpSync(copy, root, { recursive: true });
+      writeFileSync(
+        path.join(root, "tests", "second.feature"),
+        ["Feature: second", "", "Scenario: only one", "* match 1 == 1", ""].join("\n"),
+      );
+      // the file itself under a path with a space, as the app data folder can be
+      const argsDir = mkdtempSync(path.join(tmpdir(), "kk run targets-"));
+      temps.push(argsDir);
+      const targetFile = path.join(argsDir, "run-targets.txt");
+      // rows `| 1 |` and `| 3 |` of the outline `add <a>` (lines 10 and 13), then the scenario at line 3
+      writeTargetFile(targetFile, [
+        `${path.join(root, "tests", "rows.feature")}:10:13`,
+        `${path.join(root, "tests", "second.feature")}:3`,
+      ]);
       const outDir = tmp();
       const args = buildArgs({
         jar: vendor.jar,
@@ -174,8 +186,14 @@ describe("target file through Java", () => {
       expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
       const ran = readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl"))
         .filter((e) => e.type === "SCENARIO_EXIT" && e.data.callDepth === 0)
-        .map((e) => e.data.refId);
-      expect(ran).toEqual(["[1.1:7]", "[1.3:7]"]); // rows 1 and 3, not 2 (refIds carry the Examples line)
+        .map((e) => `${e.data.feature} ${e.data.refId}`)
+        .sort();
+      // rows 1 and 3, not 2 (the refIds of rows carry the Examples line)
+      expect(ran).toEqual([
+        "tests/rows.feature [1.1:7]",
+        "tests/rows.feature [1.3:7]",
+        "tests/second.feature [1:3]",
+      ]);
     },
   );
 });

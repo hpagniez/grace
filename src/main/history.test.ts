@@ -60,6 +60,25 @@ const record = (startedAt: number, extra: Partial<RunRecord> = {}): RunRecord =>
   ...extra,
 });
 
+/**
+ * Holds a run folder the way Windows does: a process running in it, or in a subfolder of it named to
+ * come after run.json, so that a recursive delete removes run.json before it fails. (An open file
+ * holds nothing: Node deletes with POSIX semantics on Windows 11.) Returns the release.
+ */
+async function hold(runDir: string, inSubfolder: boolean): Promise<() => Promise<void>> {
+  const dir = inSubfolder ? path.join(runDir, "zz-held") : runDir;
+  mkdirSync(dir, { recursive: true });
+  const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], {
+    cwd: dir,
+    stdio: "ignore",
+  });
+  await once(holder, "spawn");
+  return async () => {
+    holder.kill();
+    await once(holder, "exit");
+  };
+}
+
 /** `runs/<id>` with the given `run.json` text (none: no file). */
 function runFolder(projectDir: string, id: string, json?: string): string {
   const dir = path.join(projectDir, "runs", id);
@@ -193,9 +212,9 @@ describe("listHistory", () => {
 describe("pruneHistory", () => {
   it("keeps the 20 newest names, invalid ones included", () => {
     const project = tmp();
-    // the oldest two are valid, 3 and 4 are damaged: names decide, not content
+    // 3 is damaged and old; 12 and 24 are damaged and among the newest 20: names decide, not content
     for (let i = 1; i <= 25; i++)
-      runFolder(project, idAt(i), i === 3 || i === 4 ? "{" : JSON.stringify(record(i)));
+      runFolder(project, idAt(i), [3, 12, 24].includes(i) ? "{" : JSON.stringify(record(i)));
     pruneHistory(project);
     const left = readdirSync(path.join(project, "runs")).sort();
     expect(left).toEqual(Array.from({ length: 20 }, (_, i) => idAt(i + 6)));
@@ -208,29 +227,58 @@ describe("pruneHistory", () => {
     pruneHistory(project);
     expect(readdirSync(path.join(project, "runs"))).toHaveLength(3);
   });
+
+  it("skips a held folder and deletes the others, then tries it again", async () => {
+    const project = tmp();
+    for (let i = 1; i <= 23; i++) runFolder(project, idAt(i), JSON.stringify(record(i)));
+    const release = await hold(path.join(project, "runs", idAt(1)), false);
+    try {
+      expect(() => pruneHistory(project)).not.toThrow();
+      expect(readdirSync(path.join(project, "runs"))).toHaveLength(21); // the 20 newest and the held one
+    } finally {
+      await release();
+    }
+    pruneHistory(project);
+    expect(readdirSync(path.join(project, "runs"))).toHaveLength(20);
+  });
 });
 
 describe("clearHistory", () => {
-  it("removes all and reports a held folder", async () => {
+  it("removes all", () => {
     const project = tmp();
     for (let i = 1; i <= 3; i++) runFolder(project, idAt(i), JSON.stringify(record(i)));
-    // An open file does not hold a folder (Node deletes with POSIX semantics on Windows 11), but a
-    // process running inside it does.
-    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], {
-      cwd: path.join(project, "runs", idAt(2)),
-      stdio: "ignore",
-    });
-    await once(holder, "spawn");
-    try {
-      expect(clearHistory(project)).toBe(false);
-      expect(readdirSync(path.join(project, "runs"))).toEqual([idAt(2)]);
-    } finally {
-      holder.kill();
-      await once(holder, "exit");
-    }
     expect(clearHistory(project)).toBe(true);
     expect(readdirSync(path.join(project, "runs"))).toEqual([]);
+    expect(listHistory(project)).toEqual([]);
   });
+
+  it.each([
+    ["in the folder", false],
+    ["in a subfolder", true],
+  ])(
+    "reports a folder held by a process %s and keeps that run listed",
+    async (_where, inSubfolder) => {
+      const project = tmp();
+      for (let i = 1; i <= 3; i++) runFolder(project, idAt(i), JSON.stringify(record(i)));
+      const held = path.join(project, "runs", idAt(2));
+      writeFileSync(path.join(held, "karate-summary.html"), "<html></html>");
+      mkdirSync(path.join(held, "karate-json"));
+      writeFileSync(path.join(held, "karate-json", "karate-events.jsonl"), "{}");
+      const release = await hold(held, inSubfolder);
+      try {
+        expect(clearHistory(project)).toBe(false);
+        expect(readdirSync(path.join(project, "runs"))).toEqual([idAt(2)]);
+        // its report may be gone, its record is what keeps it in the list
+        expect(readRunRecord(project, idAt(2))).toEqual(record(2));
+        expect(listHistory(project).map((e) => e.id)).toEqual([idAt(2)]);
+      } finally {
+        await release();
+      }
+      expect(clearHistory(project)).toBe(true);
+      expect(readdirSync(path.join(project, "runs"))).toEqual([]);
+      expect(listHistory(project)).toEqual([]);
+    },
+  );
 
   it("is true when there is nothing to delete", () => {
     expect(clearHistory(path.join(tmp(), "missing"))).toBe(true);

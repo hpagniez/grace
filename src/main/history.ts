@@ -33,10 +33,13 @@ function runIds(projectDir: string): string[] {
   }
 }
 
-/** Windows antivirus can hold a file a moment, hence the retries. False if the folder stayed. */
-function removeDir(dir: string): boolean {
+/**
+ * Windows antivirus can hold a file a moment, hence the retries a person who asked for the deletion
+ * waits for; a background cleanup passes 0. False if the folder stayed.
+ */
+function removeDir(dir: string, maxRetries = 5): boolean {
   try {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+    rmSync(dir, { recursive: true, force: true, maxRetries });
     return true;
   } catch {
     return false;
@@ -90,16 +93,41 @@ export function listHistory(projectDir: string): HistoryEntry[] {
     .slice(0, HISTORY_LIMIT);
 }
 
-/** Keeps the 20 newest folders by name, valid or not. A folder that stays is tried again next time. */
+/**
+ * Keeps the 20 newest folders by name, valid or not. A folder that stays is tried again after the next
+ * run; no retries here, they would block the main process.
+ */
 export function pruneHistory(projectDir: string): void {
   for (const id of runIds(projectDir).slice(0, -HISTORY_LIMIT))
-    removeDir(path.join(runsDir(projectDir), id));
+    removeDir(path.join(runsDir(projectDir), id), 0);
 }
 
-/** Deletes every run folder; false if any stayed. */
+/**
+ * Deletes a run folder; false if it stayed. A recursive delete removes the files before it fails, and
+ * the `run.json` with them, which would drop the run from the list: put the record back.
+ */
+function removeRun(dir: string): boolean {
+  const file = path.join(dir, "run.json");
+  let record: Buffer | null = null;
+  try {
+    record = readFileSync(file);
+  } catch {
+    // no record to keep
+  }
+  if (removeDir(dir)) return true;
+  try {
+    if (record && existsSync(dir)) writeFileSync(file, record);
+  } catch {
+    // the folder is then unlisted and removeLeftoverRuns deletes it at the next start
+  }
+  return false;
+}
+
+/** Deletes every run folder; false if any stayed, and those stay listed. */
 export function clearHistory(projectDir: string): boolean {
-  const results = runIds(projectDir).map((id) => removeDir(path.join(runsDir(projectDir), id)));
-  return results.every(Boolean);
+  let ok = true;
+  for (const id of runIds(projectDir)) ok = removeRun(path.join(runsDir(projectDir), id)) && ok;
+  return ok;
 }
 
 /**
