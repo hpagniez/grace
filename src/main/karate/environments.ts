@@ -62,11 +62,19 @@ async function fileTagEnvs(file: string): Promise<string[]> {
   return envTagValues(tags);
 }
 
+const MAX_OPEN_FILES = 64;
+
 /**
  * Environment names written in `@env=`/`@envnot=` tags of the feature files under the roots. Async,
  * so a large tree does not freeze the window; it never rejects.
  */
 export async function featureTagEnvs(featureRoots: string[]): Promise<string[]> {
   const files = (await Promise.all(featureRoots.map(featureFiles))).flat();
-  return sortedUnique(await Promise.all(files.map(fileTagEnvs)));
+  const envs: string[][] = [];
+  // A few readers, not one Promise.all: that opens every file before reading any (EMFILE).
+  const reader = async () => {
+    for (let file; (file = files.pop()) !== undefined;) envs.push(await fileTagEnvs(file));
+  };
+  await Promise.all(Array.from({ length: MAX_OPEN_FILES }, reader));
+  return sortedUnique(envs);
 }

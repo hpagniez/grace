@@ -1,9 +1,24 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { copyFixture } from "../../../test/fixtures/copy";
 import { featureTagEnvs, overlayEnvs } from "./environments";
+
+// Counts the readFile calls in flight, delegating to the real one.
+const reads = vi.hoisted(() => ({ now: 0, max: 0 }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs/promises")>();
+  const readFile = (async (...args: Parameters<typeof fs.readFile>) => {
+    reads.max = Math.max(reads.max, ++reads.now);
+    try {
+      return await fs.readFile(...args);
+    } finally {
+      reads.now--;
+    }
+  }) as typeof fs.readFile;
+  return { ...fs, readFile };
+});
 
 const temps: string[] = [];
 const tmp = () => {
@@ -118,6 +133,18 @@ describe("featureTagEnvs", () => {
       "keep/target/x.feature": "@env=nested-target\nFeature: x",
     });
     expect(await featureTagEnvs([root])).toEqual(["kept"]);
+  });
+
+  it("reads at most 64 files at once", async () => {
+    const root = tmp();
+    const envs = Array.from({ length: 200 }, (_, i) => `e${String(i).padStart(3, "0")}`);
+    put(
+      root,
+      Object.fromEntries(envs.map((e, i) => [`d${i % 7}/${e}.feature`, `@env=${e}\nFeature: x`])),
+    );
+    reads.max = 0;
+    expect(await featureTagEnvs([root])).toEqual(envs);
+    expect(reads.max).toBe(64);
   });
 
   it("does not block the event loop while it scans", async () => {
