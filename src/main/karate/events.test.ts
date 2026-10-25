@@ -54,6 +54,11 @@ describe("JsonlTail", () => {
     fs.writeFileSync(file, `${line("A")}\n\r\n${line("B")}\r\n`);
     expect(readAllEvents(file).map((e) => e.type)).toEqual(["A", "B"]);
   });
+
+  it("does not quote the bad line: it can hold part of a secret", () => {
+    fs.writeFileSync(file, `{"data": s3cret-token-123}\n`); // V8 says `"{"data": s3cret-tok"...`
+    expect(() => readAllEvents(file)).toThrow(new Error(`${file}:1: invalid JSON event`));
+  });
 });
 
 describe("readAllEvents", () => {

@@ -1,10 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
+import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
+import { safeStorageBox } from "./main/secrets";
 import { loadLastProject, saveLastProject } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
 
@@ -55,11 +58,14 @@ const createWindow = () => {
   }
 };
 
-/** Handlers never reject to the renderer: a failed Runner call becomes a notice. */
-const handle = (channel: string, fn: (...args: unknown[]) => Promise<void> | void) =>
+/**
+ * Handlers never reject to the renderer: a failed Runner call becomes a notice and resolves
+ * undefined. Otherwise the handler's return value is the answer.
+ */
+const handle = (channel: string, fn: (...args: unknown[]) => unknown) =>
   ipcMain.handle(channel, async (_e, ...args) => {
     try {
-      await fn(...args);
+      return await fn(...args);
     } catch (err) {
       emit({ type: "notice", message: err instanceof Error ? err.message : String(err) });
     }
@@ -73,7 +79,7 @@ app.whenReady().then(async () => {
   const vendor = vendorPaths(
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
   );
-  const runner = new Runner({ vendor, dataDir, emit });
+  const runner = new Runner({ vendor, dataDir, secrets: safeStorageBox(), emit });
 
   handle(CH.ready, () => {
     for (const e of runner.replay()) emit(e);
@@ -99,6 +105,21 @@ app.whenReady().then(async () => {
     }
     runner.setFilter(filter);
   });
+  handle(CH.env, async (name) => {
+    if (name !== null && (typeof name !== "string" || name.length > 64)) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await runner.setEnv(name);
+  });
+  handle(CH.properties, (e) => {
+    const edit = parsePropertiesEdit(e);
+    if (!edit) {
+      emit({ type: "notice", message: "Invalid request" });
+      return false;
+    }
+    return runner.saveProperties(edit);
+  });
   handle(CH.cancel, () => runner.cancel());
   handle(CH.report, async () => {
     const report = runner.reportPath();
@@ -121,6 +142,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error(err);
   }
+  removeLeftoverArgFiles(dataDir);
   createWindow();
   try {
     const last = loadLastProject(dataDir);

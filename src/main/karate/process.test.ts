@@ -23,7 +23,17 @@ function start(dryRun: boolean, onLines: (l: string[]) => void, feature?: string
   temps.push(root, outDir);
   const { classpath, featureRoots } = detectLayout(root);
   const targets = feature ? [path.join(root, ...feature.split("/"))] : featureRoots;
-  const args = buildArgs({ jar, classpath, root, outDir, dryRun, targets, tags: [] });
+  const args = buildArgs({
+    jar,
+    classpath,
+    root,
+    outDir,
+    dryRun,
+    targets,
+    tags: [],
+    env: null,
+    argFile: null,
+  });
   const p = spawnKarate(java, args, root, onLines);
   procs.push(p);
   return p;

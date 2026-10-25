@@ -57,6 +57,13 @@ export function Progress(props: { state: AppState }) {
         <span data-testid="progress-elapsed" class="font-mono">
           {mmss(elapsed())}
         </span>
+        <span
+          data-testid="run-env"
+          title="Environment of the run"
+          class="rounded bg-zinc-200 px-1.5 text-xs empty:hidden dark:bg-zinc-700"
+        >
+          {run().env ?? ""}
+        </span>
         <span data-testid="run-outcome" class="font-medium">
           {outcome()}
         </span>
