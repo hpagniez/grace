@@ -1,6 +1,7 @@
 // Shared by main and renderer: keep this file free of Node imports.
 import type { EnvView } from "./env";
 import type { HistoryEntry } from "./history";
+import type { HttpCall } from "./http";
 import type { Layout, Status, TestNode } from "./model";
 import type { FilterState } from "./tags";
 
@@ -47,6 +48,7 @@ export type AppEvent =
     }
   | { type: "scenarios"; updates: ScenarioUpdate[] }
   | { type: "steps"; key: string; steps: Step[] }
+  | { type: "calls"; key: string; calls: HttpCall[] }
   | { type: "console"; lines: string[] }
   | {
       type: "runFinished";

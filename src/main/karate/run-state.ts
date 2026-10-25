@@ -2,6 +2,7 @@ import type { AppEvent, ScenarioUpdate, Summary } from "../../shared/events";
 import type { TestStatusFinal } from "../../shared/history";
 import type { Status, TestNode } from "../../shared/model";
 import type { KarateEvent } from "./events";
+import { extractCalls } from "./http";
 import { extractSteps } from "./steps";
 import { leafIndex } from "./tree";
 
@@ -24,7 +25,7 @@ export class RunState {
     return key !== undefined && this.keys.includes(key) ? key : null;
   }
 
-  /** At most one `scenarios` event (last status per key wins), then one `steps` event per scenario. */
+  /** At most one `scenarios` event (last status per key wins), then a `steps` and a `calls` event per scenario. */
   apply(events: KarateEvent[]): AppEvent[] {
     const updates = new Map<string, ScenarioUpdate>();
     const steps: AppEvent[] = [];
@@ -55,9 +56,12 @@ export class RunState {
         this.status.set(key, update.status);
         updates.set(key, update);
       } else if (type === "FEATURE_EXIT") {
+        const calls = new Map(extractCalls(d).map((sc) => [sc.refId, sc.calls]));
         for (const sc of extractSteps(d)) {
           const key = this.keyOf(d.relativePath, sc.refId);
-          if (key) steps.push({ type: "steps", key, steps: sc.steps });
+          if (!key) continue;
+          steps.push({ type: "steps", key, steps: sc.steps });
+          steps.push({ type: "calls", key, calls: calls.get(sc.refId) ?? [] });
         }
       }
     }
