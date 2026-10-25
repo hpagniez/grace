@@ -1048,8 +1048,8 @@ describe("Runner properties", () => {
       "Secret api.token (All environments) can't be read. Replace it in Properties.",
     );
     expect(all("runStarted")).toHaveLength(0);
-    // discovery still works
-    expect(all("project")).toHaveLength(2);
+    // refused before the pre-run dry run: no JVM started; discovery still works
+    expect(all("project")).toHaveLength(1);
     expect(last("project").tree).not.toBeNull();
 
     // with secret storage unavailable, a secret of the environment cannot be used either
@@ -1064,6 +1064,7 @@ describe("Runner properties", () => {
       "Secret api.token (qa) can't be read. Replace it in Properties.",
     );
     expect(off.all("runStarted")).toHaveLength(0);
+    expect(off.all("project")).toHaveLength(1);
   });
 
   it("keep copies the stored ciphertext, a rename needs a new value", T, async () => {
