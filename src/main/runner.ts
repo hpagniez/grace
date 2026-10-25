@@ -379,7 +379,7 @@ export class Runner {
       this.sendFilter();
       const { classpath, featureRoots } = detectLayout(project.root);
       this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
-      this.tagEnvs = featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
+      this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
       return true;
     }
