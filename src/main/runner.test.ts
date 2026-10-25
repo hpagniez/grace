@@ -2,10 +2,12 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import {
+  closeSync,
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -50,17 +52,23 @@ function setup(
 ) {
   temps.push(dataDir);
   const events: AppEvent[] = [];
+  let listener = (_e: AppEvent) => {};
   const runner = new Runner({
     vendor: paths,
     dataDir,
     secrets,
-    emit: (e) => events.push(e),
+    emit: (e) => {
+      events.push(e);
+      listener(e);
+    },
   });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
     events.filter((e): e is Of<K> => e.type === type);
   const last = <K extends AppEvent["type"]>(type: K) => all(type).at(-1)!;
-  return { runner, events, dataDir, all, last };
+  /** Calls `f` with each event as it is emitted, before the runner goes on. */
+  const onEvent = (f: (e: AppEvent) => void) => (listener = f);
+  return { runner, events, dataDir, all, last, onEvent };
 }
 
 function fixture(name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history"): string {
@@ -1703,6 +1711,25 @@ describe("Runner history", () => {
     expect(folders(dataDir, root)).toEqual([id]);
   });
 
+  it("cancel after a re-run's environment switch, with no process, runs nothing", T, async () => {
+    const { runner, all, last, dataDir, onEvent } = setup();
+    const root = fixture("env");
+    const [id] = seed(dataDir, root, 1, { env: "qa" });
+    await runner.open(root);
+    let cancel: Promise<void> | null = null;
+    onEvent((e) => {
+      // the switch's dry run has exited and its filter is sent: the env tags are read next, no JVM is up
+      if (e.type === "filter" && all("project").length === 2) cancel ??= runner.cancel();
+    });
+    await runner.rerun(id);
+    await cancel;
+    expect(last("notice").message).toBe("Run cancelled");
+    expect(all("project")).toHaveLength(2); // open, then the switch: no pre-run dry run
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([id]);
+    expect(last("history").runs.map((r) => r.id)).toEqual([id]);
+  });
+
   it("a re-run whose environment has a parse error switches and runs nothing", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("broken");
@@ -1803,6 +1830,27 @@ describe("Runner history", () => {
     expect(all("notice")).toHaveLength(notices);
     expect(folders(dataDir, root)).toEqual([]);
     expect(last("history").runs).toEqual([]);
+    expect(runner.reportPath()).toBeNull();
+  });
+
+  it("clearHistory keeps the toolbar report of a run it could not delete", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "always").key);
+    const report = runner.reportPath()!;
+    expect(report).not.toBeNull();
+    const fd = openSync(report, 0x10000000); // libuv's UV_FS_O_EXLOCK: no sharing, so no delete
+    try {
+      runner.clearHistory();
+      expect(last("notice").message).toBe("Some runs could not be deleted");
+    } finally {
+      closeSync(fd);
+    }
+    expect(last("history").runs).toMatchObject([{ reportAvailable: true }]);
+    expect(runner.reportPath()).toBe(report);
+    runner.clearHistory();
+    expect(folders(dataDir, root)).toEqual([]);
     expect(runner.reportPath()).toBeNull();
   });
 
