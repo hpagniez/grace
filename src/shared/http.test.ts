@@ -95,6 +95,27 @@ describe("prettyBody", () => {
     expect(prettyBody(indented)).toBe(indented);
   });
 
+  it("keeps number text", () => {
+    expect(prettyBody('{"id":12345678901234567890,"price":1.50}')).toBe(
+      '{\n  "id": 12345678901234567890,\n  "price": 1.50\n}',
+    );
+  });
+
+  it("keeps punctuation inside strings", () => {
+    expect(prettyBody('{"a":"x,{y}:[z]\\"q"}')).toBe('{\n  "a": "x,{y}:[z]\\"q"\n}');
+    expect(prettyBody('{"a":"p\\\\","b":"q"}')).toBe('{\n  "a": "p\\\\",\n  "b": "q"\n}');
+  });
+
+  it("keeps empty containers on one line", () => {
+    expect(prettyBody('{"a":{},"b":[]}')).toBe('{\n  "a": {},\n  "b": []\n}');
+    expect(prettyBody("[ { } , [ ] ]")).toBe("[\n  {},\n  []\n]");
+  });
+
+  it("matches JSON.stringify for nested ordinary input", () => {
+    const x = ' {"a":[{"b":null,"c":[1,[2,{"d":true}]]},"s"],\n"e":{"f":-1.5}} ';
+    expect(prettyBody(x)).toBe(JSON.stringify(JSON.parse(x), null, 2));
+  });
+
   it("leaves a JSON scalar as logged", () => {
     expect(prettyBody("1.0")).toBe("1.0");
     expect(prettyBody("null")).toBe("null");
