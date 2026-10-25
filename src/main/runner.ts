@@ -29,7 +29,7 @@ import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
 import { buildTree, findNode, parseRefId, resolveNode, rowLines } from "./karate/tree";
-import { makeMasker } from "./mask";
+import { makeMasker, maskEvent } from "./mask";
 import type { SecretBox } from "./secrets";
 import {
   emptyEnvSettings,
@@ -57,32 +57,6 @@ const isDir = (p: string) => {
 function dryRunError(lines: string[]): string {
   const hits = lines.filter((l) => l.includes("Exception") || l.includes("feature"));
   return (hits.length ? hits : lines.slice(-20)).join("\n");
-}
-
-/** The event with every secret value in its run text replaced; events of other types carry no run text. */
-function masked(e: AppEvent, mask: (text: string) => string): AppEvent {
-  switch (e.type) {
-    case "console":
-      return { ...e, lines: e.lines.map(mask) };
-    case "scenarios":
-      return {
-        ...e,
-        updates: e.updates.map((u) => (u.error === undefined ? u : { ...u, error: mask(u.error) })),
-      };
-    case "steps":
-      return {
-        ...e,
-        steps: e.steps.map((s) => ({
-          ...s,
-          text: mask(s.text), // an outline row's step text holds its Examples values
-          log: s.log === null ? null : mask(s.log),
-        })),
-      };
-    case "notice":
-      return { ...e, message: mask(e.message) }; // an invalid event line can be quoted in it
-    default:
-      return e;
-  }
 }
 
 /**
@@ -563,7 +537,7 @@ export class Runner {
     const outDir = this.outDir("run"); // creates the project folder the argument file goes in
     const argFile = props.rows.length ? path.join(this.projectDir(), "run-args.txt") : null;
     const mask = makeMasker(props.secrets);
-    const emit = (e: AppEvent) => this.o.emit(masked(e, mask));
+    const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
     try {
       if (argFile) writeArgFile(argFile, props.rows);
       const state = new RunState(tree, node, filter);
