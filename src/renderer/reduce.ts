@@ -1,3 +1,4 @@
+import type { EnvView } from "../shared/env";
 import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
 import type { Status, TestNode } from "../shared/model";
 import { NO_FILTER, type FilterState } from "../shared/tags";
@@ -12,6 +13,8 @@ export interface RunView {
   outcome: RunOutcome | null;
   summary: Summary | null;
   reportAvailable: boolean;
+  /** The environment the run in progress, or the last run, used. */
+  env: string | null;
 }
 export interface AppState {
   project: Project | null;
@@ -26,6 +29,8 @@ export interface AppState {
   selected: string | null;
   /** The open project's tag filter, as main holds it; changes only when main says so. */
   filter: FilterState;
+  /** The open project's environment and run properties, as main holds them; null with no project. */
+  env: EnvView | null;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
 }
@@ -45,6 +50,7 @@ const idleRun = (): RunView => ({
   outcome: null,
   summary: null,
   reportAvailable: false,
+  env: null,
 });
 
 export function initialState(): AppState {
@@ -60,6 +66,7 @@ export function initialState(): AppState {
     notice: null,
     selected: null,
     filter: noFilter(),
+    env: null,
     busy: false,
   };
 }
@@ -83,6 +90,7 @@ export function reduce(s: AppState, e: AppEvent): void {
           selected: null,
           run: idleRun(),
           filter: noFilter(), // main's `filter` event follows
+          env: null, // and its `environment` event
         });
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
@@ -103,7 +111,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     }
     case "runStarted":
-      s.run = { ...idleRun(), active: true, total: e.total, startedAt: e.startedAt };
+      s.run = { ...idleRun(), active: true, total: e.total, startedAt: e.startedAt, env: e.env };
       for (const key of e.keys) {
         s.statuses[key] = "pending";
         delete s.results[key];
@@ -142,6 +150,13 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "filter":
       s.filter = e.filter;
+      break;
+    case "environment":
+      if (!s.project) break; // main can still hold the previous project's view
+      // a result from another environment must not pass for the state of this one
+      if (s.env && s.env.env !== e.view.env)
+        Object.assign(s, { statuses: {}, results: {}, steps: {}, selected: null, run: idleRun() });
+      s.env = e.view;
       break;
     case "busy":
       s.busy = e.busy;
