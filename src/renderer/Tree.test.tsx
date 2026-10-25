@@ -63,6 +63,8 @@ function setup() {
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
+    setEnv: vi.fn(async () => {}),
+    saveProperties: vi.fn(async () => true),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -94,6 +96,7 @@ describe("main screen", () => {
       keys: ["s:tests/basic.feature#1", "s:tests/basic.feature#2"],
       total: 2,
       startedAt: Date.now(),
+      env: null,
     });
     send({
       type: "scenarios",
@@ -156,7 +159,14 @@ describe("main screen", () => {
     load();
     expect(button("run-all-button").disabled).toBe(false);
     expect(button("cancel-button").disabled).toBe(true);
-    send({ type: "runStarted", selection: "d:", keys: [], total: 4, startedAt: Date.now() });
+    send({
+      type: "runStarted",
+      selection: "d:",
+      keys: [],
+      total: 4,
+      startedAt: Date.now(),
+      env: null,
+    });
     for (const id of ["run-all-button", "open-button", "refresh-button"])
       expect(button(id).disabled).toBe(true);
     for (const b of screen.getAllByTestId("run-node"))
@@ -266,7 +276,14 @@ describe("main screen", () => {
   it("shows progress, outcome, elapsed and the notice", () => {
     const { send, load } = setup();
     load();
-    send({ type: "runStarted", selection: "d:", keys: [], total: 4, startedAt: Date.now() });
+    send({
+      type: "runStarted",
+      selection: "d:",
+      keys: [],
+      total: 4,
+      startedAt: Date.now(),
+      env: null,
+    });
     send({
       type: "scenarios",
       updates: [

@@ -68,8 +68,12 @@ export function buildArgs(o: {
   dryRun: boolean;
   tags: string[];
   targets: string[];
+  env: string | null;
+  argFile: string | null;
 }): string[] {
   return [
+    // The launcher expands `@file` only before the main class, so it goes first.
+    ...(o.argFile ? [`@${o.argFile}`] : []),
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
     "-cp",
@@ -85,13 +89,21 @@ export function buildArgs(o: {
     "false",
     "-f",
     "html,karate:jsonl",
+    ...(o.env ? ["-e", o.env] : []),
     ...(o.dryRun ? ["-D"] : []),
     ...o.tags,
     ...o.targets,
   ];
 }
 
-const STRIPPED = ["karate_options", "java_tool_options", "jdk_java_options", "_java_options"];
+const STRIPPED = [
+  "karate_options",
+  "karate_env",
+  "karate_config_dir",
+  "java_tool_options",
+  "jdk_java_options",
+  "_java_options",
+];
 
 /** Windows env keys come in any case, so compare lower-cased. Does not mutate `env`. */
 export function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

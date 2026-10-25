@@ -42,10 +42,9 @@ export class JsonlTail {
       if (!text) continue;
       try {
         events.push(JSON.parse(text));
-      } catch (err) {
-        throw new Error(
-          `${this.file}:${this.lineNo}: invalid JSON event (${(err as Error).message})`,
-        );
+      } catch {
+        // not the parser's message: it quotes part of the line, which can hold a secret
+        throw new Error(`${this.file}:${this.lineNo}: invalid JSON event`);
       }
     }
     return events;

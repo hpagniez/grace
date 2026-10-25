@@ -1,12 +1,11 @@
 import type { Api } from "../shared/ipc";
 import type { AppState } from "./reduce";
 import { matchingLeaves } from "../shared/tags";
+import { btn, primary } from "./buttons";
+import { EnvPicker } from "./EnvPicker";
+import { PropertiesDialog } from "./PropertiesDialog";
 
 const LAYOUT_LABEL = { maven: "Maven", gradle: "Gradle", standalone: "Standalone" } as const;
-
-const base = "rounded border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40";
-const btn = `${base} border-zinc-300 bg-white hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700`;
-const primary = `${base} border-green-700 bg-green-600 text-white hover:bg-green-700`;
 
 export function Toolbar(props: { state: AppState; api: Api }) {
   const active = () => props.state.run.active;
@@ -32,6 +31,8 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           {props.state.project ? LAYOUT_LABEL[props.state.project.layout] : ""}
         </span>
       </div>
+      <EnvPicker state={props.state} api={props.api} />
+      <PropertiesDialog state={props.state} api={props.api} />
       <button
         data-testid="open-button"
         class={btn}

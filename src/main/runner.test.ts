@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { copyFixture } from "../../test/fixtures/copy";
+import type { PropertiesEdit, RowEdit } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { TestNode } from "../shared/model";
 import { matchingLeaves, NO_FILTER, projectTags, type TagFilter } from "../shared/tags";
@@ -22,8 +23,9 @@ import { readAllEvents } from "./karate/events";
 import { spawnKarate } from "./karate/process";
 import { buildTree, leafKeys } from "./karate/tree";
 import { Runner } from "./runner";
-import { loadProjectFilter } from "./settings";
-import { vendorPaths } from "./vendor";
+import { fakeSecretBox, type SecretBox } from "./secrets";
+import { loadProjectEnv, loadProjectFilter, saveProjectEnv } from "./settings";
+import { vendorPaths, type VendorPaths } from "./vendor";
 
 const vendor = vendorPaths(path.resolve("vendor"));
 const temps: string[] = [];
@@ -38,10 +40,19 @@ afterEach(async () => {
 
 type Of<K extends AppEvent["type"]> = Extract<AppEvent, { type: K }>;
 
-function setup(dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"))) {
+function setup(
+  dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-")),
+  secrets: SecretBox = fakeSecretBox(),
+  paths: VendorPaths = vendor,
+) {
   temps.push(dataDir);
   const events: AppEvent[] = [];
-  const runner = new Runner({ vendor, dataDir, emit: (e) => events.push(e) });
+  const runner = new Runner({
+    vendor: paths,
+    dataDir,
+    secrets,
+    emit: (e) => events.push(e),
+  });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
     events.filter((e): e is Of<K> => e.type === type);
@@ -49,11 +60,14 @@ function setup(dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"))) {
   return { runner, events, dataDir, all, last };
 }
 
-function fixture(name: "clean" | "broken" | "maven" | "edge" | "tags"): string {
+function fixture(name: "clean" | "broken" | "maven" | "edge" | "tags" | "env"): string {
   const d = copyFixture(name);
   temps.push(d);
   return d;
 }
+
+const printed = (events: AppEvent[]) =>
+  events.flatMap((e) => (e.type === "console" ? e.lines : []));
 
 const leaves = (tree: TestNode | null) => (tree ? leafKeys(tree).length : -1);
 
@@ -151,7 +165,7 @@ describe("Runner discovery", () => {
   });
 
   it("replay restores a window that loads during discovery", T, async () => {
-    const { runner } = setup();
+    const { runner, last } = setup();
     expect(runner.replay()).toEqual([{ type: "busy", busy: false }]);
     const opening = runner.open(fixture("clean"));
     // The window may load before the first project event: it still learns the runner is busy.
@@ -160,6 +174,7 @@ describe("Runner discovery", () => {
     expect(runner.replay()).toEqual([
       runner.current(),
       { type: "filter", filter: NO_FILTER },
+      last("environment"),
       { type: "busy", busy: false },
     ]);
   });
@@ -421,6 +436,8 @@ describe("Runner tag filter", () => {
       dryRun: true,
       tags: tagArgs(f),
       targets: featureRoots,
+      env: null,
+      argFile: null,
     });
     expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
     return buildTree(readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")), "x");
@@ -529,6 +546,7 @@ describe("Runner tag filter", () => {
     expect(second.runner.replay()).toEqual([
       second.runner.current(),
       saved,
+      second.last("environment"),
       { type: "busy", busy: false },
     ]);
   });
@@ -584,5 +602,612 @@ describe("Runner tag filter", () => {
       expect(expected).toHaveLength(count);
       expect(ids(matchingLeaves(await dryRunTree(root, f), NO_FILTER))).toEqual(expected);
     }
+  });
+});
+
+describe("Runner environment", () => {
+  const names = (tree: TestNode | null) =>
+    tree ? matchingLeaves(tree, NO_FILTER).map((n) => n.name) : [];
+  /** Event types after `from`, without the busy events. */
+  const typesAfter = (events: AppEvent[], from: number) =>
+    events
+      .slice(from)
+      .map((e) => e.type)
+      .filter((t) => t !== "busy");
+
+  it("suggestions from overlays and tags", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    expect(last("environment").view).toMatchObject({
+      env: null,
+      suggestions: ["prod", "qa"],
+      overlays: ["qa"],
+    });
+    expect(typesAfter(events, 0)).toEqual(["project", "filter", "environment"]);
+  });
+
+  it("setEnv rediscovers", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    expect(names(last("project").tree)).not.toContain("qa only");
+    expect(names(last("project").tree)).toContain("not prod");
+    const from = events.length;
+    await runner.setEnv("qa");
+    expect(typesAfter(events, from)).toEqual(["project", "filter", "environment"]);
+    expect(names(last("project").tree)).toContain("qa only");
+    expect(last("environment").view.env).toBe("qa");
+    // the tag of a scenario prod lacks is pruned, as after a Refresh
+    runner.setFilter({ include: ["env=qa"], exclude: [], hideNonMatching: false });
+    await runner.setEnv("prod");
+    const tree = last("project").tree;
+    expect(names(tree)).not.toContain("qa only");
+    expect(names(tree)).not.toContain("not prod");
+    expect(last("filter").filter).toEqual(NO_FILTER);
+    expect(loadProjectFilter(dataDir, root)).toEqual(NO_FILTER);
+  });
+
+  it("a run uses -e", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("karate.env = qa"))).toBe(true);
+    expect(last("runStarted").env).toBe("qa");
+    expect(runner.reportPath()).not.toBeNull();
+    // a result from qa is not the state of prod
+    await runner.setEnv("prod");
+    expect(runner.reportPath()).toBeNull();
+  });
+
+  it("setEnv saves and open restores", T, async () => {
+    const first = setup();
+    const root = fixture("env");
+    const properties = {
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: { qa: [{ name: "api.token", secret: fakeSecretBox().encrypt("tok-123") }] },
+    };
+    saveProjectEnv(first.dataDir, root, { env: null, properties });
+    await first.runner.open(root);
+    await first.runner.setEnv("qa");
+    expect(loadProjectEnv(first.dataDir, root)).toEqual({ env: "qa", properties });
+    await first.runner.dispose();
+    const second = setup(first.dataDir);
+    await second.runner.open(root);
+    expect(second.last("environment").view.env).toBe("qa");
+    expect(names(second.last("project").tree)).toContain("qa only");
+    expect(second.runner.replay()).toEqual([
+      second.runner.current(),
+      { type: "filter", filter: NO_FILTER },
+      second.last("environment"),
+      { type: "busy", busy: false },
+    ]);
+  });
+
+  it("the view shows secret rows without their values", T, async () => {
+    const root = fixture("env");
+    const dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"));
+    const token = fakeSecretBox().encrypt("tok-123");
+    saveProjectEnv(dataDir, root, {
+      env: null,
+      properties: {
+        shared: [{ name: "timeout", value: "5000" }],
+        byEnv: {
+          qa: [
+            { name: "api.token", secret: token },
+            { name: "broken", secret: "Zm9v" },
+          ],
+          toString: [],
+        },
+      },
+    });
+    const { runner, last } = setup(dataDir);
+    await runner.open(root);
+    const { view } = last("environment");
+    expect(view.suggestions).toEqual(["prod", "qa", "toString"]);
+    expect(view.secretsAvailable).toBe(true);
+    expect(view.properties).toEqual({
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: {
+        qa: [
+          { name: "api.token", secret: true, state: "set" },
+          { name: "broken", secret: true, state: "unreadable" },
+        ],
+        toString: [],
+      },
+    });
+    expect(JSON.stringify(view)).not.toMatch(/tok-123|Zm9v/);
+    expect(JSON.stringify(view)).not.toContain(token);
+
+    const off = setup(dataDir, fakeSecretBox(false));
+    await off.runner.open(root);
+    const unavailable = off.last("environment").view;
+    expect(unavailable.secretsAvailable).toBe(false);
+    expect(unavailable.properties.byEnv.qa[0]).toEqual({
+      name: "api.token",
+      secret: true,
+      state: "unreadable",
+    });
+  });
+
+  it("cancel during setEnv restores the previous environment", T, async () => {
+    const { runner, events, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    const before = runner.current();
+    const view = last("environment");
+    const from = events.length;
+    const switching = runner.setEnv("prod");
+    await runner.cancel();
+    await switching;
+    expect(typesAfter(events, from)).toEqual(["project", "filter", "environment", "notice"]);
+    expect(all("project").at(-1)).toEqual(before);
+    expect(last("environment")).toEqual(view);
+    expect(last("notice").message).toBe("Cancelled");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+    // the restored environment is the one discovery uses
+    await runner.refresh();
+    expect(names(last("project").tree)).toContain("qa only");
+  });
+
+  it("a parse error still applies and saves the environment", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("broken");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    expect(last("project").error).toContain("syntax.feature");
+    expect(last("environment").view.env).toBe("qa");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+  });
+
+  it("invalid env name is refused", T, async () => {
+    const { runner, events, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    for (const name of ["bad name", "-Dx=1", "", "a".repeat(65)]) {
+      const from = events.length;
+      await runner.setEnv(name);
+      expect(last("notice").message).toBe("Invalid environment name");
+      // the view in force is re-sent, so a window that shows the typed name reverts
+      expect(typesAfter(events, from)).toEqual(["notice", "environment"]);
+    }
+    await runner.setEnv(null); // the same environment: nothing to do
+    expect(all("project")).toHaveLength(1);
+    expect(last("environment").view.env).toBeNull();
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+  });
+
+  it("setEnv while busy gets the busy notice", T, async () => {
+    const { runner, events, all, last } = setup();
+    await runner.open(fixture("env"));
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    const from = events.length;
+    await runner.setEnv("qa");
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(typesAfter(events, from).filter((t) => t === "notice" || t === "environment")).toEqual([
+      "notice",
+      "environment",
+    ]);
+    await runner.cancel();
+    await run;
+    expect(all("environment")).toHaveLength(2);
+    expect(last("environment").view.env).toBeNull();
+  });
+
+  it("a change refused during a discovery re-sends the environment in force", T, async () => {
+    const { runner, events, all, last } = setup();
+    await runner.open(fixture("env"));
+    const switching = runner.setEnv("qa");
+    await until(() => all("busy").at(-1)?.busy === true);
+    const from = events.length;
+    await runner.setEnv("prod");
+    // the window must not show the environment still being discovered
+    expect(typesAfter(events, from)).toEqual(["notice", "environment"]);
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(last("environment").view.env).toBeNull();
+    const replayed = runner.replay().find((e): e is Of<"environment"> => e.type === "environment");
+    expect(replayed?.view.env).toBeNull();
+    await switching;
+    expect(last("environment").view.env).toBe("qa");
+  });
+
+  it("a discovery that throws keeps the environment before", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    const before = runner.replay();
+    // a file where the run folders go: emptying the dry run folder throws
+    const runs = path.join(
+      dataDir,
+      "projects",
+      createHash("sha1").update(root).digest("hex").slice(0, 12),
+    );
+    rmSync(runs, { recursive: true, force: true, maxRetries: 5 });
+    writeFileSync(runs, "");
+    const from = events.length;
+    await expect(runner.setEnv("qa")).rejects.toThrow();
+    // the window still shows the name it sent until main re-sends the environment in force
+    expect(typesAfter(events, from)).toEqual(["environment"]);
+    expect(last("environment").view.env).toBeNull();
+    expect(runner.replay()).toEqual(before);
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+    rmSync(runs);
+    await runner.refresh(); // discovers with the environment before
+    expect(names(last("project").tree)).not.toContain("qa only");
+  });
+
+  it("KARATE_ENV in the parent environment is ignored", T, async () => {
+    const saved = process.env.KARATE_ENV;
+    process.env.KARATE_ENV = "prod";
+    try {
+      const { runner, events, last } = setup();
+      await runner.open(fixture("env"));
+      expect(names(last("project").tree)).toContain("not prod");
+      await runner.run(byName(last("project").tree!, "always").key);
+      expect(printed(events).some((l) => l.includes("karate.env = null"))).toBe(true);
+      expect(last("runStarted").env).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.KARATE_ENV;
+      else process.env.KARATE_ENV = saved;
+    }
+  });
+});
+
+describe("Runner properties", () => {
+  const SECRET = "s3cret-token-123";
+  const plain = (name: string, value: string): RowEdit => ({ name, value, secret: false });
+  const secret = (name: string, value: string): RowEdit => ({ name, value, secret: true });
+  const keep = (name: string): RowEdit => ({ name, secret: true, keep: true });
+  const argFile = (dataDir: string, root: string) =>
+    path.join(
+      dataDir,
+      "projects",
+      createHash("sha1").update(root).digest("hex").slice(0, 12),
+      "run-args.txt",
+    );
+  /** Command lines of the running java.exe processes of the project at `root`. */
+  const javaCommandLines = (root: string) =>
+    execFileSync(
+      "powershell",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "(Get-CimInstance Win32_Process -Filter \"Name='java.exe'\").CommandLine",
+      ],
+      { encoding: "utf8" },
+    )
+      .split(/\r?\n/)
+      .filter((l) => l.includes(root));
+
+  it("shared and env properties, env wins", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    runner.saveProperties({
+      shared: [plain("timeout", "5000")],
+      byEnv: { qa: [plain("timeout", "9000")] },
+    });
+    await runner.setEnv("qa");
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("timeout = 9000"))).toBe(true);
+    const from = events.length;
+    await runner.setEnv(null);
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events.slice(from)).some((l) => l.includes("timeout = 5000"))).toBe(true);
+  });
+
+  it("a secret reaches the run and is masked", T, async () => {
+    const { runner, events, all, last } = setup();
+    const root = fixture("env");
+    // a failing match puts the value in the scenario's error too
+    writeFileSync(
+      path.join(root, "tests", "leak.feature"),
+      [
+        "Feature: leak",
+        "",
+        "Scenario: leak",
+        "  * print 'api.token =', karate.properties['api.token']",
+        "  * match karate.properties['api.token'] == 'other'",
+        "",
+      ].join("\n"),
+    );
+    await runner.open(root);
+    await runner.setEnv("qa");
+    runner.saveProperties({ shared: [], byEnv: { qa: [secret("api.token", SECRET)] } });
+    expect(last("environment").view.properties.byEnv.qa).toEqual([
+      { name: "api.token", secret: true, state: "set" },
+    ]);
+    await runner.run("f:tests/leak.feature");
+    expect(last("runFinished").summary).toMatchObject({ scenariosFailed: 1 });
+    expect(printed(events).some((l) => l.includes("api.token = ****"))).toBe(true);
+    const failed = all("scenarios")
+      .flatMap((e) => e.updates)
+      .find((u) => u.status === "failed");
+    expect(failed?.error).toContain("****");
+    const logs = all("steps").flatMap((e) => e.steps.map((s) => s.log ?? ""));
+    expect(logs.some((l) => l.includes("api.token = ****"))).toBe(true);
+    expect(JSON.stringify(events)).not.toContain(SECRET);
+  });
+
+  it("settings never hold the plain secret", T, async () => {
+    const { runner, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} });
+    expect(readFileSync(path.join(dataDir, "settings.json"), "utf8")).not.toContain(SECRET);
+    expect(loadProjectEnv(dataDir, root).properties.shared).toEqual([
+      { name: "api.token", secret: fakeSecretBox().encrypt(SECRET) },
+    ]);
+  });
+
+  it("properties it cannot save are applied with a notice", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    await runner.open(fixture("env"));
+    mkdirSync(path.join(dataDir, "settings.json")); // writing a file there fails
+    expect(runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} })).toBe(true); // applied, though not saved
+    expect(last("notice").message).toContain("The properties could not be saved");
+    expect(last("environment").view.properties.shared).toEqual([
+      { name: "timeout", value: "5000" },
+    ]);
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("timeout = 5000"))).toBe(true);
+  });
+
+  it("the secret is not on the command line", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} });
+    const saved = loadProjectEnv(dataDir, root);
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    const lines = javaCommandLines(root);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(`@${argFile(dataDir, root)}`);
+    expect(lines[0]).not.toContain(SECRET);
+    // a save while busy is refused
+    expect(runner.saveProperties({ shared: [], byEnv: {} })).toBe(false);
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(loadProjectEnv(dataDir, root)).toEqual(saved);
+    await run;
+    expect(last("runFinished").outcome).toBe("finished");
+  });
+
+  it("no argument file is left after a run, a cancel, or a failed spawn", T, async () => {
+    const paths = { ...vendor };
+    const { runner, events, all, last, dataDir } = setup(undefined, undefined, paths);
+    const root = fixture("env");
+    const file = argFile(dataDir, root);
+    const key = (name: string) => byName(last("project").tree!, name).key;
+    await runner.open(root);
+    runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} });
+
+    await runner.run(key("always"));
+    expect(last("runFinished").outcome).toBe("finished");
+    expect(existsSync(file)).toBe(false);
+
+    const slow = runner.run(key("slow"));
+    await until(() => all("runStarted").length === 2);
+    expect(readFileSync(file, "latin1")).toBe('"-Dtimeout=5000"\r\n');
+    await runner.cancel();
+    await slow;
+    expect(last("runFinished").outcome).toBe("cancelled");
+    expect(existsSync(file)).toBe(false);
+
+    const pidFile = path.join(dataDir, "running.pid");
+    mkdirSync(pidFile); // writing a file there fails
+    try {
+      await runner.run(key("always"));
+      expect(last("notice").message).toContain("EISDIR");
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      rmSync(pidFile, { recursive: true, force: true });
+    }
+
+    // the pre-run dry run is spawned before run() first awaits: only the run gets the missing Java
+    const from = events.length;
+    const failing = runner.run(key("always"));
+    paths.java = path.join(dataDir, "missing", "java.exe");
+    await failing;
+    expect(last("runFinished").outcome).toBe("failed");
+    expect(printed(events.slice(from)).some((l) => l.includes("ENOENT"))).toBe(true);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("an argument file another process holds is a notice, not an error", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} });
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    // without delete sharing, as an antivirus or an indexer can, until its input closes
+    const holder = spawn("powershell", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$f = [IO.File]::Open('${argFile(dataDir, root)}', 'Open', 'Read', 'ReadWrite'); 'held'; [Console]::In.ReadLine(); $f.Close()`,
+    ]);
+    const exited = new Promise((r) => holder.on("exit", r));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        holder.stdout.on("data", (d) => String(d).includes("held") && resolve());
+        void exited.then(() => reject(new Error("the holder exited")));
+      });
+      await run;
+      expect(last("runFinished").outcome).toBe("finished");
+      expect(last("notice").message).toContain("could not be deleted");
+    } finally {
+      holder.stdin.end();
+      await exited;
+    }
+  });
+
+  it("an unreadable secret blocks the run", T, async () => {
+    const first = setup();
+    const root = fixture("env");
+    await first.runner.open(root);
+    first.runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} });
+    await first.runner.dispose();
+    const settings = path.join(first.dataDir, "settings.json");
+    const cipher = fakeSecretBox().encrypt(SECRET);
+    writeFileSync(settings, readFileSync(settings, "utf8").replace(cipher, "Zm9v"));
+
+    const { runner, all, last } = setup(first.dataDir);
+    await runner.open(root);
+    expect(last("environment").view.properties.shared).toEqual([
+      { name: "api.token", secret: true, state: "unreadable" },
+    ]);
+    await runner.run("d:");
+    expect(last("notice").message).toBe(
+      "Secret api.token (All environments) can't be read. Replace it in Properties.",
+    );
+    expect(all("runStarted")).toHaveLength(0);
+    // refused before the pre-run dry run: no JVM started; discovery still works
+    expect(all("project")).toHaveLength(1);
+    expect(last("project").tree).not.toBeNull();
+
+    // with secret storage unavailable, a secret of the environment cannot be used either
+    saveProjectEnv(first.dataDir, root, {
+      env: "qa",
+      properties: { shared: [], byEnv: { qa: [{ name: "api.token", secret: cipher }] } },
+    });
+    const off = setup(first.dataDir, fakeSecretBox(false));
+    await off.runner.open(root);
+    await off.runner.run("d:");
+    expect(off.last("notice").message).toBe(
+      "Secret api.token (qa) can't be read. Replace it in Properties.",
+    );
+    expect(off.all("runStarted")).toHaveLength(0);
+    expect(off.all("project")).toHaveLength(1);
+  });
+
+  it("keep copies the stored ciphertext, a rename needs a new value", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({
+      shared: [secret("api.token", SECRET), plain("timeout", "5000")],
+      byEnv: {},
+    });
+    const cipher = fakeSecretBox().encrypt(SECRET);
+    const applied = runner.saveProperties({
+      shared: [keep("api.token"), plain("timeout", "6000")],
+      byEnv: { qa: [] },
+    });
+    expect(applied).toBe(true);
+    expect(all("notice")).toHaveLength(0);
+    expect(loadProjectEnv(dataDir, root).properties).toEqual({
+      shared: [
+        { name: "api.token", secret: cipher },
+        { name: "timeout", value: "6000" },
+      ],
+      byEnv: { qa: [] },
+    });
+    expect(last("environment").view.properties).toEqual({
+      shared: [
+        { name: "api.token", secret: true, state: "set" },
+        { name: "timeout", value: "6000" },
+      ],
+      byEnv: { qa: [] },
+    });
+
+    const saved = loadProjectEnv(dataDir, root);
+    const views = all("environment").length;
+    const cases: [PropertiesEdit, string][] = [
+      [{ shared: [keep("api.key")], byEnv: {} }, "All environments: api.key"],
+      [{ shared: [], byEnv: { qa: [keep("api.token")] } }, "qa: api.token"],
+      [{ shared: [keep("timeout")], byEnv: {} }, "All environments: timeout"],
+    ];
+    for (const [edit, row] of cases) {
+      expect(runner.saveProperties(edit)).toBe(false);
+      expect(last("notice").message).toBe(`Properties not saved: ${row}: No saved secret to keep`);
+    }
+    expect(loadProjectEnv(dataDir, root)).toEqual(saved);
+    expect(all("environment")).toHaveLength(views);
+  });
+
+  it("reserved names and bad values are refused", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    expect(runner.saveProperties({ shared: [], byEnv: {} })).toBe(false); // no project
+    await runner.open(root);
+    const views = all("environment").length;
+    const cases: [PropertiesEdit, string][] = [
+      [{ shared: [plain("karate.options", "-t @x")], byEnv: {} }, "karate.options: Reserved name"],
+      [{ shared: [plain("JAVA.home", "x")], byEnv: {} }, "JAVA.home: Reserved name"],
+      [{ shared: [plain("a", "x\ny")], byEnv: {} }, "a: No line breaks"],
+      [
+        { shared: [secret("a", "é")], byEnv: {} },
+        "a: This value cannot be passed to Java exactly.",
+      ],
+      [{ shared: [plain("a", "1"), plain("a", "2")], byEnv: {} }, "a: Duplicate name"],
+    ];
+    for (const [edit, error] of cases) {
+      expect(runner.saveProperties(edit)).toBe(false);
+      expect(last("notice").message).toBe(`Properties not saved: All environments: ${error}`);
+    }
+    expect(all("environment")).toHaveLength(views);
+    expect(existsSync(path.join(dataDir, "settings.json"))).toBe(false);
+
+    const off = setup(undefined, fakeSecretBox(false));
+    await off.runner.open(root);
+    expect(off.runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} })).toBe(
+      false,
+    );
+    expect(off.last("notice").message).toBe("Secret storage is not available on this system");
+    expect(existsSync(path.join(off.dataDir, "settings.json"))).toBe(false);
+    // plain rows still save
+    expect(off.runner.saveProperties({ shared: [plain("timeout", "1")], byEnv: {} })).toBe(true);
+    expect(loadProjectEnv(off.dataDir, root).properties.shared).toEqual([
+      { name: "timeout", value: "1" },
+    ]);
+  });
+
+  it("saved rows today's rules reject are named in one notice on open", T, async () => {
+    const root = fixture("env");
+    const dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"));
+    const properties = {
+      shared: [
+        { name: "timeout", value: "5000" },
+        { name: "java.home", value: "C:/jdk" },
+      ],
+      byEnv: {
+        qa: [{ name: "greeting", secret: "Zm9v", value: "h\u00e9llo" }, { secret: "Zm9v" }],
+      },
+    };
+    writeFileSync(
+      path.join(dataDir, "settings.json"),
+      JSON.stringify({ projects: { [root]: { properties } } }),
+    );
+    const { runner, all, last } = setup(dataDir);
+    await runner.open(root);
+    await runner.refresh();
+    expect(all("notice").map((n) => n.message)).toEqual([
+      "Some saved properties were not loaded and are kept in settings.json: All environments: java.home, qa: greeting, qa: (no name)",
+    ]);
+    expect(last("environment").view.properties).toEqual({
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: { qa: [] },
+    });
+  });
+
+  it("no properties, no @ argument", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    // rows of another environment are not passed
+    runner.saveProperties({ shared: [], byEnv: { qa: [plain("timeout", "9000")] } });
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    const lines = javaCommandLines(root);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain("run-args.txt");
+    expect(lines[0]).not.toMatch(/\s"?@/);
+    expect(existsSync(argFile(dataDir, root))).toBe(false);
+    await runner.cancel();
+    await run;
   });
 });
