@@ -92,7 +92,7 @@ How runs are stored:
 - Each run writes to its own folder `<app data>\projects\<hash>\runs\<id>\`, passed as `-o`. `<id>` is the local start time `yyyyMMdd-HHmmss-SSS`, so folder names sort by time; if that folder already exists, `-2`, `-3`… is appended.
 - The discovery folder `...\dryrun\` is unchanged: emptied before each dry run.
 - A run gets a folder only once every check before spawning has passed (unreadable secret, nothing to run, test changed: no folder, no history entry).
-- When a run ends (finished, cancelled, or failed, including a failed start after its folder was created), main writes `run.json` (R2) into its folder, then applies retention (R7).
+- When a run ends and the window is told so (`runFinished`: finished, cancelled, or failed, including a start that failed because the pid file could not be written), main writes `run.json` (R2) into its folder, then applies retention (R7). An error before that, such as an argument or targets file that cannot be written, writes no `run.json` and removes the empty folder.
 - Quitting the app during a run kills it (walking skeleton) and still writes its `run.json`, as cancelled, within the same 10 s bound. If that fails, the folder is deleted at the next start.
 - At app start, before any run, main deletes:
   - every run folder without a `run.json` (left by a crash of the app during a run);
