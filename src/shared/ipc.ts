@@ -13,6 +13,10 @@ export const CH = {
   filter: "filter:set",
   env: "env:set",
   properties: "properties:save",
+  rerun: "history:rerun",
+  rerunFailed: "history:rerunFailed",
+  runReport: "history:report",
+  clearHistory: "history:clear",
   event: "app:event",
 } as const;
 
@@ -27,5 +31,10 @@ export interface Api {
   setEnv(name: string | null): Promise<void>;
   /** True once main applied the edit; false if it refused it (a notice says why). */
   saveProperties(edit: PropertiesEdit): Promise<boolean>;
+  /** The history actions send only the run's folder id, never a path. */
+  rerun(id: string): Promise<void>;
+  rerunFailed(id: string): Promise<void>;
+  openRunReport(id: string): Promise<void>;
+  clearHistory(): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }
