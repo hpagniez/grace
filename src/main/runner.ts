@@ -373,28 +373,27 @@ export class Runner {
 
   /**
    * Discovery of open, refresh and setEnv with `envs`, then `filter` without the tags the new tree
-   * lacks (a failed dry run drops nothing), then `environment`. Cancel puts the project, tree and
-   * environment from before back and re-sends them and the filter, which it leaves unchanged.
+   * lacks (a failed dry run drops nothing), then `environment`. `envs` replaces the environment only
+   * once the discovery succeeded, so nothing shows or uses it before. Cancel puts the project and tree
+   * from before back and re-sends them, the filter, which it leaves unchanged, and the environment.
    */
   private async rediscover(
     project: Project,
     filter: FilterState,
     envs: EnvSettings,
   ): Promise<boolean> {
-    const before = { project: this.project, tree: this.tree, envs: this.envs };
+    const before = { project: this.project, tree: this.tree };
     this.project = project;
-    this.envs = envs;
     let tree: TestNode | null;
     try {
-      tree = await this.discover();
+      tree = await this.discover(envs.env);
     } catch (err) {
-      // the next run must not use an environment the window does not show, and the window may
-      // still show the name it sent
-      ({ project: this.project, tree: this.tree, envs: this.envs } = before);
-      this.o.emit(this.envEvent());
+      ({ project: this.project, tree: this.tree } = before);
+      this.o.emit(this.envEvent()); // the window may still show the name it sent
       throw err;
     }
     if (!this.cancelled) {
+      this.envs = envs;
       this.filter = filter;
       const pruned = tree && pruneFilter(filter, projectTags(tree));
       if (
@@ -410,7 +409,7 @@ export class Runner {
       this.o.emit(this.envEvent());
       return true;
     }
-    ({ project: this.project, tree: this.tree, envs: this.envs } = before);
+    ({ project: this.project, tree: this.tree } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
     this.sendFilter();
     this.o.emit(this.envEvent());
@@ -436,6 +435,7 @@ export class Runner {
     outDir: string,
     dryRun: boolean,
     targets: string[],
+    env: string | null,
     onLines: (l: string[]) => void,
     argFile: string | null = null,
   ) {
@@ -452,14 +452,14 @@ export class Runner {
       dryRun,
       targets,
       tags,
-      env: this.envs.env,
+      env,
       argFile,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
 
-  /** Dry run on all feature roots; emits and returns the new tree, or null on error. */
-  private async discover(): Promise<TestNode | null> {
+  /** Dry run on all feature roots with `env`; emits and returns the new tree, or null on error. */
+  private async discover(env: string | null): Promise<TestNode | null> {
     const project = this.project!;
     const { featureRoots } = detectLayout(project.root);
     const rootName = path.basename(project.root);
@@ -470,7 +470,7 @@ export class Runner {
     } else {
       const outDir = this.outDir("dryrun");
       const lines: string[] = [];
-      const proc = this.spawn(outDir, true, featureRoots, (l) => lines.push(...l));
+      const proc = this.spawn(outDir, true, featureRoots, env, (l) => lines.push(...l));
       const code = await proc.exit;
       this.proc = null;
       if (this.cancelled) return null; // killed on purpose: keep the last tree
@@ -526,7 +526,7 @@ export class Runner {
     const props = this.runProperties();
     if (!props) return;
     const old = this.tree && findNode(this.tree, key);
-    const tree = await this.discover();
+    const tree = await this.discover(this.envs.env);
     if (this.cancelled) {
       this.o.emit({ type: "notice", message: "Run cancelled" });
       return;
@@ -572,6 +572,7 @@ export class Runner {
         outDir,
         false,
         targets,
+        this.envs.env,
         (lines) => emit({ type: "console", lines }),
         argFile,
       );
