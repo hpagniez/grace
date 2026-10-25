@@ -1,10 +1,20 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { copyFixture } from "../../../test/fixtures/copy";
 import { vendorPaths } from "../vendor";
-import { argFileText, removeLeftoverArgFiles, writeArgFile } from "./argfile";
+import { argFileText, removeLeftoverArgFiles, writeArgFile, writeTargetFile } from "./argfile";
 import { buildArgs } from "./command";
+import { readAllEvents } from "./events";
 import { spawnKarate } from "./process";
 
 const vendor = vendorPaths(path.resolve("vendor"));
@@ -46,7 +56,37 @@ describe("writeArgFile", () => {
   });
 });
 
+describe("writeTargetFile", () => {
+  it("quotes, doubles backslashes and writes UTF-8", () => {
+    const file = path.join(tmp(), "run-targets.txt");
+    const targets = [String.raw`C:\Users\hé llo\a.feature:3:15`, String.raw`D:\p "q"\b.feature:7`];
+    writeTargetFile(file, targets);
+    const text =
+      String.raw`"C:\\Users\\hé llo\\a.feature:3:15"` +
+      "\r\n" +
+      String.raw`"D:\\p \"q\"\\b.feature:7"` +
+      "\r\n";
+    expect(readFileSync(file).equals(Buffer.from(text, "utf8"))).toBe(true);
+  });
+  it("writes an empty file for no targets", () => {
+    const file = path.join(tmp(), "run-targets.txt");
+    writeTargetFile(file, []);
+    expect(readFileSync(file)).toHaveLength(0);
+  });
+});
+
 describe("removeLeftoverArgFiles", () => {
+  it("also deletes run-targets.txt", () => {
+    const dataDir = tmp();
+    const project = path.join(dataDir, "projects", "h1");
+    mkdirSync(project, { recursive: true });
+    for (const f of ["run-args.txt", "run-targets.txt", "env.json"])
+      writeFileSync(path.join(project, f), "x");
+    removeLeftoverArgFiles(dataDir);
+    expect(existsSync(path.join(project, "run-args.txt"))).toBe(false);
+    expect(existsSync(path.join(project, "run-targets.txt"))).toBe(false);
+    expect(existsSync(path.join(project, "env.json"))).toBe(true);
+  });
   it("deletes every run-args.txt and nothing else", () => {
     const dataDir = tmp();
     for (const p of ["h1", "h2", "h3"])
@@ -106,4 +146,54 @@ describe("argument file through Java", () => {
     expect(printed("A")).toBe(TRICKY);
     expect(printed("B")).toBe("plain");
   });
+});
+
+describe("target file through Java", () => {
+  it(
+    "runs exactly the targets of the file, in paths with a space and é",
+    { timeout: 120_000 },
+    async () => {
+      const root = mkdtempSync(path.join(tmpdir(), "kk hist é-"));
+      temps.push(root);
+      const copy = copyFixture("edge");
+      temps.push(copy);
+      cpSync(copy, root, { recursive: true });
+      writeFileSync(
+        path.join(root, "tests", "second.feature"),
+        ["Feature: second", "", "Scenario: only one", "* match 1 == 1", ""].join("\n"),
+      );
+      // the file itself under a path with a space, as the app data folder can be
+      const argsDir = mkdtempSync(path.join(tmpdir(), "kk run targets-"));
+      temps.push(argsDir);
+      const targetFile = path.join(argsDir, "run-targets.txt");
+      // rows `| 1 |` and `| 3 |` of the outline `add <a>` (lines 10 and 13), then the scenario at line 3
+      writeTargetFile(targetFile, [
+        `${path.join(root, "tests", "rows.feature")}:10:13`,
+        `${path.join(root, "tests", "second.feature")}:3`,
+      ]);
+      const outDir = tmp();
+      const args = buildArgs({
+        jar: vendor.jar,
+        classpath: [root],
+        root,
+        outDir,
+        dryRun: false,
+        tags: [],
+        targets: [`@${targetFile}`],
+        env: null,
+        argFile: null,
+      });
+      expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
+      const ran = readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl"))
+        .filter((e) => e.type === "SCENARIO_EXIT" && e.data.callDepth === 0)
+        .map((e) => `${e.data.feature} ${e.data.refId}`)
+        .sort();
+      // rows 1 and 3, not 2 (the refIds of rows carry the Examples line)
+      expect(ran).toEqual([
+        "tests/rows.feature [1.1:7]",
+        "tests/rows.feature [1.3:7]",
+        "tests/second.feature [1:3]",
+      ]);
+    },
+  );
 });

@@ -5,6 +5,7 @@ import { initialState, reduce, type AppState } from "./reduce";
 export function createAppStore(api: Api): {
   state: AppState;
   select(key: string): void;
+  showPanel(panel: AppState["panel"]): void;
   dispose(): void;
 } {
   const [state, setState] = createStore(initialState());
@@ -14,6 +15,7 @@ export function createAppStore(api: Api): {
   return {
     state,
     select: (key) => setState((draft) => void (draft.selected = key)),
+    showPanel: (panel) => setState((draft) => void (draft.panel = panel)),
     dispose,
   };
 }

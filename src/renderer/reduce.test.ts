@@ -2,8 +2,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { EnvView } from "../shared/env";
 import type { AppEvent } from "../shared/events";
+import type { HistoryEntry } from "../shared/history";
 import type { TestNode } from "../shared/model";
-import { NO_FILTER } from "../shared/tags";
 import { readAllEvents } from "../main/karate/events";
 import { RunState } from "../main/karate/run-state";
 import { buildTree, leafKeys } from "../main/karate/tree";
@@ -22,6 +22,7 @@ const other = { root: "D:/q", layout: "standalone" } as const;
 const started = (ks: string[] = keys, env: string | null = null): AppEvent => ({
   type: "runStarted",
   selection: tree.key,
+  runId: "20261025-120000-000",
   keys: ks,
   total: ks.length,
   startedAt: 1000,
@@ -37,6 +38,23 @@ const envView = (env: string | null): EnvView => ({
   secretsAvailable: true,
 });
 const environment = (env: string | null): AppEvent => ({ type: "environment", view: envView(env) });
+const entry = (id: string, over: Partial<HistoryEntry> = {}): HistoryEntry => ({
+  id,
+  startedAt: 1000,
+  durationMillis: 2000,
+  env: null,
+  filter: { include: [], exclude: [], hideNonMatching: false },
+  selection: null,
+  failedOf: null,
+  outcome: "finished",
+  exitCode: 0,
+  passed: 1,
+  failed: 0,
+  total: 1,
+  reportAvailable: true,
+  ...over,
+});
+const history = (...runs: HistoryEntry[]): AppEvent => ({ type: "history", runs });
 
 describe("reduce", () => {
   it("runStarted sets selection to pending, keeps others, clears console, sets total", () => {
@@ -55,7 +73,7 @@ describe("reduce", () => {
   it("replays a whole run: done 9, passed 8, failed 1, outcome finished", () => {
     const s = initialState();
     apply(s, project(), started());
-    const rs = new RunState(tree, tree, NO_FILTER);
+    const rs = new RunState(tree, leafKeys(tree));
     apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
     expect(s.run).toMatchObject({
       active: false,
@@ -124,7 +142,7 @@ describe("reduce", () => {
   it("project event for another folder resets the run view", () => {
     const s = initialState();
     apply(s, project(), started());
-    const rs = new RunState(tree, tree, NO_FILTER);
+    const rs = new RunState(tree, leafKeys(tree));
     apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
     s.selected = keys[0];
     const runView = () => {
@@ -157,7 +175,7 @@ describe("reduce", () => {
     const withResults = () => {
       const s = initialState();
       apply(s, project(), environment("qa"), started());
-      const rs = new RunState(tree, tree, NO_FILTER);
+      const rs = new RunState(tree, leafKeys(tree));
       apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
       s.selected = keys[0];
       return s;
@@ -224,6 +242,72 @@ describe("reduce", () => {
     });
   });
 
+  describe("history", () => {
+    const RUN = "20261025-120000-000";
+    // a finished run whose report exists, as the window holds it after runFinished
+    const finished = () => {
+      const s = initialState();
+      apply(s, project(), started(), {
+        type: "runFinished",
+        outcome: "finished",
+        exitCode: 0,
+        summary: null,
+        reportAvailable: true,
+      });
+      return s;
+    };
+
+    it("history event replaces the list", () => {
+      const s = initialState();
+      expect(s.history).toEqual([]);
+      expect(s.panel).toBe("console");
+      apply(s, project(), history(entry("a"), entry("b")));
+      expect(s.history.map((r) => r.id)).toEqual(["a", "b"]);
+      apply(s, history(entry("c")));
+      expect(s.history.map((r) => r.id)).toEqual(["c"]);
+    });
+
+    it("runStarted switches to the console and records the run id", () => {
+      const s = initialState();
+      expect(s.run.runId).toBeNull();
+      s.panel = "history";
+      apply(s, project(), started());
+      expect(s.panel).toBe("console");
+      expect(s.run.runId).toBe(RUN);
+    });
+
+    it("clearing the history disables Report", () => {
+      const s = finished();
+      expect(s.run.reportAvailable).toBe(true);
+      apply(s, history(entry(RUN), entry("20261025-110000-000")));
+      expect(s.run.reportAvailable).toBe(true); // its folder is still listed with a report
+      apply(s, history(entry("20261025-110000-000")));
+      expect(s.run.reportAvailable).toBe(false); // retention dropped it
+      const t = finished();
+      apply(t, history(entry(RUN, { reportAvailable: false })));
+      expect(t.run.reportAvailable).toBe(false);
+      const u = finished();
+      apply(u, history());
+      expect(u.run.reportAvailable).toBe(false);
+    });
+
+    it("another project empties the history", () => {
+      const s = initialState();
+      apply(s, project(), history(entry("a")));
+      apply(s, project());
+      expect(s.history).toHaveLength(1); // a refresh of the same project keeps it
+      apply(s, { ...(project() as Extract<AppEvent, { type: "project" }>), project: other });
+      expect(s.history).toEqual([]);
+      apply(s, history(entry("a")), {
+        type: "project",
+        project: null,
+        tree: null,
+        error: "Folder not found",
+      });
+      expect(s.history).toEqual([]);
+    });
+  });
+
   it("console keeps the last 10000 lines", () => {
     const s = initialState();
     const chunk = (from: number, to: number): AppEvent => ({
@@ -244,7 +328,7 @@ describe("reduce", () => {
     apply(s, { type: "busy", busy: false });
     expect(s.busy).toBe(false);
     apply(s, project(), { type: "busy", busy: true }, started());
-    apply(s, ...new RunState(tree, tree, NO_FILTER).finish(1, true, false));
+    apply(s, ...new RunState(tree, leafKeys(tree)).finish(1, true, false));
     expect(s.busy).toBe(false);
   });
 

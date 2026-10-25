@@ -2,8 +2,10 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "node:path";
 import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
+import { RUN_ID } from "./shared/history";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
@@ -71,6 +73,13 @@ const handle = (channel: string, fn: (...args: unknown[]) => unknown) =>
     }
   });
 
+/** History requests carry a run's folder id only: anything else is refused before the Runner sees it. */
+const handleRunId = (channel: string, fn: (id: string) => unknown) =>
+  handle(channel, (id) => {
+    if (typeof id === "string" && RUN_ID.test(id)) return fn(id);
+    emit({ type: "notice", message: "Invalid request" });
+  });
+
 app.whenReady().then(async () => {
   if (!primary) return;
   // No menu: its Reload would drop the window's view of a live run.
@@ -125,6 +134,13 @@ app.whenReady().then(async () => {
     const report = runner.reportPath();
     if (report) await shell.openPath(report);
   });
+  handleRunId(CH.rerun, (id) => runner.rerun(id));
+  handleRunId(CH.rerunFailed, (id) => runner.rerunFailed(id));
+  handleRunId(CH.runReport, async (id) => {
+    const report = runner.runReportPath(id);
+    if (report) await shell.openPath(report);
+  });
+  handle(CH.clearHistory, () => runner.clearHistory());
 
   let quitting = false;
   app.on("before-quit", (e) => {
@@ -143,6 +159,7 @@ app.whenReady().then(async () => {
     console.error(err);
   }
   removeLeftoverArgFiles(dataDir);
+  removeLeftoverRuns(dataDir);
   createWindow();
   try {
     const last = loadLastProject(dataDir);

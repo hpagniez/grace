@@ -323,6 +323,7 @@ describe("environment combo", () => {
     send({
       type: "runStarted",
       selection: "d:",
+      runId: "20261025-120000-000",
       keys: [],
       total: 1,
       startedAt: Date.now(),
@@ -339,7 +340,15 @@ describe("progress", () => {
     const runEnv = () => screen.getByTestId("run-env").textContent;
     expect(runEnv()).toBe("");
     const start = (env: string | null) =>
-      send({ type: "runStarted", selection: "d:", keys: [], total: 1, startedAt: 1, env });
+      send({
+        type: "runStarted",
+        selection: "d:",
+        runId: "20261025-120000-000",
+        keys: [],
+        total: 1,
+        startedAt: 1,
+        env,
+      });
     start("qa");
     expect(runEnv()).toBe("qa");
     send({

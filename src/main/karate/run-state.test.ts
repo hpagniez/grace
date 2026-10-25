@@ -1,14 +1,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppEvent, ScenarioUpdate } from "../../shared/events";
-import { NO_FILTER } from "../../shared/tags";
+import { matchingLeaves, NO_FILTER } from "../../shared/tags";
 import { readAllEvents } from "./events";
 import { RunState } from "./run-state";
-import { buildTree } from "./tree";
+import { buildTree, leafKeys } from "./tree";
 
 const events = (name: string) => readAllEvents(path.resolve("test/fixtures/events", name));
 const tree = buildTree(events("dryrun-clean.jsonl"), "tests");
-const newState = () => new RunState(tree, tree, NO_FILTER);
+const newState = () => new RunState(tree, leafKeys(tree));
 const smokeNotWip = { ...NO_FILTER, include: ["smoke"], exclude: ["wip"] };
 const updatesOf = (out: AppEvent[]): ScenarioUpdate[] =>
   out.flatMap((e) => (e.type === "scenarios" ? e.updates : []));
@@ -105,12 +105,19 @@ describe("RunState", () => {
     expect(out.find((e) => e.type === "runFinished")).toMatchObject({ outcome: "finished" });
   });
 
-  it("keys are the matching leaves", () => {
-    expect(new RunState(tree, tree, smokeNotWip).keys).toHaveLength(2);
+  it("run state tracks exactly the given keys", () => {
+    const keys = ["s:tests/basic.feature#2", "s:tests/slow.feature#1"];
+    const state = new RunState(tree, keys);
+    expect(state.keys).toEqual(keys);
+    const seen = updatesOf(state.apply(events("run-clean.jsonl"))).map((u) => u.key);
+    expect(seen.sort()).toEqual(keys);
   });
 
   it("warns when Karate ran more than selected", () => {
-    const state = new RunState(tree, tree, smokeNotWip);
+    const state = new RunState(
+      tree,
+      matchingLeaves(tree, smokeNotWip).map((n) => n.key),
+    );
     state.apply(events("run-clean.jsonl"));
     expect(state.finish(1, false, true).at(-1)).toEqual({
       type: "notice",
@@ -122,5 +129,53 @@ describe("RunState", () => {
     const state = newState();
     state.apply(events("run-clean.jsonl"));
     expect(state.finish(1, false, true).some((e) => e.type === "notice")).toBe(false);
+  });
+
+  describe("results", () => {
+    it("after a finished run: notRun for unexited keys", () => {
+      const run = events("run-clean.jsonl");
+      const enter = run.find((e) => e.type === "SCENARIO_ENTER" && e.data.callDepth === 0)!;
+      const state = newState();
+      state.apply([enter, run.find((e) => e.type === "SUITE_EXIT")!]);
+      state.finish(0, false, true);
+      const r = state.results();
+      expect([...r.keys()]).toEqual(state.keys);
+      expect([...r.values()].every((v) => v.status === "notRun")).toBe(true);
+    });
+
+    it("after a cancel: interrupted for running, notRun for never started", () => {
+      const state = newState();
+      state.apply(events("4-after-taskkill-complete-file.jsonl"));
+      state.finish(1, true, false);
+      const statuses = [...state.results()].map(([key, v]) => [key, v.status]);
+      expect(statuses.filter(([, s]) => s === "interrupted")).toEqual([
+        ["s:tests/slow.feature#1", "interrupted"],
+      ]);
+      expect(statuses.filter(([, s]) => s === "notRun")).toHaveLength(8);
+    });
+
+    it("after a failed run without SUITE_EXIT: same split", () => {
+      const state = newState();
+      state.apply(events("4-after-taskkill-complete-file.jsonl"));
+      state.finish(3, false, false);
+      expect(state.results().get("s:tests/slow.feature#1")?.status).toBe("interrupted");
+      expect(state.results().get("s:tests/basic.feature#1")?.status).toBe("notRun");
+    });
+
+    it("keep durations", () => {
+      const state = newState();
+      state.apply(events("run-clean.jsonl"));
+      state.finish(1, false, true);
+      const r = state.results();
+      expect(r.get("s:tests/basic.feature#1")).toEqual({ status: "passed", durationMillis: 285 });
+      expect(r.get("s:tests/basic.feature#2")).toEqual({ status: "failed", durationMillis: 7 });
+      expect(r.get("s:tests/slow.feature#1")).toEqual({ status: "passed", durationMillis: 8074 });
+    });
+
+    it("leave durationMillis out when Karate gave none", () => {
+      const state = newState();
+      state.finish(3, false, false);
+      expect([...state.results().values()][0]).toEqual({ status: "notRun" });
+    });
   });
 });
