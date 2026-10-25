@@ -150,16 +150,24 @@ describe("run.json", () => {
     expect(readRunRecord(project, "")).toBeNull();
   });
 
-  it("readRunRecord reads null for a missing folder, a folder with no file and a file over 5 MB", () => {
+  it("readRunRecord reads null for a missing folder, a folder with no file and a file over 64 MB", () => {
     const project = tmp();
     expect(readRunRecord(project, idAt(1))).toBeNull();
     runFolder(project, idAt(2));
     expect(readRunRecord(project, idAt(2))).toBeNull();
     const text = JSON.stringify(record(3));
-    runFolder(project, idAt(3), text + " ".repeat(5 * 1024 * 1024));
+    runFolder(project, idAt(3), text + " ".repeat(64 * 1024 * 1024));
     expect(readRunRecord(project, idAt(3))).toBeNull();
     runFolder(project, idAt(4), text);
     expect(readRunRecord(project, idAt(4))).not.toBeNull();
+    // a suite of 25k+ tests writes more than 5 MB: still listed
+    runFolder(project, idAt(5), text + " ".repeat(6 * 1024 * 1024));
+    expect(readRunRecord(project, idAt(5))).not.toBeNull();
+    expect(
+      listHistory(project)
+        .map((e) => e.id)
+        .sort(),
+    ).toEqual([idAt(4), idAt(5)]);
   });
 });
 

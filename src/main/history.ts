@@ -18,7 +18,8 @@ import {
   type RunRecord,
 } from "../shared/history";
 
-const MAX_RECORD_BYTES = 5 * 1024 * 1024;
+/** About 200 bytes per test: room for 300k tests, still a bound on a hand-made file. */
+const MAX_RECORD_BYTES = 64 * 1024 * 1024;
 
 const runsDir = (projectDir: string) => path.join(projectDir, "runs");
 
@@ -69,7 +70,7 @@ export function writeRunRecord(dir: string, r: RunRecord): void {
   writeFileSync(path.join(dir, "run.json"), JSON.stringify(r));
 }
 
-/** Null for an id that is not a run id, a missing folder or file, a file over 5 MB or an invalid record. */
+/** Null for an id that is not a run id, a missing folder or file, a file over 64 MB or an invalid record. */
 export function readRunRecord(projectDir: string, id: string): RunRecord | null {
   if (!RUN_ID.test(id)) return null; // also keeps `..` and separators out of the path
   try {
