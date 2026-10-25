@@ -146,6 +146,21 @@ describe("environment combo", () => {
     expect(api.setEnv).not.toHaveBeenCalled();
   });
 
+  it("puts the environment back when nothing is sent", () => {
+    const { send, load, view } = setup();
+    load();
+    type("(none)");
+    enter();
+    expect(input().value).toBe("");
+    send({ type: "environment", view: view({ env: "qa" }) });
+    type(" qa");
+    fireEvent.blur(input());
+    flush();
+    expect(input().value).toBe("qa");
+    fireEvent.input(input(), { target: { value: "qa" }, inputType: "insertReplacementText" });
+    expect(input().value).toBe("qa");
+  });
+
   it("invalid name shows error and does not call setEnv", () => {
     const { api, load } = setup();
     load();
