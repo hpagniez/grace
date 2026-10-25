@@ -67,11 +67,11 @@ describe("overlayEnvs", () => {
 });
 
 describe("featureTagEnvs", () => {
-  it("reads tag values from the env fixture", () => {
-    expect(featureTagEnvs([copyFixture("env")])).toEqual(["prod", "qa"]);
+  it("reads tag values from the env fixture", async () => {
+    expect(await featureTagEnvs([copyFixture("env")])).toEqual(["prod", "qa"]);
   });
 
-  it("handles several tags per line, Feature tags, lists, and comments", () => {
+  it("handles several tags per line, Feature tags, lists, and comments", async () => {
     const root = tmp();
     put(root, {
       "a.feature": [
@@ -89,19 +89,19 @@ describe("featureTagEnvs", () => {
       "deep/er/b.feature": "@env=staging\r\nFeature: b\r\n",
       "deep/er/c.txt": "@env=notafeature",
     });
-    expect(featureTagEnvs([root])).toEqual(["dev", "ok-1", "prod", "qa", "staging"]);
+    expect(await featureTagEnvs([root])).toEqual(["dev", "ok-1", "prod", "qa", "staging"]);
   });
 
-  it("merges several roots and survives roots that do not exist", () => {
+  it("merges several roots and survives roots that do not exist", async () => {
     const a = tmp();
     const b = tmp();
     put(a, { "x.feature": "@env=a\nFeature: x" });
     put(b, { "y.feature": "@env=b\nFeature: y" });
-    expect(featureTagEnvs([a, path.join(a, "missing"), b])).toEqual(["a", "b"]);
-    expect(featureTagEnvs([])).toEqual([]);
+    expect(await featureTagEnvs([a, path.join(a, "missing"), b])).toEqual(["a", "b"]);
+    expect(await featureTagEnvs([])).toEqual([]);
   });
 
-  it("skips target, build, node_modules and .git", () => {
+  it("skips target, build, node_modules and .git", async () => {
     const root = tmp();
     put(root, {
       "keep/x.feature": "@env=kept\nFeature: x",
@@ -111,6 +111,19 @@ describe("featureTagEnvs", () => {
       ".git/x.feature": "@env=in-git\nFeature: x",
       "keep/target/x.feature": "@env=nested-target\nFeature: x",
     });
-    expect(featureTagEnvs([root])).toEqual(["kept"]);
+    expect(await featureTagEnvs([root])).toEqual(["kept"]);
+  });
+
+  it("does not block the event loop while it scans", async () => {
+    const root = tmp();
+    put(root, {
+      "a.feature": "@env=a\nFeature: a",
+      "x/b.feature": "@env=b\nFeature: b",
+      "x/y/c.feature": "@env=c\nFeature: c",
+    });
+    let ticked = false;
+    setImmediate(() => (ticked = true));
+    expect(await featureTagEnvs([root])).toEqual(["a", "b", "c"]);
+    expect(ticked).toBe(true);
   });
 });

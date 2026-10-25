@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { envTagValues, sortedUnique, validEnvName } from "../../shared/env";
 
@@ -20,29 +21,32 @@ export function overlayEnvs(dirs: string[]): string[] {
   );
 }
 
-function featureFiles(dir: string): string[] {
+async function featureFiles(dir: string): Promise<string[]> {
   let entries;
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    entries = await readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
-  return entries.flatMap((e) =>
-    e.isDirectory()
-      ? SKIPPED_DIRS.has(e.name)
-        ? []
-        : featureFiles(path.join(dir, e.name))
-      : e.name.endsWith(".feature")
-        ? [path.join(dir, e.name)]
-        : [],
+  const files = await Promise.all(
+    entries.map((e) =>
+      e.isDirectory()
+        ? SKIPPED_DIRS.has(e.name)
+          ? []
+          : featureFiles(path.join(dir, e.name))
+        : e.name.endsWith(".feature")
+          ? [path.join(dir, e.name)]
+          : [],
+    ),
   );
+  return files.flat();
 }
 
 /** Tag lines are lines whose first token starts with `@`; `# @env=x` comments are not tag lines. */
-function fileTagEnvs(file: string): string[] {
+async function fileTagEnvs(file: string): Promise<string[]> {
   let text;
   try {
-    text = readFileSync(file, "utf8");
+    text = await readFile(file, "utf8");
   } catch {
     return [];
   }
@@ -55,6 +59,11 @@ function fileTagEnvs(file: string): string[] {
   return envTagValues(tags);
 }
 
-/** Environment names written in `@env=`/`@envnot=` tags of the feature files under the roots. */
-export const featureTagEnvs = (featureRoots: string[]): string[] =>
-  sortedUnique(featureRoots.flatMap(featureFiles).map(fileTagEnvs));
+/**
+ * Environment names written in `@env=`/`@envnot=` tags of the feature files under the roots. Async,
+ * so a large tree does not freeze the window; it never rejects.
+ */
+export async function featureTagEnvs(featureRoots: string[]): Promise<string[]> {
+  const files = (await Promise.all(featureRoots.map(featureFiles))).flat();
+  return sortedUnique(await Promise.all(files.map(fileTagEnvs)));
+}
