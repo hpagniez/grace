@@ -21,6 +21,9 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
   const [text, setText] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   let typed = false; // since focus: leaving an untouched box puts the environment back
+  // The name sent until main's next view; undefined when none is on its way. A pick commits on
+  // input, and the Enter or blur after it can come before main's busy echo locks the box.
+  let sent: string | null | undefined;
 
   const restore = () => {
     typed = false;
@@ -32,6 +35,7 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
   createEffect(
     () => [view(), shown()] as const,
     ([, value]) => {
+      sent = undefined;
       setText(value);
       setError(null);
     },
@@ -48,9 +52,12 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
     if (locked()) return; // Electron blurs the box it disables: that change was sent already
     const name = value.trim();
     const next = name === "" || name === NONE ? null : name;
+    if (next === sent) return; // on its way already: keep the text until main answers
     if (next !== null && !validEnvName(next)) setError(INVALID_ENV);
-    else if (next !== (view()?.env ?? null)) void props.api.setEnv(next);
-    else restore(); // nothing sent, so no view comes back to reset the box
+    else if (next !== (view()?.env ?? null)) {
+      sent = next;
+      void props.api.setEnv(next);
+    } else restore(); // nothing sent, so no view comes back to reset the box
   };
   const leave = (value: string) => (typed ? commit(value) : restore());
 
