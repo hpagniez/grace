@@ -1,5 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import type { EnvView } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { TestNode } from "../shared/model";
 import { NO_FILTER } from "../shared/tags";
@@ -18,16 +19,24 @@ const project = (t: TestNode | null = tree): AppEvent => ({
   error: null,
 });
 const other = { root: "D:/q", layout: "standalone" } as const;
-const started = (ks: string[] = keys): AppEvent => ({
+const started = (ks: string[] = keys, env: string | null = null): AppEvent => ({
   type: "runStarted",
   selection: tree.key,
   keys: ks,
   total: ks.length,
   startedAt: 1000,
-  env: null,
+  env,
 });
 const apply = (s: ReturnType<typeof initialState>, ...es: AppEvent[]) =>
   es.forEach((e) => reduce(s, e));
+const envView = (env: string | null): EnvView => ({
+  env,
+  suggestions: [],
+  overlays: [],
+  properties: { shared: [], byEnv: {} },
+  secretsAvailable: true,
+});
+const environment = (env: string | null): AppEvent => ({ type: "environment", view: envView(env) });
 
 describe("reduce", () => {
   it("runStarted sets selection to pending, keeps others, clears console, sets total", () => {
@@ -141,6 +150,78 @@ describe("reduce", () => {
     s.selected = keys[0];
     apply(s, project(null));
     expect(s.selected).toBeNull();
+  });
+
+  describe("environment", () => {
+    // a finished run with a selected test: everything an environment change must clear
+    const withResults = () => {
+      const s = initialState();
+      apply(s, project(), environment("qa"), started());
+      const rs = new RunState(tree, tree, NO_FILTER);
+      apply(s, ...rs.apply(fixture("run-clean.jsonl")), ...rs.finish(1, false, true));
+      s.selected = keys[0];
+      return s;
+    };
+    const runView = (s: ReturnType<typeof initialState>) => {
+      const { statuses, results, steps, selected, run } = s;
+      return { statuses, results, steps, selected, run };
+    };
+    const reset = { statuses: {}, results: {}, steps: {}, selected: null, run: initialState().run };
+
+    it("env change clears results", () => {
+      const s = withResults();
+      expect(s.run.reportAvailable).toBe(true);
+      apply(s, environment("prod"));
+      expect(runView(s)).toEqual(reset);
+      expect(s.run.reportAvailable).toBe(false);
+      expect(s.env?.env).toBe("prod");
+      apply(s, started(), { type: "scenarios", updates: [{ key: keys[0], status: "passed" }] });
+      apply(s, environment(null)); // to no environment, too
+      expect(runView(s)).toEqual(reset);
+    });
+
+    it("same env keeps them", () => {
+      const s = withResults();
+      const before = structuredClone(runView(s));
+      apply(s, environment("qa")); // main re-sends the view after a refusal or a properties save
+      expect(runView(s)).toEqual(before);
+      expect(s.env?.env).toBe("qa");
+    });
+
+    it("keeps the filter and the console when the environment changes", () => {
+      const s = withResults();
+      s.filter = { include: ["smoke"], exclude: [], hideNonMatching: true };
+      s.console = ["line"];
+      apply(s, environment("prod"));
+      expect(s.filter.include).toEqual(["smoke"]);
+      expect(s.console).toEqual(["line"]);
+    });
+
+    it("is dropped by another folder or none, and ignored with no project", () => {
+      const s = withResults();
+      apply(s, project(), environment("qa")); // same folder refreshed
+      expect(s.env?.env).toBe("qa");
+      apply(s, { ...(project() as Extract<AppEvent, { type: "project" }>), project: other });
+      expect(s.env).toBeNull();
+      apply(s, project(), environment("qa"), {
+        type: "project",
+        project: null,
+        tree: null,
+        error: "Folder not found",
+      });
+      expect(s.env).toBeNull();
+      apply(s, environment("qa")); // main can still hold the previous project's view
+      expect(s.env).toBeNull();
+    });
+
+    it("runStarted records the environment of the run", () => {
+      const s = initialState();
+      apply(s, project(), environment("qa"), started(keys, "qa"));
+      expect(s.run.env).toBe("qa");
+      apply(s, started());
+      expect(s.run.env).toBeNull();
+      expect(initialState().run.env).toBeNull();
+    });
   });
 
   it("console keeps the last 10000 lines", () => {
