@@ -18,11 +18,11 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F07 | Failure details: error, location, step list with step logs | must | done | `SCENARIO_EXIT.error` (starts with `path.feature:line`), `FEATURE_EXIT.data` | [spec](specs/2026-10-24-walking-skeleton.md) |
 | F08 | Environment switcher + run properties per environment, with encrypted secrets | must | done | `-e` on dry runs and runs; suggestions from `karate-config-<env>.js` and `@env`/`@envnot` tags; `-D` props via a `java @file` argument file; secrets in Electron `safeStorage` | [spec](specs/2026-10-25-environment-switcher.md) |
 | F09 | Open the generated HTML report | must | done | `<output>/karate-summary.html` opened in the default browser | [spec](specs/2026-10-24-walking-skeleton.md) |
-| F10 | Run history: past runs, re-run, re-run failed only | should | idea | `karate-reports_yyyyMMdd_HHmmss` folders (`-B`); failed lines → `file:LINE` | — |
-| F11 | HTTP inspector per step: request, response, headers, timing | should | idea | `FEATURE_EXIT.data` step logs after the run; live needs our own `RunListener` | — |
-| F12 | Thread count and stop/kill run | should | idea | `-T`; kill process tree (Windows: `taskkill /T /F`, exits 1, so the app tracks "cancelled") | — |
+| F10 | Run history: list of past runs (date, environment, tags, counts, duration), open a past run's results and report, re-run it, re-run failed only | should | idea | keep each run's output folder (`-B` timestamped `karate-reports_yyyyMMdd_HHmmss`, or our own per-run `-o`) plus a small run summary; failed scenarios → `file:LINE` args. See [notes](#f10-run-history) | — |
+| F11 | HTTP inspector per step: method, URL, status, request and response headers and bodies, timing; pretty JSON/XML, copy as cURL | should | idea | after the run: parse the HTTP text in `FEATURE_EXIT.data` step logs; live: our own `RunListener` (shared with F14). See [notes](#f11-http-inspector) | — |
+| F12 | Thread count: choose how many scenarios run in parallel, saved per project (Cancel already ships, see F32) | should | idea | `-T <n>`; progress already counts depth-0 `SCENARIO_EXIT`, so it holds with parallel runs; console lines interleave across threads | — |
 | F13 | Project setup: Maven, Gradle, standalone jar, karate CLI | should | idea | `karate doctor --json`; `karate-pom.json` as project file | — |
-| F14 | Step debugger: breakpoints, step, variables | should | idea | **not in OSS core** (debug server is in the paid `karate-ide` jar); needs our own `RunListener` | — |
+| F14 | Step debugger: breakpoints on steps, pause, step over, continue, inspect variables | should | idea | **not in OSS core** (debug server is in the paid `karate-ide` jar); needs our own Java `RunListener` jar passed with `--listener`, talking to the main process over a local socket. See [notes](#f14-step-debugger) | — |
 | F15 | Trends: pass rate over time, flaky tests | should | idea | aggregate stored run history (F10) | — |
 | F16 | Watch mode: re-run on save | could | idea | file watcher in main process | — |
 | F17 | Open in external editor at file:line | could | idea | OS shell / editor URL scheme | — |
@@ -40,3 +40,29 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F29 | Loading always visible: a loader or animation while opening, discovering, saving and running | should | idea | none (the Runner's `busy` state and run progress) | — |
 | F30 | Toolbar that stays readable with a long project path: less crowded layout for the path and the buttons | should | idea | none | — |
 | F31 | Open… starts in the last opened folder | should | idea | none (`dialog.showOpenDialog` `defaultPath` from `lastProject`) | — |
+| F32 | Cancel a run or a discovery dry run | must | done | kill the process tree (Windows: `taskkill /PID <pid> /T /F`, exits 1, so the app records "cancelled") | [spec](specs/2026-10-24-walking-skeleton.md) |
+
+## Idea notes
+
+Starting points for the larger ideas. The spec, written just before building, decides.
+
+### F10 Run history
+
+- Store each run under the app's data folder: its output folder (HTML report, `karate-events.jsonl`) and a summary file (start time, duration, environment, tag filter, paths run, counts, exit code or "cancelled").
+- A history list per project, newest first. Selecting a run shows its tree results, failures and console from the stored files, without running Karate.
+- Re-run repeats the same paths, environment and tags. Re-run failed only passes the failed scenarios as `file:LINE` arguments (outline examples by their example line).
+- Keep the last N runs per project (a setting) and delete older folders, since reports grow fast.
+- Feeds F15 (trends and flaky tests).
+
+### F11 HTTP inspector
+
+- First version, after the run: parse the request and response text that Karate writes into step logs in `FEATURE_EXIT.data`. Show a list of calls per scenario, then a detail pane with headers, body (pretty JSON or XML) and timing.
+- Copy a request as cURL. Mask values the environment switcher (F08) marks as secret.
+- Live version: the `RunListener` from F14 streams `HTTP_*` events while the run goes.
+
+### F14 Step debugger
+
+- A small Java `RunListener` jar, built and bundled with the app like the Karate jar (ADR 0006), added to the classpath and passed with `--listener`.
+- It connects to a local socket opened by the main process and sends `STEP_*`, `HTTP_*` and `MATCH_EXIT` events. Returning from `onEvent` only when the app says "continue" makes it pause on a breakpoint.
+- Breakpoints are set on step lines in the tree or in a feature view (F28). While paused, show the scenario's variables, read through the listener.
+- Building Java needs its own toolchain in the repo and a decision record. Run one thread (`-T 1`) while debugging.
