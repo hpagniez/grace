@@ -41,6 +41,10 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F30 | Toolbar that stays readable with a long project path: less crowded layout for the path and the buttons | should | idea | none | — |
 | F31 | Open… starts in the last opened folder | should | idea | none (`dialog.showOpenDialog` `defaultPath` from `lastProject`) | — |
 | F32 | Cancel a run or a discovery dry run | must | done | kill the process tree (Windows: `taskkill /PID <pid> /T /F`, exits 1, so the app records "cancelled") | [spec](specs/2026-10-24-walking-skeleton.md) |
+| F33 | Update the bundled JRE, Karate jar and other packed dependencies reliably: see that a new version exists, bump it with its checksum, prove the app still works | should | idea | none in the app. Versions, URLs and SHA-256 are pinned in `scripts/fetch-vendor.mjs` (Temurin 21.0.12.1+1, Karate 2.1.4); Dependabot watches only npm and GitHub Actions. See [notes](#f33-bundled-dependency-updates) | — |
+| F34 | Usage telemetry: track and monitor how the app is used (features used, runs, errors) | could | idea | none; needs a decision record (opt-in, what is collected, where it is sent, retention). See [notes](#f34-telemetry) | — |
+| F35 | In-app feedback: report an issue or propose an improvement, and upvote other people's ideas, from inside the app | could | idea | none; needs a tracker people can reach and a decision record: the repo is private (ADR 0007), so its GitHub Issues are not open to users. See [notes](#f35-in-app-feedback-and-voting) | — |
+| F36 | Mouse cursor matches the action: pointer on clickable items, not-allowed on disabled ones, a busy cursor while opening, discovering or running, text cursor in fields | should | idea | none (Tailwind v4's preflight gives buttons `cursor: default`; today only disabled controls set a cursor) | — |
 
 ## Idea notes
 
@@ -58,3 +62,24 @@ Starting points for the larger ideas. The spec, written just before building, de
 - It connects to a local socket opened by the main process and sends `STEP_*`, `HTTP_*` and `MATCH_EXIT` events. Returning from `onEvent` only when the app says "continue" makes it pause on a breakpoint.
 - Breakpoints are set on step lines in the tree or in a feature view (F28). While paused, show the scenario's variables, read through the listener.
 - Building Java needs its own toolchain in the repo and a decision record. Run one thread (`-T 1`) while debugging.
+
+### F33 Bundled dependency updates
+
+- A scheduled CI workflow checks for a newer Temurin 21 JRE (Adoptium API) and Karate release (GitHub releases). When one exists, it opens a PR that bumps the URL, file name and SHA-256 in `scripts/fetch-vendor.mjs`.
+- That PR's normal CI (unit and e2e tests with the bundled Java and Karate) is the proof that it still works. A Karate bump also re-checks the CLI flags against `RunCommand.java` and refreshes the event fixtures (AGENTS.md).
+- Major versions (a new Java LTS, Karate 3) stay a manual change: they can change the CLI, the event file or the JVM options.
+- Showing the bundled versions in the app helps bug reports (F35).
+
+### F34 Telemetry
+
+- Opt-in: off until the person agrees, asked once, and a setting turns it off at any time. The app works the same without it.
+- Anonymous: a random install id, app version, OS, features used, run counts and durations, error types. Never project paths, test or environment names, property values (F08 secrets) or console text.
+- Sent from the main process in batches, never blocking a run; nothing is sent when offline or opted out.
+- The decision record picks the service (hosted or self-hosted, within free plans), the retention and the privacy notice.
+
+### F35 In-app feedback and voting
+
+- A Feedback entry in the app opens a report or idea form, prefilled with the app version and OS (never project data).
+- Voting needs identities, or another way to stop repeat votes. Options for the decision record: GitHub Issues or Discussions once the repo is public (people need a GitHub account; votes are reactions), or a hosted feedback board.
+- A first step can be a link with prefilled text, before any UI of our own.
+- One place for "about, feedback, privacy" ties this to F26 (update notices) and F34 (telemetry consent).
