@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -997,6 +997,35 @@ describe("Runner properties", () => {
     expect(last("runFinished").outcome).toBe("failed");
     expect(printed(events.slice(from)).some((l) => l.includes("ENOENT"))).toBe(true);
     expect(existsSync(file)).toBe(false);
+  });
+
+  it("an argument file another process holds is a notice, not an error", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({ shared: [plain("timeout", "5000")], byEnv: {} });
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    // without delete sharing, as an antivirus or an indexer can, until its input closes
+    const holder = spawn("powershell", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$f = [IO.File]::Open('${argFile(dataDir, root)}', 'Open', 'Read', 'ReadWrite'); 'held'; [Console]::In.ReadLine(); $f.Close()`,
+    ]);
+    const exited = new Promise((r) => holder.on("exit", r));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        holder.stdout.on("data", (d) => String(d).includes("held") && resolve());
+        void exited.then(() => reject(new Error("the holder exited")));
+      });
+      await run;
+      expect(last("runFinished").outcome).toBe("finished");
+      expect(last("notice").message).toContain("could not be deleted");
+    } finally {
+      holder.stdin.end();
+      await exited;
+    }
   });
 
   it("an unreadable secret blocks the run", T, async () => {
