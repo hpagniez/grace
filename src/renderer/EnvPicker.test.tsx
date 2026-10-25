@@ -113,11 +113,12 @@ describe("environment combo", () => {
   });
 
   it("(none) and an empty box mean no environment", () => {
-    const { api, load } = setup();
+    const { api, send, load, view } = setup();
     load({ env: "qa" });
     type("(none)");
     enter();
     expect(api.setEnv).toHaveBeenLastCalledWith(null);
+    send({ type: "environment", view: view({ env: "qa" }) }); // refused: main re-sends qa
     type("");
     enter();
     expect(api.setEnv).toHaveBeenCalledTimes(2);
@@ -277,6 +278,35 @@ describe("environment combo", () => {
     fireEvent.input(input(), { target: { value: "qa" }, inputType: "insertReplacementText" });
     fireEvent.blur(input());
     expect(api.setEnv).toHaveBeenCalledOnce();
+  });
+
+  it("sends a change once until main's view comes back", () => {
+    const { api, send, load, view } = setup();
+    load({ suggestions: ["prod", "qa"] });
+    // an Electron pick, then the Enter or blur that follows before main's busy echo
+    const pick = (value: string) => {
+      input().value = value;
+      fireEvent(input(), new Event("input", { bubbles: true }));
+      flush();
+    };
+    pick("prod");
+    enter();
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith("prod");
+    blur();
+    expect(api.setEnv).toHaveBeenCalledOnce();
+    // a refusal re-sends the environment in force: the same name can be sent again
+    send({ type: "environment", view: view({ suggestions: ["prod", "qa"] }) });
+    pick("prod");
+    blur();
+    expect(api.setEnv).toHaveBeenCalledTimes(2);
+    send({ type: "environment", view: view({ env: "prod", suggestions: ["prod", "qa"] }) });
+    type("qa");
+    enter();
+    enter();
+    expect(api.setEnv).toHaveBeenCalledTimes(3);
+    expect(api.setEnv).toHaveBeenLastCalledWith("qa");
+    // the text typed is not put back while the change is on its way
+    expect(input().value).toBe("qa");
   });
 
   it("disabled while busy", () => {
