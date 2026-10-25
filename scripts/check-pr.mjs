@@ -23,11 +23,17 @@ const TARGETS = {
   hotfix: ["main", "develop"],
 };
 
+/** Release and hotfix branches are named after their tag (ADR 0009). */
+const VERSIONED = /^(release|hotfix)\/v\d+\.\d+\.\d+$/;
+
 /** Null when a PR from `head` may target `base` under git flow, else the reason. */
 export function branchError(head, base) {
-  const allowed = TARGETS[head.split("/")[0]];
+  const kind = head.split("/")[0];
+  if ((kind === "release" || kind === "hotfix") && !VERSIONED.test(head))
+    return `${head} must be named ${kind}/vX.Y.Z, after its tag`;
+  const allowed = TARGETS[kind];
   if (head.includes("/") && allowed?.includes(base)) return null;
-  return `${head} may not target ${base}: feature/* and dependabot/* go to develop, release/* and hotfix/* to main or develop`;
+  return `${head} may not target ${base}: feature/* and dependabot/* go to develop, release/vX.Y.Z and hotfix/vX.Y.Z to main or develop`;
 }
 
 function main() {

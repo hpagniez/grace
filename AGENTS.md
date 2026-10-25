@@ -39,7 +39,7 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 
 ## Git workflow
 
-Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
+Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md).
 
 ### Commits
 
@@ -58,8 +58,8 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md).
 | `main` | | | Released code only. Tagged `vX.Y.Z` (SemVer). |
 | `develop` | `main` | | Integration branch. |
 | `feature/<topic>` | `develop` | `develop` | Via PR. Kebab-case topic. |
-| `release/X.Y.Z` | `develop` | `main` and `develop` | Version bump and fixes only. Tag on `main`. |
-| `hotfix/X.Y.Z` | `main` | `main` and `develop` | Urgent fix to a released version. |
+| `release/vX.Y.Z` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.0.0`. Version bump and fixes only. Tag on `main`. |
+| `hotfix/vX.Y.Z` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.1`. Urgent fix to a released version. |
 
 - Merge with `--no-ff`.
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
