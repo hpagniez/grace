@@ -549,7 +549,10 @@ export class Runner {
     const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
     try {
       if (argFile) writeArgFile(argFile, props.rows);
-      const state = new RunState(tree, node, filter);
+      const state = new RunState(
+        tree,
+        matchingLeaves(node, filter).map((n) => n.key),
+      );
       const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
       const proc = this.spawn(
         outDir,
