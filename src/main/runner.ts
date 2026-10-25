@@ -129,15 +129,18 @@ export class Runner {
   /**
    * Re-discovers with the new environment (env tags change which tests exist). It is saved once that
    * discovery ends, also on a parse error; a cancel keeps the environment before and saves nothing.
+   * Refused while busy or for an invalid name (the environment in force is re-sent).
    */
   async setEnv(name: string | null): Promise<void> {
     if (!this.project) return;
+    const invalid = name !== null && !validEnvName(name);
+    if (this.busy || invalid) {
+      this.o.emit({ type: "notice", message: this.busy ? BUSY : "Invalid environment name" });
+      this.o.emit(this.envEvent());
+      return;
+    }
+    if (name === this.envs.env) return;
     await this.guarded(async () => {
-      if (name !== null && !validEnvName(name)) {
-        this.o.emit({ type: "notice", message: "Invalid environment name" });
-        return;
-      }
-      if (name === this.envs.env) return;
       const envs = { ...this.envs, env: name };
       if (!(await this.rediscover(this.project!, this.filter, envs))) return;
       this.report = null; // a result from another environment
@@ -282,7 +285,14 @@ export class Runner {
     const before = { project: this.project, tree: this.tree, envs: this.envs };
     this.project = project;
     this.envs = envs;
-    const tree = await this.discover();
+    let tree: TestNode | null;
+    try {
+      tree = await this.discover();
+    } catch (err) {
+      // nothing was sent yet: the next run must not use an environment the window does not show
+      ({ project: this.project, tree: this.tree, envs: this.envs } = before);
+      throw err;
+    }
     if (!this.cancelled) {
       this.filter = filter;
       const pruned = tree && pruneFilter(filter, projectTags(tree));

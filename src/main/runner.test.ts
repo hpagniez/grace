@@ -754,12 +754,15 @@ describe("Runner environment", () => {
   });
 
   it("invalid env name is refused", T, async () => {
-    const { runner, all, last, dataDir } = setup();
+    const { runner, events, all, last, dataDir } = setup();
     const root = fixture("env");
     await runner.open(root);
     for (const name of ["bad name", "-Dx=1", "", "a".repeat(65)]) {
+      const from = events.length;
       await runner.setEnv(name);
       expect(last("notice").message).toBe("Invalid environment name");
+      // the view in force is re-sent, so a window that shows the typed name reverts
+      expect(typesAfter(events, from)).toEqual(["notice", "environment"]);
     }
     await runner.setEnv(null); // the same environment: nothing to do
     expect(all("project")).toHaveLength(1);
@@ -768,16 +771,44 @@ describe("Runner environment", () => {
   });
 
   it("setEnv while busy gets the busy notice", T, async () => {
-    const { runner, all, last } = setup();
+    const { runner, events, all, last } = setup();
     await runner.open(fixture("env"));
     const run = runner.run(byName(last("project").tree!, "slow").key);
     await until(() => all("runStarted").length > 0);
+    const from = events.length;
     await runner.setEnv("qa");
     expect(last("notice").message).toBe("A run is already in progress");
+    expect(typesAfter(events, from).filter((t) => t === "notice" || t === "environment")).toEqual([
+      "notice",
+      "environment",
+    ]);
     await runner.cancel();
     await run;
-    expect(all("environment")).toHaveLength(1);
+    expect(all("environment")).toHaveLength(2);
     expect(last("environment").view.env).toBeNull();
+  });
+
+  it("a discovery that throws keeps the environment before", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    const before = runner.replay();
+    // a file where the run folders go: emptying the dry run folder throws
+    const runs = path.join(
+      dataDir,
+      "projects",
+      createHash("sha1").update(root).digest("hex").slice(0, 12),
+    );
+    rmSync(runs, { recursive: true, force: true, maxRetries: 5 });
+    writeFileSync(runs, "");
+    const from = events.length;
+    await expect(runner.setEnv("qa")).rejects.toThrow();
+    expect(typesAfter(events, from)).toEqual([]);
+    expect(runner.replay()).toEqual(before);
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+    rmSync(runs);
+    await runner.refresh(); // discovers with the environment before
+    expect(names(last("project").tree)).not.toContain("qa only");
   });
 
   it("KARATE_ENV in the parent environment is ignored", T, async () => {
