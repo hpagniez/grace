@@ -215,7 +215,7 @@ Test projects:
 | redirect kept | `followRedirects = false`, `GET /moved` → 302 | 3xx |
 | via helper | calls `tests/common/create-user.feature` → 201 | 2xx, via |
 | xml | `POST /echo` with `<user><name>bob</name></user>` → 200 | 2xx |
-| secret header | `header X-Token = karate.properties['api.token']`, `GET /hello` → 200 | 2xx |
+| secret header | `header X-Token = karate.properties['api.token'] \|\| 'none'`, `GET /hello` → 200 | 2xx |
 
 And `tests/shared.feature`, whose Background has `* def made = callonce read('common/create-user.feature') { name: 'shared' }`, with two passing scenarios, "first" then "second". Its one `POST /users` → 201 belongs to "first".
 

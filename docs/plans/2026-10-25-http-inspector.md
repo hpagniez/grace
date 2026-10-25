@@ -89,7 +89,7 @@
   - `timeout` uses `* configure readTimeout = 500`
   - `via helper` uses `* def result = call read('common/create-user.feature') { name: 'alice' }`
   - `xml` posts `<user><name>bob</name></user>` to `echo`
-  - `secret header` uses `And header X-Token = karate.properties['api.token']`
+  - `secret header` uses `And header X-Token = karate.properties['api.token'] || 'none'`
 
   `tests/shared.feature`, Background `* url baseUrl` and `* def made = callonce read('common/create-user.feature') { name: 'shared' }`, then scenarios `first` and `second`, each `* match made.user.name == 'shared'`.
 - [ ] **Step 2: Extend `scripts/capture-fixtures.mjs`.** Copy the http project to the temp work folder and run `[join(http, "tests")]` → `run-http.jsonl`. Then, in that copy, write `auth.feature` with the layout of `create-user.feature`, so `method post` is line 8 (`@ignore`; `url baseUrl`, `path 'users'`, `request { name: 'token' }`, `method post`, `status 201`) and replace `karate-config.js` with one that starts the mock, then calls `karate.callSingle('classpath:auth.feature', { baseUrl: baseUrl })` and returns `{ baseUrl: baseUrl }`. Run `[join(http, "tests", "shared.feature")]` → `run-http-config.jsonl`. Change `status 201` to `status 200` in `auth.feature` and run the same target → `run-http-config-fail.jsonl`.
