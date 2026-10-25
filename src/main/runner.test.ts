@@ -811,7 +811,9 @@ describe("Runner environment", () => {
     writeFileSync(runs, "");
     const from = events.length;
     await expect(runner.setEnv("qa")).rejects.toThrow();
-    expect(typesAfter(events, from)).toEqual([]);
+    // the window still shows the name it sent until main re-sends the environment in force
+    expect(typesAfter(events, from)).toEqual(["environment"]);
+    expect(last("environment").view.env).toBeNull();
     expect(runner.replay()).toEqual(before);
     expect(loadProjectEnv(dataDir, root).env).toBeNull();
     rmSync(runs);
