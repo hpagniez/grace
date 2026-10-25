@@ -93,6 +93,7 @@ describe("main screen", () => {
     send({
       type: "runStarted",
       selection: "d:",
+      runId: "20261025-120000-000",
       keys: ["s:tests/basic.feature#1", "s:tests/basic.feature#2"],
       total: 2,
       startedAt: Date.now(),
@@ -162,6 +163,7 @@ describe("main screen", () => {
     send({
       type: "runStarted",
       selection: "d:",
+      runId: "20261025-120000-000",
       keys: [],
       total: 4,
       startedAt: Date.now(),
@@ -279,6 +281,7 @@ describe("main screen", () => {
     send({
       type: "runStarted",
       selection: "d:",
+      runId: "20261025-120000-000",
       keys: [],
       total: 4,
       startedAt: Date.now(),

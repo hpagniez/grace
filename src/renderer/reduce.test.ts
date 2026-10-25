@@ -21,6 +21,7 @@ const other = { root: "D:/q", layout: "standalone" } as const;
 const started = (ks: string[] = keys, env: string | null = null): AppEvent => ({
   type: "runStarted",
   selection: tree.key,
+  runId: "20261025-120000-000",
   keys: ks,
   total: ks.length,
   startedAt: 1000,

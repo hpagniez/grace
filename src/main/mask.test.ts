@@ -127,10 +127,11 @@ describe("maskEvent", () => {
   });
 
   it("leaves the fields the window matches on exact", () => {
-    const m = makeMasker(["a"]);
+    const m = makeMasker(["a", "2026"]);
     const started: AppEvent = {
       type: "runStarted",
       selection: "s:a#1",
+      runId: "20261025-143212-007",
       keys: ["s:a#1", "s:a#2"],
       total: 2,
       startedAt: 5,

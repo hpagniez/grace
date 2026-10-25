@@ -217,6 +217,7 @@ describe("filter bar", () => {
     send({
       type: "runStarted",
       selection: "d:",
+      runId: "20261025-120000-000",
       keys: [],
       total: 2,
       startedAt: Date.now(),

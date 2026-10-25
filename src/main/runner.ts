@@ -13,6 +13,7 @@ import {
   type RowView,
 } from "../shared/env";
 import type { AppEvent, Project } from "../shared/events";
+import type { RunRecord, StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import {
   matches,
@@ -22,6 +23,7 @@ import {
   pruneFilter,
   type FilterState,
 } from "../shared/tags";
+import { createRunDir, listHistory, pruneHistory, writeRunRecord } from "./history";
 import { writeArgFile } from "./karate/argfile";
 import { buildArgs, detectLayout, selectionTargets, tagArgs } from "./karate/command";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
@@ -77,6 +79,19 @@ function setRowLines(tree: TestNode, root: string): void {
   walk(tree);
 }
 
+/** The tests of run.json: each selected leaf with the final status and duration its run gave it. */
+function storedTests(leaves: TestNode[], results: ReturnType<RunState["results"]>): StoredTest[] {
+  return leaves.map((n) => ({
+    kind: n.kind as StoredTest["kind"],
+    file: n.file,
+    refId: n.refId!,
+    name: n.name,
+    line: n.line,
+    key: n.key,
+    ...results.get(n.key)!,
+  }));
+}
+
 /**
  * Owns the project, its test tree, its tag filter, its environment and run properties, and the one
  * Karate process (dry run or run) at a time.
@@ -91,6 +106,8 @@ export class Runner {
   private overlays: string[] = [];
   private tagEnvs: string[] = [];
   private busy = false;
+  /** The operation `guarded` is running, for `dispose` to wait on. */
+  private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
   private cancelled = false;
   private report: string | null = null;
@@ -264,14 +281,21 @@ export class Runner {
   replay(): AppEvent[] {
     const busy: AppEvent = { type: "busy", busy: this.busy };
     return this.last
-      ? [this.last, { type: "filter", filter: this.filter }, this.envEvent(), busy]
+      ? [
+          this.last,
+          { type: "filter", filter: this.filter },
+          this.envEvent(),
+          this.historyEvent(),
+          busy,
+        ]
       : [busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
   async dispose(): Promise<void> {
     this.cancelled = true;
-    if (this.proc) await within(this.proc.kill(), 10_000);
+    // The kill ends the run's process; the run then writes its record before `running` settles.
+    await within(Promise.allSettled([this.proc?.kill(), this.running]), 10_000);
     rmSync(this.pidFile, { force: true });
   }
 
@@ -325,6 +349,11 @@ export class Runner {
     };
   }
 
+  /** The open project's runs, newest first; none with no project. */
+  private historyEvent(): AppEvent {
+    return { type: "history", runs: this.project ? listHistory(this.projectDir()) : [] };
+  }
+
   /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
   private storeFilter(f: FilterState) {
     this.filter = f;
@@ -346,8 +375,9 @@ export class Runner {
     this.busy = true;
     this.cancelled = false;
     this.o.emit({ type: "busy", busy: true });
+    this.running = work();
     try {
-      await work();
+      await this.running;
     } finally {
       this.busy = false;
       this.o.emit({ type: "busy", busy: false });
@@ -390,25 +420,27 @@ export class Runner {
       this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
+      this.o.emit(this.historyEvent());
       return true;
     }
     ({ project: this.project, tree: this.tree } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
     this.sendFilter();
     this.o.emit(this.envEvent());
+    this.o.emit(this.historyEvent());
     this.o.emit({ type: "notice", message: "Cancelled" });
     return false;
   }
 
-  /** `<dataDir>/projects/<hash>`: the run folders and the argument file of the project. */
+  /** `<dataDir>/projects/<hash>`: the run folders, the dry run folder and the argument file of the project. */
   private projectDir(): string {
     const hash = createHash("sha1").update(this.project!.root).digest("hex").slice(0, 12);
     return path.join(this.o.dataDir, "projects", hash);
   }
 
-  /** Empties and returns `<dataDir>/projects/<hash>/<kind>`, so no file of an earlier spawn is ever read. */
-  private outDir(kind: "run" | "dryrun"): string {
-    const dir = path.join(this.projectDir(), kind);
+  /** Empties and returns `<dataDir>/projects/<hash>/dryrun`, so no file of an earlier dry run is ever read. */
+  private dryRunDir(): string {
+    const dir = path.join(this.projectDir(), "dryrun");
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
     mkdirSync(dir, { recursive: true });
     return dir;
@@ -451,7 +483,7 @@ export class Runner {
     if (featureRoots.length === 0) {
       tree = buildTree([], rootName); // Karate with no paths would load a pom or print help
     } else {
-      const outDir = this.outDir("dryrun");
+      const outDir = this.dryRunDir();
       const lines: string[] = [];
       const proc = this.spawn(outDir, true, featureRoots, env, (l) => lines.push(...l));
       const code = await proc.exit;
@@ -530,7 +562,8 @@ export class Runner {
       this.o.emit({ type: "notice", message: "This test no longer matches the filter" });
       return;
     }
-    if (matchingLeaves(node, filter).length === 0) {
+    const leaves = matchingLeaves(node, filter);
+    if (leaves.length === 0) {
       this.o.emit({ type: "notice", message: "Nothing to run" });
       return;
     }
@@ -543,16 +576,60 @@ export class Runner {
     }
 
     this.report = null;
-    const outDir = this.outDir("run"); // creates the project folder the argument file goes in
-    const argFile = props.rows.length ? path.join(this.projectDir(), "run-args.txt") : null;
+    const projectDir = this.projectDir();
+    const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
     const mask = makeMasker(props.secrets);
     const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
+    const created = new Date();
+    // also creates the project folder the argument file goes in
+    const { id, dir: outDir } = createRunDir(projectDir, created);
+    let startedAt = created.getTime(); // the time of runStarted; the folder's if the run never starts
+    let ended = false; // the run reached its end events, so it gets a run.json
     try {
       if (argFile) writeArgFile(argFile, props.rows);
       const state = new RunState(
         tree,
-        matchingLeaves(node, filter).map((n) => n.key),
+        leaves.map((n) => n.key),
       );
+      /** Writes run.json (R2), applies retention and sends `history`. A failure is a notice: it must not replace the run's outcome. */
+      const store = (done: Extract<AppEvent, { type: "runFinished" }>) => {
+        ended = true;
+        try {
+          const { kind, file, name, line, key } = node;
+          const record: RunRecord = {
+            version: 1,
+            startedAt,
+            durationMillis: Date.now() - startedAt,
+            env: this.envs.env,
+            filter,
+            selection: { kind, file, name, line, key },
+            failedOf: null,
+            outcome: done.outcome,
+            exitCode: done.outcome === "cancelled" ? null : done.exitCode, // a kill's code is not Karate's
+            tests: storedTests(leaves, state.results()),
+          };
+          writeRunRecord(outDir, record);
+          pruneHistory(projectDir);
+          this.o.emit(this.historyEvent());
+        } catch (err) {
+          emit({
+            type: "notice",
+            message: `The run could not be saved to the history: ${(err as Error).message}`,
+          });
+        }
+      };
+      const report = path.join(outDir, "karate-summary.html");
+      /** Sends the end events, then stores the run. An exit code of null forces outcome 'failed'. */
+      const end = (code: number | null, cancelled: boolean) => {
+        for (let e of state.finish(code, cancelled, false)) {
+          if (e.type === "runFinished") {
+            this.report = e.outcome === "finished" && existsSync(report) ? report : null;
+            e = { ...e, reportAvailable: this.report !== null };
+            emit(e);
+            store(e);
+          } else emit(e);
+        }
+      };
       const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
       const proc = this.spawn(
         outDir,
@@ -568,16 +645,18 @@ export class Runner {
         // without the pid file a crash of the app would leave this JVM running: do not run
         await proc.kill();
         this.proc = null;
-        for (const e of state.finish(null, false, false)) emit(e);
+        end(null, false);
         emit({ type: "notice", message: (err as Error).message });
         return;
       }
+      startedAt = Date.now();
       emit({
         type: "runStarted",
         selection: node.key,
+        runId: id,
         keys: state.keys,
         total: state.keys.length,
-        startedAt: Date.now(),
+        startedAt,
         env: this.envs.env,
       });
 
@@ -599,15 +678,7 @@ export class Runner {
       this.proc = null;
       rmSync(this.pidFile, { force: true });
 
-      const report = path.join(outDir, "karate-summary.html");
-      // exit code null forces outcome 'failed'
-      for (let e of state.finish(fatal ? null : code, this.cancelled && !fatal, false)) {
-        if (e.type === "runFinished") {
-          this.report = e.outcome === "finished" && existsSync(report) ? report : null;
-          e = { ...e, reportAvailable: this.report !== null };
-        }
-        emit(e);
-      }
+      end(fatal ? null : code, this.cancelled && !fatal);
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
@@ -619,6 +690,14 @@ export class Runner {
           type: "notice",
           message: `The run's argument file could not be deleted; the app deletes it when it next starts. ${(err as Error).message}`,
         });
+      }
+      if (!ended) {
+        // An error ended the run before its end events: nothing to list. Best effort, as the next start deletes it too.
+        try {
+          rmSync(outDir, { recursive: true, force: true, maxRetries: 5 });
+        } catch {
+          // left for removeLeftoverRuns
+        }
       }
     }
   }
