@@ -60,6 +60,17 @@ export function selectionTargets(
   return node.kind === "folder" || node.kind === "feature" ? [abs] : [`${abs}:${node.line}`];
 }
 
+/** One `<abs file>:L1:L2…` target per feature file for nodes that have a line: lines ascending, files in first-seen order. */
+export function lineTargets(nodes: TestNode[], root: string): string[] {
+  const byFile = new Map<string, number[]>();
+  for (const n of nodes) {
+    if (n.line === null) continue;
+    const abs = path.join(root, ...n.file.split("/"));
+    byFile.set(abs, [...(byFile.get(abs) ?? []), n.line]);
+  }
+  return [...byFile].map(([abs, lines]) => `${abs}:${lines.sort((a, b) => a - b).join(":")}`);
+}
+
 export function buildArgs(o: {
   jar: string;
   classpath: string[];
