@@ -54,11 +54,13 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
         data-testid="clear-history-dialog"
         aria-labelledby="clear-history-title"
         class="m-auto w-[28rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-        onClose={() => setOpen(false)} // Escape
+        onClose={() => dialog.open || setOpen(false)} // Escape; not a late event after a reopen
       >
         <Show when={open()}>
           <p id="clear-history-title" class="text-sm">
-            {`Delete the ${props.state.history.length} runs of this project and their reports?`}
+            {props.state.history.length === 1
+              ? "Delete the 1 run of this project and its report?"
+              : `Delete the ${props.state.history.length} runs of this project and their reports?`}
           </p>
           <div class="mt-4 flex justify-end gap-2">
             <button

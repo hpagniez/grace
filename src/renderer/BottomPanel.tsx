@@ -15,33 +15,31 @@ export function BottomPanel(props: { state: AppState; api: Api; showPanel: (p: P
   const panel = () => props.state.panel;
   return (
     <section class="flex h-48 shrink-0 flex-col border-t border-zinc-200 dark:border-zinc-700">
-      <div
-        role="tablist"
-        aria-label="Console and run history"
-        class="flex items-center gap-1 border-b border-zinc-200 bg-zinc-50 px-2 dark:border-zinc-700 dark:bg-zinc-800"
-      >
-        <button
-          type="button"
-          role="tab"
-          id="tab-console"
-          data-testid="tab-console"
-          aria-selected={panel() === "console" ? "true" : "false"}
-          class={tabClass(panel() === "console")}
-          onClick={() => props.showPanel("console")}
-        >
-          Console
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="tab-history"
-          data-testid="tab-history"
-          aria-selected={panel() === "history" ? "true" : "false"}
-          class={tabClass(panel() === "history")}
-          onClick={() => props.showPanel("history")}
-        >
-          {`History (${props.state.history.length})`}
-        </button>
+      <div class="flex items-center border-b border-zinc-200 bg-zinc-50 px-2 dark:border-zinc-700 dark:bg-zinc-800">
+        <div role="tablist" aria-label="Console and run history" class="flex items-center gap-1">
+          <button
+            type="button"
+            role="tab"
+            id="tab-console"
+            data-testid="tab-console"
+            aria-selected={panel() === "console" ? "true" : "false"}
+            class={tabClass(panel() === "console")}
+            onClick={() => props.showPanel("console")}
+          >
+            Console
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-history"
+            data-testid="tab-history"
+            aria-selected={panel() === "history" ? "true" : "false"}
+            class={tabClass(panel() === "history")}
+            onClick={() => props.showPanel("history")}
+          >
+            {`History (${props.state.history.length})`}
+          </button>
+        </div>
         <Show when={panel() === "history"}>
           <div class="ml-auto">
             <ClearHistory state={props.state} api={props.api} />
