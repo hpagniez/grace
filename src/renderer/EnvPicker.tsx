@@ -42,6 +42,7 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
     const next = name === "" || name === NONE ? null : name;
     if (next !== null && !validEnvName(next)) setError(INVALID_ENV);
     else if (next !== (view()?.env ?? null)) void props.api.setEnv(next);
+    else setText(shown()); // nothing sent, so no view comes back to reset the box
   };
 
   return (
