@@ -135,6 +135,15 @@ describe("environment combo", () => {
     expect(api.setEnv).toHaveBeenCalledTimes(2);
   });
 
+  it("an Electron pick commits at once", () => {
+    const { api, load } = setup();
+    load({ suggestions: ["prod", "qa"] });
+    // Electron 45 sends a plain input Event for a datalist pick, not an InputEvent
+    input().value = "prod";
+    fireEvent(input(), new Event("input", { bubbles: true }));
+    expect(api.setEnv).toHaveBeenCalledExactlyOnceWith("prod");
+  });
+
   it("picking (none) from the list clears the environment", () => {
     const { api, load } = setup();
     load({ env: "qa", suggestions: ["qa"] });
