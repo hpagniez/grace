@@ -109,12 +109,54 @@ function indentXml(src: string): string | null {
   return open.length === 0 ? out.join("\n") : null;
 }
 
+/**
+ * Valid JSON text indented with 2 spaces, walked rather than re-serialised so that number
+ * and string text stay as logged (`JSON.stringify` would turn 12345678901234567890 into 12345678901234567000).
+ */
+function indentJson(src: string): string {
+  let out = "";
+  let depth = 0;
+  let inString = false;
+  const newline = () => "\n" + "  ".repeat(depth);
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inString) {
+      out += ch;
+      if (ch === "\\") out += src[++i];
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+      out += ch;
+    } else if (ch === "{" || ch === "[") {
+      let j = i + 1;
+      while (/\s/.test(src[j])) j++;
+      if (src[j] === (ch === "{" ? "}" : "]")) {
+        out += ch + src[j]; // an empty container stays on one line
+        i = j;
+      } else {
+        depth++;
+        out += ch + newline();
+      }
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      out += newline() + ch;
+    } else if (ch === ",") {
+      out += "," + newline();
+    } else if (ch === ":") {
+      out += ": ";
+    } else if (!/\s/.test(ch)) {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 /** A JSON object or array re-indented with 2 spaces, well-formed XML indented; anything else as logged. */
 export function prettyBody(body: string): string {
   try {
-    const json: unknown = JSON.parse(body);
-    // A bare number would lose digits (`1.0` → `1`), so only objects and arrays are re-written.
-    if (typeof json === "object" && json !== null) return JSON.stringify(json, null, 2);
+    const json: unknown = JSON.parse(body); // only to check the text is valid
+    // A bare scalar is left alone: there is nothing to indent.
+    if (typeof json === "object" && json !== null) return indentJson(body);
   } catch {
     // not JSON: try XML
   }
