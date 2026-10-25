@@ -12,6 +12,10 @@ const api: Api = {
   setFilter: (f) => ipcRenderer.invoke(CH.filter, f),
   setEnv: (name) => ipcRenderer.invoke(CH.env, name),
   saveProperties: (edit) => ipcRenderer.invoke(CH.properties, edit),
+  rerun: (id) => ipcRenderer.invoke(CH.rerun, id),
+  rerunFailed: (id) => ipcRenderer.invoke(CH.rerunFailed, id),
+  openRunReport: (id) => ipcRenderer.invoke(CH.runReport, id),
+  clearHistory: () => ipcRenderer.invoke(CH.clearHistory),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

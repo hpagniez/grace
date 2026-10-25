@@ -23,14 +23,28 @@ import {
   pruneFilter,
   type FilterState,
 } from "../shared/tags";
-import { createRunDir, listHistory, pruneHistory, writeRunRecord } from "./history";
-import { writeArgFile } from "./karate/argfile";
-import { buildArgs, detectLayout, selectionTargets, tagArgs } from "./karate/command";
+import {
+  clearHistory as removeRuns,
+  createRunDir,
+  listHistory,
+  pruneHistory,
+  readRunRecord,
+  writeRunRecord,
+} from "./history";
+import { writeArgFile, writeTargetFile } from "./karate/argfile";
+import { buildArgs, detectLayout, lineTargets, selectionTargets, tagArgs } from "./karate/command";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
-import { buildTree, findNode, parseRefId, resolveNode, rowLines } from "./karate/tree";
+import {
+  buildTree,
+  findNode,
+  parseRefId,
+  resolveNode,
+  resolveTests,
+  rowLines,
+} from "./karate/tree";
 import { makeMasker, maskEvent } from "./mask";
 import type { SecretBox } from "./secrets";
 import {
@@ -78,6 +92,14 @@ function setRowLines(tree: TestNode, root: string): void {
   };
   walk(tree);
 }
+
+/**
+ * What a run selects: a tree node (a click or a Re-run), found again after the pre-run discovery or
+ * refused with `gone`; or stored tests (Re-run failed, or a Re-run of one).
+ */
+type RunTarget =
+  | { key: string; old: Pick<TestNode, "key" | "kind" | "file" | "name"> | null; gone: string }
+  | { tests: StoredTest[]; failedOf: number | null };
 
 /** The tests of run.json: each selected leaf with the final status and duration its run gave it. */
 function storedTests(leaves: TestNode[], results: ReturnType<RunState["results"]>): StoredTest[] {
@@ -177,19 +199,7 @@ export class Runner {
       return;
     }
     if (name === this.envs.env) return;
-    await this.guarded(async () => {
-      const envs = { ...this.envs, env: name };
-      if (!(await this.rediscover(this.project!, this.filter, envs))) return;
-      this.report = null; // a result from another environment
-      try {
-        saveProjectEnv(this.o.dataDir, this.project!.root, envs);
-      } catch (err) {
-        this.o.emit({
-          type: "notice",
-          message: `The environment could not be saved: ${(err as Error).message}`,
-        });
-      }
-    });
+    await this.guarded(() => this.switchEnv(name, this.filter));
   }
 
   /** Refused while busy (the filter in force is re-sent); ignored with no project. */
@@ -260,7 +270,47 @@ export class Runner {
   }
 
   async run(key: string): Promise<void> {
-    if (this.project) await this.guarded(() => this.runGuarded(key));
+    if (this.project)
+      await this.guarded(() =>
+        this.runTarget(
+          {
+            key,
+            old: this.tree && findNode(this.tree, key),
+            gone: "This test changed; the tree was refreshed",
+          },
+          this.filter,
+        ),
+      );
+  }
+
+  /** Re-run (R5): the run's selection on its environment and filter; a Re-run failed run's tests, all of them. */
+  async rerun(id: string): Promise<void> {
+    if (this.project) await this.guarded(() => this.rerunGuarded(id, false));
+  }
+
+  /** Re-run failed (R6): the run's failed tests on its environment and filter. */
+  async rerunFailed(id: string): Promise<void> {
+    if (this.project) await this.guarded(() => this.rerunGuarded(id, true));
+  }
+
+  /** Deletes the open project's run folders (R7); the tree keeps its statuses. Refused while busy. */
+  clearHistory(): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      return;
+    }
+    if (!this.project) return;
+    this.report = null; // the toolbar Report's folder is gone
+    if (!removeRuns(this.projectDir()))
+      this.o.emit({ type: "notice", message: "Some runs could not be deleted" });
+    this.o.emit(this.historyEvent());
+  }
+
+  /** The report of a listed run of the open project (R4); null if it has none. Never takes a path. */
+  runReportPath(id: string): string | null {
+    if (!this.project || !readRunRecord(this.projectDir(), id)) return null; // also checks the id
+    const report = path.join(this.projectDir(), "runs", id, "karate-summary.html");
+    return existsSync(report) ? report : null;
   }
 
   async cancel(): Promise<void> {
@@ -375,8 +425,8 @@ export class Runner {
     this.busy = true;
     this.cancelled = false;
     this.o.emit({ type: "busy", busy: true });
-    this.running = work();
     try {
+      this.running = work(); // inside the try: a synchronous throw must not leave busy set
       await this.running;
     } finally {
       this.busy = false;
@@ -432,7 +482,26 @@ export class Runner {
     return false;
   }
 
-  /** `<dataDir>/projects/<hash>`: the run folders, the dry run folder and the argument file of the project. */
+  /**
+   * Environment switcher R1: discovery with `env` and `filter`, then the environment saved, also after a
+   * parse error. False if cancelled, which keeps the environment before and saves nothing.
+   */
+  private async switchEnv(env: string | null, filter: FilterState): Promise<boolean> {
+    const envs = { ...this.envs, env };
+    if (!(await this.rediscover(this.project!, filter, envs))) return false;
+    this.report = null; // a result from another environment
+    try {
+      saveProjectEnv(this.o.dataDir, this.project!.root, envs);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `The environment could not be saved: ${(err as Error).message}`,
+      });
+    }
+    return true;
+  }
+
+  /** `<dataDir>/projects/<hash>`: the run folders, the dry run folder and the argument and targets files of the project. */
   private projectDir(): string {
     const hash = createHash("sha1").update(this.project!.root).digest("hex").slice(0, 12);
     return path.join(this.o.dataDir, "projects", hash);
@@ -453,12 +522,13 @@ export class Runner {
     env: string | null,
     onLines: (l: string[]) => void,
     argFile: string | null = null,
+    filter: FilterState = NO_FILTER,
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
     const { classpath } = detectLayout(root);
     // discovery lists every test; a run gets the filter
-    const tags = dryRun ? [] : tagArgs(this.filter);
+    const tags = dryRun ? [] : tagArgs(filter);
     const args = buildArgs({
       jar,
       classpath,
@@ -509,11 +579,11 @@ export class Runner {
   }
 
   /**
-   * The run's properties (R4) with secrets decrypted, and the secret values to mask; null, after a
-   * notice, if a secret cannot be read.
+   * The properties (R4) of a run on `env` with secrets decrypted, and the secret values to mask; null,
+   * after a notice, if a secret cannot be read.
    */
-  private runProperties(): { rows: PlainRow[]; secrets: string[] } | null {
-    const { env, properties } = this.envs;
+  private runProperties(env: string | null): { rows: PlainRow[]; secrets: string[] } | null {
+    const { properties } = this.envs;
     const rows: PlainRow[] = [];
     const secrets: string[] = [];
     for (const r of effectiveRows(properties.shared, properties.byEnv, env)) {
@@ -536,48 +606,135 @@ export class Runner {
     return { rows, secrets };
   }
 
-  private async runGuarded(key: string): Promise<void> {
+  /**
+   * Re-run and Re-run failed (R5, R6): the record's secrets checked, its environment switched to, its
+   * filter shown and saved, then its selection or tests run with the filter as written.
+   */
+  private async rerunGuarded(id: string, failedOnly: boolean): Promise<void> {
+    const record = readRunRecord(this.projectDir(), id);
+    if (!record) {
+      this.o.emit({ type: "notice", message: "This run is no longer in the history" });
+      return;
+    }
+    if (!this.runProperties(record.env)) return; // before the switch: nothing changes
+    const switching = record.env !== this.envs.env;
+    if (switching && !(await this.switchEnv(record.env, record.filter))) return; // cancelled
+    // As if chosen in the filter bar, without vanished tags (tag filter R5).
+    this.storeFilter(
+      this.tree ? pruneFilter(record.filter, projectTags(this.tree)) : record.filter,
+    );
+    this.sendFilter();
+    if (switching && !this.tree) return; // a parse error: the environment is switched, nothing runs
+    const { selection, tests, failedOf, startedAt } = record;
+    await this.runTarget(
+      failedOnly
+        ? { tests: tests.filter((t) => t.status === "failed"), failedOf: startedAt }
+        : selection
+          ? { key: selection.key, old: selection, gone: "The tests of this run no longer exist" }
+          : { tests, failedOf },
+      record.filter,
+    );
+  }
+
+  /**
+   * The pre-run checks of a target after the pre-run discovery, then its run. `filter` is the one
+   * saved, not pruned: a vanished included tag shrinks the run, never widens it.
+   */
+  private async runTarget(target: RunTarget, filter: FilterState): Promise<void> {
+    const env = this.envs.env;
     // The rows depend on the environment and the saved lists only: refuse before any JVM starts.
-    const props = this.runProperties();
+    const props = this.runProperties(env);
     if (!props) return;
-    const old = this.tree && findNode(this.tree, key);
-    const tree = await this.discover(this.envs.env);
+    const tree = await this.discover(env);
     if (this.cancelled) {
       this.o.emit({ type: "notice", message: "Run cancelled" });
       return;
     }
     if (!tree) return;
-    const node = old ? resolveNode(tree, old) : findNode(tree, key);
+    const notice = (message: string) => this.o.emit({ type: "notice", message });
+    const { root } = this.project!;
+    const run = { tree, filter, env, props };
+
+    if ("tests" in target) {
+      // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
+      const { found, missing, dynamic } = resolveTests(tree, target.tests);
+      const said = [
+        missing === 1 ? "1 failed test no longer exists" : "",
+        missing > 1 ? `${missing} failed tests no longer exist` : "",
+        dynamic
+          ? `${dynamic} failed ${dynamic === 1 ? "row" : "rows"} of a dynamic Examples table can't be run alone. Run its outline.`
+          : "",
+        found.length ? "" : "Nothing to run",
+      ].filter(Boolean);
+      // one notice: the window shows only the last
+      if (said.length)
+        notice(said.map((m) => (said.length > 1 && !m.endsWith(".") ? `${m}.` : m)).join(" "));
+      if (!found.length) return;
+      await this.runBody({
+        ...run,
+        leaves: found,
+        targets: lineTargets(found, root),
+        targetFile: true,
+        selection: null,
+        failedOf: target.failedOf,
+      });
+      return;
+    }
+
+    const node = target.old ? resolveNode(tree, target.old) : findNode(tree, target.key);
     if (!node) {
-      this.o.emit({ type: "notice", message: "This test changed; the tree was refreshed" });
+      notice(target.gone);
       return;
     }
     if (node.kind === "row" && node.line === null) {
-      this.o.emit({ type: "notice", message: "Run the outline to run its rows" });
+      notice("Run the outline to run its rows");
       return;
     }
-    // The filter as saved, not pruned: a vanished included tag shrinks the run, never widens it.
-    const filter = this.filter;
     if ((node.kind === "scenario" || node.kind === "row") && !matches(node.tags, filter)) {
-      this.o.emit({ type: "notice", message: "This test no longer matches the filter" });
+      notice("This test no longer matches the filter");
       return;
     }
     const leaves = matchingLeaves(node, filter);
     if (leaves.length === 0) {
-      this.o.emit({ type: "notice", message: "Nothing to run" });
+      notice("Nothing to run");
       return;
     }
-    const { root } = this.project!;
     const targets = selectionTargets(node, root, detectLayout(root).featureRoots, filter);
     if (!targets) {
       // a matching row of a partly matching outline has no line (dynamic Examples)
-      this.o.emit({ type: "notice", message: "Clear the filter to run this outline" });
+      notice("Clear the filter to run this outline");
       return;
     }
+    await this.runBody({
+      ...run,
+      leaves,
+      targets,
+      targetFile: false,
+      selection: node,
+      failedOf: null,
+    });
+  }
 
+  /**
+   * Runs `leaves` with `targets`, passed as `@<file>` when `targetFile` (any number fits), and stores
+   * the run in its folder. The argument and targets files are deleted whatever happens.
+   */
+  private async runBody(o: {
+    tree: TestNode;
+    leaves: TestNode[];
+    targets: string[];
+    targetFile: boolean;
+    filter: FilterState;
+    env: string | null;
+    props: { rows: PlainRow[]; secrets: string[] };
+    selection: TestNode | null;
+    failedOf: number | null;
+  }): Promise<void> {
+    const { tree, leaves, filter, env, props, selection, failedOf } = o;
     this.report = null;
     const projectDir = this.projectDir();
     const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
+    const targetFile = o.targetFile ? path.join(projectDir, "run-targets.txt") : null;
     const mask = makeMasker(props.secrets);
     const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
     const created = new Date();
@@ -587,6 +744,7 @@ export class Runner {
     let ended = false; // the run reached its end events, so it gets a run.json
     try {
       if (argFile) writeArgFile(argFile, props.rows);
+      if (targetFile) writeTargetFile(targetFile, o.targets); // if it cannot be written, nothing runs
       const state = new RunState(
         tree,
         leaves.map((n) => n.key),
@@ -595,15 +753,20 @@ export class Runner {
       const store = (done: Extract<AppEvent, { type: "runFinished" }>) => {
         ended = true;
         try {
-          const { kind, file, name, line, key } = node;
           const record: RunRecord = {
             version: 1,
             startedAt,
             durationMillis: Date.now() - startedAt,
-            env: this.envs.env,
+            env,
             filter,
-            selection: { kind, file, name, line, key },
-            failedOf: null,
+            selection: selection && {
+              kind: selection.kind,
+              file: selection.file,
+              name: selection.name,
+              line: selection.line,
+              key: selection.key,
+            },
+            failedOf,
             outcome: done.outcome,
             exitCode: done.outcome === "cancelled" ? null : done.exitCode, // a kill's code is not Karate's
             tests: storedTests(leaves, state.results()),
@@ -634,10 +797,11 @@ export class Runner {
       const proc = this.spawn(
         outDir,
         false,
-        targets,
-        this.envs.env,
+        targetFile ? [`@${targetFile}`] : o.targets,
+        env,
         (lines) => emit({ type: "console", lines }),
         argFile,
+        filter,
       );
       try {
         if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
@@ -652,12 +816,12 @@ export class Runner {
       startedAt = Date.now();
       emit({
         type: "runStarted",
-        selection: node.key,
+        selection: (selection ?? tree).key, // stored tests can span the tree
         runId: id,
         keys: state.keys,
         total: state.keys.length,
         startedAt,
-        env: this.envs.env,
+        env,
       });
 
       // A bad event line or malformed data is fatal: the run's status can no longer be trusted.
@@ -683,13 +847,15 @@ export class Runner {
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
       // 24.15 does not, so the unit tests cover only the notice). A failure must not replace the run's outcome.
-      try {
-        if (argFile) rmSync(argFile, { force: true, maxRetries: 5 });
-      } catch (err) {
-        emit({
-          type: "notice",
-          message: `The run's argument file could not be deleted; the app deletes it when it next starts. ${(err as Error).message}`,
-        });
+      for (const file of [argFile, targetFile]) {
+        try {
+          if (file) rmSync(file, { force: true, maxRetries: 5 });
+        } catch (err) {
+          emit({
+            type: "notice",
+            message: `The run's argument file could not be deleted; the app deletes it when it next starts. ${(err as Error).message}`,
+          });
+        }
       }
       if (!ended) {
         // An error ended the run before its end events: nothing to list. Best effort, as the next start deletes it too.
