@@ -37,6 +37,7 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
   };
 
   const commit = (value: string) => {
+    if (locked()) return; // Electron blurs the box it disables: that change was sent already
     const name = value.trim();
     const next = name === "" || name === NONE ? null : name;
     if (next !== null && !validEnvName(next)) setError(INVALID_ENV);
