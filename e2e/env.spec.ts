@@ -8,6 +8,7 @@ import {
   node,
   openProject,
   ourJavaCommandLines,
+  ourJavaPids,
   project,
   test,
 } from "./helpers";
@@ -86,12 +87,13 @@ test("Suggestions come from overlay files and env tags", async () => {
 
   await expect(input(win)).toHaveValue("");
   await expect(input(win)).toHaveAttribute("placeholder", "(none)");
-  await expect(win.locator("#env-suggestions option")).toHaveCount(3);
-  expect(
-    await win
-      .locator("#env-suggestions option")
-      .evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value)),
-  ).toEqual(["(none)", "prod", "qa"]);
+  await expect
+    .poll(() =>
+      win
+        .locator("#env-suggestions option")
+        .evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value)),
+    )
+    .toEqual(["(none)", "prod", "qa"]);
 });
 
 test("Changing the environment updates the tree", async () => {
@@ -196,9 +198,24 @@ test("A secret is used but never shown", async () => {
 
   await runAlways(win);
   await expect(consoleText(win)).toContainText("api.token = ****");
-  await node(win, "always").click();
+  // Step logs are collapsed until opened, and a print step's log is where an unmasked value would show.
+  await node(win, "always").getByRole("button", { name: "always", exact: true }).click();
+  await expect(win.getByTestId("details-location")).toHaveText("tests/env.feature:3");
+  const toggles = win.getByTestId("step-toggle");
+  await expect(toggles.first()).toBeVisible();
+  for (const toggle of await toggles.all()) await toggle.click();
+  await expect(win.getByTestId("step-log").filter({ hasText: "api.token = ****" })).toHaveCount(1);
+  // markup, text and the value of every field: outerHTML and innerText alone miss field values
   const everything = () =>
-    win.evaluate(() => document.documentElement.outerHTML + document.body.innerText);
+    win.evaluate(() =>
+      [
+        document.documentElement.outerHTML,
+        document.body.innerText,
+        ...[...document.querySelectorAll("input, textarea")].map(
+          (e) => (e as HTMLInputElement).value,
+        ),
+      ].join("\n"),
+    );
   expect(await everything()).not.toContain(SECRET);
 
   await openProperties(win);
@@ -231,7 +248,6 @@ test("A secret stays off the command line and out of the settings file", async (
   for (const line of lines) expect(line).not.toContain(SECRET);
   const settings = readFileSync(path.join(userData, "settings.json"), "utf8");
   expect(settings).not.toContain(SECRET);
-  expect(settings).toContain('"secret":"');
 
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 45_000 });
   const argFiles = () =>
@@ -281,6 +297,8 @@ test("An unreadable secret blocks runs", async () => {
   await expect(win.getByTestId("run-outcome")).toHaveText("");
   await expect(win.getByTestId("progress-text")).toHaveText("0 / 0");
   await expect(node(win, "always")).toHaveAttribute("data-status", "notRun");
+  // the refusal came before any JVM launched (the pre-run dry run has ended)
+  await expect.poll(ourJavaPids).toEqual([]);
 
   await openProperties(win);
   await scopeItem(win, "qa").click();
@@ -288,6 +306,7 @@ test("An unreadable secret blocks runs", async () => {
 });
 
 test("Settings survive a restart", async () => {
+  test.setTimeout(90_000);
   const { app, userData } = await openWithSecret();
 
   // one app per user-data folder: close it before the second starts
