@@ -68,7 +68,7 @@ Tested on: <!-- OS + version, Java version, Karate version (e.g. Windows 11, Jav
 
 ### Git
 
-- [ ] Branch is `feature/<topic>` (or `release/X.Y.Z` / `hotfix/X.Y.Z`) and is up to date with its base
+- [ ] Branch is `feature/<topic>` (or `release/vX.Y.Z` / `hotfix/vX.Y.Z`) and is up to date with its base
 - [ ] Every commit follows Conventional Commits; one logical change per commit
 - [ ] No merge commits from the base branch mixed with unrelated work; no force-push to `main` or `develop`
 
