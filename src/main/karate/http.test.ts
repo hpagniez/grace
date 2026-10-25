@@ -97,6 +97,23 @@ describe("parseStepLog", () => {
     expect(calls[0].responseBody).toBeNull();
   });
 
+  it("pairs a response with the request of the same number", () => {
+    const log =
+      "request:\n1 > GET http://h/a\n1 > Host: h\n\n" +
+      "request:\n2 > GET http://h/b\n2 > Host: h\n\n" +
+      "response time in milliseconds: 5\n2 < 200 GET http://h/b\n2 < Content-Length: 3\ntwo\n\n" +
+      "response time in milliseconds: 7\n1 < 404 GET http://h/a\n1 < Content-Length: 3\none\n";
+    const calls = parseStepLog(log);
+    expect(calls.map((c) => [c.url, c.status, c.millis, c.responseBody])).toEqual([
+      ["http://h/a", 404, 7, "one"],
+      ["http://h/b", 200, 5, "two"],
+    ]);
+    expect(calls.map((c) => c.attempt)).toEqual([
+      { n: 1, of: 2 },
+      { n: 2, of: 2 },
+    ]);
+  });
+
   it("drops a followed redirect's unanswered request", () => {
     const log =
       "request:\n1 > GET http://h/moved\n1 > Host: h\n\n" +
