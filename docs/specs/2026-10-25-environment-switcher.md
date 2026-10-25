@@ -183,7 +183,7 @@ Feature: Environment switcher and run properties
   Scenario: Suggestions come from overlay files and env tags
     When I open the env sample project
     Then the Env combo is empty and shows the placeholder "(none)"
-    And its suggestions are "prod" and "qa"
+    And its suggestions are "(none)", "prod" and "qa"
 
   Scenario: Changing the environment updates the tree
     Given the env sample project is open
