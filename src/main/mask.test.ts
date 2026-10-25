@@ -29,8 +29,10 @@ describe("makeMasker", () => {
   });
 
   it("masks values with regex metacharacters literally", () => {
-    const mask = makeMasker(["$&", ".*", "a\b"]);
-    expect(mask("pre $& mid .* post a\b end abc")).toBe("pre **** mid **** post **** end abc");
+    const mask = makeMasker(["$&", ".*", "a\\b"]);
+    expect(mask("pre $& mid .* post a\\b json a\\\\b end abc")).toBe(
+      "pre **** mid **** post **** json **** end abc",
+    );
   });
 
   it("masks the longest form first", () => {
