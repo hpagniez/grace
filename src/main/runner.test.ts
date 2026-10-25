@@ -1162,6 +1162,34 @@ describe("Runner properties", () => {
     ]);
   });
 
+  it("saved rows today's rules reject are named in one notice on open", T, async () => {
+    const root = fixture("env");
+    const dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-"));
+    const properties = {
+      shared: [
+        { name: "timeout", value: "5000" },
+        { name: "java.home", value: "C:/jdk" },
+      ],
+      byEnv: {
+        qa: [{ name: "greeting", secret: "Zm9v", value: "h\u00e9llo" }, { secret: "Zm9v" }],
+      },
+    };
+    writeFileSync(
+      path.join(dataDir, "settings.json"),
+      JSON.stringify({ projects: { [root]: { properties } } }),
+    );
+    const { runner, all, last } = setup(dataDir);
+    await runner.open(root);
+    await runner.refresh();
+    expect(all("notice").map((n) => n.message)).toEqual([
+      "Some saved properties were not loaded and are kept in settings.json: All environments: java.home, qa: greeting, qa: (no name)",
+    ]);
+    expect(last("environment").view.properties).toEqual({
+      shared: [{ name: "timeout", value: "5000" }],
+      byEnv: { qa: [] },
+    });
+  });
+
   it("no properties, no @ argument", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");

@@ -129,6 +129,7 @@ Editor layout (mockups compared in the brainstorm):
 - The environment and the property lists are saved per project in `settings.json`, in the same per-project entry as the tag filter, and restored when the project opens. Saving one part of the entry keeps the others (today `saveProjectFilter` replaces the whole entry: that changes).
 - A secret is stored as the base64 of `safeStorage.encryptString(value)`. On Windows, Electron keeps the key for that in the app data folder (`Local State`), itself protected by DPAPI, so a secret can be read back only by the same Windows user with the same app data folder. Its plain value is never written to disk by the app, except inside the short-lived argument file (below).
 - A malformed entry, list or row reads as missing; it never blocks opening a project.
+- A saved row that today's rules reject (a name now reserved, a value Java cannot take) is not loaded, and opening the project says so once: "Some saved properties were not loaded and are kept in settings.json: <scope>: <name>, …" (never the value). Saves keep it in the file, after the rows of its list, while that list exists.
 
 ## Design decisions already made
 
