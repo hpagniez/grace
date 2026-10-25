@@ -1,4 +1,5 @@
 // Shared by main and renderer: keep this file free of Node imports.
+import type { EnvView } from "./env";
 import type { Layout, Status, TestNode } from "./model";
 import type { FilterState } from "./tags";
 
@@ -33,7 +34,14 @@ export interface Project {
 }
 export type AppEvent =
   | { type: "project"; project: Project | null; tree: TestNode | null; error: string | null }
-  | { type: "runStarted"; selection: string; keys: string[]; total: number; startedAt: number }
+  | {
+      type: "runStarted";
+      selection: string;
+      keys: string[];
+      total: number;
+      startedAt: number;
+      env: string | null;
+    }
   | { type: "scenarios"; updates: ScenarioUpdate[] }
   | { type: "steps"; key: string; steps: Step[] }
   | { type: "console"; lines: string[] }
@@ -47,5 +55,7 @@ export type AppEvent =
   | { type: "notice"; message: string }
   /** The open project's tag filter, as main holds and applies it. */
   | { type: "filter"; filter: FilterState }
+  /** The open project's environment, suggestions and run properties, as main holds them. */
+  | { type: "environment"; view: EnvView }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
   | { type: "busy"; busy: boolean };
