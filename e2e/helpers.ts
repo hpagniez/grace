@@ -37,7 +37,7 @@ export const test = base.extend<{ cleanup: void }>({
 export { expect };
 
 /** A fresh copy of a fixture project, deleted after the test. */
-export function project(name: "clean" | "broken" | "maven" | "tags"): string {
+export function project(name: "clean" | "broken" | "maven" | "tags" | "env"): string {
   const dir = copyFixture(name);
   dirs.push(dir);
   return dir;
@@ -46,14 +46,18 @@ export function project(name: "clean" | "broken" | "maven" | "tags"): string {
 /** An empty folder, deleted after the test. */
 export const emptyProject = () => tempDir("kk-empty-");
 
-/** Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the first app before). */
+/**
+ * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
+ * first app before), and `extraEnv` added to the app's environment.
+ */
 export async function launch(
   userDataDir?: string,
+  extraEnv: Record<string, string> = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
-    env: { ...process.env, KARATE_KID_USER_DATA: userData },
+    env: { ...process.env, ...extraEnv, KARATE_KID_USER_DATA: userData },
   });
   apps.push(app);
   const win = await app.firstWindow();
@@ -84,15 +88,15 @@ export async function stubOpenPath(app: ElectronApplication): Promise<() => Prom
 
 const jreDir = path.resolve("vendor", "jre").toLowerCase() + path.sep;
 
-/** PIDs of running java.exe processes started from this repo's bundled JRE. */
-export function ourJavaPids(): number[] {
+/** Running java.exe processes started from this repo's bundled JRE, with their command lines. */
+function ourJavaProcesses(): { pid: number; commandLine: string }[] {
   const out = execFileSync(
     "powershell",
     [
       "-NoProfile",
       "-NonInteractive",
       "-Command",
-      `Get-CimInstance Win32_Process -Filter "Name='java.exe'" | ForEach-Object { "$($_.ProcessId)|$($_.ExecutablePath)" }`,
+      `Get-CimInstance Win32_Process -Filter "Name='java.exe'" | ForEach-Object { "$($_.ProcessId)|$($_.ExecutablePath)|$($_.CommandLine)" }`,
     ],
     { encoding: "utf8", windowsHide: true },
   );
@@ -100,8 +104,14 @@ export function ourJavaPids(): number[] {
     .split(/\r?\n/)
     .map((l) => l.split("|"))
     .filter(([, exe]) => exe && exe.toLowerCase().startsWith(jreDir))
-    .map(([pid]) => Number(pid));
+    .map(([pid, , ...rest]) => ({ pid: Number(pid), commandLine: rest.join("|") }));
 }
+
+/** PIDs of running java.exe processes started from this repo's bundled JRE. */
+export const ourJavaPids = (): number[] => ourJavaProcesses().map((p) => p.pid);
+
+/** Command lines of running java.exe processes started from this repo's bundled JRE. */
+export const ourJavaCommandLines = (): string[] => ourJavaProcesses().map((p) => p.commandLine);
 
 /** The tree row of the node whose ▶ button is named `Run <name>`. */
 export const node = (win: Page, name: string) =>
