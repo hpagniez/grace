@@ -111,8 +111,18 @@ test("the window cannot get too short for the layout", async () => {
   ).toBe(true);
 });
 
+/**
+ * 600 px fits CI's small screen. A first-start window taller than the screen would be pulled onto it
+ * at the restart (F41) and come back shorter.
+ */
+async function fitScreen(app: ElectronApplication, win: Page) {
+  await setWindowHeight(app, 600);
+  await expect.poll(() => win.evaluate(() => window.innerHeight)).toBeLessThan(600);
+}
+
 test("the height survives a restart", async () => {
   const first = await started();
+  await fitScreen(first.app, first.win);
   await dragBy(first.win, 108);
   await expectHeights(first.win, { panel: 300 });
   await first.app.close();
@@ -157,6 +167,7 @@ test("a saved height taller than the window is clamped at start", async () => {
 
 test("releasing a drag above the window keeps the maximum and ends the drag", async () => {
   const first = await started();
+  await fitScreen(first.app, first.win);
   await dragTo(first.win, -100);
   await expectHeights(first.win, { main: 120 });
   const shown = await height(panel(first.win));
