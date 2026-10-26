@@ -222,10 +222,14 @@ test("A run of one test replaces only its calls", async () => {
   const { win } = await open("http");
   await runAll(win);
   await expect(tab(win)).toHaveText("HTTP (13)");
+  await tab(win).click();
 
   await node(win, "ok").getByTestId("run-node").click();
   // a stored run has ended: the first Run all is the first entry
   await expect(win.getByTestId("tab-history")).toHaveText("History (2)", { timeout: 60_000 });
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished");
   await expect(tab(win)).toHaveText("HTTP (13)");
+  // starting the run kept the HTTP tab open
+  await expect(tab(win)).toHaveAttribute("aria-selected", "true");
+  await expect(rows(win)).toHaveCount(13);
 });

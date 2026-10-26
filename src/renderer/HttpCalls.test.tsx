@@ -120,7 +120,7 @@ describe("HTTP tab", () => {
     expect(screen.getByTestId("tab-http").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("http-calls")).toBeTruthy();
     expect(screen.queryByTestId("console")).toBeNull();
-    // starting a run still switches to Console, and the calls stay counted
+    // starting a run keeps the HTTP tab open, and the calls of tests outside the run stay
     send({
       type: "runStarted",
       selection: "d:",
@@ -130,8 +130,8 @@ describe("HTTP tab", () => {
       startedAt: 0,
       env: null,
     });
-    expect(screen.getByTestId("tab-console").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByTestId("console")).toBeTruthy();
+    expect(screen.getByTestId("tab-http").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("http-calls")).toBeTruthy();
     expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (4)");
   });
 

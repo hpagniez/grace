@@ -129,7 +129,7 @@ How runs are stored:
 
 ### R3. History tab
 
-- The bottom panel gets two tabs: **Console** and **History (n)**, n being the number of listed runs. The panel keeps its height. The app starts on Console; starting any run switches to Console.
+- The bottom panel gets two tabs: **Console** and **History (n)**, n being the number of listed runs. The panel keeps its height. The app starts on Console; starting a run keeps the tab that is open (the HTTP inspector, F11, changed this: it switched to Console before).
 - The tab lists the project's runs, newest first, up to 20, one row each:
   - **When**: "Today 14:32", "Yesterday 17:20", else the date and time ("2026-10-21 09:05").
   - **Env**: the environment, "—" for none.

@@ -132,13 +132,13 @@ describe("reduce", () => {
     s.selectedCall = { key: keys[0], index: 0 };
     apply(s, started([keys[0]]));
     expect(s.selectedCall).toBeNull();
-    // a run of other tests switches to Console too: the details pane goes back to the node
+    // a run of other tests keeps the bottom tab and the selected call
     s.calls[keys[1]] = [aCall];
     s.selectedCall = { key: keys[1], index: 0 };
     s.panel = "http";
     apply(s, started([keys[0]]));
-    expect(s.panel).toBe("console");
-    expect(s.selectedCall).toBeNull();
+    expect(s.panel).toBe("http");
+    expect(s.selectedCall).toEqual({ key: keys[1], index: 0 });
   });
 
   it("a new project and an environment change clear calls and the selected call", () => {
@@ -370,12 +370,12 @@ describe("reduce", () => {
       expect(s.history.map((r) => r.id)).toEqual(["c"]);
     });
 
-    it("runStarted switches to the console and records the run id", () => {
+    it("runStarted keeps the bottom tab and records the run id", () => {
       const s = initialState();
       expect(s.run.runId).toBeNull();
       s.panel = "history";
       apply(s, project(), started());
-      expect(s.panel).toBe("console");
+      expect(s.panel).toBe("history");
       expect(s.run.runId).toBe(RUN);
     });
 

@@ -144,8 +144,8 @@ export function reduce(s: AppState, e: AppEvent): void {
         runId: e.runId,
         env: e.env,
       };
-      s.panel = "console";
-      s.selectedCall = null; // the details pane goes back to the node with the tab
+      // the bottom tab stays as it is, so the HTTP tab can be watched filling during the run
+      if (s.selectedCall && e.keys.includes(s.selectedCall.key)) s.selectedCall = null;
       for (const key of e.keys) {
         s.statuses[key] = "pending";
         delete s.results[key];
