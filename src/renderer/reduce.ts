@@ -38,6 +38,11 @@ export interface AppState {
   filter: FilterState;
   /** The open project's environment and run properties, as main holds them; null with no project. */
   env: EnvView | null;
+  /**
+   * The open project's thread count, as main holds it. A fresh object per `threads` event, so the
+   * box resets even when main re-sends the count it held. Null with no project.
+   */
+  threads: { count: number } | null;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
   /** The open project's listed runs, newest first, as main sends them. */
@@ -84,6 +89,7 @@ export function initialState(): AppState {
     selected: null,
     filter: noFilter(),
     env: null,
+    threads: null,
     busy: false,
     history: [],
     httpGroups: [],
@@ -114,6 +120,7 @@ export function reduce(s: AppState, e: AppEvent): void {
           run: idleRun(),
           filter: noFilter(), // main's `filter` event follows
           env: null, // and its `environment` event
+          threads: null, // main's `threads` event follows
           history: [], // main's `history` follows a project that opens
         });
       }
@@ -209,6 +216,10 @@ export function reduce(s: AppState, e: AppEvent): void {
           run: idleRun(),
         });
       s.env = e.view;
+      break;
+    case "threads":
+      if (!s.project) break; // main can still hold the previous project's count
+      s.threads = { count: e.count };
       break;
     case "busy":
       s.busy = e.busy;

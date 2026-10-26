@@ -21,6 +21,7 @@
   }
   input:not([type]),
   input[type="text"],
+  input[type="number"],
   textarea {
     cursor: text;
   }
