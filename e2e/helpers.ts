@@ -220,6 +220,21 @@ export function seedRuns(
   });
 }
 
+/** `data.threads` of the first `SUITE_ENTER` line of a run's event stream: the count Karate ran with. */
+export function ranThreads(userData: string, root: string, id: string): number {
+  const events = path.join(
+    projectDataDir(userData, root),
+    "runs",
+    id,
+    "karate-json",
+    "karate-events.jsonl",
+  );
+  const suite = readFileSync(events, "utf8")
+    .split(/\r?\n/)
+    .find((line) => line.includes('"SUITE_ENTER"'));
+  return JSON.parse(suite!).data.threads;
+}
+
 export const SECRET = "s3cret-token-123";
 
 /** The settings entry of the project, as main saved it. */
