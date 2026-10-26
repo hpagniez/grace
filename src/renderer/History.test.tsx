@@ -135,7 +135,7 @@ describe("bottom panel tabs", () => {
     showHistory();
     // a tablist holds tabs only: Clear history sits beside it
     const tablist = screen.getByRole("tablist");
-    expect([...tablist.children].map((c) => c.getAttribute("role"))).toEqual(["tab", "tab"]);
+    expect([...tablist.children].map((c) => c.getAttribute("role"))).toEqual(["tab", "tab", "tab"]);
     expect(tablist.contains(clear())).toBe(false);
     expect(screen.getByTestId("tab-history").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("history")).toBeTruthy();
@@ -145,7 +145,7 @@ describe("bottom panel tabs", () => {
     expect(screen.queryByTestId("history")).toBeNull();
   });
 
-  it("starting a run switches to Console", () => {
+  it("starting a run keeps the History tab", () => {
     const { send } = setup();
     showHistory();
     send({
@@ -157,7 +157,8 @@ describe("bottom panel tabs", () => {
       startedAt: at(25, 15, 0),
       env: null,
     });
-    expect(screen.getByTestId("console")).toBeTruthy();
+    expect(screen.getByTestId("tab-history").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("history")).toBeTruthy();
   });
 });
 

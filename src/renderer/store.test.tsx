@@ -1,6 +1,7 @@
 import { flush } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
+import type { HttpCall } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { NO_FILTER } from "../shared/tags";
@@ -140,6 +141,105 @@ describe("createAppStore", () => {
       // the store holds its own copy, never the shared constant
       expect(store.state.filter).not.toBe(NO_FILTER);
       expect(NO_FILTER).toEqual({ include: [], exclude: [], hideNonMatching: false });
+    });
+  });
+
+  describe("http calls", () => {
+    const aCall = (status: number): HttpCall => ({
+      method: "GET",
+      url: "http://localhost/x",
+      requestHeaders: [],
+      requestBody: null,
+      status,
+      responseHeaders: [],
+      responseBody: null,
+      millis: null,
+      error: null,
+      via: null,
+      startTime: status,
+      attempt: null,
+    });
+    const node = (key: string, kind: TestNode["kind"], children: TestNode[] = []): TestNode => ({
+      key,
+      kind,
+      name: key,
+      file: "a.feature",
+      line: 1,
+      refId: null,
+      tags: [],
+      children,
+    });
+    const setup = () => {
+      let cb: (e: AppEvent) => void = () => {};
+      const api = {
+        ready: async () => {},
+        onEvent: (f: (e: AppEvent) => void) => ((cb = f), () => {}),
+      } as unknown as Api;
+      const store = createAppStore(api);
+      const send = (e: AppEvent) => {
+        cb(e);
+        flush();
+      };
+      send({
+        type: "project",
+        project: { root: "D:/p", layout: "standalone" },
+        tree: node("f:a.feature", "feature", [
+          node("s:a#1", "scenario"),
+          node("s:a#2", "scenario"),
+        ]),
+        error: null,
+      });
+      send({ type: "calls", key: "s:a#1", calls: [aCall(200), aCall(404)] });
+      return store;
+    };
+    const ok = { key: "s:a#1", index: 0 };
+    const notFound = { key: "s:a#1", index: 1 };
+
+    it("selectCall, select and showPanel", () => {
+      const store = setup();
+      store.selectCall(ok);
+      store.showPanel("http");
+      flush();
+      expect(store.state.selectedCall).toEqual(ok); // the HTTP tab keeps it
+      store.showPanel("console");
+      flush();
+      expect(store.state.panel).toBe("console");
+      expect(store.state.selectedCall).toBeNull();
+      store.selectCall(ok);
+      store.showPanel("history");
+      flush();
+      expect(store.state.selectedCall).toBeNull();
+      store.selectCall(ok);
+      store.select("s:a#2"); // a tree click gives the details pane back
+      flush();
+      expect(store.state.selected).toBe("s:a#2");
+      expect(store.state.selectedCall).toBeNull();
+    });
+
+    it("toggleGroup drops a call it hides", () => {
+      const store = setup();
+      store.selectCall(ok);
+      store.toggleGroup("all");
+      flush();
+      expect(store.state.selectedCall).toEqual(ok); // All hides nothing
+      store.toggleGroup("4xx");
+      flush();
+      expect(store.state.httpGroups).toEqual(["4xx"]);
+      expect(store.state.selectedCall).toBeNull(); // the 200 is hidden
+      store.selectCall(notFound);
+      store.toggleGroup("none");
+      flush();
+      expect(store.state.httpGroups).toEqual(["4xx", "none"]);
+      expect(store.state.selectedCall).toEqual(notFound);
+      store.toggleGroup("4xx");
+      flush();
+      expect(store.state.httpGroups).toEqual(["none"]);
+      expect(store.state.selectedCall).toBeNull(); // the 404 is hidden
+      store.selectCall(notFound);
+      store.toggleGroup("all");
+      flush();
+      expect(store.state.httpGroups).toEqual([]);
+      expect(store.state.selectedCall).toEqual(notFound);
     });
   });
 });
