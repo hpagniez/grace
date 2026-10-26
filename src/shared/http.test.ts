@@ -70,6 +70,26 @@ describe("curlCommand", () => {
     );
   });
 
+  it("adds no body for an empty one", () => {
+    expect(curlCommand(call({ method: "POST", requestBody: "" }))).toBe(
+      "curl -X POST 'http://h/x'",
+    );
+  });
+
+  it("sends HEAD with --head, since -X HEAD waits for a body", () => {
+    const headers = [
+      { name: "Host", value: "h" },
+      { name: "Accept", value: "*/*" },
+    ];
+    expect(curlCommand(call({ method: "HEAD", requestHeaders: headers }))).toBe(
+      "curl --head 'http://h/x' -H 'Accept: */*'",
+    );
+    expect(curlCommand(call({ method: "head", requestBody: "x" }))).toBe(
+      "curl --head 'http://h/x'",
+    );
+    expect(curlCommand(call({ method: "HEAD", url: null }))).toBeNull();
+  });
+
   it("quotes every value", () => {
     const c = call({
       url: "http://h/it's",
