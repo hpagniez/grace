@@ -8,10 +8,12 @@ import {
   loadLastProject,
   loadProjectEnv,
   loadProjectFilter,
+  loadProjectThreads,
   loadWindowState,
   saveLastProject,
   saveProjectEnv,
   saveProjectFilter,
+  saveProjectThreads,
   saveWindowState,
   skippedProperties,
   type EnvSettings,
@@ -358,6 +360,63 @@ describe("settings", () => {
       e.properties.shared.push({ name: "a", value: "1" });
       e.properties.byEnv.qa = [];
       expect(emptyEnvSettings()).toEqual({ env: null, properties: { shared: [], byEnv: {} } });
+    });
+  });
+
+  describe("thread count", () => {
+    it("save then load returns the count", () => {
+      const data = tmp();
+      saveProjectThreads(data, "x", 8);
+      expect(loadProjectThreads(data, "x")).toBe(8);
+    });
+
+    it("each project has its own count", () => {
+      const data = tmp();
+      saveProjectThreads(data, "a", 3);
+      expect(loadProjectThreads(data, "a")).toBe(3);
+      expect(loadProjectThreads(data, "b")).toBe(1);
+    });
+
+    it("saving the count keeps the other settings", () => {
+      const data = tmp();
+      const project = path.join(tmp(), "proj");
+      mkdirSync(project);
+      const f: FilterState = { include: ["smoke"], exclude: [], hideNonMatching: false };
+      const w: WindowState = { x: 1, y: 2, width: 700, height: 500, maximized: false };
+      const e: EnvSettings = {
+        env: "qa",
+        properties: { shared: [{ name: "timeout", value: "5000" }], byEnv: {} },
+      };
+      saveLastProject(data, project);
+      saveWindowState(data, w);
+      saveProjectFilter(data, project, f);
+      saveProjectEnv(data, project, e);
+      saveProjectThreads(data, project, 4);
+      expect(loadLastProject(data)).toBe(project);
+      expect(loadWindowState(data)).toEqual(w);
+      expect(loadProjectFilter(data, project)).toEqual(f);
+      expect(loadProjectEnv(data, project)).toEqual(e);
+      expect(loadProjectThreads(data, project)).toBe(4);
+    });
+
+    it.each(["8", 0, 2.5, 64, null])("a malformed saved count %j loads as 1", (threads) => {
+      const data = tmp();
+      writeFileSync(
+        path.join(data, "settings.json"),
+        JSON.stringify({ projects: { x: { threads } } }),
+      );
+      expect(loadProjectThreads(data, "x")).toBe(1);
+    });
+
+    it("an unreadable file loads as 1", () => {
+      const data = tmp();
+      saveProjectThreads(data, "x", 8);
+      readFails.code = "EBUSY";
+      try {
+        expect(loadProjectThreads(data, "x")).toBe(1);
+      } finally {
+        readFails.code = null;
+      }
     });
   });
 

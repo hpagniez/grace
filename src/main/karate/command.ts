@@ -81,6 +81,8 @@ export function buildArgs(o: {
   targets: string[];
   env: string | null;
   argFile: string | null;
+  /** Karate's `-T`. A dry run always gets 1: a `threads` in karate-pom.json would interleave its events. */
+  threads: number;
 }): string[] {
   return [
     // The launcher expands `@file` only before the main class, so it goes first.
@@ -101,7 +103,7 @@ export function buildArgs(o: {
     "-f",
     "html,karate:jsonl",
     ...(o.env ? ["-e", o.env] : []),
-    ...(o.dryRun ? ["-D"] : []),
+    ...(o.dryRun ? ["-D", "-T", "1"] : ["-T", String(o.threads)]),
     ...o.tags,
     ...o.targets,
   ];

@@ -185,6 +185,7 @@ export function seedRuns(
       startedAt,
       durationMillis: 5_000,
       env: null,
+      threads: 1,
       filter: { ...NO_FILTER },
       selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
       failedOf: null,
@@ -217,6 +218,21 @@ export function seedRuns(
     if (opts.report) writeFileSync(path.join(dir, "karate-summary.html"), "<html></html>");
     return id;
   });
+}
+
+/** `data.threads` of the first `SUITE_ENTER` line of a run's event stream: the count Karate ran with. */
+export function ranThreads(userData: string, root: string, id: string): number {
+  const events = path.join(
+    projectDataDir(userData, root),
+    "runs",
+    id,
+    "karate-json",
+    "karate-events.jsonl",
+  );
+  const suite = readFileSync(events, "utf8")
+    .split(/\r?\n/)
+    .find((line) => line.includes('"SUITE_ENTER"'));
+  return JSON.parse(suite!).data.threads;
 }
 
 export const SECRET = "s3cret-token-123";

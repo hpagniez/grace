@@ -4,6 +4,7 @@ import { matchingLeaves } from "../shared/tags";
 import { btn, primary } from "./buttons";
 import { EnvPicker } from "./EnvPicker";
 import { PropertiesDialog } from "./PropertiesDialog";
+import { Threads } from "./Threads";
 
 const LAYOUT_LABEL = { maven: "Maven", gradle: "Gradle", standalone: "Standalone" } as const;
 
@@ -34,6 +35,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         </span>
       </div>
       <EnvPicker state={props.state} api={props.api} />
+      <Threads state={props.state} api={props.api} />
       <PropertiesDialog state={props.state} api={props.api} />
       <button
         data-testid="open-button"
