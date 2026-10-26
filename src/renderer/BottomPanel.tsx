@@ -5,6 +5,7 @@ import { Console } from "./Console";
 import { ClearHistory, History } from "./History";
 import { narrowedCalls, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
+import { Splitter } from "./Splitter";
 import type { AppState } from "./reduce";
 
 type Panel = AppState["panel"];
@@ -20,10 +21,27 @@ export function BottomPanel(props: {
   showPanel: (p: Panel) => void;
   selectCall: (ref: CallRef) => void;
   toggleGroup: (g: HttpGroup | "all") => void;
+  /** The saved height; flexbox shrinks the panel when the window is too small for it. */
+  height: number;
+  setHeight: (h: number) => void;
+  main: () => HTMLElement | undefined;
+  setDragging: (on: boolean) => void;
 }) {
   const panel = () => props.state.panel;
+  let section: HTMLElement | undefined;
   return (
-    <section class="flex h-48 shrink-0 flex-col border-t border-zinc-200 dark:border-zinc-700">
+    <section
+      ref={(e) => (section = e)}
+      data-testid="bottom-panel"
+      style={`height:${props.height}px`}
+      class="flex min-h-24 flex-col border-t border-zinc-200 dark:border-zinc-700"
+    >
+      <Splitter
+        panel={() => section}
+        main={props.main}
+        setHeight={props.setHeight}
+        setDragging={props.setDragging}
+      />
       <div class="flex items-center border-b border-zinc-200 bg-zinc-50 px-2 dark:border-zinc-700 dark:bg-zinc-800">
         <div
           role="tablist"

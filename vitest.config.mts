@@ -21,6 +21,7 @@ export default defineConfig({
           include: ["**/*.test.tsx"],
           exclude,
           environment: "jsdom",
+          setupFiles: ["test/jsdom-setup.ts"],
           // externalized deps resolve with Node rules; inline Solid packages so they get the browser build too
           server: { deps: { inline: [/solid/] } },
         },
