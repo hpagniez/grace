@@ -12,8 +12,9 @@ Spec: [HTTP inspector](../specs/2026-10-25-http-inspector.md).
 | `npm test` | 529/529 passed |
 | `npm run e2e` | 52/52 passed, including the 4 tests in `e2e/http.spec.ts` |
 | Built app driven on a copy of the `http` fixture, Run all, screenshots | HTTP tab reads `HTTP (13)`; chips 1xx 0, 2xx 6, 3xx 1, 4xx 3, 5xx 1, No response 2; errors-only filter leaves 6 rows; XML, refused, timeout and called-feature calls show as the spec says; dark mode and a 900×650 window are readable |
+| Built app on a throwaway project calling public APIs over the internet (httpbin.org, jsonplaceholder.typicode.com; 13 scenarios, Run all in 8.6 s) | 15 calls: 2xx 12, 4xx 1 (418), 5xx 1 (503), No response 1 (read timeout on `/delay/3`, request and error shown, cURL enabled). HTTPS and the encoded query `q=karate%20kid` shown as sent; the gzip body readable; `/redirect/2` followed into one 200 call under its first URL; form body `user=kid&note=it%27s+here` copied as `--data-raw`; `Authorization: ***` masked by Karate (the echoed token in the response body is not: Karate masks headers only); HEAD copied as `curl --head`; a 1 MB JSON body (`/photos`) selected in 223 ms and scrolled without lag. Known limits seen: a multipart request body is Karate's part summary, so its cURL cannot replay it; a binary response (`/bytes/256`) shows headers only, because Karate logs no binary body. |
 
-Not covered by the automated part: a person's own Karate project, pasting a copied cURL into a shell, and how it feels to use.
+Not covered by the automated part: a person's own Karate project, and how it feels to use.
 
 ## By hand (done by a person)
 
@@ -56,10 +57,10 @@ Start the app with `npm start` from the repo (or the built zip). Use a writable 
 ### B. A real project of yours
 
 16. Open one of your own Karate projects, ideally one with auth helpers (`call`, `callonce`, `karate.callSingle`) and an expected failure. Run all. Every HTTP call you expect is in the HTTP tab, including calls inside called features (they read `via …`).
-    - Result: not done: no real project available.
+    - Result: not done by a person: no real project available. Covered in part by the public-API run in the automated part.
 17. For a failing scenario, select it in the tree and look at its calls. The request and response you need to understand the failure are there, readable, and the bodies are indented.
-    - Result: not done: no real project available.
+    - Result: not done by a person: no real project available. Covered in part by the public-API run in the automated part.
 18. Copy a call that needs no secret and no local mock as cURL, paste it into Git Bash, and run it. It replays the request.
-    - Result: not done: no real project available.
+    - Result: not done by a person: no real project available. Covered in part by the public-API run in the automated part.
 19. Anything confusing, missing or wrong while using it:
     - Notes: none (no real project).
