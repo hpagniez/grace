@@ -24,6 +24,13 @@ describe("placeWindow", () => {
     expect(placeWindow(rect(-1800, 50, 700, 500), [main, left])).toEqual(rect(-1800, 50, 700, 500));
   });
 
+  it("keeps a window flush with the screen edges, invisible borders included", () => {
+    // A window snapped to the left half: its invisible resize border sticks out left, right and below.
+    const snapped = rect(-7, 0, 974, 1047);
+    expect(placeWindow(snapped, areas)).toEqual(snapped);
+    expect(placeWindow(rect(-9, 0, 974, 1040), areas)).toEqual(rect(0, 0, 974, 1040));
+  });
+
   it("equal overlap picks the first work area", () => {
     expect(placeWindow(rect(1620, 100, 600, 400), areas)).toEqual(rect(1320, 100, 600, 400));
   });

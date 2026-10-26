@@ -173,6 +173,14 @@ test("a window partly off the screen is pulled onto it", async () => {
   near((await shown(app)).bounds, { ...saved, x: wa.x + wa.width - 700 });
 });
 
+test("a window flush with the screen edges keeps its size and place", async () => {
+  const { workArea: wa } = await firstStart();
+  // Snapped to the left: Windows' invisible resize border sticks out left and below the work area.
+  const saved = { x: wa.x - 7, y: wa.y, width: 600, height: wa.height + 7 };
+  const { app } = await launch(withSaved({ ...saved, maximized: false }));
+  near((await shown(app)).bounds, saved);
+});
+
 test("a window bigger than the screen is shrunk to fit", async () => {
   const { workArea: wa } = await firstStart();
   const saved = { x: wa.x, y: wa.y, width: wa.width + 500, height: 500 };
