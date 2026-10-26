@@ -164,6 +164,23 @@ test("releasing a drag above the window keeps the maximum and ends the drag", as
   await expectHeights(win, { panel: shown });
 });
 
+test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
+  const { app, win } = await started();
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(520, 480);
+    w.webContents.send("app:event", { type: "notice", message: "a long notice ".repeat(300) });
+  });
+  const root = win.getByTestId("app");
+  await expect
+    .poll(() => root.evaluate((e) => e.scrollHeight > e.clientHeight)) // the panel is cut off
+    .toBe(true);
+
+  await win.getByTestId("tab-http").focus();
+  expect(await root.evaluate((e) => e.scrollTop)).toBe(0);
+  expect((await win.locator("header").boundingBox())!.y).toBeGreaterThanOrEqual(0);
+});
+
 test("Tab moves focus past the splitter", async () => {
   const { win } = await started();
   await splitter(win).focus();
