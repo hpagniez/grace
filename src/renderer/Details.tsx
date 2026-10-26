@@ -2,6 +2,8 @@ import { createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
+import { CallDetails } from "./CallDetails";
+import { findCall } from "./http";
 import { findNode, formatMillis, leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
 
@@ -134,23 +136,32 @@ export function Details(props: { state: AppState }) {
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
       : null;
+  // The call replaces the node while the HTTP tab is up; findCall is null once the call is gone.
+  const call = () => (props.state.panel === "http" ? findCall(props.state) : null);
   return (
     <aside
       data-testid="details"
       class="min-h-0 flex-1 space-y-2 overflow-auto border-l border-zinc-200 p-3 dark:border-zinc-700"
     >
       <Show
-        when={node()}
-        fallback={<p class="text-sm text-zinc-500">Select a test to see its details</p>}
-      >
-        {(n) => (
+        when={call()}
+        fallback={
           <Show
-            when={n().kind === "scenario" || n().kind === "row"}
-            fallback={<Group node={n()} state={props.state} />}
+            when={node()}
+            fallback={<p class="text-sm text-zinc-500">Select a test to see its details</p>}
           >
-            <Leaf node={n()} state={props.state} />
+            {(n) => (
+              <Show
+                when={n().kind === "scenario" || n().kind === "row"}
+                fallback={<Group node={n()} state={props.state} />}
+              >
+                <Leaf node={n()} state={props.state} />
+              </Show>
+            )}
           </Show>
-        )}
+        }
+      >
+        {(c) => <CallDetails listed={c()} />}
       </Show>
     </aside>
   );
