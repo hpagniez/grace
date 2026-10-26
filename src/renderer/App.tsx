@@ -18,7 +18,7 @@ export function App(props: { api: Api }) {
   return (
     <div
       data-testid="app"
-      class={`flex h-screen flex-col overflow-hidden bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 ${dragging() ? "cursor-row-resize select-none" : ""}`}
+      class={`flex h-screen flex-col overflow-hidden bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 ${dragging() ? "cursor-row-resize select-none" : state.busy || state.run.active ? "cursor-progress" : ""}`}
     >
       <Toolbar state={state} api={props.api} />
       <Progress state={state} />

@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* In the base layer, so the `disabled:cursor-not-allowed` utilities still win. */
+@layer base {
+  button:enabled,
+  input[type="checkbox"]:enabled,
+  label:has(input[type="checkbox"]:enabled) {
+    cursor: pointer;
+  }
+  input:not([type]),
+  input[type="text"],
+  textarea {
+    cursor: text;
+  }
+  button:disabled,
+  input:disabled,
+  label:has(input[type="checkbox"]:disabled) {
+    cursor: not-allowed;
+  }
+}
