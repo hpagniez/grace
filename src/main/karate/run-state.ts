@@ -1,5 +1,6 @@
 import type { AppEvent, ScenarioUpdate, Summary } from "../../shared/events";
 import type { TestStatusFinal } from "../../shared/history";
+import type { HttpCall } from "../../shared/http";
 import type { Status, TestNode } from "../../shared/model";
 import type { KarateEvent } from "./events";
 import { extractCalls } from "./http";
@@ -56,7 +57,13 @@ export class RunState {
         this.status.set(key, update.status);
         updates.set(key, update);
       } else if (type === "FEATURE_EXIT") {
-        const calls = new Map(extractCalls(d).map((sc) => [sc.refId, sc.calls]));
+        // Karate's log format is not a contract: a feature whose calls cannot be read loses them, not the run its progress.
+        let calls = new Map<string, HttpCall[]>();
+        try {
+          calls = new Map(extractCalls(d).map((sc) => [sc.refId, sc.calls]));
+        } catch {
+          // no calls for this feature; every test of it still gets an empty `calls` event below
+        }
         for (const sc of extractSteps(d)) {
           const key = this.keyOf(d.relativePath, sc.refId);
           if (!key) continue;
