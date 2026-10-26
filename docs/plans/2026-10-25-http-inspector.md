@@ -23,7 +23,7 @@
   - chips `All <n>`, `<group label> <n>`
   - row: `—` badge for No response; `attempt <i> of <n>`; `via <file>:<line>`; time with `formatMillis`, `—` when none
   - empty states `No HTTP calls yet. Calls appear when a feature finishes.`, `No HTTP calls in <node name>`, `No calls in the chosen groups`
-  - details: status `<code> · <group label>` or `No response`; sections `Request`, `Response`; button `Copy as cURL`, then `Copied` for 2 s, `Copy failed` if the write rejects
+  - details: status `<code> · <group label>` or `No response`; sections `Request`, `Response`, each shown only when something is under it; button `Copy as cURL`, then `Copied` for 2 s, `Copy failed` if the write rejects
 - Never run `npm test` and `npm run e2e` at the same time.
 
 ## Review Focus
@@ -107,7 +107,7 @@
 - Consumes: Task 1 (`HttpCall`, `HttpHeader`); Task 2's event files.
 - Produces:
   - `type LoggedCall = Omit<HttpCall, "error" | "via" | "startTime">`
-  - `parseStepLog(log: string): LoggedCall[]`: spec R1 for one log: followed-redirect hops dropped, a last unanswered request kept with `status: null`, `attempt` set on every call when the log yields more than one.
+  - `parseStepLog(log: string): LoggedCall[]`: spec R1 for one log: followed-redirect hops dropped, a last unanswered request kept with `status: null`, `attempt` set on every call when the log yields more than one and all have the same method and URL.
   - `extractCalls(featureExitData: Record<string, any>): { refId: string; calls: HttpCall[] }[]`: one entry per scenario, like `extractSteps`.
 
 - [ ] **Step 1: Write the failing tests** in `src/main/karate/http.test.ts`. `parseStepLog` on inline logs (copy the spec's example as the base):
