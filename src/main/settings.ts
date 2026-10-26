@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
@@ -34,17 +34,61 @@ function read(dataDir: string): Record<string, unknown> {
     : {};
 }
 
-/** Read-modify-write, so one key never drops the others. */
+/**
+ * Read-modify-write, so one key never drops the others. Written to a temp file, flushed, then renamed
+ * over the old one: a save cut off by a crash or a power loss leaves the old file whole.
+ */
 function update(dataDir: string, change: (s: Record<string, unknown>) => void): void {
   const settings = read(dataDir);
   change(settings);
   mkdirSync(dataDir, { recursive: true });
-  writeFileSync(file(dataDir), JSON.stringify(settings));
+  const tmp = `${file(dataDir)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(settings), { flush: true });
+  renameSync(tmp, file(dataDir));
 }
 
 export function saveLastProject(dataDir: string, root: string): void {
   update(dataDir, (s) => {
     s.lastProject = root;
+  });
+}
+
+/** The window's normal-state bounds and whether it was maximized. */
+export interface WindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+}
+
+/** The saved window state, or null if none is saved, it is malformed or the file cannot be read. Never throws. */
+export function loadWindowState(dataDir: string): WindowState | null {
+  try {
+    const { window: w } = read(dataDir);
+    if (!isObject(w)) return null;
+    const { x, y, width, height, maximized } = w;
+    const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+    return finite(x) &&
+      finite(y) &&
+      finite(width) &&
+      finite(height) &&
+      width > 0 &&
+      height > 0 &&
+      typeof maximized === "boolean"
+      ? { x, y, width, height, maximized }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveWindowState(
+  dataDir: string,
+  { x, y, width, height, maximized }: WindowState,
+): void {
+  update(dataDir, (s) => {
+    s.window = { x, y, width, height, maximized };
   });
 }
 

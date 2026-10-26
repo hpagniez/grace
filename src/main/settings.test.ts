@@ -8,22 +8,31 @@ import {
   loadLastProject,
   loadProjectEnv,
   loadProjectFilter,
+  loadWindowState,
   saveLastProject,
   saveProjectEnv,
   saveProjectFilter,
+  saveWindowState,
   skippedProperties,
   type EnvSettings,
+  type WindowState,
 } from "./settings";
 
-// Set to an error code to make every readFileSync fail with it, like a file another program holds.
+// Set to an error code to make every readFileSync (or renameSync) fail with it, like a file another program holds.
 const readFails = vi.hoisted(() => ({ code: null as string | null }));
+const renameFails = vi.hoisted(() => ({ code: null as string | null }));
 vi.mock("node:fs", async (importOriginal) => {
   const fs = await importOriginal<typeof import("node:fs")>();
   const readFileSync = ((...args: Parameters<typeof fs.readFileSync>) => {
     if (readFails.code) throw Object.assign(new Error(readFails.code), { code: readFails.code });
     return fs.readFileSync(...args);
   }) as typeof fs.readFileSync;
-  return { ...fs, readFileSync };
+  const renameSync = ((...args: Parameters<typeof fs.renameSync>) => {
+    if (renameFails.code)
+      throw Object.assign(new Error(renameFails.code), { code: renameFails.code });
+    return fs.renameSync(...args);
+  }) as typeof fs.renameSync;
+  return { ...fs, readFileSync, renameSync };
 });
 
 const temps: string[] = [];
@@ -349,6 +358,84 @@ describe("settings", () => {
       e.properties.shared.push({ name: "a", value: "1" });
       e.properties.byEnv.qa = [];
       expect(emptyEnvSettings()).toEqual({ env: null, properties: { shared: [], byEnv: {} } });
+    });
+  });
+
+  describe("window state", () => {
+    const ok: WindowState = { x: -1900, y: 20, width: 700, height: 500, maximized: true };
+    const writeSettings = (data: string, text: string) =>
+      writeFileSync(path.join(data, "settings.json"), text);
+
+    it("save then load returns the window state", () => {
+      const data = tmp();
+      saveWindowState(data, ok);
+      expect(loadWindowState(data)).toEqual(ok);
+    });
+
+    it("loadWindowState reads a broken state as nothing saved", () => {
+      expect(loadWindowState(tmp())).toBeNull();
+      const { maximized: _, ...noMaximized } = ok;
+      for (const window of [
+        "abc",
+        { ...ok, width: -5 },
+        { ...ok, width: 0 },
+        { ...ok, x: "a" },
+        noMaximized,
+      ]) {
+        const data = tmp();
+        writeSettings(data, JSON.stringify({ window }));
+        expect(loadWindowState(data), JSON.stringify(window)).toBeNull();
+      }
+      const data = tmp();
+      writeSettings(
+        data,
+        '{"window":{"x":1e999,"y":0,"width":700,"height":500,"maximized":false}}',
+      );
+      expect(loadWindowState(data)).toBeNull();
+    });
+
+    it("saving the window keeps the other settings", () => {
+      const data = tmp();
+      const project = path.join(tmp(), "proj");
+      mkdirSync(project);
+      const f: FilterState = { include: ["smoke"], exclude: [], hideNonMatching: false };
+      saveLastProject(data, project);
+      saveProjectFilter(data, project, f);
+      saveWindowState(data, ok);
+      expect(loadLastProject(data)).toBe(project);
+      expect(loadProjectFilter(data, project)).toEqual(f);
+      expect(loadWindowState(data)).toEqual(ok);
+    });
+
+    it("a failed rename leaves the file as it was", () => {
+      const data = tmp();
+      const project = path.join(tmp(), "proj");
+      mkdirSync(project);
+      saveLastProject(data, project);
+      const settings = path.join(data, "settings.json");
+      const before = readFileSync(settings, "utf8");
+      renameFails.code = "EPERM";
+      try {
+        expect(() => saveWindowState(data, ok)).toThrow("EPERM");
+      } finally {
+        renameFails.code = null;
+      }
+      expect(readFileSync(settings, "utf8")).toBe(before);
+      saveWindowState(data, ok);
+      expect(loadLastProject(data)).toBe(project);
+      expect(loadWindowState(data)).toEqual(ok);
+    });
+
+    it("a leftover temp file is ignored", () => {
+      const data = tmp();
+      const project = path.join(tmp(), "proj");
+      mkdirSync(project);
+      saveLastProject(data, project);
+      writeFileSync(path.join(data, "settings.json.tmp"), "{junk");
+      expect(loadLastProject(data)).toBe(project);
+      saveWindowState(data, ok);
+      expect(loadLastProject(data)).toBe(project);
+      expect(loadWindowState(data)).toEqual(ok);
     });
   });
 });
