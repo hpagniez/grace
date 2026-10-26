@@ -111,12 +111,15 @@ test("the window cannot get too short for the layout", async () => {
   ).toBe(true);
 });
 
-/**
- * 600 px fits CI's small screen. A first-start window taller than the screen would be pulled onto it
- * at the restart (F41) and come back shorter.
- */
+/** 600 px tall fits CI's small screen, so the restart (F41) restores the same height whatever the first start's. */
 async function fitScreen(app: ElectronApplication, win: Page) {
-  await setWindowHeight(app, 600);
+  const width = await app.evaluate(
+    ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getSize()[0],
+  );
+  await app.evaluate(
+    ({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setSize(w, 600),
+    width,
+  );
   await expect.poll(() => win.evaluate(() => window.innerHeight)).toBeLessThan(600);
 }
 
