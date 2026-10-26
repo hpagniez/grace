@@ -45,6 +45,7 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F34 | Usage telemetry: track and monitor how the app is used (features used, runs, errors) | could | idea | none; needs a decision record (opt-in, what is collected, where it is sent, retention). See [notes](#f34-telemetry) | — |
 | F35 | In-app feedback: report an issue or propose an improvement, and upvote other people's ideas, from inside the app | could | idea | none; needs a tracker people can reach and a decision record: the repo is private (ADR 0007), so its GitHub Issues are not open to users. See [notes](#f35-in-app-feedback-and-voting) | — |
 | F36 | Mouse cursor matches the action: pointer on clickable items, not-allowed on disabled ones, a busy cursor while opening, discovering or running, text cursor in fields | should | idea | none (Tailwind v4's preflight gives buttons `cursor: default`; today only disabled controls set a cursor) | — |
+| F37 | Resizable bottom panel: drag a splitter between the tree and details area and the bottom panel (Console, History, HTTP) to change its height; resize with the keyboard too; a sensible minimum and maximum; the height is remembered | should | idea | none (the panel is a fixed `h-48` in `BottomPanel.tsx`, so the HTTP tab (F11) shows about 5 call rows and 13 calls already need scrolling; height saved per app in `settings.json`, next to `lastProject`) | — |
 
 ## Idea notes
 
