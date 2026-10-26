@@ -97,7 +97,7 @@ Success:
 ### R3. Runs
 
 1. Every run passes `-T <n>` with the open project's count at the moment the run starts, `-T 1` included. That covers Run all, the ▶ button on any tree node, Re-run and Re-run failed from the toolbar or the History tab. Because `-T` is always passed, it overrides a `threads` in the project's `karate-pom.json`, so the run uses exactly the count the box shows. A pom project that ran with the pom's count before F12 runs at 1 until the person changes the box.
-2. Discovery dry runs pass no `-T`. That covers open, Refresh, an environment switch and the discovery before each run.
+2. Discovery dry runs pass `-T 1`. That covers open, Refresh, an environment switch and the discovery before each run. A dry run with no `-T` takes the `threads` of a `karate-pom.json`, and its events then interleave across features, which the tree builder cannot read (found by the end-to-end test of the pom scenario).
 3. Re-run and Re-run failed use the current count, not the count stored in the run they repeat.
 
 ### R4. History
@@ -124,7 +124,7 @@ The spec author's calls:
 - One check, in main, with a plain-words notice and the box reset, instead of a second check in the renderer (R2.2).
 - The column goes after Env (R4.4).
 - `run.json` keeps `version: 1` and gets no new decision record (R4.1).
-- `-T 1` is passed explicitly (R3.1), and dry runs pass no `-T` (R3.2).
+- `-T 1` is passed explicitly (R3.1), and dry runs pass `-T 1` (R3.2).
 - The count is not added to the `runStarted` event.
 
 Resolved by the builder check (2026-10-26):
@@ -200,9 +200,9 @@ Feature: Thread count
     When I type "16" into the Threads box and press Enter
     Then the window sends the count 16 once and nothing else
 
-  Scenario: Discovery passes no thread count (unit)
+  Scenario: Discovery passes one thread (unit)
     When the command line of a dry run is built with a count of 8
-    Then it has no "-T"
+    Then it has "-T" "1"
     And the command line of a run with a count of 8 has "-T" "8"
 
   # R2: checking and saving

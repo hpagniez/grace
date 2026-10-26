@@ -81,7 +81,7 @@ export function buildArgs(o: {
   targets: string[];
   env: string | null;
   argFile: string | null;
-  /** Karate's `-T`, passed on runs only: a dry run only lists the tests. */
+  /** Karate's `-T`. A dry run always gets 1: a `threads` in karate-pom.json would interleave its events. */
   threads: number;
 }): string[] {
   return [
@@ -103,7 +103,7 @@ export function buildArgs(o: {
     "-f",
     "html,karate:jsonl",
     ...(o.env ? ["-e", o.env] : []),
-    ...(o.dryRun ? ["-D"] : ["-T", String(o.threads)]),
+    ...(o.dryRun ? ["-D", "-T", "1"] : ["-T", String(o.threads)]),
     ...o.tags,
     ...o.targets,
   ];
