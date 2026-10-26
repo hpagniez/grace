@@ -31,7 +31,7 @@ Start the app with `npm start` from the repo (or the built zip). Use a writable 
 4. Turn on **4xx**, **5xx** and **No response**. Exactly 6 rows are left: three `404` on `/nothing` (attempt 1, 2 and 3 of 3), one `500` on `/boom`, and two `—` (refused, timeout). Click **All**: 13 rows again.
    - Result: passed (checked by Tusquito, 2026-10-26).
 5. Click the scenario `retry` in the tree. The list narrows to its 3 calls. Click `http.feature`: 12 calls. Click `tests`: 13.
-   - Result: passed (checked by Tusquito, 2026-10-26). Feedback: the tab read "HTTP (13)" while the list showed 3 calls for `retry`. Changed: the tab now counts the rows the list shows (spec R3).
+   - Result: passed (checked by Tusquito, 2026-10-26). Feedback: the tab read "HTTP (13)" while the list showed 3 calls for `retry`. Changed: the tab now counts the rows the list shows (spec R3). Re-checked after the change: passed (Tusquito, 2026-10-26).
 6. Click the `POST …/echo` row (scenario `xml`). The right pane shows `POST`, the URL, `200 · 2xx Success`, the request headers, and the body indented on three lines (`<user>`, `  <name>bob</name>`, `</user>`). The response shows the same XML.
    - Result: passed (checked by Tusquito, 2026-10-26).
 7. Click the `refused` row. The pane shows `GET`, `No response`, and the error in a red box. **Copy as cURL** is disabled.
@@ -50,9 +50,9 @@ Start the app with `npm start` from the repo (or the built zip). Use a writable 
 13. Secret: click **Properties…**, add `api.token` = `s3cret-token-123` in **All environments**, tick **Secret**, and save. Run the scenario `secret header`. Its call shows `X-Token: ****`. Copy as cURL, paste it, and check it holds `****`, never `s3cret-token-123`.
     - Result: passed (checked by Tusquito, 2026-10-26).
 14. Run only `ok` (its ▶ button). The tab still reads **HTTP (13)**: other tests keep their calls, and `ok` gets a fresh one.
-    - Result: passed (checked by Tusquito, 2026-10-26). Same feedback as step 5: "HTTP (13)" was misleading with one test selected. Fixed by the same change.
+    - Result: passed (checked by Tusquito, 2026-10-26). Same feedback as step 5: "HTTP (13)" was misleading with one test selected. Fixed by the same change. Re-checked: passed.
 15. Start Run all and open the HTTP tab while it runs. Calls appear feature by feature as each feature ends.
-    - Result: changed (checked by Tusquito, 2026-10-26). Run all switched the bottom panel to Console, so the HTTP tab could not be watched filling. Changed: starting a run keeps the open tab (spec R3; run history spec R3 updated).
+    - Result: changed (checked by Tusquito, 2026-10-26). Run all switched the bottom panel to Console, so the HTTP tab could not be watched filling. Changed: starting a run keeps the open tab (spec R3; run history spec R3 updated). Re-checked after the change: passed (Tusquito, 2026-10-26).
 
 ### B. A real project of yours
 
