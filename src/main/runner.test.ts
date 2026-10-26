@@ -22,6 +22,7 @@ import type { AppEvent } from "../shared/events";
 import type { RunRecord, StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import { matchingLeaves, NO_FILTER, projectTags, type TagFilter } from "../shared/tags";
+import { THREADS_ERROR } from "../shared/threads";
 import { createRunDir, writeRunRecord } from "./history";
 import { buildArgs, detectLayout, tagArgs } from "./karate/command";
 import { readAllEvents } from "./karate/events";
@@ -29,7 +30,7 @@ import { spawnKarate } from "./karate/process";
 import { buildTree, leafKeys } from "./karate/tree";
 import { Runner } from "./runner";
 import { fakeSecretBox, type SecretBox } from "./secrets";
-import { loadProjectEnv, loadProjectFilter, saveProjectEnv } from "./settings";
+import { loadProjectEnv, loadProjectFilter, loadProjectThreads, saveProjectEnv } from "./settings";
 import { vendorPaths, type VendorPaths } from "./vendor";
 
 const vendor = vendorPaths(path.resolve("vendor"));
@@ -109,6 +110,14 @@ function hashTree(root: string): Map<string, string> {
   }
   return out;
 }
+
+/** `<dataDir>/projects/<hash>`, where the Runner keeps a project's runs and dry run. */
+const projectDir = (dataDir: string, root: string) =>
+  path.join(dataDir, "projects", createHash("sha1").update(root).digest("hex").slice(0, 12));
+
+/** The `-T` a Karate run was given, as its first SUITE_ENTER records it. */
+const suiteThreads = (file: string): number =>
+  readAllEvents(file).find((e) => e.type === "SUITE_ENTER")!.data.threads;
 
 /** Command lines of the running java.exe processes of the project at `root`. */
 const javaCommandLines = (root: string) =>
@@ -200,6 +209,7 @@ describe("Runner discovery", () => {
     expect(runner.replay()).toEqual([
       runner.current(),
       { type: "filter", filter: NO_FILTER },
+      { type: "threads", count: 1 },
       last("environment"),
       last("history"),
       { type: "busy", busy: false },
@@ -465,6 +475,7 @@ describe("Runner tag filter", () => {
       targets: featureRoots,
       env: null,
       argFile: null,
+      threads: 1,
     });
     expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
     return buildTree(readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")), "x");
@@ -573,6 +584,7 @@ describe("Runner tag filter", () => {
     expect(second.runner.replay()).toEqual([
       second.runner.current(),
       saved,
+      { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
       { type: "busy", busy: false },
@@ -633,6 +645,88 @@ describe("Runner tag filter", () => {
   });
 });
 
+describe("Runner threads", () => {
+  const eventsFile = (dataDir: string, root: string, dir: string) =>
+    path.join(projectDir(dataDir, root), dir, "karate-json", "karate-events.jsonl");
+
+  it("a run passes the count and discovery does not", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    runner.setThreads(2);
+    expect(last("threads")).toEqual({ type: "threads", count: 2 });
+    expect(loadProjectThreads(dataDir, root)).toBe(2);
+    await runner.run("d:");
+    const { runId } = last("runStarted");
+    expect(suiteThreads(eventsFile(dataDir, root, path.join("runs", runId)))).toBe(2);
+    expect(suiteThreads(eventsFile(dataDir, root, "dryrun"))).toBe(1);
+  });
+
+  it("restores the count on open, per project", T, async () => {
+    const first = setup();
+    const root = fixture("clean");
+    await first.runner.open(root);
+    first.runner.setThreads(3);
+    await first.runner.dispose();
+    const second = setup(first.dataDir);
+    await second.runner.open(root);
+    expect(second.last("threads").count).toBe(3);
+    expect(second.runner.replay()).toContainEqual({ type: "threads", count: 3 });
+    await second.runner.open(fixture("maven"));
+    expect(second.last("threads").count).toBe(1);
+  });
+
+  it("a cancelled open restores the count before", T, async () => {
+    const { runner, last } = setup();
+    await runner.open(fixture("clean"));
+    runner.setThreads(3);
+    const opening = runner.open(fixture("maven"));
+    await runner.cancel();
+    expect(await opening).toBe(false);
+    expect(last("threads").count).toBe(3);
+  });
+
+  it("refuses a count that is not a whole number from 1 to 32", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    runner.setThreads(2);
+    for (const bad of [0, 33, 2.5, NaN, "4", null, -1]) {
+      runner.setThreads(bad);
+      expect(last("notice").message).toBe(THREADS_ERROR);
+      expect(last("threads").count).toBe(2);
+      expect(loadProjectThreads(dataDir, root)).toBe(2);
+    }
+  });
+
+  it("rejects a change while busy", T, async () => {
+    const { runner, all, last } = setup();
+    await runner.open(fixture("clean"));
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    runner.setThreads(4);
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(last("threads").count).toBe(1);
+    await runner.cancel();
+    await run;
+  });
+
+  it("applies a count it cannot save", T, async () => {
+    const { runner, last, dataDir } = setup();
+    await runner.open(fixture("clean"));
+    mkdirSync(path.join(dataDir, "settings.json")); // writing a file there fails
+    runner.setThreads(4);
+    expect(last("notice").message).toContain("The thread count could not be saved");
+    expect(last("threads").count).toBe(4);
+  });
+
+  it("ignores a change with no project", () => {
+    const { runner, events } = setup();
+    runner.setThreads(4);
+    expect(events).toEqual([]);
+  });
+});
+
 describe("Runner environment", () => {
   const names = (tree: TestNode | null) =>
     tree ? matchingLeaves(tree, NO_FILTER).map((n) => n.name) : [];
@@ -651,7 +745,13 @@ describe("Runner environment", () => {
       suggestions: ["prod", "qa"],
       overlays: ["qa"],
     });
-    expect(typesAfter(events, 0)).toEqual(["project", "filter", "environment", "history"]);
+    expect(typesAfter(events, 0)).toEqual([
+      "project",
+      "filter",
+      "threads",
+      "environment",
+      "history",
+    ]);
   });
 
   it("setEnv rediscovers", T, async () => {
@@ -662,7 +762,13 @@ describe("Runner environment", () => {
     expect(names(last("project").tree)).toContain("not prod");
     const from = events.length;
     await runner.setEnv("qa");
-    expect(typesAfter(events, from)).toEqual(["project", "filter", "environment", "history"]);
+    expect(typesAfter(events, from)).toEqual([
+      "project",
+      "filter",
+      "threads",
+      "environment",
+      "history",
+    ]);
     expect(names(last("project").tree)).toContain("qa only");
     expect(last("environment").view.env).toBe("qa");
     // the tag of a scenario prod lacks is pruned, as after a Refresh
@@ -707,6 +813,7 @@ describe("Runner environment", () => {
     expect(second.runner.replay()).toEqual([
       second.runner.current(),
       { type: "filter", filter: NO_FILTER },
+      { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
       { type: "busy", busy: false },
@@ -773,6 +880,7 @@ describe("Runner environment", () => {
     expect(typesAfter(events, from)).toEqual([
       "project",
       "filter",
+      "threads",
       "environment",
       "history",
       "notice",
@@ -1235,8 +1343,6 @@ describe("Runner properties", () => {
 
 describe("Runner history", () => {
   const SECRET = "s3cret-token-123";
-  const projectDir = (dataDir: string, root: string) =>
-    path.join(dataDir, "projects", createHash("sha1").update(root).digest("hex").slice(0, 12));
   /** The run folder names of the project, oldest first. */
   const folders = (dataDir: string, root: string) => {
     try {
@@ -1437,6 +1543,7 @@ describe("Runner history", () => {
     expect(runner.replay()).toEqual([
       runner.current(),
       { type: "filter", filter: NO_FILTER },
+      { type: "threads", count: 1 },
       last("environment"),
       last("history"),
       { type: "busy", busy: false },

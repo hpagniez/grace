@@ -184,6 +184,7 @@ app.whenReady().then(async () => {
     }
     runner.setFilter(filter);
   });
+  handle(CH.threads, (n) => runner.setThreads(n));
   handle(CH.env, async (name) => {
     if (name !== null && (typeof name !== "string" || name.length > 64)) {
       emit({ type: "notice", message: "Invalid request" });

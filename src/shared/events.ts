@@ -60,6 +60,8 @@ export type AppEvent =
   | { type: "notice"; message: string }
   /** The open project's tag filter, as main holds and applies it. */
   | { type: "filter"; filter: FilterState }
+  /** The open project's thread count, as main holds it and passes to every run. */
+  | { type: "threads"; count: number }
   /** The open project's environment, suggestions and run properties, as main holds them. */
   | { type: "environment"; view: EnvView }
   /** The open project's listed runs, newest first. */

@@ -150,6 +150,7 @@ describe("buildArgs", () => {
     tags: [],
     env: null,
     argFile: null,
+    threads: 1,
   };
   const base = [
     "-Dstdout.encoding=UTF-8",
@@ -169,12 +170,18 @@ describe("buildArgs", () => {
     "html,karate:jsonl",
   ];
   it("builds the exact command line", () => {
-    expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "t1"]);
+    expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
     expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "t1"]);
+  });
+  it("passes -T on runs only", () => {
+    const run = buildArgs({ ...o, threads: 8, dryRun: false });
+    expect(run.slice(-3)).toEqual(["-T", "8", "t1"]);
+    expect(buildArgs({ ...o, threads: 8, dryRun: true })).not.toContain("-T");
   });
   it("puts the tag arguments just before the targets", () => {
     const tags = ["-t=@smoke"];
     expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([...base, "-D", ...tags, "t1"]);
+    expect(buildArgs({ ...o, dryRun: false, tags })).toEqual([...base, "-T", "1", ...tags, "t1"]);
   });
   it("puts the argument file first and -e after -f", () => {
     expect(buildArgs({ ...o, dryRun: false, env: "qa", argFile: "A.txt" })).toEqual([
@@ -182,11 +189,13 @@ describe("buildArgs", () => {
       ...base,
       "-e",
       "qa",
+      "-T",
+      "1",
       "t1",
     ]);
   });
   it("without env or argFile is unchanged", () => {
-    expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "t1"]);
+    expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
   });
 });
 

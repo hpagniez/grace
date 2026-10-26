@@ -23,6 +23,7 @@ import {
   pruneFilter,
   type FilterState,
 } from "../shared/tags";
+import { THREADS_ERROR, validThreads } from "../shared/threads";
 import {
   clearHistory as removeRuns,
   createRunDir,
@@ -51,8 +52,10 @@ import {
   emptyEnvSettings,
   loadProjectEnv,
   loadProjectFilter,
+  loadProjectThreads,
   saveProjectEnv,
   saveProjectFilter,
+  saveProjectThreads,
   skippedProperties,
   type EnvSettings,
   type StoredLists,
@@ -115,14 +118,15 @@ function storedTests(leaves: TestNode[], results: ReturnType<RunState["results"]
 }
 
 /**
- * Owns the project, its test tree, its tag filter, its environment and run properties, and the one
- * Karate process (dry run or run) at a time.
+ * Owns the project, its test tree, its tag filter, its thread count, its environment and run
+ * properties, and the one Karate process (dry run or run) at a time.
  */
 export class Runner {
   private project: Project | null = null;
   private tree: TestNode | null = null;
   private last: Extract<AppEvent, { type: "project" }> | null = null;
   private filter: FilterState = { ...NO_FILTER, include: [], exclude: [] };
+  private threads = 1;
   private envs: EnvSettings = emptyEnvSettings();
   /** Environments of overlay files and env tags, scanned at each discovery of open, refresh and setEnv. */
   private overlays: string[] = [];
@@ -169,6 +173,7 @@ export class Runner {
         { root, layout: detectLayout(root).layout },
         loadProjectFilter(this.o.dataDir, root),
         loadProjectEnv(this.o.dataDir, root),
+        loadProjectThreads(this.o.dataDir, root),
       );
       if (!opened) this.report = report;
       else if (skipped.length)
@@ -182,7 +187,9 @@ export class Runner {
 
   async refresh(): Promise<void> {
     if (this.project)
-      await this.guarded(() => this.rediscover(this.project!, this.filter, this.envs));
+      await this.guarded(() =>
+        this.rediscover(this.project!, this.filter, this.envs, this.threads),
+      );
   }
 
   /**
@@ -212,6 +219,34 @@ export class Runner {
     if (!this.project) return;
     this.storeFilter({ ...f, include: [...f.include], exclude: [...f.exclude] });
     this.sendFilter();
+  }
+
+  /**
+   * Refused while busy or for anything but a whole number from 1 to 32 (the count in force is
+   * re-sent); ignored with no project. Applied even if it cannot be saved, as the filter is.
+   */
+  setThreads(n: unknown): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      this.sendThreads();
+      return;
+    }
+    if (!this.project) return;
+    if (!validThreads(n)) {
+      this.o.emit({ type: "notice", message: THREADS_ERROR });
+      this.sendThreads();
+      return;
+    }
+    this.threads = n;
+    try {
+      saveProjectThreads(this.o.dataDir, this.project.root, n);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `The thread count could not be saved: ${(err as Error).message}`,
+      });
+    }
+    this.sendThreads();
   }
 
   /**
@@ -335,6 +370,7 @@ export class Runner {
       ? [
           this.last,
           { type: "filter", filter: this.filter },
+          { type: "threads", count: this.threads },
           this.envEvent(),
           this.historyEvent(),
           busy,
@@ -357,6 +393,10 @@ export class Runner {
 
   private sendFilter() {
     this.o.emit({ type: "filter", filter: this.filter });
+  }
+
+  private sendThreads() {
+    this.o.emit({ type: "threads", count: this.threads });
   }
 
   /** The plain value of a saved secret; null if it cannot be decrypted or Java cannot take it exactly. */
@@ -437,14 +477,16 @@ export class Runner {
 
   /**
    * Discovery of open, refresh and setEnv with `envs`, then `filter` without the tags the new tree
-   * lacks (a failed dry run drops nothing), then `environment`. `envs` replaces the environment only
-   * once the discovery succeeded, so nothing shows or uses it before. Cancel puts the project and tree
-   * from before back and re-sends them, the filter, which it leaves unchanged, and the environment.
+   * lacks (a failed dry run drops nothing), then `threads`, then `environment`. `envs` and `threads`
+   * replace those in force only once the discovery succeeded, so nothing shows or uses them before.
+   * Cancel puts the project and tree from before back and re-sends them, the filter and the thread
+   * count, which it leaves unchanged, and the environment.
    */
   private async rediscover(
     project: Project,
     filter: FilterState,
     envs: EnvSettings,
+    threads: number,
   ): Promise<boolean> {
     const before = { project: this.project, tree: this.tree };
     this.project = project;
@@ -459,6 +501,7 @@ export class Runner {
     if (!this.cancelled) {
       this.envs = envs;
       this.filter = filter;
+      this.threads = threads;
       const pruned = tree && pruneFilter(filter, projectTags(tree));
       if (
         pruned &&
@@ -467,6 +510,7 @@ export class Runner {
       )
         this.storeFilter(pruned);
       this.sendFilter();
+      this.sendThreads();
       const { classpath, featureRoots } = detectLayout(project.root);
       this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
@@ -477,6 +521,7 @@ export class Runner {
     ({ project: this.project, tree: this.tree } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
     this.sendFilter();
+    this.sendThreads();
     this.o.emit(this.envEvent());
     this.o.emit(this.historyEvent());
     this.o.emit({ type: "notice", message: "Cancelled" });
@@ -489,7 +534,7 @@ export class Runner {
    */
   private async switchEnv(env: string | null, filter: FilterState): Promise<boolean> {
     const envs = { ...this.envs, env };
-    if (!(await this.rediscover(this.project!, filter, envs))) return false;
+    if (!(await this.rediscover(this.project!, filter, envs, this.threads))) return false;
     this.report = null; // a result from another environment
     try {
       saveProjectEnv(this.o.dataDir, this.project!.root, envs);
@@ -524,6 +569,7 @@ export class Runner {
     onLines: (l: string[]) => void,
     argFile: string | null,
     filter: FilterState, // required: a run that forgot it would run unfiltered
+    threads: number, // required: a run that forgot it would run on one thread
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
@@ -540,6 +586,7 @@ export class Runner {
       tags,
       env,
       argFile,
+      threads,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
@@ -564,6 +611,7 @@ export class Runner {
         (l) => lines.push(...l),
         null,
         NO_FILTER,
+        this.threads, // buildArgs drops it on a dry run
       );
       const code = await proc.exit;
       this.proc = null;
@@ -666,7 +714,7 @@ export class Runner {
     if (!tree) return;
     const notice = (message: string) => this.o.emit({ type: "notice", message });
     const { root } = this.project!;
-    const run = { tree, filter, env, props };
+    const run = { tree, filter, threads: this.threads, env, props };
 
     if ("tests" in target) {
       // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
@@ -738,12 +786,13 @@ export class Runner {
     targets: string[];
     targetFile: boolean;
     filter: FilterState;
+    threads: number;
     env: string | null;
     props: { rows: PlainRow[]; secrets: string[] };
     selection: TestNode | null;
     failedOf: number | null;
   }): Promise<void> {
-    const { tree, leaves, filter, env, props, selection, failedOf } = o;
+    const { tree, leaves, filter, threads, env, props, selection, failedOf } = o;
     this.report = null;
     const projectDir = this.projectDir();
     const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
@@ -815,6 +864,7 @@ export class Runner {
         (lines) => emit({ type: "console", lines }),
         argFile,
         filter,
+        threads,
       );
       try {
         if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
