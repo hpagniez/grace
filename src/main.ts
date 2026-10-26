@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  screen,
   shell,
   type OpenDialogOptions,
 } from "electron";
@@ -19,13 +20,29 @@ import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
 import { Runner } from "./main/runner";
 import { safeStorageBox } from "./main/secrets";
-import { loadLastProject, saveLastProject } from "./main/settings";
+import {
+  loadLastProject,
+  loadWindowState,
+  saveLastProject,
+  saveWindowState,
+} from "./main/settings";
 import { vendorPaths } from "./main/vendor";
+import { placeWindow } from "./main/window";
 
 // End-to-end tests give each app instance its own settings and run folders.
 if (process.env.KARATE_KID_USER_DATA) app.setPath("userData", process.env.KARATE_KID_USER_DATA);
 
 let win: BrowserWindow | null = null;
+let startMaximized = false;
+
+/** Shows the window the first time, maximized if it was saved so. A minimized window was shown already. */
+const reveal = () => {
+  if (!win || win.isDestroyed() || win.isVisible() || win.isMinimized()) return;
+  if (startMaximized) {
+    win.maximize(); // shows a hidden window, but does not focus it
+    win.focus();
+  } else win.show();
+};
 
 // One instance per userData folder: a second one would kill the first one's run as an orphan
 // and share its run folders. It hands over to the first window instead.
@@ -34,7 +51,7 @@ if (!primary) app.quit();
 app.on("second-instance", () => {
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
-  win.show(); // still hidden if it has not painted yet
+  reveal(); // still hidden if it has not painted yet
   win.focus();
 });
 
@@ -44,10 +61,17 @@ const emit = (e: AppEvent) => {
   }
 };
 
-const createWindow = () => {
+const createWindow = (dataDir: string) => {
+  const saved = loadWindowState(dataDir);
+  const placed =
+    saved &&
+    placeWindow(
+      saved,
+      screen.getAllDisplays().map((d) => d.workArea),
+    );
+  startMaximized = saved?.maximized ?? false;
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...(placed ?? { width: 1200, height: 800 }),
     minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
     show: false, // shown once painted, so it never flashes white
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#18181b" : "#ffffff", // the app root's two backgrounds
@@ -61,12 +85,25 @@ const createWindow = () => {
 
   // A window that never shows would leave the app unreachable: show it anyway if the page fails or is slow.
   const w = win;
-  const reveal = () => {
-    if (!w.isDestroyed() && !w.isVisible()) w.show();
-  };
   w.once("ready-to-show", reveal);
   w.webContents.once("did-fail-load", reveal);
   setTimeout(reveal, 5000);
+
+  // Saved at the end of each move or resize by the person too, so a crash or a shutdown keeps it.
+  const save = () => {
+    try {
+      const maximized = w.isMaximized() && !w.isMinimized();
+      const bounds = maximized || w.isMinimized() ? w.getNormalBounds() : w.getBounds();
+      saveWindowState(dataDir, { ...bounds, maximized });
+    } catch (err) {
+      console.error(err); // the last saved state stays; never block the close
+    }
+  };
+  w.on("close", save)
+    .on("moved", save)
+    .on("resized", save)
+    .on("maximize", save)
+    .on("unmaximize", save);
 
   // The window only ever shows the app's own page.
   const contents = win.webContents;
@@ -191,7 +228,7 @@ app.whenReady().then(async () => {
   }
   removeLeftoverArgFiles(dataDir);
   removeLeftoverRuns(dataDir);
-  createWindow();
+  createWindow(dataDir);
   try {
     const last = loadLastProject(dataDir);
     if (last) await runner.open(last);
@@ -201,7 +238,7 @@ app.whenReady().then(async () => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      createWindow(dataDir);
     }
   });
 });
