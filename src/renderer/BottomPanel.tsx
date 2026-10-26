@@ -3,7 +3,7 @@ import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Console } from "./Console";
 import { ClearHistory, History } from "./History";
-import { totalCalls, type CallRef } from "./http";
+import { narrowedCalls, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
 import type { AppState } from "./reduce";
 
@@ -61,7 +61,7 @@ export function BottomPanel(props: {
             class={tabClass(panel() === "http")}
             onClick={() => props.showPanel("http")}
           >
-            {`HTTP (${totalCalls(props.state.calls)})`}
+            {`HTTP (${shownCalls(narrowedCalls(props.state), props.state.httpGroups).length})`}
           </button>
         </div>
         <Show when={panel() === "history"}>

@@ -252,10 +252,14 @@ describe("HTTP tab", () => {
       "5xx Server error 0",
       "No response 1",
     ]);
-    expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (4)"); // the count is the window's
+    expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (1)"); // the rows the tab shows
     fromTree("create user");
     expect(rows()).toHaveLength(3);
     expect(chipTexts()[0]).toBe("All 3");
+    expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (3)");
+    click(chip("2xx"));
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (1)"); // chips count too
   });
 
   it("shows the three empty states", () => {

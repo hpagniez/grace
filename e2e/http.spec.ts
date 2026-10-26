@@ -76,6 +76,7 @@ test("Reading the calls of one Run all", async () => {
   await test.step("The tree selection narrows the list", async () => {
     await select(win, "retry");
     await expect(rows(win)).toHaveCount(3);
+    await expect(tab(win)).toHaveText("HTTP (3)"); // the tab counts the rows it shows
     for (const status of await rows(win).evaluateAll((els) =>
       els.map((e) => e.getAttribute("data-status")),
     ))

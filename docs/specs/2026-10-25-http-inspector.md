@@ -147,7 +147,7 @@ Status classes, from the code: 100–199 **1xx Informational**, 200–299 **2xx 
 
 ### R3. HTTP tab
 
-- The bottom panel gets a third tab, **HTTP (n)**, after Console and History. n is the number of calls the window holds. The panel keeps its height. Starting a run still switches to Console.
+- The bottom panel gets a third tab, **HTTP (n)**, after Console and History. n is the number of rows the list shows: the calls under the tree selection, in the chosen status groups (the All chip's count when no group is on). The panel keeps its height. Starting a run keeps the tab that is open, so the HTTP tab can be watched filling as features end (changed after the 2026-10-26 hands-on check; it switched to Console before).
 - **Narrowing.** The list shows the calls of the tests under the tree selection: a scenario or row shows its own; an outline, feature or folder shows all under it; the root, or no selection, shows all.
 - **Rows**, in run order (the step start time, then the order in the log), one per call:
   - status: the code, or "—" for No response, on a badge coloured by class;
@@ -247,6 +247,7 @@ Feature: HTTP inspector
     When I open the HTTP tab and select the scenario "retry" in the tree
     Then the list shows 3 calls with status 404
     And they read "attempt 1 of 3", "attempt 2 of 3" and "attempt 3 of 3"
+    And the HTTP tab reads "HTTP (3)"
 
   Scenario: A call's request and response
     Given the http sample project has finished Run all
