@@ -134,7 +134,7 @@ In one step log:
 - A request with no response that is the last of the step log is a **No response** call. Its error is the step's `errorMessage` (none if the step passed).
 - A failed step whose keyword is `method` and whose log has no `request:` is one **No response** call: method from the step text (`method get` → `GET`), no URL, no request, the step's `errorMessage` as its error.
 
-Each call keeps: method; URL; request headers (name, value, in logged order); request body or none; status code, or none for No response; response headers; response body or none; response time in ms, or none; error or none; via or none; the step's start time; and, when one step logged more than one answered call (`retry until`), its attempt number and the attempt count.
+Each call keeps: method; URL; request headers (name, value, in logged order); request body or none; status code, or none for No response; response headers; response body or none; response time in ms, or none; error or none; via or none; the step's start time; and, when one step logged more than one call and every one has the same method and URL (`retry until` resends the same request), its attempt number and the attempt count. Different calls made in one step, such as two `karate.http()` calls in a JS step, are not attempts.
 
 Status classes, from the code: 100–199 **1xx Informational**, 200–299 **2xx Success**, 300–399 **3xx Redirect**, 400–499 **4xx Client error**, 500–599 **5xx Server error**. A call with no status is **No response**. A code outside 100–599 counts only in All.
 
