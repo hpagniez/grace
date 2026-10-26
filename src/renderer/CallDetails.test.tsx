@@ -71,6 +71,14 @@ const timedOut = call({
   startTime: 3,
 });
 const refused = call({ url: null, status: null, error: "Connection refused", startTime: 4 });
+// nothing logged to show under Request or Response
+const noContent = call({
+  method: "DELETE",
+  url: "http://localhost/users/7",
+  status: 204,
+  startTime: 5,
+});
+const silent = call({ url: "http://localhost/hang", status: null, error: null, startTime: 6 });
 
 function setup() {
   let emit: (e: AppEvent) => void = () => {};
@@ -85,7 +93,8 @@ function setup() {
   };
   send({ type: "project", project: { root: "D:/p", layout: "standalone" }, tree, error: null });
   send({ type: "calls", key: "s:a.feature#1", calls: [created, xml] });
-  send({ type: "calls", key: "s:a.feature#2", calls: [timedOut, refused] });
+  send({ type: "calls", key: "s:a.feature#2", calls: [timedOut, refused, noContent, silent] });
+  return { send };
 }
 
 const click = (el: HTMLElement) => {
@@ -97,6 +106,7 @@ const selectCall = (i: number) => {
   click(screen.getAllByTestId("http-call")[i]);
 };
 const id = (testid: string) => screen.getByTestId(testid);
+const heading = (name: string) => screen.queryByRole("heading", { name });
 const textOf = (testid: string) => id(testid).textContent;
 const fromTree = (name: string) => click(within(screen.getByTestId("tree")).getByText(name));
 // Let the awaited clipboard write settle, then apply what it set.
@@ -129,6 +139,8 @@ describe("call details", () => {
     // the node's own details give way to the call
     expect(screen.queryByTestId("details-location")).toBeNull();
     expect(textOf("copy-curl")).toBe("Copy as cURL");
+    expect(heading("Request")).toBeTruthy();
+    expect(heading("Response")).toBeTruthy();
   });
 
   it("indents an XML body and leaves out what the call lacks", () => {
@@ -153,6 +165,29 @@ describe("call details", () => {
     expect(textOf("call-request-headers")).toBe("Accept: */*"); // the request was logged
     expect(screen.queryByTestId("call-response-headers")).toBeNull();
     expect(screen.queryByTestId("call-response-body")).toBeNull();
+    expect(heading("Request")).toBeTruthy();
+    expect(heading("Response")).toBeTruthy(); // it holds the error
+  });
+
+  it("has no heading with nothing under it", () => {
+    setup();
+    // a 204 with no headers and no body: the status says it all
+    selectCall(4);
+    expect(textOf("call-status")).toBe("204 · 2xx Success");
+    expect(heading("Request")).toBeNull();
+    expect(heading("Response")).toBeNull();
+    // No response and no error either
+    click(screen.getAllByTestId("http-call")[5]);
+    expect(textOf("call-status")).toBe("No response");
+    expect(textOf("call-url")).toBe("http://localhost/hang");
+    expect(screen.queryByTestId("call-error")).toBeNull();
+    expect(heading("Request")).toBeNull();
+    expect(heading("Response")).toBeNull();
+    // no logged request: Response still holds the error
+    click(screen.getAllByTestId("http-call")[3]);
+    expect(heading("Request")).toBeNull();
+    expect(heading("Response")).toBeTruthy();
+    expect(textOf("call-error")).toBe("Connection refused");
   });
 
   it("copies the call as cURL", async () => {
@@ -235,5 +270,19 @@ describe("call details", () => {
     click(id("tab-console"));
     expect(screen.queryByTestId("call-details")).toBeNull();
     expect(textOf("details-location")).toBe("a.feature:3");
+  });
+
+  it("gives the pane back to the node when a new run empties its calls", () => {
+    const { send } = setup();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    fromTree("create user");
+    selectCall(0);
+    expect(screen.getByTestId("call-details")).toBeTruthy();
+    send({ type: "calls", key: "s:a.feature#1", calls: [] });
+    expect(screen.queryByTestId("call-details")).toBeNull();
+    expect(screen.queryAllByTestId("http-call")).toHaveLength(0);
+    expect(textOf("details-location")).toBe("a.feature:3");
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });
