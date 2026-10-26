@@ -54,16 +54,18 @@ export const emptyProject = () => tempDir("kk-empty-");
 
 /**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
- * first app before), and `extraEnv` added to the app's environment.
+ * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
  */
 export async function launch(
   userDataDir?: string,
   extraEnv: Record<string, string> = {},
+  opts: { colorScheme?: "light" | "dark" } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
     env: { ...process.env, ...extraEnv, KARATE_KID_USER_DATA: userData },
+    colorScheme: opts.colorScheme,
   });
   apps.push(app);
   const win = await app.firstWindow();
