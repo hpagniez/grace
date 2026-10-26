@@ -84,7 +84,7 @@ Success:
 The placement uses each connected screen's work area.
 
 1. **On a screen.** If the saved bounds overlap at least one work area, the window goes to the work area it overlaps most (by overlapping area).
-2. **Pulled fully onto it.** If the saved bounds stick out of that work area on any side, the window is moved, keeping its size, until it lies fully inside. If it is wider or taller than the work area, it is first shrunk to the work area's width or height.
+2. **Pulled fully onto it.** If the saved bounds stick out of that work area on any side, the window is moved, keeping its size, until it lies fully inside. If it is wider or taller than the work area, it is first shrunk to the work area's width or height. Windows' invisible resize border does not count as sticking out: the bounds of a window flush with a screen edge (snapped, or dragged there) reach up to 8 px past the work area on the left, right and bottom, and such a window stays exactly where it was (added after the branch review).
 3. **No screen.** If the saved bounds overlap no work area (the screen they were on is unplugged or switched off), the window opens as on a first start: 1200×800, centred on the main screen. If the state says maximized, it is maximized there, on the main screen.
 4. Maximized windows: the window is created at its placed normal bounds, on its screen, and then maximized; Windows maximizes it on the screen it is on.
 5. The placement is a pure function with no Electron import, so it can be tested with any screen layout.
@@ -254,4 +254,4 @@ Feature: Window bounds
 - Rounding: Electron's bounds are whole numbers; the placement keeps them whole. e2e checks of bounds may allow 1 px, like `e2e/panel.spec.ts`.
 - How `createWindow` gets the app data folder (it is a `const` inside the `whenReady` callback today).
 - Existing e2e specs that restart the app with the same app data folder (`panel`, `env`, `history`, `open`, `tags`) now get their window back too. They may be adjusted where the restored window changes what they measure, keeping what each one checks.
-- Mixed display scaling: if the person ever reports a wrong size after restoring onto a screen with a different scaling, the usual Electron workaround is a second `setBounds` after creation. Not built now.
+- Mixed display scaling: no workaround beyond the one below. The `BrowserWindow` constructor fits the size to the main screen's work area, so `createWindow` calls `setBounds` with the placed bounds right after it (found in the branch review); that is also the usual Electron workaround for mixed scaling, which stays unchecked.

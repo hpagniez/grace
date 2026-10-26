@@ -1,7 +1,7 @@
 # App check: window bounds (F41)
 
 Date: 2026-10-26
-Branch: `feature/window-bounds` at f0b439e
+Branch: `feature/window-bounds` at d09724e
 Machine: Windows 11 Pro 10.0.26300 (x64), Node 24.15.0, bundled Temurin 21.0.12.1 and Karate 2.1.4.
 Spec: [Window bounds](../specs/2026-10-26-window-bounds.md).
 
@@ -9,8 +9,8 @@ Spec: [Window bounds](../specs/2026-10-26-window-bounds.md).
 
 | Check | Result |
 |---|---|
-| `npm test` | 553/553 passed, including the new `src/main/window.test.ts` (11) and 5 new window-state tests in `src/main/settings.test.ts` |
-| `npm run e2e` | 85/85 passed, including the new `e2e/window.spec.ts` (11) |
+| `npm test` | 554/554 passed, including the new `src/main/window.test.ts` (12) and 5 new window-state tests in `src/main/settings.test.ts` |
+| `npm run e2e` | 86/86 passed, including the new `e2e/window.spec.ts` (12). Run with the mouse cursor off the area where test windows open: a real cursor there ends the panel splitter's synthetic drags in `e2e/panel.spec.ts` (seen on this machine, not caused by F41) |
 | `npm run typecheck`, `npm run lint` | passed |
 
 Not covered by the automated part: a second screen (the machine running the tests has one), unplugging a screen, Windows Snap, how the start looks, and a second launch while the first window is still hidden.
@@ -24,6 +24,8 @@ Build with `npm run package`, then start `out\karate-kid-win32-x64\karate-kid.ex
 1. Move the window to the second screen, resize it, close the app and start it again. It opens on the second screen at the same place and size, with no white or wrong-theme frame.
    - Result: not reported yet.
 2. Maximize it on the second screen, close the app and start it again. It opens maximized on the second screen. Unmaximize it: it goes back to the size and place it had before you maximized it.
+   - Result: not reported yet.
+3. Maximize the window on the main screen, move it to the second screen with Win+Shift+Right, close the app and start it again. It opens maximized on the second screen.
    - Result: not reported yet.
 
 ### B. The second screen is gone
