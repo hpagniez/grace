@@ -40,6 +40,7 @@ test("cursors match what a control does", async () => {
     expect(await cursor(l)).toBe("pointer");
   expect(await cursor(win.getByTestId("cancel-button"))).toBe("not-allowed");
   expect(await cursor(win.getByTestId("env-input"))).toBe("text");
+  expect(await cursor(win.getByTestId("threads-input"))).toBe("text");
   expect(await cursor(win.getByTestId("splitter"))).toBe("row-resize");
 });
 
