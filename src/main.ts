@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type OpenDialogOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  shell,
+  type OpenDialogOptions,
+} from "electron";
 import path from "node:path";
 import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
@@ -25,6 +34,7 @@ if (!primary) app.quit();
 app.on("second-instance", () => {
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
+  win.show(); // still hidden if it has not painted yet
   win.focus();
 });
 
@@ -39,6 +49,8 @@ const createWindow = () => {
     width: 1200,
     height: 800,
     minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
+    show: false, // shown once painted, so it never flashes white
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#18181b" : "#ffffff", // the app root's two backgrounds
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -46,6 +58,15 @@ const createWindow = () => {
       sandbox: true,
     },
   });
+
+  // A window that never shows would leave the app unreachable: show it anyway if the page fails or is slow.
+  const w = win;
+  const reveal = () => {
+    if (!w.isDestroyed() && !w.isVisible()) w.show();
+  };
+  w.once("ready-to-show", reveal);
+  w.webContents.once("did-fail-load", reveal);
+  setTimeout(reveal, 5000);
 
   // The window only ever shows the app's own page.
   const contents = win.webContents;

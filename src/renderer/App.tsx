@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
 import { Details } from "./Details";
@@ -12,6 +12,7 @@ import { createAppStore } from "./store";
 export function App(props: { api: Api }) {
   const { state, select, showPanel, selectCall, toggleGroup, dispose } = createAppStore(props.api);
   onCleanup(dispose);
+  onSettled(() => document.getElementById("startup")?.remove()); // index.html's startup screen
   const [height, setHeight] = createSignal(loadPanelHeight()); // read before the first paint
   const [dragging, setDragging] = createSignal(false);
   let main: HTMLElement | undefined;
