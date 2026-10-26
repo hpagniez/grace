@@ -1,5 +1,7 @@
 // Shared by main and renderer: keep this file free of Node imports.
 import type { EnvView } from "./env";
+import type { HistoryEntry } from "./history";
+import type { HttpCall } from "./http";
 import type { Layout, Status, TestNode } from "./model";
 import type { FilterState } from "./tags";
 
@@ -37,6 +39,8 @@ export type AppEvent =
   | {
       type: "runStarted";
       selection: string;
+      /** The run's folder name under `runs/`. */
+      runId: string;
       keys: string[];
       total: number;
       startedAt: number;
@@ -44,6 +48,7 @@ export type AppEvent =
     }
   | { type: "scenarios"; updates: ScenarioUpdate[] }
   | { type: "steps"; key: string; steps: Step[] }
+  | { type: "calls"; key: string; calls: HttpCall[] }
   | { type: "console"; lines: string[] }
   | {
       type: "runFinished";
@@ -57,5 +62,7 @@ export type AppEvent =
   | { type: "filter"; filter: FilterState }
   /** The open project's environment, suggestions and run properties, as main holds them. */
   | { type: "environment"; view: EnvView }
+  /** The open project's listed runs, newest first. */
+  | { type: "history"; runs: HistoryEntry[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
   | { type: "busy"; busy: boolean };

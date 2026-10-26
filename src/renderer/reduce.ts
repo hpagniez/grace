@@ -1,7 +1,10 @@
 import type { EnvView } from "../shared/env";
 import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
+import type { HistoryEntry } from "../shared/history";
+import type { HttpCall, HttpGroup } from "../shared/http";
 import type { Status, TestNode } from "../shared/model";
 import { NO_FILTER, type FilterState } from "../shared/tags";
+import type { CallRef } from "./http";
 
 export interface RunView {
   active: boolean;
@@ -13,6 +16,8 @@ export interface RunView {
   outcome: RunOutcome | null;
   summary: Summary | null;
   reportAvailable: boolean;
+  /** The run folder's name, the key of its entry in the history. */
+  runId: string | null;
   /** The environment the run in progress, or the last run, used. */
   env: string | null;
 }
@@ -23,6 +28,8 @@ export interface AppState {
   statuses: Record<string, Status>;
   results: Record<string, { durationMillis?: number; error?: string }>;
   steps: Record<string, Step[]>;
+  /** Each test's HTTP calls, in run order; cleared exactly as `steps` is. */
+  calls: Record<string, HttpCall[]>;
   console: string[];
   run: RunView;
   notice: string | null;
@@ -33,6 +40,14 @@ export interface AppState {
   env: EnvView | null;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
+  /** The open project's listed runs, newest first, as main sends them. */
+  history: HistoryEntry[];
+  /** The status groups switched on in the HTTP tab; none means All. Lasts for the session. */
+  httpGroups: HttpGroup[];
+  /** The call shown in the details pane in place of the node; null shows the node. */
+  selectedCall: CallRef | null;
+  /** The tab shown in the bottom panel. */
+  panel: "console" | "history" | "http";
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -50,6 +65,7 @@ const idleRun = (): RunView => ({
   outcome: null,
   summary: null,
   reportAvailable: false,
+  runId: null,
   env: null,
 });
 
@@ -61,6 +77,7 @@ export function initialState(): AppState {
     statuses: {},
     results: {},
     steps: {},
+    calls: {},
     console: [],
     run: idleRun(),
     notice: null,
@@ -68,6 +85,10 @@ export function initialState(): AppState {
     filter: noFilter(),
     env: null,
     busy: false,
+    history: [],
+    httpGroups: [],
+    selectedCall: null,
+    panel: "console",
   };
 }
 
@@ -87,10 +108,13 @@ export function reduce(s: AppState, e: AppEvent): void {
           statuses: {},
           results: {},
           steps: {},
+          calls: {},
           selected: null,
+          selectedCall: null,
           run: idleRun(),
           filter: noFilter(), // main's `filter` event follows
           env: null, // and its `environment` event
+          history: [], // main's `history` follows a project that opens
         });
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
@@ -102,7 +126,8 @@ export function reduce(s: AppState, e: AppEvent): void {
         return !!a && !!b && a.kind === b.kind && a.name === b.name;
       };
       if (s.selected && !same(s.selected)) s.selected = null;
-      for (const map of [s.statuses, s.results, s.steps] as Record<string, unknown>[])
+      if (s.selectedCall && !same(s.selectedCall.key)) s.selectedCall = null;
+      for (const map of [s.statuses, s.results, s.steps, s.calls] as Record<string, unknown>[])
         for (const key of Object.keys(map)) if (!same(key)) delete map[key];
       s.project = e.project;
       s.tree = e.tree;
@@ -111,11 +136,21 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     }
     case "runStarted":
-      s.run = { ...idleRun(), active: true, total: e.total, startedAt: e.startedAt, env: e.env };
+      s.run = {
+        ...idleRun(),
+        active: true,
+        total: e.total,
+        startedAt: e.startedAt,
+        runId: e.runId,
+        env: e.env,
+      };
+      // the bottom tab stays as it is, so the HTTP tab can be watched filling during the run
+      if (s.selectedCall && e.keys.includes(s.selectedCall.key)) s.selectedCall = null;
       for (const key of e.keys) {
         s.statuses[key] = "pending";
         delete s.results[key];
         delete s.steps[key];
+        delete s.calls[key];
       }
       s.console = [];
       break;
@@ -138,6 +173,9 @@ export function reduce(s: AppState, e: AppEvent): void {
     case "steps":
       s.steps[e.key] = e.steps;
       break;
+    case "calls":
+      s.calls[e.key] = e.calls;
+      break;
     case "console":
       s.console = s.console.concat(e.lines).slice(-CONSOLE_LIMIT);
       break;
@@ -151,11 +189,25 @@ export function reduce(s: AppState, e: AppEvent): void {
     case "filter":
       s.filter = e.filter;
       break;
+    case "history":
+      s.history = e.runs;
+      // the toolbar Report opens a run's report: it needs the run to still be listed with one
+      if (!e.runs.some((r) => r.id === s.run.runId && r.reportAvailable))
+        s.run.reportAvailable = false;
+      break;
     case "environment":
       if (!s.project) break; // main can still hold the previous project's view
       // a result from another environment must not pass for the state of this one
       if (s.env && s.env.env !== e.view.env)
-        Object.assign(s, { statuses: {}, results: {}, steps: {}, selected: null, run: idleRun() });
+        Object.assign(s, {
+          statuses: {},
+          results: {},
+          steps: {},
+          calls: {},
+          selected: null,
+          selectedCall: null,
+          run: idleRun(),
+        });
       s.env = e.view;
       break;
     case "busy":

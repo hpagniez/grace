@@ -1,20 +1,23 @@
 import type { AppEvent, ScenarioUpdate, Summary } from "../../shared/events";
+import type { TestStatusFinal } from "../../shared/history";
+import type { HttpCall } from "../../shared/http";
 import type { Status, TestNode } from "../../shared/model";
-import { matchingLeaves, type TagFilter } from "../../shared/tags";
 import type { KarateEvent } from "./events";
+import { extractCalls } from "./http";
 import { extractSteps } from "./steps";
 import { leafIndex } from "./tree";
 
-/** Turns Karate events into status updates for the scenarios and rows of one selection that match the filter. */
+/** Turns Karate events into status updates for the scenarios and rows with the given keys (the caller applies any filter). */
 export class RunState {
   readonly keys: string[];
   private readonly index: Map<string, TestNode>;
   private readonly status = new Map<string, Status>();
+  private readonly duration = new Map<string, number>();
   private summary: Summary | null = null;
   private suiteExit = false;
 
-  constructor(tree: TestNode, selection: TestNode, filter: TagFilter) {
-    this.keys = matchingLeaves(selection, filter).map((n) => n.key);
+  constructor(tree: TestNode, keys: string[]) {
+    this.keys = keys;
     this.index = leafIndex(tree);
   }
 
@@ -23,7 +26,7 @@ export class RunState {
     return key !== undefined && this.keys.includes(key) ? key : null;
   }
 
-  /** At most one `scenarios` event (last status per key wins), then one `steps` event per scenario. */
+  /** At most one `scenarios` event (last status per key wins), then a `steps` and a `calls` event per scenario. */
   apply(events: KarateEvent[]): AppEvent[] {
     const updates = new Map<string, ScenarioUpdate>();
     const steps: AppEvent[] = [];
@@ -48,14 +51,24 @@ export class RunState {
         if (type === "SCENARIO_EXIT") {
           update.status = d.skipped ? "notRun" : d.passed ? "passed" : "failed";
           update.durationMillis = d.durationMillis;
+          if (typeof d.durationMillis === "number") this.duration.set(key, d.durationMillis);
           if (update.status === "failed" && d.error) update.error = d.error;
         }
         this.status.set(key, update.status);
         updates.set(key, update);
       } else if (type === "FEATURE_EXIT") {
+        // Karate's log format is not a contract: a feature whose calls cannot be read loses them, not the run its progress.
+        let calls = new Map<string, HttpCall[]>();
+        try {
+          calls = new Map(extractCalls(d).map((sc) => [sc.refId, sc.calls]));
+        } catch {
+          // no calls for this feature; every test of it still gets an empty `calls` event below
+        }
         for (const sc of extractSteps(d)) {
           const key = this.keyOf(d.relativePath, sc.refId);
-          if (key) steps.push({ type: "steps", key, steps: sc.steps });
+          if (!key) continue;
+          steps.push({ type: "steps", key, steps: sc.steps });
+          steps.push({ type: "calls", key, calls: calls.get(sc.refId) ?? [] });
         }
       }
     }
@@ -78,6 +91,7 @@ export class RunState {
         ? this.keys.filter((k) => (this.status.get(k) ?? "running") === "running")
         : [...this.status].filter(([, s]) => s === "running").map(([k]) => k);
     const status = outcome === "finished" ? "notRun" : "interrupted";
+    for (const key of unended) this.status.set(key, status);
     if (unended.length)
       out.push({ type: "scenarios", updates: unended.map((key) => ({ key, status })) });
     out.push({ type: "runFinished", outcome, exitCode, summary: this.summary, reportAvailable });
@@ -95,5 +109,17 @@ export class RunState {
       });
     }
     return out;
+  }
+
+  /** Final status and duration per tracked key, as `finish` left them. Valid after `finish`: a test that never started is `notRun`. */
+  results(): Map<string, { status: TestStatusFinal; durationMillis?: number }> {
+    return new Map(
+      this.keys.map((key) => {
+        const s = this.status.get(key);
+        const status = s === undefined || s === "pending" || s === "running" ? "notRun" : s;
+        const durationMillis = this.duration.get(key);
+        return [key, durationMillis === undefined ? { status } : { status, durationMillis }];
+      }),
+    );
   }
 }

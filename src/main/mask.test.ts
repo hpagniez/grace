@@ -105,6 +105,34 @@ describe("maskEvent", () => {
     for (const [event, expected] of events) expect(maskEvent(event, mask)).toEqual(expected);
   });
 
+  it("masks a calls event", () => {
+    const call = {
+      method: "GET",
+      url: `http://h/x?t=${S}`,
+      requestHeaders: [{ name: "Authorization", value: `Bearer ${S}` }],
+      requestBody: null,
+      status: 200,
+      responseHeaders: [],
+      responseBody: null,
+      millis: 3,
+      error: null,
+      via: null,
+      startTime: 1,
+      attempt: null,
+    };
+    expect(maskEvent({ type: "calls", key: "s:a#1", calls: [call] }, mask)).toEqual({
+      type: "calls",
+      key: "s:a#1",
+      calls: [
+        {
+          ...call,
+          url: "http://h/x?t=****",
+          requestHeaders: [{ name: "Authorization", value: "Bearer ****" }],
+        },
+      ],
+    });
+  });
+
   it("masks a field it does not know, nested too", () => {
     const event = {
       type: "runFinished",
@@ -127,10 +155,11 @@ describe("maskEvent", () => {
   });
 
   it("leaves the fields the window matches on exact", () => {
-    const m = makeMasker(["a"]);
+    const m = makeMasker(["a", "2026"]);
     const started: AppEvent = {
       type: "runStarted",
       selection: "s:a#1",
+      runId: "20261025-143212-007",
       keys: ["s:a#1", "s:a#2"],
       total: 2,
       startedAt: 5,

@@ -80,6 +80,45 @@ async function main() {
     r = await karate(clean, [clean]);
     await writeSanitised(r.eventFile, "run-clean.jsonl", clean);
 
+    // The http project: every kind of call, then the same project with a `callSingle` helper in its config.
+    const http = join(work, "http");
+    await cp(join(root, "test", "fixtures", "projects", "http"), http, { recursive: true });
+    r = await karate(http, [join(http, "tests")]);
+    await writeSanitised(r.eventFile, "run-http.jsonl", http);
+    // `method post` is line 8, like create-user.feature, so a "via" line reads the same.
+    const auth = (status) =>
+      [
+        "@ignore",
+        "Feature: helper that gets a token",
+        "",
+        "Scenario:",
+        "  Given url baseUrl",
+        "  And path 'users'",
+        "  And request { name: 'token' }",
+        "  When method post",
+        `  Then status ${status}`,
+        "",
+      ].join("\n");
+    await writeFile(join(http, "auth.feature"), auth(201));
+    await writeFile(
+      join(http, "karate-config.js"),
+      [
+        "function fn() {",
+        "  var mock = karate.callSingle('classpath:start-mock.feature');",
+        "  var baseUrl = 'http://localhost:' + mock.port;",
+        "  karate.callSingle('classpath:auth.feature', { baseUrl: baseUrl });",
+        "  return { baseUrl: baseUrl };",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const shared = join(http, "tests", "shared.feature");
+    r = await karate(http, [shared]);
+    await writeSanitised(r.eventFile, "run-http-config.jsonl", http);
+    await writeFile(join(http, "auth.feature"), auth(200)); // the mock answers 201: the helper fails
+    r = await karate(http, [shared]);
+    await writeSanitised(r.eventFile, "run-http-config-fail.jsonl", http);
+
     const spikeCopy = join(work, "spike");
     await cp(join(spike, "project"), spikeCopy, { recursive: true });
     r = await karate(spikeCopy, [join(spikeCopy, "extra", "outline-sizes.feature")], {

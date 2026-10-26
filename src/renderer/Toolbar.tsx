@@ -14,6 +14,8 @@ export function Toolbar(props: { state: AppState; api: Api }) {
     !busy() &&
     !!props.state.tree &&
     matchingLeaves(props.state.tree, props.state.filter).length > 0;
+  const newest = () => props.state.history[0]; // main sends the newest run first
+  const failedCount = () => newest()?.failed ?? 0;
   return (
     <header class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
       <div class="flex min-w-0 flex-1 items-baseline gap-2">
@@ -58,6 +60,14 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         Run all
       </button>
       <button
+        data-testid="rerun-failed-button"
+        class={btn}
+        disabled={busy() || failedCount() === 0}
+        onClick={() => void props.api.rerunFailed(newest()!.id)}
+      >
+        {`Re-run failed (${failedCount()})`}
+      </button>
+      <button
         data-testid="cancel-button"
         class={btn}
         disabled={!busy()}
@@ -68,7 +78,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <button
         data-testid="report-button"
         class={btn}
-        disabled={active() || !props.state.run.reportAvailable}
+        disabled={busy() || !props.state.run.reportAvailable}
         onClick={() => void props.api.openReport()}
       >
         Report

@@ -4,7 +4,14 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TestNode } from "../../shared/model";
 import { NO_FILTER } from "../../shared/tags";
-import { buildArgs, childEnv, detectLayout, selectionTargets, tagArgs } from "./command";
+import {
+  buildArgs,
+  childEnv,
+  detectLayout,
+  lineTargets,
+  selectionTargets,
+  tagArgs,
+} from "./command";
 
 const dirs: string[] = [];
 function project(files: string[], folders: string[] = []): string {
@@ -99,6 +106,18 @@ describe("selectionTargets", () => {
     it("is null when no row matches", () => {
       expect(selectionTargets(outline(), root, roots, f("other"))).toBeNull();
     });
+  });
+});
+
+describe("lineTargets", () => {
+  const root = path.join("D:", "Mes tests", "équipe");
+  const at = (file: string, line: number) => node("scenario", file, line);
+  it("groups by file with ascending lines, files in first-seen order", () => {
+    const nodes = [at("tests/b.feature", 20), at("tests/a.feature", 12), at("tests/b.feature", 5)];
+    expect(lineTargets(nodes, root)).toEqual([
+      `${path.join(root, "tests", "b.feature")}:5:20`,
+      `${path.join(root, "tests", "a.feature")}:12`,
+    ]);
   });
 });
 

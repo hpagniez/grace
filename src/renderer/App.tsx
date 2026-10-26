@@ -1,6 +1,6 @@
 import { onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
-import { Console } from "./Console";
+import { BottomPanel } from "./BottomPanel";
 import { Details } from "./Details";
 import { FilterBar } from "./FilterBar";
 import { Progress } from "./Progress";
@@ -9,7 +9,7 @@ import { Tree } from "./Tree";
 import { createAppStore } from "./store";
 
 export function App(props: { api: Api }) {
-  const { state, select, dispose } = createAppStore(props.api);
+  const { state, select, showPanel, selectCall, toggleGroup, dispose } = createAppStore(props.api);
   onCleanup(dispose);
   return (
     <div class="flex h-screen flex-col bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
@@ -32,7 +32,13 @@ export function App(props: { api: Api }) {
           <Details state={state} />
         </div>
       </main>
-      <Console lines={state.console} />
+      <BottomPanel
+        state={state}
+        api={props.api}
+        showPanel={showPanel}
+        selectCall={selectCall}
+        toggleGroup={toggleGroup}
+      />
     </div>
   );
 }
