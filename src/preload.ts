@@ -10,6 +10,7 @@ const api: Api = {
   cancel: () => ipcRenderer.invoke(CH.cancel),
   openReport: () => ipcRenderer.invoke(CH.report),
   setFilter: (f) => ipcRenderer.invoke(CH.filter, f),
+  setThreads: (n) => ipcRenderer.invoke(CH.threads, n),
   setEnv: (name) => ipcRenderer.invoke(CH.env, name),
   saveProperties: (edit) => ipcRenderer.invoke(CH.properties, edit),
   rerun: (id) => ipcRenderer.invoke(CH.rerun, id),
