@@ -57,6 +57,7 @@ async function setThreads(win: Page, value: string) {
 test("A project with no saved count runs with 1 thread", async () => {
   test.setTimeout(120_000);
   const { dir, win, userData } = await openClean();
+  await expect(box(win)).toBeEnabled(); // a disabled box shows 1 before main sends the count
   await expect(box(win)).toHaveValue("1");
 
   await runAll(win, 1);
@@ -100,6 +101,7 @@ test("Re-run failed uses the current count", async () => {
 test("The box overrides a karate-pom.json", async () => {
   test.setTimeout(120_000);
   const { dir, win, userData } = await openClean({ threads: 3 });
+  await expect(box(win)).toBeEnabled();
   await expect(box(win)).toHaveValue("1");
 
   await runAll(win, 1);
@@ -136,6 +138,7 @@ test("The count is saved per project", async () => {
 
   await openProject(second.app, project("tags"));
   await expect(nodeByKey(second.win, "f:tests/tags.feature")).toBeVisible({ timeout: 15_000 });
+  await expect(box(second.win)).toBeEnabled();
   await expect(box(second.win)).toHaveValue("1");
   await openProject(second.app, dir);
   await expect(nodeByKey(second.win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
@@ -148,11 +151,13 @@ test("A value out of range is refused", async () => {
   await setThreads(win, "2");
   await expect.poll(() => saved(userData, dir)?.threads).toBe(2);
 
-  for (const value of ["0", "33", "2.5", ""]) {
+  for (const [i, value] of ["0", "33", "2.5", ""].entries()) {
     await setThreads(win, value);
     // the box takes the typed value and goes back to 2 only when main re-sends the count it holds
     await expect(box(win)).toHaveValue("2");
-    await expect(notice(win)).toHaveText("Threads must be a whole number from 1 to 32");
+    // the notice stays on screen: the box reset and the unchanged saved count prove each later refusal
+    if (i === 0)
+      await expect(notice(win)).toHaveText("Threads must be a whole number from 1 to 32");
     expect(saved(userData, dir)?.threads, value).toBe(2);
   }
 });

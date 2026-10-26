@@ -705,15 +705,39 @@ describe("Runner threads", () => {
   });
 
   it("rejects a change while busy", T, async () => {
-    const { runner, all, last } = setup();
-    await runner.open(fixture("clean"));
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
     const run = runner.run("f:tests/slow.feature");
     await until(() => all("runStarted").length > 0);
+    const sent = all("threads").length;
     runner.setThreads(4);
     expect(last("notice").message).toBe("A run is already in progress");
+    expect(all("threads")).toHaveLength(sent + 1); // main re-sends the count it holds
     expect(last("threads").count).toBe(1);
+    expect(loadProjectThreads(dataDir, root)).toBe(1);
     await runner.cancel();
     await run;
+  });
+
+  it("re-run uses the current count, not the run's", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    runner.setThreads(2);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const { runId } = last("runStarted");
+    runner.setThreads(1);
+    await runner.rerun(runId);
+    const second = last("runStarted").runId;
+    expect(second).not.toBe(runId);
+    const stored = (id: string) =>
+      JSON.parse(
+        readFileSync(path.join(projectDir(dataDir, root), "runs", id, "run.json"), "utf8"),
+      );
+    expect(stored(runId).threads).toBe(2);
+    expect(stored(second).threads).toBe(1);
+    expect(suiteThreads(eventsFile(dataDir, root, path.join("runs", second)))).toBe(1);
   });
 
   it("applies a count it cannot save", T, async () => {
