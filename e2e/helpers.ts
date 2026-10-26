@@ -185,6 +185,7 @@ export function seedRuns(
       startedAt,
       durationMillis: 5_000,
       env: null,
+      threads: 1,
       filter: { ...NO_FILTER },
       selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
       failedOf: null,

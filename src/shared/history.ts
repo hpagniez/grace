@@ -37,6 +37,8 @@ export interface RunRecord {
   startedAt: number;
   durationMillis: number;
   env: string | null;
+  /** The count passed with `-T`; null for a run stored before F12. */
+  threads: number | null;
   filter: FilterState;
   /** Null for a Re-run failed, whose `failedOf` is then the `startedAt` of its source run. */
   selection: StoredSelection | null;
@@ -52,6 +54,7 @@ export interface HistoryEntry {
   startedAt: number;
   durationMillis: number;
   env: string | null;
+  threads: number | null;
   filter: FilterState;
   selection: StoredSelection | null;
   failedOf: number | null;
@@ -99,6 +102,12 @@ export function parseRunRecord(x: unknown): RunRecord | null {
   if (!num(startedAt) || !num(durationMillis) || !numOrNull(failedOf) || !numOrNull(exitCode))
     return null;
   if (env !== null && !(str(env) && validEnvName(env))) return null;
+  const threads = x.threads ?? null; // a record stored before F12 has none
+  if (
+    threads !== null &&
+    !(typeof threads === "number" && Number.isInteger(threads) && threads >= 1)
+  )
+    return null;
   if (!str(outcome) || !OUTCOMES.includes(outcome)) return null;
   const filter = parseFilterState(x.filter);
   if (!filter) return null;
@@ -112,6 +121,7 @@ export function parseRunRecord(x: unknown): RunRecord | null {
     startedAt,
     durationMillis,
     env,
+    threads,
     filter,
     selection: sel,
     failedOf,
