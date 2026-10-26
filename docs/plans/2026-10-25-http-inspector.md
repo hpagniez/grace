@@ -17,7 +17,7 @@
 - Parse rules: spec R1, word for word, plus one guard (Review Focus 1): a `request:` line starts a call only when the next line matches `^\d+ > `.
 - Status groups, in this order, with these labels: `1xx Informational`, `2xx Success`, `3xx Redirect`, `4xx Client error`, `5xx Server error`, `No response`; plus `All` first. A code outside 100–599 is in no group (counts in All only).
 - Badge colours (white text, AA contrast): 1xx `bg-zinc-600`, 2xx `bg-green-700`, 3xx `bg-sky-700`, 4xx `bg-amber-700`, 5xx `bg-red-600`, No response `bg-red-900`, outside 100–599 `bg-zinc-600`.
-- cURL: `curl -X <METHOD> '<URL>'`, then ` -H '<Name>: <value>'` per request header in logged order except `Host`, `Content-Length`, `Connection` (case-insensitive), then ` --data-raw '<body>'` when there is a body, as logged. Every `'` inside a value is written `'\''`. Masked values (`***`, `****`) are copied unchanged.
+- cURL: `curl -X <METHOD> '<URL>'` (for `HEAD`, any case: `curl --head '<URL>'` and no body, because `-X HEAD` makes curl wait for a body), then ` -H '<Name>: <value>'` per request header in logged order except `Host`, `Content-Length`, `Connection` (case-insensitive), then ` --data-raw '<body>'` when there is a body, as logged. Every `'` inside a value is written `'\''`. Masked values (`***`, `****`) are copied unchanged.
 - Exact copy:
   - tab `HTTP (<n>)` after `Console` and `History (<n>)`; tablist label `Console, run history and HTTP calls`
   - chips `All <n>`, `<group label> <n>`
