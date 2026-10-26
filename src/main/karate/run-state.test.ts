@@ -81,6 +81,28 @@ describe("RunState", () => {
     });
   });
 
+  it("keeps the run going when a feature's calls cannot be read", () => {
+    const broken = structuredClone(events("run-clean.jsonl"));
+    const exit = broken.find(
+      (e) =>
+        e.type === "FEATURE_EXIT" &&
+        e.data.callDepth === 0 &&
+        e.data.relativePath === "tests/basic.feature",
+    )!;
+    // `callResults` is read only for calls, so this breaks `extractCalls` and nothing else
+    exit.data.scenarioResults[0].stepResults[0].callResults = 42;
+    const out = newState().apply(broken);
+    const of = (type: "steps" | "calls", prefix = "s:tests/basic.feature#") =>
+      out.filter((e) => e.type === type && e.key.startsWith(prefix));
+    expect(of("steps")).toHaveLength(4);
+    expect(of("calls")).toHaveLength(4);
+    for (const e of of("calls")) expect(e).toMatchObject({ calls: [] });
+    // the other features after it still send theirs, and the statuses still arrive
+    expect(of("steps", "s:tests/")).toHaveLength(9);
+    expect(of("calls", "s:tests/")).toHaveLength(9);
+    expect(updatesOf(out).filter((u) => u.status === "passed")).toHaveLength(8);
+  });
+
   it("emits no calls for called features", () => {
     const out = newState().apply(events("run-clean.jsonl"));
     const keys = out.flatMap((e) => (e.type === "calls" ? [e.key] : []));
