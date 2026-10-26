@@ -103,7 +103,7 @@ Success:
 ### R4. History
 
 1. `run.json` gets a `threads` field: the count the run passed with `-T`. `version` stays 1. App versions from before F12 ignore the field. [ADR 0010](../decisions/0010-run-history-one-folder-per-run.md) says a change to `run.json` needs a version bump, or old runs drop out of the list. An added field that old records lack and old app versions ignore drops no run, so there is no bump and no new decision record.
-2. `parseRunRecord` reads a missing `threads` as null: unknown. A run stored before F12 used Karate's default of 1, or the `threads` of the project's `karate-pom.json`, and the app recorded neither. A `threads` that is present but not a whole number of at least 1 makes the record malformed, like any other bad field. There is no upper bound, so raising `MAX_THREADS` later never hides stored runs.
+2. `parseRunRecord` reads a missing or null `threads` as null: unknown. Null is accepted so that a record survives a write and read round trip. A run stored before F12 used Karate's default of 1, or the `threads` of the project's `karate-pom.json`, and the app recorded neither. A `threads` that is present but not a whole number of at least 1 makes the record malformed, like any other bad field. There is no upper bound, so raising `MAX_THREADS` later never hides stored runs.
 3. `RunRecord.threads` and `HistoryEntry.threads` are `number | null`. Every run written from F12 on stores a number.
 4. The History tab gets a "Threads" column right after Env (`data-testid="history-threads"`). It shows the number, or "—" for null.
 
