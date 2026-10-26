@@ -22,30 +22,30 @@ Build with `npm run package`, then start `out\karate-kid-win32-x64\karate-kid.ex
 ### A. Two screens
 
 1. Move the window to the second screen, resize it, close the app and start it again. It opens on the second screen at the same place and size, with no white or wrong-theme frame.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 2. Maximize it on the second screen, close the app and start it again. It opens maximized on the second screen. Unmaximize it: it goes back to the size and place it had before you maximized it.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 3. Maximize the window on the main screen, move it to the second screen with Win+Shift+Right, close the app and start it again. It opens maximized on the second screen.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 
 ### B. The second screen is gone
 
 1. Close the app maximized on the second screen. Disconnect the second screen (or set Windows to "Show only on 1") and start the app. It opens maximized on the main screen.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 2. Reconnect the screen, move the window there not maximized, close the app, disconnect the screen again and start the app. It opens 1200×800, centred on the main screen, fully visible.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 
 ### C. Partly off the screen
 
 1. Drag the window so half of it sticks out past the second screen's outer edge (the edge with no other screen beyond it). Close the app and start it again. It opens fully on the second screen, the same size.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 
 ### D. Snapped
 
 1. Snap the window to the left half of a screen with Win+Left. Close the app and start it again. It opens at the size and place it had while snapped.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
 
 ### E. A second launch during start-up
 
 1. Maximize the window and close the app. Start it, and start it again before the window shows (double-click the exe twice quickly). One window appears, maximized, and comes to the front.
-   - Result: not reported yet.
+   - Result: passed (checked by Tusquito, 2026-10-26).
