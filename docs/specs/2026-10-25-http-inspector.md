@@ -179,7 +179,7 @@ Status classes, from the code: 100–199 **1xx Informational**, 200–299 **2xx 
 ### R5. Copy as cURL
 
 - **Copy as cURL** puts a bash-quoted command on the clipboard:
-  - `curl -X <METHOD> '<URL>'`;
+  - `curl -X <METHOD> '<URL>'`; for `HEAD` (any case) `curl --head '<URL>'` instead, with no body, because `-X HEAD` makes curl wait for a body that never comes;
   - one `-H '<Name>: <value>'` per request header, in logged order, except `Host`, `Content-Length` and `Connection`: curl sets those itself, and a stale `Content-Length` breaks the request;
   - `--data-raw '<body>'` when the request has a body, as logged (not re-indented);
   - single quotes around every value; a `'` inside is written `'\''`.
