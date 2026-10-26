@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Changed during Task 5:** discovery dry runs pass `-T 1`, not no `-T`: a `karate-pom.json` with `threads` above 1 made discovery multi-threaded and broke the tree. See spec R3.2 and commit 09ebb64. Where the plan below says `-T` goes on runs only and never on a dry run, read "runs get the count, dry runs get 1".
+
 **Goal:** A per-project Threads box in the toolbar whose count every run passes to Karate as `-T <n>`, recorded in each run's `run.json` and shown in a History column.
 
 **Architecture:** Shared rules (`MAX_THREADS`, `validThreads`) live in a new `src/shared/threads.ts`. `settings.ts` loads and saves `projects[root].threads`. The `Runner` holds the open project's count like the tag filter. It checks and saves it in `setThreads`, applies it in `rediscover`, sends a `threads` event, and passes it through `spawn` to `buildArgs`, which adds `-T` on runs only. `run.json` and `HistoryEntry` gain `threads: number | null`. The renderer keeps `threads: { count } | null` (a fresh object per event) and a `Threads` box between Env and Properties….
