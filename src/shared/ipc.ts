@@ -11,6 +11,7 @@ export const CH = {
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
+  threads: "threads:set",
   env: "env:set",
   properties: "properties:save",
   rerun: "history:rerun",
@@ -28,6 +29,7 @@ export interface Api {
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
+  setThreads(n: number): Promise<void>;
   setEnv(name: string | null): Promise<void>;
   /** True once main applied the edit; false if it refused it (a notice says why). */
   saveProperties(edit: PropertiesEdit): Promise<boolean>;

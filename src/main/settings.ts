@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "no
 import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
+import { validThreads } from "../shared/threads";
 
 const file = (dataDir: string) => path.join(dataDir, "settings.json");
 
@@ -199,6 +200,23 @@ export function loadProjectEnv(dataDir: string, root: string): EnvSettings {
   } catch {
     return emptyEnvSettings();
   }
+}
+
+/** The saved thread count of a project; 1 if none is saved, it is malformed or the file cannot be read. Never throws. */
+export function loadProjectThreads(dataDir: string, root: string): number {
+  try {
+    const entry = savedEntry(dataDir, root);
+    const threads = isObject(entry) ? entry.threads : null;
+    return validThreads(threads) ? threads : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function saveProjectThreads(dataDir: string, root: string, n: number): void {
+  updateEntry(dataDir, root, (e) => {
+    e.threads = n;
+  });
 }
 
 /** The rows of a saved list that the rules of today reject, as written. */
