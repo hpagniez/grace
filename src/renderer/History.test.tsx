@@ -135,7 +135,7 @@ describe("bottom panel tabs", () => {
     showHistory();
     // a tablist holds tabs only: Clear history sits beside it
     const tablist = screen.getByRole("tablist");
-    expect([...tablist.children].map((c) => c.getAttribute("role"))).toEqual(["tab", "tab"]);
+    expect([...tablist.children].map((c) => c.getAttribute("role"))).toEqual(["tab", "tab", "tab"]);
     expect(tablist.contains(clear())).toBe(false);
     expect(screen.getByTestId("tab-history").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("history")).toBeTruthy();
