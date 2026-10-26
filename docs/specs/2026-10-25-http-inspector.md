@@ -172,7 +172,8 @@ Status classes, from the code: 100–199 **1xx Informational**, 200–299 **2xx 
   - the test's name and location (`file:line`), and the via line when there is one;
   - **Copy as cURL** (R5);
   - **Request**: headers as `Name: value` lines in logged order, then the body;
-  - **Response**: status line, headers, body. For a No response call: the error in the red box the details pane uses for a failed test, instead of the response.
+  - **Response**: headers, body; the status is in the header above. For a No response call: the error in the red box the details pane uses for a failed test, instead of the response.
+  - The Request and Response headings show only when something is under them.
 - Bodies show in monospace, in a scrolling box. A body that parses as JSON is re-indented with 2 spaces. A body that parses as XML is indented with 2 spaces. Any other body shows as logged.
 - The pane goes back to the node details when a tree node is clicked, another bottom tab is chosen, or the selected call leaves the list (a run clears it, narrowing or a chip hides it).
 
