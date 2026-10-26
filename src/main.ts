@@ -38,6 +38,7 @@ const createWindow = () => {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
+    minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
