@@ -820,6 +820,7 @@ export class Runner {
             startedAt,
             durationMillis: Date.now() - startedAt,
             env,
+            threads,
             filter,
             selection: selection && {
               kind: selection.kind,

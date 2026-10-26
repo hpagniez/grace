@@ -33,6 +33,7 @@ const entry = (id: string, over: Partial<HistoryEntry> = {}): HistoryEntry => ({
   startedAt: at(25, 14, 32),
   durationMillis: 72_000,
   env: null,
+  threads: 1,
   filter: { include: [], exclude: [], hideNonMatching: false },
   selection: { kind: "folder", file: "", name: "clean", line: null, key: "d:" },
   failedOf: null,
@@ -221,6 +222,17 @@ describe("history list", () => {
     expect(text(2, "history-what")).toBe("Failed tests of Today 14:32");
     expect(text(2, "history-result")).toBe("Error (exit 3)");
     expect(text(2, "history-duration")).toBe("0s");
+  });
+
+  it("shows each run's thread count, or a dash", () => {
+    const { load } = setup();
+    load(entry("a", { threads: 8 }), entry("b", { threads: null }));
+    showHistory();
+    expect(
+      [...screen.getByTestId("history").querySelectorAll("th")].map((c) => c.textContent),
+    ).toEqual(["When", "Env", "Threads", "Tags", "What ran", "Result", "Duration", "Actions"]);
+    expect(text(0, "history-threads")).toBe("8");
+    expect(text(1, "history-threads")).toBe("—");
   });
 
   it("puts the path of a feature or folder in the tooltip", () => {

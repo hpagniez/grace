@@ -660,6 +660,11 @@ describe("Runner threads", () => {
     const { runId } = last("runStarted");
     expect(suiteThreads(eventsFile(dataDir, root, path.join("runs", runId)))).toBe(2);
     expect(suiteThreads(eventsFile(dataDir, root, "dryrun"))).toBe(1);
+    const stored = JSON.parse(
+      readFileSync(path.join(projectDir(dataDir, root), "runs", runId, "run.json"), "utf8"),
+    );
+    expect(stored.threads).toBe(2);
+    expect(last("history").runs[0]).toMatchObject({ id: runId, threads: 2 });
   });
 
   it("restores the count on open, per project", T, async () => {
@@ -1365,6 +1370,7 @@ describe("Runner history", () => {
         startedAt: at.getTime(),
         durationMillis: 1000,
         env: null,
+        threads: 1,
         filter: NO_FILTER,
         selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
         failedOf: null,
@@ -1400,6 +1406,7 @@ describe("Runner history", () => {
       version: 1,
       startedAt: last("runStarted").startedAt,
       env: null,
+      threads: 1,
       filter: NO_FILTER,
       selection: { kind: "folder", file: "", line: null, key: "d:" },
       failedOf: null,

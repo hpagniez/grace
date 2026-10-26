@@ -44,6 +44,7 @@ const entry = (id: string, over: Partial<HistoryEntry> = {}): HistoryEntry => ({
   startedAt: 1000,
   durationMillis: 2000,
   env: null,
+  threads: 1,
   filter: { include: [], exclude: [], hideNonMatching: false },
   selection: null,
   failedOf: null,
