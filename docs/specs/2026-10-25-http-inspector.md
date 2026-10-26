@@ -296,8 +296,9 @@ Feature: HTTP inspector
 
   Scenario: A run of one test replaces only its calls
     Given the http sample project has finished Run all
+    And the HTTP tab is open
     When I run "ok" and it finishes
-    Then the HTTP tab still reads "HTTP (13)"
+    Then the HTTP tab is still open and reads "HTTP (13)"
 ```
 
 Also automated (Vitest):
