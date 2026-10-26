@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type OpenDialogOptions } from "electron";
 import path from "node:path";
 import { parsePropertiesEdit } from "./shared/env";
 import type { AppEvent } from "./shared/events";
@@ -95,7 +95,16 @@ app.whenReady().then(async () => {
     for (const e of runner.replay()) emit(e);
   });
   handle(CH.open, async () => {
-    const r = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    // Start next to the last project, so its siblings are one click away.
+    const last = loadLastProject(dataDir);
+    const options: OpenDialogOptions = {
+      properties: ["openDirectory"],
+      ...(last ? { defaultPath: path.dirname(last) } : {}),
+    };
+    const r =
+      win && !win.isDestroyed()
+        ? await dialog.showOpenDialog(win, options)
+        : await dialog.showOpenDialog(options);
     if (r.canceled || !r.filePaths[0]) return;
     if (await runner.open(r.filePaths[0])) saveLastProject(dataDir, r.filePaths[0]);
   });

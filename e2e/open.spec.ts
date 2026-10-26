@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import path from "node:path";
 import {
   emptyProject,
@@ -7,6 +8,7 @@ import {
   nodeByKey,
   openProject,
   project,
+  recordOpenDialog,
   test,
 } from "./helpers";
 
@@ -69,4 +71,38 @@ test("Nothing to run", async () => {
   await openProject(app, dir);
   await expect(win.getByTestId("tree-message")).toHaveText("No feature files found");
   await expect(win.getByTestId("run-all-button")).toBeDisabled();
+});
+
+test("Open… starts in the last project's parent folder", async () => {
+  const dir = project("clean");
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
+  const calls = await recordOpenDialog(app);
+
+  await win.getByTestId("open-button").click();
+  await expect
+    .poll(calls)
+    .toEqual([{ parent: true, defaultPath: path.dirname(path.resolve(dir)) }]);
+});
+
+test("Open… with no last project", async () => {
+  const { app, win } = await launch();
+  const calls = await recordOpenDialog(app);
+  await win.getByTestId("open-button").click();
+  await expect.poll(calls).toEqual([{ parent: true }]);
+});
+
+test("the last project folder was deleted", async () => {
+  const dir = project("clean");
+  const first = await launch();
+  await openProject(first.app, dir);
+  await expect(nodeByKey(first.win, "d:tests")).toBeVisible({ timeout: 15_000 });
+  await first.app.close();
+  rmSync(dir, { recursive: true, force: true });
+
+  const { app, win } = await launch(first.userData);
+  const calls = await recordOpenDialog(app);
+  await win.getByTestId("open-button").click();
+  await expect.poll(calls).toEqual([{ parent: true }]);
 });
