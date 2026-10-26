@@ -82,6 +82,8 @@ const createWindow = (dataDir: string) => {
       sandbox: true,
     },
   });
+  // The constructor fits the size to the main screen's work area; setBounds keeps it.
+  if (placed) win.setBounds(placed);
 
   // A window that never shows would leave the app unreachable: show it anyway if the page fails or is slow.
   const w = win;
