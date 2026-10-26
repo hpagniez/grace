@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+@layer base {
+  /* Thin themed scrollbars everywhere: scrollbar-width is not inherited, scrollbar-color is. */
+  * {
+    scrollbar-width: thin;
+  }
+  :root {
+    scrollbar-color: var(--color-zinc-400) transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      scrollbar-color: var(--color-zinc-500) transparent;
+    }
+  }
+  /* Cursors sit in the base layer, so the `disabled:cursor-not-allowed` utilities still win. */
+  button:enabled,
+  input[type="checkbox"]:enabled,
+  label:has(input[type="checkbox"]:enabled) {
+    cursor: pointer;
+  }
+  input:not([type]),
+  input[type="text"],
+  textarea {
+    cursor: text;
+  }
+  button:disabled,
+  input:disabled,
+  label:has(input[type="checkbox"]:disabled) {
+    cursor: not-allowed;
+  }
+}

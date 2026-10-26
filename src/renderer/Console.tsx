@@ -23,7 +23,7 @@ export function Console(props: { lines: string[] }) {
       ref={(e) => (el = e)}
       data-testid="console"
       onScroll={onScroll}
-      class="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-200"
+      class="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-zinc-900 [scrollbar-color:var(--color-zinc-500)_transparent] px-3 py-2 font-mono text-xs text-zinc-200"
     >
       <For each={props.lines}>{(line) => <div class={lineClass(line)}>{line}</div>}</For>
     </div>

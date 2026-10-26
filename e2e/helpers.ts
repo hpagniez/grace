@@ -54,16 +54,18 @@ export const emptyProject = () => tempDir("kk-empty-");
 
 /**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
- * first app before), and `extraEnv` added to the app's environment.
+ * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
  */
 export async function launch(
   userDataDir?: string,
   extraEnv: Record<string, string> = {},
+  opts: { colorScheme?: "light" | "dark" } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
     env: { ...process.env, ...extraEnv, KARATE_KID_USER_DATA: userData },
+    colorScheme: opts.colorScheme,
   });
   apps.push(app);
   const win = await app.firstWindow();
@@ -77,6 +79,30 @@ export async function openProject(app: ElectronApplication, dir: string): Promis
   }, dir);
   const win = await app.firstWindow();
   await win.getByTestId("open-button").click();
+}
+
+/**
+ * Replaces the folder picker with a recorder that cancels; the returned function reads each call's
+ * parent window (whether one was passed) and starting folder.
+ */
+export async function recordOpenDialog(
+  app: ElectronApplication,
+): Promise<() => Promise<{ parent: boolean; defaultPath?: string }[]>> {
+  await app.evaluate(({ dialog }) => {
+    const calls: { parent: boolean; defaultPath?: string }[] = [];
+    (globalThis as { openDialogCalls?: typeof calls }).openDialogCalls = calls;
+    dialog.showOpenDialog = (async (...args: unknown[]) => {
+      const options = args[args.length - 1] as { defaultPath?: string };
+      calls.push({ parent: args.length === 2, defaultPath: options.defaultPath });
+      return { canceled: true, filePaths: [] };
+    }) as never;
+  });
+  return () =>
+    app.evaluate(
+      () =>
+        (globalThis as { openDialogCalls?: { parent: boolean; defaultPath?: string }[] })
+          .openDialogCalls ?? [],
+    );
 }
 
 /** Replaces `shell.openPath` with a recorder; the returned function reads the recorded paths. */
