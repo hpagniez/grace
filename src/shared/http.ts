@@ -48,10 +48,12 @@ const sq = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
 export function curlCommand(c: HttpCall): string | null {
   if (c.url === null) return null;
   const method = /^[A-Za-z]+$/.test(c.method) ? c.method : sq(c.method);
-  const parts = [`curl -X ${method} ${sq(c.url)}`];
+  // `-X HEAD` makes curl wait for a body that never comes: `--head` sends the same request and returns.
+  const head = c.method.toUpperCase() === "HEAD";
+  const parts = [head ? `curl --head ${sq(c.url)}` : `curl -X ${method} ${sq(c.url)}`];
   for (const h of c.requestHeaders)
     if (!CURL_SETS.has(h.name.toLowerCase())) parts.push(`-H ${sq(`${h.name}: ${h.value}`)}`);
-  if (c.requestBody) parts.push(`--data-raw ${sq(c.requestBody)}`);
+  if (c.requestBody && !head) parts.push(`--data-raw ${sq(c.requestBody)}`);
   return parts.join(" ");
 }
 
@@ -153,12 +155,13 @@ function indentJson(src: string): string {
 
 /** A JSON object or array re-indented with 2 spaces, well-formed XML indented; anything else as logged. */
 export function prettyBody(body: string): string {
+  let json: unknown = null;
   try {
-    const json: unknown = JSON.parse(body); // only to check the text is valid
-    // A bare scalar is left alone: there is nothing to indent.
-    if (typeof json === "object" && json !== null) return indentJson(body);
+    json = JSON.parse(body); // only to check the text is valid
   } catch {
     // not JSON: try XML
   }
+  // A bare scalar is left alone: there is nothing to indent.
+  if (typeof json === "object" && json !== null) return indentJson(body);
   return indentXml(body.trim()) ?? body;
 }
