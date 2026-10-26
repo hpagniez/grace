@@ -66,7 +66,8 @@ Starting points for the larger ideas. The spec, written just before building, de
 ### F33 Bundled dependency updates
 
 - A scheduled CI workflow checks for a newer Temurin 21 JRE (Adoptium API) and Karate release (GitHub releases). When one exists, it opens a PR that bumps the URL, file name and SHA-256 in `scripts/fetch-vendor.mjs`.
-- That PR's normal CI (unit and e2e tests with the bundled Java and Karate) is the proof that it still works. A Karate bump also re-checks the CLI flags against `RunCommand.java` and refreshes the event fixtures (AGENTS.md).
+- That PR's normal CI (unit and e2e tests with the bundled Java and Karate) is the proof that it still works. A Karate bump also re-checks the CLI flags against `RunCommand.java` and re-records the event fixtures with `npm run fixtures` (AGENTS.md).
+- A Karate bump must re-record the HTTP inspector fixtures (`test/fixtures/events/run-http*.jsonl`): F11 parses Karate's step-log text, which can change between versions. Acceptance: the re-recorded http sample project still yields the 13 calls of the F11 spec table, and `src/main/karate/http.test.ts` passes.
 - Major versions (a new Java LTS, Karate 3) stay a manual change: they can change the CLI, the event file or the JVM options.
 - Showing the bundled versions in the app helps bug reports (F35).
 
