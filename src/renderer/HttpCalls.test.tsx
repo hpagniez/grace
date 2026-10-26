@@ -294,7 +294,40 @@ describe("HTTP tab", () => {
     expect(document.activeElement).toBe(row);
   });
 
-  it("selects a row with Enter", () => {
+  it("shows the new calls in place when a test's calls are replaced", () => {
+    const { send } = setup();
+    showHttp();
+    expect(rows()).toHaveLength(4);
+    send({
+      type: "calls",
+      key: "s:tests/users.feature#1",
+      calls: [
+        call({
+          method: "PUT",
+          url: "http://localhost/users/42",
+          status: 500,
+          millis: 31,
+          startTime: 1,
+        }),
+        call({ url: "http://localhost/users/43", status: 302, millis: 4, startTime: 2 }),
+      ],
+    });
+    expect(rows()).toHaveLength(3);
+    expect(rows().map((r) => r.dataset.status)).toEqual(["500", "302", "none"]);
+    expect(text(0, "http-call-status")).toBe("500");
+    expect(text(0, "http-call-method")).toBe("PUT");
+    expect(text(0, "http-call-url")).toBe("http://localhost/users/42");
+    expect(text(0, "http-call-time")).toBe("31 ms");
+    expect(within(rows()[0]).queryByTestId("http-call-via")).toBeNull();
+    expect(text(1, "http-call-url")).toBe("http://localhost/users/43");
+    expect(text(1, "http-call-time")).toBe("4 ms");
+    expect(within(rows()[1]).queryByTestId("http-call-attempt")).toBeNull();
+    expect(text(2, "http-call-test")).toBe("list users"); // the other test's row stays
+    expect(screen.getByTestId("tab-http").textContent).toBe("HTTP (3)");
+    expect(chipTexts()[0]).toBe("All 3");
+  });
+
+  it("selects a row and marks it pressed", () => {
     setup();
     showHttp();
     const row = rows()[1];

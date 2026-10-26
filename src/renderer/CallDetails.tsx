@@ -40,6 +40,14 @@ function Message(props: {
 export function CallDetails(props: { listed: ListedCall }) {
   const call = () => props.listed.call;
   const test = () => props.listed.test;
+  // A heading shows only when something sits under it: a request logged with headers or a body, a response with
+  // headers or a body, or (no response) the error.
+  const hasRequest = () =>
+    call().url !== null && (call().requestHeaders.length > 0 || !!call().requestBody);
+  const hasResponse = () =>
+    call().status !== null
+      ? call().responseHeaders.length > 0 || !!call().responseBody
+      : !!call().error;
   const curl = createMemo(() => curlCommand(call()));
   const id = () => `${props.listed.ref.key}\n${props.listed.ref.index}`;
 
@@ -97,25 +105,25 @@ export function CallDetails(props: { listed: ListedCall }) {
       >
         {copy()?.id === id() ? copy()!.label : "Copy as cURL"}
       </button>
-      <Show when={call().url !== null}>
+      <Show when={hasRequest()}>
         <h3 class="text-sm font-semibold">Request</h3>
         <Message kind="request" headers={call().requestHeaders} body={call().requestBody} />
       </Show>
-      <h3 class="text-sm font-semibold">Response</h3>
-      <Show
-        when={call().status !== null}
-        fallback={
-          <Show when={call().error}>
+      <Show when={hasResponse()}>
+        <h3 class="text-sm font-semibold">Response</h3>
+        <Show
+          when={call().status !== null}
+          fallback={
             <pre
               data-testid="call-error"
               class="whitespace-pre-wrap rounded border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
             >
               {call().error}
             </pre>
-          </Show>
-        }
-      >
-        <Message kind="response" headers={call().responseHeaders} body={call().responseBody} />
+          }
+        >
+          <Message kind="response" headers={call().responseHeaders} body={call().responseBody} />
+        </Show>
       </Show>
     </div>
   );
