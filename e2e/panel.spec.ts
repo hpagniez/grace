@@ -123,13 +123,18 @@ test("the height survives a restart", async () => {
 
 test("a smaller window shrinks the panel without forgetting its height", async () => {
   const { app, win } = await started();
-  await dragBy(win, 308);
-  await expectHeights(win, { panel: 500 });
+  // 700 px fits CI's small screen, where an 800 px window is cut down; the target comes from the room left.
+  await setWindowHeight(app, 700);
+  await expect.poll(() => win.evaluate(() => window.innerHeight)).toBeLessThan(700);
+  const room = (await height(win.locator("main"))) + (await height(panel(win)));
+  const want = Math.round(room) - 120 - 40;
+  await dragBy(win, want - 192);
+  await expectHeights(win, { panel: want });
 
   await setWindowHeight(app, 500);
   await expectHeights(win, { main: 120 });
-  await setWindowHeight(app, 800);
-  await expectHeights(win, { panel: 500 });
+  await setWindowHeight(app, 700);
+  await expectHeights(win, { panel: want });
 });
 
 test("a bad saved height falls back to the default", async () => {
