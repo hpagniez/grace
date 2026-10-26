@@ -649,7 +649,7 @@ describe("Runner threads", () => {
   const eventsFile = (dataDir: string, root: string, dir: string) =>
     path.join(projectDir(dataDir, root), dir, "karate-json", "karate-events.jsonl");
 
-  it("a run passes the count and discovery does not", T, async () => {
+  it("a run passes the count and discovery passes 1", T, async () => {
     const { runner, last, dataDir } = setup();
     const root = fixture("clean");
     await runner.open(root);

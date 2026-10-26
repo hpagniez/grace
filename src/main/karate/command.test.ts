@@ -171,16 +171,24 @@ describe("buildArgs", () => {
   ];
   it("builds the exact command line", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
-    expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "t1"]);
+    expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "-T", "1", "t1"]);
   });
-  it("passes -T on runs only", () => {
+  it("passes the count on runs and -T 1 on dry runs", () => {
     const run = buildArgs({ ...o, threads: 8, dryRun: false });
     expect(run.slice(-3)).toEqual(["-T", "8", "t1"]);
-    expect(buildArgs({ ...o, threads: 8, dryRun: true })).not.toContain("-T");
+    const dry = buildArgs({ ...o, threads: 8, dryRun: true });
+    expect(dry.slice(-4)).toEqual(["-D", "-T", "1", "t1"]);
   });
   it("puts the tag arguments just before the targets", () => {
     const tags = ["-t=@smoke"];
-    expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([...base, "-D", ...tags, "t1"]);
+    expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([
+      ...base,
+      "-D",
+      "-T",
+      "1",
+      ...tags,
+      "t1",
+    ]);
     expect(buildArgs({ ...o, dryRun: false, tags })).toEqual([...base, "-T", "1", ...tags, "t1"]);
   });
   it("puts the argument file first and -e after -f", () => {

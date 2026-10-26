@@ -611,7 +611,7 @@ export class Runner {
         (l) => lines.push(...l),
         null,
         NO_FILTER,
-        this.threads, // buildArgs drops it on a dry run
+        this.threads, // buildArgs passes 1 on a dry run
       );
       const code = await proc.exit;
       this.proc = null;
