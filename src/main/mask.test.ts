@@ -105,6 +105,34 @@ describe("maskEvent", () => {
     for (const [event, expected] of events) expect(maskEvent(event, mask)).toEqual(expected);
   });
 
+  it("masks a calls event", () => {
+    const call = {
+      method: "GET",
+      url: `http://h/x?t=${S}`,
+      requestHeaders: [{ name: "Authorization", value: `Bearer ${S}` }],
+      requestBody: null,
+      status: 200,
+      responseHeaders: [],
+      responseBody: null,
+      millis: 3,
+      error: null,
+      via: null,
+      startTime: 1,
+      attempt: null,
+    };
+    expect(maskEvent({ type: "calls", key: "s:a#1", calls: [call] }, mask)).toEqual({
+      type: "calls",
+      key: "s:a#1",
+      calls: [
+        {
+          ...call,
+          url: "http://h/x?t=****",
+          requestHeaders: [{ name: "Authorization", value: "Bearer ****" }],
+        },
+      ],
+    });
+  });
+
   it("masks a field it does not know, nested too", () => {
     const event = {
       type: "runFinished",

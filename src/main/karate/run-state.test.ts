@@ -55,6 +55,62 @@ describe("RunState", () => {
     expect(steps.filter((e) => e.key.startsWith("s:tests/basic.feature#"))).toHaveLength(4);
   });
 
+  it("emits calls when a feature ends", () => {
+    const out = newState().apply(events("run-clean.jsonl"));
+    const callsOf = (key: string) => out.find((e) => e.type === "calls" && e.key === key);
+    const basic = out.flatMap((e) =>
+      (e.type === "steps" || e.type === "calls") && e.key.startsWith("s:tests/basic.feature#")
+        ? [e]
+        : [],
+    );
+    expect(callsOf("s:tests/basic.feature#1")).toMatchObject({
+      calls: [{ method: "GET", url: expect.stringContaining("/hello"), status: 200 }],
+    });
+    expect(callsOf("s:tests/basic.feature#3")).toMatchObject({
+      calls: [{ method: "POST", status: 201, via: "tests/common/create-user.feature:8" }],
+    });
+    expect(callsOf("s:tests/basic.feature#4")).toEqual({
+      type: "calls",
+      key: "s:tests/basic.feature#4",
+      calls: [],
+    });
+    expect(basic.filter((e) => e.type === "calls")).toHaveLength(4);
+    // each calls event comes right after the steps event of the same key
+    out.forEach((e, i) => {
+      if (e.type === "calls") expect(out[i - 1]).toMatchObject({ type: "steps", key: e.key });
+    });
+  });
+
+  it("keeps the run going when a feature's calls cannot be read", () => {
+    const broken = structuredClone(events("run-clean.jsonl"));
+    const exit = broken.find(
+      (e) =>
+        e.type === "FEATURE_EXIT" &&
+        e.data.callDepth === 0 &&
+        e.data.relativePath === "tests/basic.feature",
+    )!;
+    // `callResults` is read only for calls, so this breaks `extractCalls` and nothing else
+    exit.data.scenarioResults[0].stepResults[0].callResults = 42;
+    const out = newState().apply(broken);
+    const of = (type: "steps" | "calls", prefix = "s:tests/basic.feature#") =>
+      out.filter((e) => e.type === type && e.key.startsWith(prefix));
+    expect(of("steps")).toHaveLength(4);
+    expect(of("calls")).toHaveLength(4);
+    for (const e of of("calls")) expect(e).toMatchObject({ calls: [] });
+    // the other features after it still send theirs, and the statuses still arrive
+    expect(of("steps", "s:tests/")).toHaveLength(9);
+    expect(of("calls", "s:tests/")).toHaveLength(9);
+    expect(updatesOf(out).filter((u) => u.status === "passed")).toHaveLength(8);
+  });
+
+  it("emits no calls for called features", () => {
+    const out = newState().apply(events("run-clean.jsonl"));
+    const keys = out.flatMap((e) => (e.type === "calls" ? [e.key] : []));
+    expect(keys.some((k) => k.includes("common/create-user") || k.includes("start-mock"))).toBe(
+      false,
+    );
+  });
+
   // The spike sample (taskkill during tests/slow.feature) has the same slow.feature refIds as the clean tree.
   it("finish after cancel interrupts running scenarios", () => {
     const state = newState();
