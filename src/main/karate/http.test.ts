@@ -97,6 +97,17 @@ describe("parseStepLog", () => {
     expect(calls[0].responseBody).toBeNull();
   });
 
+  it("does not call two different requests in one log attempts", () => {
+    const pair = (n: number, method: string, url: string) =>
+      `request:\n${n} > ${method} ${url}\n${n} > Host: h\n\nresponse time in milliseconds: ${n}\n${n} < 200 ${method} ${url}\n${n} < Content-Length: 0\n\n`;
+    const calls = parseStepLog(pair(1, "GET", "http://h/hello") + pair(2, "GET", "http://h/boom"));
+    expect(calls.map((c) => c.url)).toEqual(["http://h/hello", "http://h/boom"]);
+    expect(calls.map((c) => c.attempt)).toEqual([null, null]);
+    // the same URL with another method is not a retry either
+    const other = parseStepLog(pair(1, "GET", "http://h/x") + pair(2, "POST", "http://h/x"));
+    expect(other.map((c) => c.attempt)).toEqual([null, null]);
+  });
+
   it("pairs a response with the request of the same number", () => {
     const log =
       "request:\n1 > GET http://h/a\n1 > Host: h\n\n" +
@@ -108,10 +119,7 @@ describe("parseStepLog", () => {
       ["http://h/a", 404, 7, "one"],
       ["http://h/b", 200, 5, "two"],
     ]);
-    expect(calls.map((c) => c.attempt)).toEqual([
-      { n: 1, of: 2 },
-      { n: 2, of: 2 },
-    ]);
+    expect(calls.map((c) => c.attempt)).toEqual([null, null]); // two URLs: not attempts
   });
 
   it("drops a followed redirect's unanswered request", () => {
@@ -138,6 +146,26 @@ describe("parseStepLog", () => {
         attempt: null,
       },
     ]);
+  });
+
+  it("keeps a response time line with no response line after it as body text", () => {
+    const log =
+      "request:\n1 > POST http://h/x\n1 > Host: h\nresponse time in milliseconds: 3\nrest\n\n" +
+      "response time in milliseconds: 4\n1 < 200 POST http://h/x\n1 < Content-Length: 0\n";
+    const [call, ...more] = parseStepLog(log);
+    expect(more).toEqual([]);
+    expect(call.requestBody).toBe("response time in milliseconds: 3\nrest");
+    expect(call).toMatchObject({ status: 200, millis: 4 });
+  });
+
+  it("drops a response whose number matches no request", () => {
+    const log =
+      "request:\n1 > GET http://h/a\n1 > Host: h\n\n" +
+      "response time in milliseconds: 2\n7 < 500 GET http://h/z\n7 < Content-Length: 0\n\n" +
+      "response time in milliseconds: 3\n1 < 200 GET http://h/a\n1 < Content-Length: 0\n";
+    const calls = parseStepLog(log);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ url: "http://h/a", status: 200, millis: 3, attempt: null });
   });
 
   it("finds nothing in a log without request:", () => {

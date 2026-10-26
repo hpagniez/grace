@@ -86,7 +86,12 @@ export function parseStepLog(log: string): LoggedCall[] {
   const calls = requests
     .filter((r, k) => r.call.status !== null || k === requests.length - 1)
     .map((r) => r.call);
-  if (calls.length > 1) calls.forEach((c, k) => (c.attempt = { n: k + 1, of: calls.length }));
+  // Retries resend one request: several calls to different requests are separate calls, not attempts.
+  if (
+    calls.length > 1 &&
+    calls.every((c) => c.method === calls[0].method && c.url === calls[0].url)
+  )
+    calls.forEach((c, k) => (c.attempt = { n: k + 1, of: calls.length }));
   return calls;
 }
 
