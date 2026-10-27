@@ -35,7 +35,7 @@ Backlog of what karate-kid does or will do. One row per user-facing capability.
 | F24 | Console that reads as a terminal: monospace on a dark panel, clearly separated from the rest, legible in dark mode | should | idea | console lines only (as F06) | — |
 | F25 | Custom window title bar instead of the default Electron frame | could | idea | none (Electron frameless window with its own drag region and window buttons) | — |
 | F26 | App updates: how a new version reaches people who installed the zip (auto-update, or an update notice with a download link) | should | idea | none; needs a decision record (Squirrel/installer vs zip, GitHub Releases on a private repo, signing) | — |
-| F27 | Home screen: choose a project folder, with the list of recently opened folders | should | idea | none (recent folders saved in `settings.json`, next to `lastProject`) | — |
+| F27 | Home screen: choose a project folder, with the list of recently opened folders | should | specced | none (recent folders saved in `settings.json`, next to `lastProject`) | [spec](specs/2026-10-27-home-screen.md) |
 | F28 | Feature file editor in the app, with Karate autocompletion | could | idea | Karate keywords and `karate.*` API from [inventory/karate-core.md](inventory/karate-core.md); parse errors from a dry run (exit 3) | — |
 | F29 | Loading always visible: a loader or animation while opening, discovering, saving and running | should | idea | none (the Runner's `busy` state and run progress) | — |
 | F30 | Toolbar that stays readable with a long project path: less crowded layout for the path and the buttons | should | idea | none | — |
