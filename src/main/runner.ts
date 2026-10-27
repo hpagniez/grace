@@ -150,7 +150,8 @@ export class Runner {
   private disposing = false;
   private report: string | null = null;
   private readonly pidFile: string;
-  private readonly sendRecent: () => Promise<void>;
+  /** Checks the saved recent list and emits it as a `recent` event; main calls it after the `ready` replay. */
+  readonly sendRecent: () => Promise<void>;
 
   constructor(
     private readonly o: {

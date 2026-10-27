@@ -18,12 +18,13 @@ import { parseFilterState } from "./shared/tags";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
+import { checkRecent } from "./main/recent";
 import { Runner } from "./main/runner";
 import { safeStorageBox } from "./main/secrets";
 import {
   loadLastProject,
+  loadRecentProjects,
   loadWindowState,
-  saveOpenedProject,
   saveWindowState,
 } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
@@ -141,6 +142,13 @@ const handleRunId = (channel: string, fn: (id: string) => unknown) =>
     emit({ type: "notice", message: "Invalid request" });
   });
 
+/** Recent-list requests carry a folder path only: anything else is refused before the Runner sees it. */
+const handlePath = (channel: string, fn: (root: string) => unknown) =>
+  handle(channel, (root) => {
+    if (typeof root === "string" && root.length <= 1000) return fn(root);
+    emit({ type: "notice", message: "Invalid request" });
+  });
+
 app.whenReady().then(async () => {
   if (!primary) return;
   // No menu: its Reload would drop the window's view of a live run.
@@ -153,21 +161,25 @@ app.whenReady().then(async () => {
 
   handle(CH.ready, () => {
     for (const e of runner.replay()) emit(e);
+    void runner.sendRecent();
   });
   handle(CH.open, async () => {
-    // Start next to the last project, so its siblings are one click away.
-    const last = loadLastProject(dataDir);
+    // Start next to the newest recent folder that still exists, so its siblings are one click away.
+    const newest = (await checkRecent(loadRecentProjects(dataDir))).find((r) => r.exists);
     const options: OpenDialogOptions = {
       properties: ["openDirectory"],
-      ...(last ? { defaultPath: path.dirname(last) } : {}),
+      ...(newest ? { defaultPath: path.dirname(newest.path) } : {}),
     };
     const r =
       win && !win.isDestroyed()
         ? await dialog.showOpenDialog(win, options)
         : await dialog.showOpenDialog(options);
     if (r.canceled || !r.filePaths[0]) return;
-    if (await runner.open(r.filePaths[0])) saveOpenedProject(dataDir, r.filePaths[0]);
+    await runner.open(r.filePaths[0]);
   });
+  handlePath(CH.openRecent, (root) => runner.openRecent(root));
+  handlePath(CH.removeRecent, (root) => runner.removeRecent(root));
+  handle(CH.close, () => runner.close());
   handle(CH.refresh, () => runner.refresh());
   handle(CH.run, async (key) => {
     if (typeof key !== "string" || key.length > 1000 || !/^[dfos]:/.test(key)) {
