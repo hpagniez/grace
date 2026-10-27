@@ -79,7 +79,7 @@ export async function launch(
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
-    env: { ...process.env, ...extraEnv, KARATE_KID_USER_DATA: userData },
+    env: { ...process.env, ...extraEnv, GRACE_USER_DATA: userData },
     colorScheme: opts.colorScheme,
   });
   apps.push(app);

@@ -31,7 +31,7 @@ import { vendorPaths } from "./main/vendor";
 import { placeWindow } from "./main/window";
 
 // End-to-end tests give each app instance its own settings and run folders.
-if (process.env.KARATE_KID_USER_DATA) app.setPath("userData", process.env.KARATE_KID_USER_DATA);
+if (process.env.GRACE_USER_DATA) app.setPath("userData", process.env.GRACE_USER_DATA);
 
 let win: BrowserWindow | null = null;
 let startMaximized = false;
