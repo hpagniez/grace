@@ -34,6 +34,11 @@ export interface Project {
   root: string;
   layout: Layout;
 }
+/** A saved recent folder and whether it is still a folder on disk. */
+export interface RecentEntry {
+  path: string;
+  exists: boolean;
+}
 export type AppEvent =
   | { type: "project"; project: Project | null; tree: TestNode | null; error: string | null }
   | {
@@ -67,4 +72,8 @@ export type AppEvent =
   /** The open project's listed runs, newest first. */
   | { type: "history"; runs: HistoryEntry[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
-  | { type: "busy"; busy: boolean };
+  | { type: "busy"; busy: boolean }
+  /** The folder main is opening, or null. Sent around each open and in every replay. */
+  | { type: "opening"; root: string | null }
+  /** The saved recent folders, newest first, each checked for existence. */
+  | { type: "recent"; entries: RecentEntry[] };
