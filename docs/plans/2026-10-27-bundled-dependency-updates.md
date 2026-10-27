@@ -10,6 +10,8 @@
 
 **Spec:** [docs/specs/2026-10-27-bundled-dependency-updates.md](../specs/2026-10-27-bundled-dependency-updates.md)
 
+**After the final review:** Tasks 3 and 4 changed as the spec's "Changes from the final review" says: `openBumpPr(o, run)` with an injectable runner, `supersedePlan(prs, dep, to, commitsOf)`, `runCommandStatus(filenames)`, and a `karate-pr` Linux job after the read-only Windows job.
+
 ## Global Constraints
 
 - No new dependency. Scripts are plain `.mjs` with JSDoc, like `scripts/fetch-vendor.mjs` and `scripts/check-pr.mjs`.
