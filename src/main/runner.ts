@@ -13,7 +13,7 @@ import {
   type RowView,
 } from "../shared/env";
 import type { AppEvent, Project } from "../shared/events";
-import type { RunRecord, StoredTest } from "../shared/history";
+import { toEntry, type RunRecord, type StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import {
   matches,
@@ -25,13 +25,15 @@ import {
 } from "../shared/tags";
 import { THREADS_ERROR, validThreads } from "../shared/threads";
 import { projectFingerprint } from "./fingerprint";
+import { findFlaky } from "./flaky";
 import {
   clearHistory as removeRuns,
   createRunDir,
-  listHistory,
+  listRuns,
   pruneHistory,
   readRunRecord,
   writeRunRecord,
+  type ListedRun,
 } from "./history";
 import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import { buildArgs, detectLayout, lineTargets, selectionTargets, tagArgs } from "./karate/command";
@@ -343,7 +345,7 @@ export class Runner {
     // the toolbar Report stays: reportPath() checks the file, which a held folder can keep
     if (!removeRuns(this.projectDir()))
       this.o.emit({ type: "notice", message: "Some runs could not be deleted" });
-    this.o.emit(this.historyEvent());
+    this.sendHistory();
   }
 
   /** The report of a listed run of the open project (R4); null if it has none. Never takes a path. */
@@ -377,7 +379,7 @@ export class Runner {
           { type: "filter", filter: this.filter },
           { type: "threads", count: this.threads },
           this.envEvent(),
-          this.historyEvent(),
+          ...this.historyEvents(),
           busy,
         ]
       : [busy];
@@ -395,6 +397,7 @@ export class Runner {
   private publish(e: Extract<AppEvent, { type: "project" }>) {
     this.last = e;
     this.o.emit(e);
+    this.o.emit(this.flakyEvent(this.listed())); // the marks follow the tree that is shown
   }
 
   private sendFilter() {
@@ -446,9 +449,26 @@ export class Runner {
     };
   }
 
-  /** The open project's runs, newest first; none with no project. */
-  private historyEvent(): AppEvent {
-    return { type: "history", runs: this.project ? listHistory(this.projectDir()) : [] };
+  /** The open project's listed runs, newest first; none with no project. */
+  private listed(): ListedRun[] {
+    return this.project ? listRuns(this.projectDir()) : [];
+  }
+
+  private flakyEvent(runs: ListedRun[]): AppEvent {
+    return { type: "flaky", tests: findFlaky(runs, this.tree) };
+  }
+
+  /** `history`, then `flaky`, from one read of the runs. */
+  private historyEvents(): AppEvent[] {
+    const runs = this.listed();
+    return [
+      { type: "history", runs: runs.map((r) => toEntry(r.id, r.record, r.reportAvailable)) },
+      this.flakyEvent(runs),
+    ];
+  }
+
+  private sendHistory() {
+    for (const e of this.historyEvents()) this.o.emit(e);
   }
 
   /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
@@ -521,7 +541,7 @@ export class Runner {
       this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
-      this.o.emit(this.historyEvent());
+      this.sendHistory();
       return true;
     }
     ({ project: this.project, tree: this.tree } = before);
@@ -529,7 +549,7 @@ export class Runner {
     this.sendFilter();
     this.sendThreads();
     this.o.emit(this.envEvent());
-    this.o.emit(this.historyEvent());
+    this.sendHistory();
     this.o.emit({ type: "notice", message: "Cancelled" });
     return false;
   }
@@ -854,7 +874,7 @@ export class Runner {
           };
           writeRunRecord(outDir, record);
           pruneHistory(projectDir);
-          this.o.emit(this.historyEvent());
+          this.sendHistory();
         } catch (err) {
           emit({
             type: "notice",
