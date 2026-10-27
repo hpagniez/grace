@@ -2090,6 +2090,21 @@ describe("Runner history", () => {
     await run;
   });
 
+  it("a first walk that gave null skips the second", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return null;
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+
   it("the second walk comes before runFinished", T, async () => {
     let walks = 0;
     let finishedAtSecondWalk: boolean | undefined;
