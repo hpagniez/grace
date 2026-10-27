@@ -32,7 +32,7 @@ Backlog of what Grace does or will do. One row per user-facing capability.
 | F21 | AI / MCP control of the runner | could | idea | — | — |
 | F22 | Console filter and search | could | idea | console lines only; Karate log lines carry no scenario id | — |
 | F23 | Tag filter AND and typed Karate tag expressions | could | idea | repeated `-t` (AND); JS `anyOf`/`allOf`/`not`, validated by a `-t` dry run | — |
-| F24 | Console that reads as a terminal: a startup banner (app, Karate and Java versions, project, tests found) and a state line ("Ready", "Starting Karate…") instead of an empty black box, on a panel darker than the window in dark mode | should | building | console lines only (as F06); versions from the pins in `scripts/vendor.json`, built into the renderer at build time | [spec](specs/2026-10-27-console-banner.md) |
+| F24 | Console that reads as a terminal: a startup banner (app, Karate and Java versions, project, tests found) and a state line ("Ready", "Starting Karate…") instead of an empty black box, on a panel darker than the window in dark mode | should | done | console lines only (as F06); versions from the pins in `scripts/vendor.json`, built into the renderer at build time | [spec](specs/2026-10-27-console-banner.md) |
 | F25 | Custom window title bar instead of the default Electron frame | could | idea | none (Electron frameless window with its own drag region and window buttons) | — |
 | F26 | App updates: how a new version reaches people who installed the zip (auto-update, or an update notice with a download link) | should | idea | none; needs a decision record (Squirrel/installer vs zip, GitHub Releases on a private repo, signing) | — |
 | F27 | Home screen: choose a project folder, with the list of recently opened folders | should | done | none (recent folders saved in `settings.json`, next to `lastProject`) | [spec](specs/2026-10-27-home-screen.md) |
@@ -52,6 +52,8 @@ Backlog of what Grace does or will do. One row per user-facing capability.
 | F41 | Remember the window: size, position, maximized state and screen, restored at the next start; back on the main screen when the saved screen is gone | should | done | none (the normal bounds and the maximized state, per app, in `settings.json` next to `lastProject`, saved on close and at the end of each move, resize, maximize or unmaximize; restored before the window shows; a window partly off its screen is pulled onto it, one on no screen opens as on a first start. Every `settings.json` save becomes atomic. Seen in the [UI polish check](checks/2026-10-26-ui-polish.md)) | [spec](specs/2026-10-26-window-bounds.md) |
 | F42 | Trends: pass rate and duration over time, for the suite and per test (split from F15) | could | idea | aggregate stored run history (F10); 20 runs per project unless a decision record widens the storage | — |
 | F43 | Reorder the bottom panel tabs (Console, History, HTTP): drag a tab left or right to change its place; the order is remembered | could | idea | none (the three tabs are hard-coded in order in `src/renderer/BottomPanel.tsx`; order saved in the renderer's `localStorage` like the panel height (F37); keyboard users need a way too, for example Alt+Left/Right on the focused tab) | — |
+| F44 | Faster CI without dropping a test: unit and e2e tests in separate parallel jobs, then each suite split over two jobs; a ready PR from about 20 to about 7 minutes, a draft PR from about 8.5 to about 5 | should | idea | none (CI and test layout only: `.github/workflows/test.yml`, `merge-when-green.yml`, `src/main/runner.test.ts`; needs a decision record that supersedes ADR 0007's one-job rule). See [notes](#f44-faster-ci) | — |
+| F45 | No Solid dev warnings in the unit test log: fix the `STRICT_READ_UNTRACKED` sources in `Threads.tsx` and in `Console.test.tsx`'s fake layout getters; keep the one `HUGE_FAN_IN` of the 500-row properties test | should | idea | none (renderer code and tests only). See [notes](#f45-solid-warnings-in-the-test-log) | — |
 
 ## Idea notes
 
@@ -91,3 +93,23 @@ Starting points for the larger ideas. The spec, written just before building, de
 - Voting needs identities, or another way to stop repeat votes. Options for the decision record: GitHub Issues or Discussions once the repo is public (people need a GitHub account; votes are reactions), or a hosted feedback board.
 - A first step can be a link with prefilled text, before any UI of our own.
 - One place for "about, feedback, privacy" ties this to F26 (update notices) and F34 (telemetry consent).
+
+### F44 Faster CI
+
+Measurements, causes and estimates: [research note](research/2026-10-27-ci-test-speed.md).
+
+- Today one Windows job runs `npm test` (about 7.8 minutes, 422 s of it in `src/main/runner.test.ts`) and then `e2e` (about 11 minutes). The runner has 2 CPUs because the repo is private, and the Java tests are CPU-bound: two at once on one runner are only 15 % faster. More jobs help; more workers on one runner barely do.
+- Step 1: `unit` and `e2e` as two jobs in `test.yml`. Ready PR about 20 → 12 minutes. A new decision record supersedes ADR 0007's "one Windows job runs both suites in turn".
+- Step 2: split `runner.test.ts` into files by `describe` block, then run `unit` as a two-job matrix with explicit file lists (not `vitest --shard`, which splits by file count). Draft PR about 8.5 → 5 minutes.
+- Step 3: `e2e` as a two-job matrix (`playwright test --shard=i/2`). `merge-when-green.yml` must then require every `e2e` step, not only the first. Ready PR about 12 → 7 minutes.
+- About 3 more billed Windows minutes per ready run (21 → 24). Separate VMs keep the global `java.exe` leak checks valid, so no test changes its assertions.
+- Later, could: leak checks scoped to each test's own folders, so Java test files can also run in parallel on one machine (mostly a local speed-up), and a spike on a cheaper JVM start (a class-data archive for the Karate jar), which would also speed up the app's dry runs.
+
+### F45 Solid warnings in the test log
+
+Details and the exact changes: [research note, section 4](research/2026-10-27-ci-test-speed.md#4-solid-warnings-in-the-npm-test-log).
+
+- `src/renderer/Threads.tsx:16`: the effect reads `count` in its untracked function. It works only because every `threads` event brings a fresh object. Read `count` in the compute function.
+- `src/renderer/Console.test.tsx`: the three fake `scrollHeight` getters read a signal or the store, and `Console.tsx` reads `scrollHeight` in an effect. Wrap the getters in `untrack`. `Console.tsx` stays as it is.
+- `HUGE_FAN_IN` in `PropertiesDialog.tsx`'s `errors` memo: only with more than 500 rows, which the list refuses anyway. Keep it.
+- The warnings show on CI (Node 24.22.1) but not locally with Node 24.15.0; the proof of the fix is a CI log without them. Optional: fail the jsdom tests on any new Solid diagnostic.

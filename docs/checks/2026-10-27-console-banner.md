@@ -24,16 +24,16 @@ Not covered by the automated part: the cursor's blink, Windows' animation settin
 Build with `npm run package`, then start `out\karate-kid-win32-x64\karate-kid.exe`. Write the result under each step: passed, or what you saw instead.
 
 1. With Windows in dark mode, start the app with no project. The console shows `karate-kid 1.1.0 · Karate 2.1.4 · Java 21.0.12.1+1`, `project  none`, and `Open a Karate project folder` with a blinking block cursor. The console is visibly darker than the tree and details above it.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 2. Open a project. While it is found, the state line says `Finding tests…`. Then the banner shows the project folder and `tests    <n> scenarios in <m> features`, the values lined up under each other, and `Ready. Press Run all, or ▶ on a test.` with `Ready.` in green.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 3. Press Run all. `Starting Karate…` shows until Karate's first line arrives, then the output streams under the banner, which stays at the top. Scroll up during the run: the console stops following; scroll back to the bottom: it follows again.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 4. Press Run all again. The first run's output is gone; the banner shows once, at the top.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 5. Select the whole console text and paste it into a text editor: the banner lines come first, followed by Karate's output.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 6. Turn off Settings, Accessibility, Visual effects, Animation effects, and restart the app: the cursor stays still. Turn it back on.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
 7. Switch Windows to light mode and restart: the console is the same dark panel as before F24 on the white window, and the banner is readable.
-   - Result: not checked yet.
+   - Result: passed (checked by Tusquito, 2026-10-27).
