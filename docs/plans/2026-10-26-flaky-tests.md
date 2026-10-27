@@ -4,6 +4,12 @@
 
 > **Changed during Task 2:** the second walk comes before `end()`, so the window gets `runFinished` only once the walk is done. Sending it first let the window look idle while main still refused runs for up to 2 s. A Cancel clicked during the walk keeps the run's outcome, and a failing walk reads as null. See spec R1.5 and commit `ac0247c`. Where Task 2 below says `end` comes first, read "walk, then `end`, then `store`".
 
+> **Changed during the final review** (commits `5032718`–`588f367`):
+> - `target` and `build` are skipped only next to a `pom.xml`, `build.gradle` or `build.gradle.kts`, so a test folder with either name counts (spec R1.2). Task 1's `Target/x` and `sub/build/x` cases below now need a build file beside them.
+> - The 2 s bound is hard: a `stop` flag is checked before each `lstat` too, and a timer races the walk.
+> - The second walk is skipped when the first gave null, and `durationMillis` runs to Java's exit.
+> - A flaky test is not placed by name when its group's runs stored that name twice, and a node is placed only once per group (spec R3.5).
+
 **Goal:** Mark each test that passed in one run and failed in another, with the same project files and environment, in the tree (counts on the nodes above it), and show its proving runs in the Details pane.
 
 **Architecture:** A new `src/main/fingerprint.ts` hashes the project files' paths, sizes and modified times. `Runner.runBody` takes the fingerprint before Java starts and after it exits, and stores it in `run.json` (`fingerprint`, version stays 1) only when both match. A pure `findFlaky` in `src/main/flaky.ts` groups the listed runs by fingerprint and environment and places each flaky test in the current tree with `resolveNode`. The Runner sends the result in a new `flaky` event after every `project` and every `history` event, and in the replay. The renderer keeps `AppState.flaky`, `Tree.tsx` draws the mark and the counts, and a new `FlakyProof` component shows the proof in `Details.tsx`.

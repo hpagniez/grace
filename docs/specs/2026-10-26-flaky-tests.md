@@ -94,7 +94,7 @@ How many runs to judge from:
 5. A run takes it twice:
    - just before Java starts, after every pre-run check has passed;
    - after Java has exited, before `run.json` is written. The window gets `runFinished` once this walk is done, so it never shows an idle runner that still refuses a run; on a few hundred files that is milliseconds.
-   The record stores it only if both are non-null and equal. Otherwise it stores null: a file was saved during the run, or the walk failed.
+   The record stores it only if both are non-null and equal. Otherwise it stores null: a file was saved during the run, or the walk failed. When the first walk gave null, the second is skipped: the record stores null either way.
 6. A cancelled run takes the second walk like any other. A run ended by quitting the app stores null, without the second walk, so the quit stays within its 10 s bound.
 7. A run that never started Java (the pid file could not be written) stores null.
 8. Discovery dry runs take no fingerprint.
