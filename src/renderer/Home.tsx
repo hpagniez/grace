@@ -11,6 +11,7 @@ const rowHover = "enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800";
 
 export function Home(props: { state: AppState; api: Api }) {
   const entries = () => props.state.recent ?? [];
+  let openButton: HTMLButtonElement | undefined;
   return (
     <div data-testid="home" class="min-h-0 flex-1 overflow-auto px-4 py-12">
       <div class="mx-auto flex max-w-[540px] flex-col items-start">
@@ -19,6 +20,7 @@ export function Home(props: { state: AppState; api: Api }) {
           Pick a folder, or reopen one you used before.
         </p>
         <button
+          ref={(e) => (openButton = e)}
           data-testid="open-button"
           class={`${primary} mt-4`}
           onClick={() => void props.api.openProject()}
@@ -67,7 +69,11 @@ export function Home(props: { state: AppState; api: Api }) {
                     aria-label="Remove from list"
                     title="Remove from list"
                     class={`shrink-0 px-3 text-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${ring}`}
-                    onClick={() => void props.api.removeRecent(entry.path)}
+                    onClick={() => {
+                      void props.api.removeRecent(entry.path);
+                      // the rows are rebuilt when the new list arrives: keep the focus off the gone row
+                      openButton?.focus();
+                    }}
                   >
                     ×
                   </button>
