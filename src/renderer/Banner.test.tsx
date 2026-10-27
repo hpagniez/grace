@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import pkg from "../../package.json";
-import { VERSIONS } from "../../scripts/fetch-vendor.mjs";
+import vendor from "../../scripts/vendor.json";
 import type { TestNode } from "../shared/model";
 import { Banner } from "./Banner";
 import { initialState, type AppState } from "./reduce";
@@ -34,7 +34,7 @@ describe("Banner", () => {
   it("names the pinned versions", () => {
     render(() => <Banner state={initialState()} />);
     expect(text("banner-versions")).toBe(
-      `karate-kid ${pkg.version} · Karate ${VERSIONS.karate} · Java ${VERSIONS.java}`,
+      `karate-kid ${pkg.version} · Karate ${vendor.karate.version} · Java ${vendor.jre.version}`,
     );
     expect(screen.getByText("karate-kid").className).toContain("text-sky-400");
   });

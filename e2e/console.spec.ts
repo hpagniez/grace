@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import vendor from "../scripts/vendor.json";
 import { expect, launch, nodeByKey, openProject, project, test } from "./helpers";
 
 const runAll = async (win: Page) => {
@@ -17,11 +18,9 @@ test("open, run and run again", async () => {
   await openProject(app, dir);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
 
-  // Playwright compiles specs to CommonJS: only a dynamic import loads the ES module
-  const { VERSIONS } = await import("../scripts/fetch-vendor.mjs");
   const banner = win.getByTestId("console-banner");
-  await expect(banner).toContainText(`Karate ${VERSIONS.karate}`);
-  await expect(banner).toContainText(`Java ${VERSIONS.java}`);
+  await expect(banner).toContainText(`Karate ${vendor.karate.version}`);
+  await expect(banner).toContainText(`Java ${vendor.jre.version}`);
   await expect(win.getByTestId("banner-project")).toContainText(dir);
   await expect(win.getByTestId("banner-tests")).toHaveText(
     /^tests {4}\d+ scenarios? in \d+ features?$/,

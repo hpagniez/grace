@@ -38,7 +38,7 @@ Success:
 ## Constraints
 
 - No new dependency. Solid 2 rules (AGENTS.md). No change to the main process, the preload or the IPC files (`src/main.ts`, `src/main/**`, `src/preload.ts`, `src/shared/ipc.ts`, `src/shared/events.ts`): F27 (`feature/home-screen`) is changing them at the same time.
-- `scripts/fetch-vendor.mjs` pins the bundled versions: Temurin `21.0.12.1+1` and Karate `2.1.4`. Each version appears today only inside URL and file-name strings. `setupJre` skips the download when `vendor/jre/bin/java.exe` exists, so a dev machine can keep an older JRE after a pin bump. CI builds start from an empty `vendor/`.
+- `scripts/vendor.json` pins the bundled versions (F33, [ADR 0012](../decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)): `jre.version` `21.0.12.1+1` and `karate.version` `2.1.4`, each next to its download URL and SHA-256. `npm run vendor` replaces `vendor/` contents whose pin changed. CI builds start from an empty `vendor/`.
 - Text contrast on the console background meets WCAG AA (4.5:1).
 
 ### What the app does today
@@ -59,7 +59,7 @@ For the look (shown as mockups, dark mode):
 - C. A startup banner (versions, project, tests found, "Ready") on the same sunken panel. **Chosen by the person.**
 
 For where the versions come from:
-1. **The pins in `scripts/fetch-vendor.mjs`, built into the renderer at build time.** No main-process or IPC change, so no conflict with F27, and F33 gets one place to bump each version. Limit: in dev only, an old JRE can survive a pin bump. **Chosen by the person.**
+1. **The bundled pins, built into the renderer at build time.** No main-process or IPC change, so no conflict with F27, and F33 gets one place to bump each version. **Chosen by the person.** The pins were in `scripts/fetch-vendor.mjs` then; F33 moved them to `scripts/vendor.json`.
 2. Main reads `vendor/jre/release` and the version inside the Karate jar at start, and sends them over a new IPC call. Always true to the files, but it touches the files F27 changes and needs a small zip reader.
 3. Ask Java and Karate at start. Dropped: an extra JVM at every launch, seen by the Java leak checks.
 
@@ -102,7 +102,7 @@ For where the versions come from:
 
 ### R5. Versions at build time
 
-1. `scripts/fetch-vendor.mjs` holds each bundled version once (Java `21.0.12.1+1`, Karate `2.1.4`), exports them, and builds its download URLs and file names from them. Its SHA-256 pins stay where they are.
+1. The versions come from `scripts/vendor.json` (`jre.version` `21.0.12.1+1`, `karate.version` `2.1.4`), the pins `npm run vendor` downloads (changed when merging with F33, 2026-10-27: F24 had first made `fetch-vendor.mjs` export them).
 2. The renderer build gets the app version (from `package.json`) and these two versions as build-time constants. The Vitest jsdom project gets the same constants, so component tests see the real values.
 3. A packaged build's banner names exactly the versions `npm run vendor` downloaded for it.
 
@@ -110,7 +110,7 @@ For where the versions come from:
 
 - The banner (option C) and its sunken dark panel (the person, from the mockups).
 - The banner stays at the top; a new run clears only the output below it (the person).
-- The versions are the pins in `scripts/fetch-vendor.mjs`, built in at build time (the person, approach 1).
+- The versions are the bundled pins (`scripts/vendor.json`), built in at build time (the person, approach 1).
 
 The spec author's calls:
 - The app version on line 1, next to Karate's and Java's: the banner is most useful in a bug report.
@@ -129,7 +129,7 @@ The spec author's calls:
 
 ## Known risks
 
-- In dev, after a JRE pin bump, the banner names the new Java while an older `vendor/jre` still runs, until `vendor/jre` is deleted and `npm run vendor` runs again. Packaged builds are not affected.
+- In dev, after a pin bump, the banner names the new versions while the old `vendor/` still runs, until `npm run vendor` runs again. Packaged builds are not affected.
 - When F27 merges, its home screen may change what the window shows with no project open, and so whether the "no project" banner is ever seen. Its texts may then need a pass.
 - The labels are aligned with spaces in a monospace font; a font fallback without fixed widths would misalign them.
 
@@ -221,7 +221,6 @@ Feature: Console banner
   # R5: versions at build time
 
   Scenario: The banner names the pinned versions
-    Given scripts/fetch-vendor.mjs pins Java "21.0.12.1+1" and Karate "2.1.4"
+    Given scripts/vendor.json pins Java "21.0.12.1+1" and Karate "2.1.4"
     Then the banner's line 1 names those versions
-    And fetch-vendor's download URLs and file names contain those versions
 ```

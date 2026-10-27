@@ -13,6 +13,7 @@ Spec: [Console banner](../specs/2026-10-27-console-banner.md).
 | `npm run e2e` | 103/103 passed, including the new `e2e/console.spec.ts` (2) |
 | `npm run typecheck`, `npm run lint` | passed |
 | `node scripts/fetch-vendor.mjs` after the pin refactor | `vendor ready`: the jar's SHA-256 still matches |
+| After merging `develop` with F33 (versions now from `scripts/vendor.json`; the pin refactor and its 2 tests dropped): `npm test`, `npm run typecheck`, `npm run lint`, `npm run package` then `npx playwright test e2e/console.spec.ts` | 718/718 passed; passed; passed; 2/2 passed |
 
 Also run by the agent: the built app started at 1100×700 in dark and light mode, with no project, with the clean sample project open (`9 scenarios in 3 features`), and after Run all. The banner, its colours, the darker dark-mode panel and the output under the banner looked as the spec says.
 
