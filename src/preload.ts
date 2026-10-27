@@ -17,6 +17,9 @@ const api: Api = {
   rerunFailed: (id) => ipcRenderer.invoke(CH.rerunFailed, id),
   openRunReport: (id) => ipcRenderer.invoke(CH.runReport, id),
   clearHistory: () => ipcRenderer.invoke(CH.clearHistory),
+  openRecent: (root) => ipcRenderer.invoke(CH.openRecent, root),
+  removeRecent: (root) => ipcRenderer.invoke(CH.removeRecent, root),
+  closeProject: () => ipcRenderer.invoke(CH.close),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

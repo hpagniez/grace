@@ -1,5 +1,5 @@
 import type { EnvView } from "../shared/env";
-import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
+import type { AppEvent, Project, RecentEntry, RunOutcome, Step, Summary } from "../shared/events";
 import type { HistoryEntry } from "../shared/history";
 import type { HttpCall, HttpGroup } from "../shared/http";
 import type { Status, TestNode } from "../shared/model";
@@ -53,6 +53,12 @@ export interface AppState {
   selectedCall: CallRef | null;
   /** The tab shown in the bottom panel. */
   panel: "console" | "history" | "http";
+  /** The folder main is opening, or null. */
+  opening: string | null;
+  /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
+  loaded: boolean;
+  /** The saved recent folders, newest first; null until main sends them. */
+  recent: RecentEntry[] | null;
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -95,6 +101,9 @@ export function initialState(): AppState {
     httpGroups: [],
     selectedCall: null,
     panel: "console",
+    opening: null,
+    loaded: false,
+    recent: null,
   };
 }
 
@@ -123,6 +132,7 @@ export function reduce(s: AppState, e: AppEvent): void {
           threads: null, // main's `threads` event follows
           history: [], // main's `history` follows a project that opens
         });
+        if (!e.project) s.console = []; // a closed project leaves no console behind
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
       const before = byKey(s.tree);
@@ -140,6 +150,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.tree = e.tree;
       s.error = e.error;
       s.notice = null;
+      s.loaded = true;
       break;
     }
     case "runStarted":
@@ -226,6 +237,14 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "notice":
       s.notice = e.message;
+      break;
+    case "opening":
+      s.opening = e.root;
+      s.loaded = true;
+      if (e.root && !s.project) s.error = null; // the last open's "Folder not found" is not this one's
+      break;
+    case "recent":
+      s.recent = e.entries;
       break;
   }
 }
