@@ -51,5 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-      - run: npm run e2e
+      # merge-when-green.yml merges only if a step with this name passed
+      - name: e2e
+        run: npm run e2e
         if: ${{ steps.pr.outputs.draft != 'true' }}

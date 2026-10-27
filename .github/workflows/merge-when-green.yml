@@ -1,0 +1,73 @@
+# Merges a labelled PR into develop once checks and test are green on its head (ADR 0011).
+# workflow_run and pull_request_target always run this file as it is on develop.
+name: merge-when-green
+
+on:
+  workflow_run:
+    workflows: [checks, test]
+    types: [completed]
+  # a label added, or a draft marked ready, after CI finished
+  pull_request_target:
+    branches: [develop]
+    types: [labeled, ready_for_review]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.event == 'pull_request'
+        && github.event.workflow_run.conclusion == 'success')
+      || (github.event_name == 'pull_request_target'
+        && contains(github.event.pull_request.labels.*.name, 'merge-when-green'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # checks and test finish close together; the second run sees the PR merged
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+    # no checkout: the job holds a write token and needs only the API
+    steps:
+      - run: |
+          skip() { echo "::notice::not merging #$PR: $1"; exit 0; }
+          [ -n "$PR" ] || skip "no PR in this event"
+          pr=$(gh api "repos/$GH_REPO/pulls/$PR" \
+            --jq '"\(.state) \(.draft) \(.base.ref) \(any(.labels[]; .name == "merge-when-green")) \(.head.sha)"')
+          read -r state draft base labelled sha <<<"$pr"
+          [ "$state" = open ] || skip "it is not open"
+          [ "$draft" = false ] || skip "it is a draft"
+          [ "$base" = develop ] || skip "it does not target develop"
+          [ "$labelled" = true ] || skip "it has no merge-when-green label"
+
+          # newest pull_request run of a workflow on the PR head ("null null" if none); a re-run updates it in place
+          latest() {
+            gh api "repos/$GH_REPO/actions/workflows/$1/runs?event=pull_request&head_sha=$sha&per_page=1" \
+              --jq '.workflow_runs[0] | "\(.id) \(.conclusion)"'
+          }
+          run=$(latest checks.yml)
+          read -r id conclusion <<<"$run"
+          [ "$conclusion" = success ] || skip "checks is not green on $sha"
+          run=$(latest test.yml)
+          read -r id conclusion <<<"$run"
+          if [ "$id" = null ]; then
+            # test.yml's paths-ignore skips a PR that changes only docs/** and *.md
+            files=$(gh api "repos/$GH_REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+            while read -r f; do
+              [[ $f == docs/* || $f == *.md ]] || skip "test has not run on $sha"
+            done <<<"$files"
+          else
+            [ "$conclusion" = success ] || skip "test is not green on $sha"
+            # a run started while the PR was a draft skipped e2e
+            e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e")][0].conclusion')
+            [ "$e2e" = success ] || skip "e2e has not passed on $sha"
+          fi
+
+          # --match-head-commit refuses the merge if a push landed after these checks
+          gh pr merge "$PR" --merge --delete-branch --match-head-commit "$sha"
