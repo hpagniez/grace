@@ -99,7 +99,7 @@ export function Tree(props: Ctx) {
   const message = () => {
     const { error, project, tree } = props.state;
     if (error) return error;
-    if (!project || !tree) return "Open a Karate project folder";
+    if (!project || !tree) return "Discovering tests…";
     if (leaves(tree).length === 0) return "No feature files found";
     return null;
   };
