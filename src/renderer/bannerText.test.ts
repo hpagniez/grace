@@ -104,6 +104,14 @@ describe("bannerState", () => {
       expect(bannerState({ ...s, console: ["x"] })).toBeNull();
   });
 
+  it("has no state line when Run all has nothing to run", () => {
+    expect(bannerState(opened(null, { error: "boom" }))).toBeNull();
+    expect(bannerState(opened(threeInTwo, { error: "boom" }))).toBeNull();
+    expect(bannerState(opened(root(feature("f:a", []))))).toBeNull();
+    const filter = { include: ["nothing-has-this"], exclude: [], hideNonMatching: false };
+    expect(bannerState(opened(threeInTwo, { filter }))).toBeNull();
+  });
+
   it("is ready again after a run that printed nothing", () => {
     const run = { ...idle.run, active: false, outcome: "cancelled" as const };
     expect(bannerState(opened(threeInTwo, { run }))).toBe("ready");

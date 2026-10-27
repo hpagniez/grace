@@ -1,4 +1,5 @@
 import type { TestNode } from "../shared/model";
+import { matchingLeaves } from "../shared/tags";
 import { leaves } from "./nodes";
 import type { AppState } from "./reduce";
 
@@ -20,10 +21,14 @@ export function testsText(s: AppState): string | null {
   return `${count(n, "scenario")} in ${count(features(s.tree), "feature")}`;
 }
 
-/** Null once the console has output: the lines then follow the banner. */
+/**
+ * Null once the console has output: the lines then follow the banner. Null too when Run all would
+ * be disabled (the toolbar's rule): "Ready" would then point at a button that does nothing.
+ */
 export function bannerState(s: AppState): BannerState | null {
   if (s.console.length > 0) return null;
   if (s.run.active) return "starting";
   if (s.busy) return "finding";
-  return s.project ? "ready" : "none";
+  if (!s.project) return "none";
+  return !s.error && s.tree && matchingLeaves(s.tree, s.filter).length > 0 ? "ready" : null;
 }
