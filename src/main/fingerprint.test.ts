@@ -15,14 +15,18 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { projectFingerprint } from "./fingerprint";
 
-// Lets a test make the stat of a file fail while the rest of the module stays real.
-const stat = vi.hoisted(() => ({ fail: false }));
+// Lets a test make the stat of a file fail or never return while the rest of the module stays real.
+const stat = vi.hoisted(() => ({ fail: false, hang: false }));
 vi.mock("node:fs/promises", async (importOriginal) => {
   const real = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...real,
     lstat: ((...args: Parameters<typeof real.lstat>) =>
-      stat.fail ? Promise.reject(new Error("EPERM")) : real.lstat(...args)) as typeof real.lstat,
+      stat.hang
+        ? new Promise(() => {})
+        : stat.fail
+          ? Promise.reject(new Error("EPERM"))
+          : real.lstat(...args)) as typeof real.lstat,
   };
 });
 
@@ -34,6 +38,7 @@ const tmp = () => {
 };
 afterEach(() => {
   stat.fail = false;
+  stat.hang = false;
   for (const d of temps.splice(0)) rmSync(d, { recursive: true, force: true, maxRetries: 5 });
 });
 
@@ -161,6 +166,14 @@ describe("projectFingerprint", () => {
   it("null past the time bound", async () => {
     const root = project();
     expect(await projectFingerprint(root, { maxFiles: 50_000, timeoutMs: 0 })).toBeNull();
+  });
+
+  it("null within the time bound when a stat never returns", async () => {
+    const root = project();
+    stat.hang = true;
+    const start = Date.now();
+    await expect(projectFingerprint(root, { maxFiles: 50_000, timeoutMs: 50 })).resolves.toBeNull();
+    expect(Date.now() - start).toBeLessThan(1000);
   });
 
   it("null for a missing root", async () => {
