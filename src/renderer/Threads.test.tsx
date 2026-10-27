@@ -49,7 +49,8 @@ afterEach(cleanup);
 
 describe("threads box", () => {
   it("shows main's count and is disabled with no project", () => {
-    const { load } = setup();
+    const { send, load } = setup();
+    send({ type: "opening", root: "D:/p" }); // no project yet: the project view, not home
     expect(box().disabled).toBe(true);
     expect(box().value).toBe("1");
     load(3);
