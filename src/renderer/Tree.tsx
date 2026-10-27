@@ -1,9 +1,10 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { FLAKY_TITLE } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { filterOn, matchingLeaves } from "../shared/tags";
-import { leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
+import { FLAKY_TONE, leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
 
 interface Ctx {
@@ -11,6 +12,8 @@ interface Ctx {
   select(key: string): void;
   api: Api;
 }
+
+const FLAKY_CHIP = `shrink-0 rounded border px-1 text-xs ${FLAKY_TONE}`;
 
 function Node(props: { node: TestNode; ctx: Ctx }) {
   const [open, setOpen] = createSignal(true);
@@ -25,6 +28,11 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
     () => !filterOn(filter()) || matchingLeaves(props.node, filter()).length > 0,
   );
   const hidden = () => !match() && filter().hideNonMatching;
+  // Counts the tests the tag filter hides too: flakiness is not about tags.
+  const flakyCount = createMemo(
+    () => leaves(props.node).filter((l) => l.key in props.ctx.state.flaky).length,
+  );
+  const isTest = () => props.node.kind === "scenario" || props.node.kind === "row";
   const label = () => (isFeature() ? props.node.file.split("/").pop()! : nodeName(props.node));
   return (
     <Show when={!hidden()}>
@@ -72,6 +80,25 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
               </span>
             )}
           </For>
+          <Show when={flakyCount() > 0}>
+            <Show
+              when={isTest()}
+              fallback={
+                <span data-testid="flaky-count" class={FLAKY_CHIP}>
+                  {`${flakyCount()} flaky`}
+                </span>
+              }
+            >
+              <span
+                data-testid="flaky-mark"
+                title={FLAKY_TITLE}
+                aria-label={FLAKY_TITLE}
+                class={FLAKY_CHIP}
+              >
+                flaky
+              </span>
+            </Show>
+          </Show>
           <Show when={match()}>
             <button
               type="button"

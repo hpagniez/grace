@@ -23,3 +23,22 @@ export interface FlakyTest {
   key: string;
   envs: FlakyEnv[];
 }
+
+export const FLAKY_TITLE = "Flaky: passed and failed with the same project files";
+
+export const flakyHeading = (env: string | null): string =>
+  env === null ? "Flaky with no environment" : `Flaky on ${env}`;
+
+const times = (n: number): string => `${n} ${n === 1 ? "time" : "times"}`;
+
+export const flakyCounts = (passed: number, failed: number): string =>
+  `Passed ${times(passed)}, failed ${times(failed)} with the same project files`;
+
+export const threadsLabel = (n: number | null): string =>
+  n === null ? "—" : n === 1 ? "1 thread" : `${n} threads`;
+
+/** The current environment first, then none, then the rest by name. */
+export function orderEnvs(envs: FlakyEnv[], current: string | null): FlakyEnv[] {
+  const rank = (e: FlakyEnv) => (e.env === current ? 0 : e.env === null ? 1 : 2);
+  return [...envs].sort((a, b) => rank(a) - rank(b) || (a.env ?? "").localeCompare(b.env ?? ""));
+}
