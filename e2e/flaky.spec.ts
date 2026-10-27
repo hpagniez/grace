@@ -119,7 +119,7 @@ async function trackEvents(win: Page) {
 async function finished(win: Page, n: number) {
   await expect(tab(win)).toHaveText(`History (${n})`, { timeout: 90_000 });
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished");
-  // not a count of `flaky` events: choosing an environment sends one too
+  // not a count of `flaky` events: choosing an environment sends two (the new tree, then the history)
   await expect
     .poll(() =>
       win.evaluate(() => {
