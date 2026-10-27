@@ -168,6 +168,13 @@ The spec author's calls:
 - The shape of the JRE marker (R2.1), as long as it is outside `vendor/jre` and `vendor/licenses`.
 - Unit test layout for the script: version parsing and comparison, picking the release from an API payload, the rewrite of `vendor.json`, the failure cases of R3.4. Payloads are inline objects or small fixtures, never live network calls.
 
+## Changes from the final review
+
+- R4.3: write permissions are per job, not for the whole workflow. The Windows job runs the new Java and jar before anyone reviewed them, so it holds a read-only token and no git credentials. It passes the recorded fixtures to a Linux job as an artifact kept one day. That job bumps the pin itself and opens the PR (see ADR 0012).
+- R4.7.6: open bump PRs are listed without their commits, and commits are fetched one older draft at a time. Listing 100 PRs with their commit authors exceeds GitHub's GraphQL node limit.
+- R3.8: the compare is read as file names only (`--jq`). The full answer is over 1 MB, more than Node's default output buffer.
+- F33 stays `building` until the first real run after merge passes: the PR-opening path cannot run before the workflow is on `develop`.
+
 ## Known risks
 
 - The workflow only runs from `develop`, so its first real run is after merge. The by-hand check covers it (Acceptance criteria).
