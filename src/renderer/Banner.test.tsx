@@ -34,9 +34,9 @@ describe("Banner", () => {
   it("names the pinned versions", () => {
     render(() => <Banner state={initialState()} />);
     expect(text("banner-versions")).toBe(
-      `karate-kid ${pkg.version} · Karate ${vendor.karate.version} · Java ${vendor.jre.version}`,
+      `Grace ${pkg.version} · Karate ${vendor.karate.version} · Java ${vendor.jre.version}`,
     );
-    expect(screen.getByText("karate-kid").className).toContain("text-sky-400");
+    expect(screen.getByText("Grace").className).toContain("text-sky-400");
   });
 
   it("asks for a project with none open", () => {
