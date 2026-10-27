@@ -48,9 +48,57 @@ function update(dataDir: string, change: (s: Record<string, unknown>) => void): 
   renameSync(tmp, file(dataDir));
 }
 
-export function saveLastProject(dataDir: string, root: string): void {
+/** How many project folders the recent list keeps. */
+export const RECENT_LIMIT = 10;
+
+/** Two paths are the same folder when they resolve alike, ignoring case (Windows) and a trailing separator. */
+const sameFolder = (a: string, b: string) =>
+  path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/** The absolute paths of a saved list, newest first, one per folder, at most RECENT_LIMIT; anything else is dropped. */
+function parseRecent(x: unknown): string[] {
+  const kept: string[] = [];
+  if (!Array.isArray(x)) return kept;
+  for (const p of x) {
+    if (kept.length === RECENT_LIMIT) break;
+    if (typeof p === "string" && path.isAbsolute(p) && !kept.some((k) => sameFolder(k, p)))
+      kept.push(p);
+  }
+  return kept;
+}
+
+/** The recent project folders, newest first, as saved (they may no longer exist). `[]` if none or the file cannot be read. Never throws. */
+export function loadRecentProjects(dataDir: string): string[] {
+  try {
+    return parseRecent(read(dataDir).recentProjects);
+  } catch {
+    return [];
+  }
+}
+
+/** Saves `root` as the last project and moves it to the top of the recent list. Throws if the file cannot be saved. */
+export function saveOpenedProject(dataDir: string, root: string): void {
   update(dataDir, (s) => {
     s.lastProject = root;
+    s.recentProjects = [
+      root,
+      ...parseRecent(s.recentProjects).filter((p) => !sameFolder(p, root)),
+    ].slice(0, RECENT_LIMIT);
+  });
+}
+
+/** Drops `root` from the recent list, and from lastProject if that is the same folder. Throws if the file cannot be saved. */
+export function removeRecentProject(dataDir: string, root: string): void {
+  update(dataDir, (s) => {
+    s.recentProjects = parseRecent(s.recentProjects).filter((p) => p !== root);
+    if (typeof s.lastProject === "string" && sameFolder(s.lastProject, root)) delete s.lastProject;
+  });
+}
+
+/** Forgets the last project, so the next start shows the home screen. Throws if the file cannot be saved. */
+export function forgetLastProject(dataDir: string): void {
+  update(dataDir, (s) => {
+    delete s.lastProject;
   });
 }
 

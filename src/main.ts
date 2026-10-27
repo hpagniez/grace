@@ -23,7 +23,7 @@ import { safeStorageBox } from "./main/secrets";
 import {
   loadLastProject,
   loadWindowState,
-  saveLastProject,
+  saveOpenedProject,
   saveWindowState,
 } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
@@ -166,7 +166,7 @@ app.whenReady().then(async () => {
         ? await dialog.showOpenDialog(win, options)
         : await dialog.showOpenDialog(options);
     if (r.canceled || !r.filePaths[0]) return;
-    if (await runner.open(r.filePaths[0])) saveLastProject(dataDir, r.filePaths[0]);
+    if (await runner.open(r.filePaths[0])) saveOpenedProject(dataDir, r.filePaths[0]);
   });
   handle(CH.refresh, () => runner.refresh());
   handle(CH.run, async (key) => {
