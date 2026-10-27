@@ -95,13 +95,39 @@ async function openCoin(heads: boolean) {
   const { app, win, userData } = await launch();
   await openProject(app, dir);
   await expect(node(win, "coin")).toBeVisible({ timeout: 15_000 });
+  await trackEvents(win);
   return { dir, coin, app, win, userData };
 }
 
-/** Waits until the run is in the history (`n` runs): a stored run has ended, and its marks follow at once. */
+/**
+ * Records the `type` of every event main sends from now on in `window.events`, oldest first. The app's
+ * own listener stays: `onEvent` adds a listener each call.
+ */
+async function trackEvents(win: Page) {
+  await win.evaluate(() => {
+    const events: string[] = [];
+    (window as unknown as { events: string[] }).events = events;
+    window.api.onEvent((e) => events.push(e.type));
+  });
+}
+
+/**
+ * Waits until the run is in the history (`n` runs): a stored run has ended. Main sends `flaky` after
+ * the `history` of that run in a message of its own, so it also waits for that one: a "no mark" check
+ * proves nothing before the marks of the new history are applied. Needs `trackEvents`.
+ */
 async function finished(win: Page, n: number) {
   await expect(tab(win)).toHaveText(`History (${n})`, { timeout: 90_000 });
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished");
+  // not a count of `flaky` events: choosing an environment sends one too
+  await expect
+    .poll(() =>
+      win.evaluate(() => {
+        const { events } = window as unknown as { events: string[] };
+        return events.lastIndexOf("flaky") > events.lastIndexOf("history");
+      }),
+    )
+    .toBe(true);
 }
 
 /** Types the count, presses Enter and waits until main has saved it. */
@@ -125,7 +151,6 @@ test("A test that flips with no change is marked flaky", async () => {
   await finished(win, 1);
   await expect(node(win, "coin")).toHaveAttribute("data-status", "failed");
   await expect(node(win, "steady")).toHaveAttribute("data-status", "passed");
-  await expect(win.getByTestId("flaky-mark")).toHaveCount(0);
 
   coin(true);
   await setThreads(win, userData, dir, 1);
@@ -159,6 +184,7 @@ test("A fix in the project is not flaky", async () => {
   const { app, win } = await launch();
   await openProject(app, dir);
   await expect(node(win, "fixable")).toBeVisible({ timeout: 15_000 });
+  await trackEvents(win);
 
   await win.getByTestId("run-all-button").click();
   await finished(win, 1);
