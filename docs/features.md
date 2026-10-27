@@ -1,6 +1,6 @@
 # Features
 
-Backlog of what karate-kid does or will do. One row per user-facing capability.
+Backlog of what Grace does or will do. One row per user-facing capability.
 
 - **Priority**: `must` (first release), `should`, `could`. Reasoning per row lives in [inventory/commercial.md](inventory/commercial.md#user-needs-a-free-runner-must-cover).
 - **Status**: `idea` → `specced` → `building` → `done`. A row moves to `specced` only when its file exists in `specs/`.
