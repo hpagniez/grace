@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
-import { checkRecent, recentSender } from "./recent";
+import { checkRecent, recentSender, type Stat } from "./recent";
 
 const dirs: string[] = [];
 const tmp = () => {
@@ -45,6 +45,29 @@ describe("checkRecent", () => {
       { path: "\\\\gone\\a", exists: true },
       { path: "\\\\gone\\b", exists: true },
     ]);
+  });
+
+  it("shares a check that is still pending, and starts a new one once it settled", async () => {
+    vi.useFakeTimers();
+    let settle!: () => void;
+    const stat = vi
+      .fn<Stat>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            settle = () => resolve({ isDirectory: () => true });
+          }),
+      )
+      .mockResolvedValue({ isDirectory: () => true });
+    const first = checkRecent(["D:\\a"], stat, 1000);
+    const second = checkRecent(["D:\\a", "D:\\b"], stat, 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.all([first, second]);
+    expect(stat.mock.calls.map(([p]) => p)).toEqual(["D:\\a", "D:\\b"]);
+    settle();
+    await vi.advanceTimersByTimeAsync(0);
+    await checkRecent(["D:\\a"], stat, 1000);
+    expect(stat.mock.calls.map(([p]) => p)).toEqual(["D:\\a", "D:\\b", "D:\\a"]);
   });
 });
 
