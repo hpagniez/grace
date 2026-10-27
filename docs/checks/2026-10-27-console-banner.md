@@ -16,7 +16,7 @@ Spec: [Console banner](../specs/2026-10-27-console-banner.md).
 
 Also run by the agent: the built app started at 1100×700 in dark and light mode, with no project, with the clean sample project open (`9 scenarios in 3 features`), and after Run all. The banner, its colours, the darker dark-mode panel and the output under the banner looked as the spec says.
 
-Not covered by the automated part: how the banner looks and reads, the cursor's blink, and Windows' animation setting.
+Not covered by the automated part: the cursor's blink, Windows' animation setting, copying the console, and how it reads to a person.
 
 ## By hand (done by a person)
 
