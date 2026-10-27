@@ -24,7 +24,7 @@ Releases 1.0.0 and 1.1.0 keep settings, the projects list, run history and saved
 Chosen: option 1. The maintainer wanted a first name like Claude or Bruno, with an easter egg. Option 2 was turned down, option 3 is not a name, option 4 keeps the legal risk. No testing tool was found under the name Grace (GitHub and web search, 2026-10-27; trademark registers not searched).
 
 - `package.json`: `name` `grace`, `productName` `Grace`. The app becomes `Grace.exe` in `Grace-win32-x64-<version>.zip`, with user data in `%APPDATA%\Grace`.
-- On start, before the single-instance lock: if `%APPDATA%\Grace` is missing and `%APPDATA%\karate-kid` exists, rename the old folder to the new one. Secrets stay readable: Electron's encryption key lives in that folder. If the rename fails (an old karate-kid is still open), use the old folder for this session and try again next start. Skipped when `GRACE_USER_DATA` is set.
+- Nothing moves the old `%APPDATA%\karate-kid` folder: the app is still in development, so it keeps no backward compatibility (AGENTS.md). Grace starts with empty settings, projects list, run history and secrets.
 - `KARATE_KID_USER_DATA` becomes `GRACE_USER_DATA`; the `karate-kid.panelHeight` localStorage key becomes `grace.panelHeight`.
 - Window title, startup screen, `README.md`, `AGENTS.md` and `docs/features.md` say Grace. Dated specs, plans, checks and research notes keep the old name: they record what was true then.
 - Add `LICENSE` (MIT, matching `package.json`).
@@ -47,7 +47,6 @@ The story: Grace, a made-up martial artist, fights bugs. The bug is a moth, afte
 ### Consequences
 
 - Good: no film or Karate Labs mark in the product name.
-- Good: users of 1.0.0 and 1.1.0 keep their data without doing anything.
+- Bad: users of 1.0.0 and 1.1.0 lose their settings, projects list, run history and secrets. The old folder stays on disk until they delete it.
 - Bad: "Grace" is a common word, so it is weak as a trademark and harder to search for.
-- Bad: the bottom panel height resets once, under the new localStorage key.
 - Neutral: links in old records to `github.com/Tusquito/karate-kid` rely on GitHub's redirect.
