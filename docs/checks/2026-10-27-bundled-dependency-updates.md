@@ -30,7 +30,7 @@ No app code changed, so the packaged app was not checked by hand. CI runs e2e on
 
 ## Still needs a person
 
-1. Turn on **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests"**. It is off today (`can_approve_pull_request_reviews: false`); without it the workflow cannot open PRs.
+1. ~~Turn on **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests"**~~. Done on 2026-10-27 at the maintainer's request, with `gh api -X PUT repos/Tusquito/karate-kid/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true`. The API then returned `can_approve_pull_request_reviews: true`, and the default token stayed `read`.
 2. After merge, the spec's "First real run after merge" check:
    1. Push a throwaway branch from `develop` whose `scripts/vendor.json` pins Karate `2.1.3` (`version`, `url`, `sha256` `c0126f3ad907e4e92a9944a0bfa4deae96beae599daf8513f47169516b5714c0`, `file`). Give that commit a Conventional Commits header (for example `test(deps): pin karate 2.1.3 for the vendor-updates check`): the test PR carries it, and `checks` reads it.
    2. `gh workflow run vendor-updates.yml --ref <that branch>`.
