@@ -87,6 +87,7 @@ describe("environment combo", () => {
 
   it("is empty and disabled with no project", () => {
     const { send, load, view } = setup();
+    send({ type: "opening", root: "D:/p" }); // no project yet: the project view, not home
     expect(input().value).toBe("");
     expect(input().placeholder).toBe("");
     expect(input().disabled).toBe(true);

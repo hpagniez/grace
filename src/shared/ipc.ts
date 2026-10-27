@@ -18,6 +18,9 @@ export const CH = {
   rerunFailed: "history:rerunFailed",
   runReport: "history:report",
   clearHistory: "history:clear",
+  openRecent: "recent:open",
+  removeRecent: "recent:remove",
+  close: "project:close",
   event: "app:event",
 } as const;
 
@@ -38,5 +41,10 @@ export interface Api {
   rerunFailed(id: string): Promise<void>;
   openRunReport(id: string): Promise<void>;
   clearHistory(): Promise<void>;
+  /** Both send a folder as saved in the recent list; main refuses any other. */
+  openRecent(root: string): Promise<void>;
+  removeRecent(root: string): Promise<void>;
+  /** Closes the open project and goes back to the home screen. */
+  closeProject(): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }
