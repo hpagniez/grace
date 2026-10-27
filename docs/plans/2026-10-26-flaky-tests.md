@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Changed during Task 2:** the second walk comes before `end()`, so the window gets `runFinished` only once the walk is done. Sending it first let the window look idle while main still refused runs for up to 2 s. A Cancel clicked during the walk keeps the run's outcome, and a failing walk reads as null. See spec R1.5 and commit `ac0247c`. Where Task 2 below says `end` comes first, read "walk, then `end`, then `store`".
+
 **Goal:** Mark each test that passed in one run and failed in another, with the same project files and environment, in the tree (counts on the nodes above it), and show its proving runs in the Details pane.
 
 **Architecture:** A new `src/main/fingerprint.ts` hashes the project files' paths, sizes and modified times. `Runner.runBody` takes the fingerprint before Java starts and after it exits, and stores it in `run.json` (`fingerprint`, version stays 1) only when both match. A pure `findFlaky` in `src/main/flaky.ts` groups the listed runs by fingerprint and environment and places each flaky test in the current tree with `resolveNode`. The Runner sends the result in a new `flaky` event after every `project` and every `history` event, and in the replay. The renderer keeps `AppState.flaky`, `Tree.tsx` draws the mark and the counts, and a new `FlakyProof` component shows the proof in `Details.tsx`.
