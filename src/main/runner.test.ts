@@ -23,6 +23,7 @@ import type { RunRecord, StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import { matchingLeaves, NO_FILTER, projectTags, type TagFilter } from "../shared/tags";
 import { THREADS_ERROR } from "../shared/threads";
+import { projectFingerprint } from "./fingerprint";
 import { createRunDir, writeRunRecord } from "./history";
 import { buildArgs, detectLayout, tagArgs } from "./karate/command";
 import { readAllEvents } from "./karate/events";
@@ -50,6 +51,7 @@ function setup(
   dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-")),
   secrets: SecretBox = fakeSecretBox(),
   paths: VendorPaths = vendor,
+  fingerprint?: (root: string) => Promise<string | null>,
 ) {
   temps.push(dataDir);
   const events: AppEvent[] = [];
@@ -62,6 +64,7 @@ function setup(
       events.push(e);
       listener(e);
     },
+    fingerprint,
   });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
@@ -1395,6 +1398,7 @@ describe("Runner history", () => {
         durationMillis: 1000,
         env: null,
         threads: 1,
+        fingerprint: null,
         filter: NO_FILTER,
         selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
         failedOf: null,
@@ -2004,5 +2008,83 @@ describe("Runner history", () => {
     expect(runner.runReportPath(cancelled)).toBeNull();
     expect(runner.runReportPath("20200101-000000-000")).toBeNull();
     expect(runner.runReportPath(`${done}\\..\\${done}`)).toBeNull();
+  });
+
+  it("a run of an unchanged project stores its fingerprint", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { fingerprint } = record(dataDir, root, id);
+    expect(fingerprint).not.toBeNull();
+    expect(fingerprint).toBe(await projectFingerprint(root));
+  });
+
+  it("a file saved during a run stores no fingerprint", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    writeFileSync(path.join(root, "note.txt"), "saved during the run");
+    await run;
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("different walks store no fingerprint", T, async () => {
+    const walks = ["a".repeat(64), "b".repeat(64)];
+    const fake = async () => walks.shift()!;
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toEqual([]);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("a cancel during the first walk starts no Java", T, async () => {
+    let runner: Runner | undefined;
+    const fake = async () => {
+      await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.all("runStarted")).toHaveLength(0);
+    expect(s.last("notice").message).toBe("Run cancelled");
+    expect(folders(s.dataDir, root)).toEqual([]);
+  });
+
+  it("dispose skips the second walk", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return "a".repeat(64);
+    };
+    const { runner, all, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    await runner.dispose();
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "cancelled", fingerprint: null });
+    await run;
+  });
+
+  it("runFinished comes before the run's history", T, async () => {
+    const { runner, events, last } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const types = events.map((e) => e.type);
+    expect(types.lastIndexOf("runFinished")).toBeLessThan(types.lastIndexOf("history"));
   });
 });

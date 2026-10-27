@@ -32,6 +32,7 @@ const record = (startedAt: number, extra: Partial<RunRecord> = {}): RunRecord =>
   durationMillis: 1000,
   env: null,
   threads: 1,
+  fingerprint: null,
   filter: NO_FILTER,
   selection: { kind: "folder", file: "", name: "", line: null, key: "d:" },
   failedOf: null,
