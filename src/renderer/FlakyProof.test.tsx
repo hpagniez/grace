@@ -40,7 +40,7 @@ const tree = (): TestNode =>
     children: [
       node("feature", "f:tests/x.feature", "x", {
         children: [
-          node("scenario", COIN, "coin", { line: 3 }),
+          node("scenario", COIN, "coin", { line: 3, tags: ["slow"] }),
           node("scenario", "s:tests/x.feature#2", "steady", { line: 6 }),
         ],
       }),
@@ -147,6 +147,9 @@ describe("flaky proof in the details pane", () => {
     );
     expect(order.indexOf("details-location")).toBeLessThan(order.indexOf("flaky-proof"));
     expect(order.indexOf("flaky-proof")).toBeLessThan(order.indexOf("details-error"));
+    // the tags have no test id
+    const tag = within(screen.getByTestId("details")).getByText("slow");
+    expect(tag.compareDocumentPosition(boxes()[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("lists the proof runs, newest first", () => {
@@ -184,6 +187,24 @@ describe("flaky proof in the details pane", () => {
     send({ type: "busy", busy: true });
     expect(reports().map((b) => b.disabled)).toEqual([true, true]);
     send({ type: "busy", busy: false });
+    expect(reports().map((b) => b.disabled)).toEqual([false, true]);
+    send({
+      type: "runStarted",
+      selection: COIN,
+      runId: "20261025-150000-000",
+      keys: [COIN],
+      total: 1,
+      startedAt: at(25, 15, 0),
+      env: "qa",
+    });
+    expect(reports().map((b) => b.disabled)).toEqual([true, true]); // a run in progress locks them
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 0,
+      summary: null,
+      reportAvailable: false,
+    });
     expect(reports().map((b) => b.disabled)).toEqual([false, true]);
   });
 
