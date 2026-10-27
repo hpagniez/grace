@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -9,6 +17,7 @@ import {
   clearHistory,
   createRunDir,
   listHistory,
+  listRuns,
   pruneHistory,
   readRunRecord,
   removeLeftoverRuns,
@@ -32,6 +41,7 @@ const record = (startedAt: number, extra: Partial<RunRecord> = {}): RunRecord =>
   durationMillis: 1000,
   env: null,
   threads: 1,
+  fingerprint: null,
   filter: NO_FILTER,
   selection: { kind: "folder", file: "", name: "", line: null, key: "d:" },
   failedOf: null,
@@ -149,7 +159,8 @@ describe("run.json", () => {
     runFolder(project, idAt(2));
     expect(readRunRecord(project, idAt(2))).toBeNull();
     const text = JSON.stringify(record(3));
-    runFolder(project, idAt(3), text + " ".repeat(64 * 1024 * 1024));
+    // grown with truncate: writing 64 MB takes over 5 s on the CI runner
+    truncateSync(path.join(runFolder(project, idAt(3), text), "run.json"), 64 * 1024 * 1024 + 1);
     expect(readRunRecord(project, idAt(3))).toBeNull();
     runFolder(project, idAt(4), text);
     expect(readRunRecord(project, idAt(4))).not.toBeNull();
@@ -207,6 +218,21 @@ describe("listHistory", () => {
       [idAt(2), false],
       [idAt(1), true],
     ]);
+  });
+});
+
+describe("listRuns", () => {
+  it("returns what listHistory lists", () => {
+    const project = tmp();
+    const records = [record(200, { env: "qa" }), record(300), record(100)];
+    records.forEach((r, i) => runFolder(project, idAt(i + 1), JSON.stringify(r)));
+    runFolder(project, idAt(4), "{not json");
+    writeFileSync(path.join(project, "runs", idAt(2), "karate-summary.html"), "<html></html>");
+    const runs = listRuns(project);
+    expect(runs.map((r) => r.id)).toEqual(listHistory(project).map((e) => e.id));
+    expect(runs.map((r) => r.id)).toEqual([idAt(2), idAt(1), idAt(3)]);
+    expect(runs.map((r) => r.record)).toEqual([records[1], records[0], records[2]]);
+    expect(runs.map((r) => r.reportAvailable)).toEqual([true, false, false]);
   });
 });
 

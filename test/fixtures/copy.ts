@@ -17,11 +17,15 @@ const projects = join(__dirname, "projects");
  * reading `rows.json` (row 2 fails).
  * `http` = the clean mock plus `/slow`, `/moved`, `/boom` and `/echo`; `tests/http.feature` makes every kind
  * of HTTP call (one scenario each) and `tests/shared.feature` shares one `callonce` call between two scenarios.
+ * `flaky` = a `karate-config-qa.js` overlay and `tests/coin.feature`: `coin` passes when `coin.json` next to the
+ * project folder holds `{ "heads": true }`, `steady` always passes. Unlike the others it is copied into
+ * `<temp dir>/project`, so a `coin.json` can sit next to it, outside the project and its fingerprint.
  */
 export function copyFixture(
-  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "http",
+  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "http" | "flaky",
 ): string {
-  const dest = mkdtempSync(join(tmpdir(), `kk-${name}-`));
+  const temp = mkdtempSync(join(tmpdir(), `kk-${name}-`));
+  const dest = name === "flaky" ? join(temp, "project") : temp;
   cpSync(join(projects, name === "broken" ? "clean" : name), dest, { recursive: true });
   if (name === "broken") cpSync(join(projects, "broken-extra"), dest, { recursive: true });
   return dest;

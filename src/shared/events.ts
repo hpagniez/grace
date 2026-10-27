@@ -1,5 +1,6 @@
 // Shared by main and renderer: keep this file free of Node imports.
 import type { EnvView } from "./env";
+import type { FlakyTest } from "./flaky";
 import type { HistoryEntry } from "./history";
 import type { HttpCall } from "./http";
 import type { Layout, Status, TestNode } from "./model";
@@ -66,5 +67,7 @@ export type AppEvent =
   | { type: "environment"; view: EnvView }
   /** The open project's listed runs, newest first. */
   | { type: "history"; runs: HistoryEntry[] }
+  /** The flaky tests of the tree last sent, by their key in it (F15). Follows every `project` and every `history` event. */
+  | { type: "flaky"; tests: FlakyTest[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
   | { type: "busy"; busy: boolean };

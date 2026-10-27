@@ -1,8 +1,10 @@
 import { createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
+import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { CallDetails } from "./CallDetails";
+import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { findNode, formatMillis, leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
@@ -54,7 +56,7 @@ function StepRow(props: { step: Step }) {
   );
 }
 
-function Leaf(props: { node: TestNode; state: AppState }) {
+function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
   const result = () => props.state.results[props.node.key];
   const steps = () => props.state.steps[props.node.key];
@@ -79,6 +81,16 @@ function Leaf(props: { node: TestNode; state: AppState }) {
             {(t) => <span class="rounded bg-zinc-200 px-1 text-xs dark:bg-zinc-700">{t}</span>}
           </For>
         </p>
+      </Show>
+      <Show when={props.state.flaky[props.node.key]}>
+        {(envs) => (
+          <FlakyProof
+            envs={envs()}
+            current={props.state.env?.env ?? null}
+            locked={props.state.run.active || props.state.busy}
+            api={props.api}
+          />
+        )}
       </Show>
       <Show when={status() === "failed" && result()?.error}>
         <pre
@@ -131,7 +143,7 @@ function Group(props: { node: TestNode; state: AppState }) {
   );
 }
 
-export function Details(props: { state: AppState }) {
+export function Details(props: { state: AppState; api: Api }) {
   const node = () =>
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
@@ -155,7 +167,7 @@ export function Details(props: { state: AppState }) {
                 when={n().kind === "scenario" || n().kind === "row"}
                 fallback={<Group node={n()} state={props.state} />}
               >
-                <Leaf node={n()} state={props.state} />
+                <Leaf node={n()} state={props.state} api={props.api} />
               </Show>
             )}
           </Show>
