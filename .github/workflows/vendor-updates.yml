@@ -1,0 +1,90 @@
+# Weekly draft PRs for a newer bundled JRE or Karate jar (ADR 0012). Marking one ready for review runs checks and test.
+name: vendor-updates
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# a run is never cut off between its push and its PR
+concurrency:
+  group: vendor-updates
+  cancel-in-progress: false
+
+jobs:
+  jre:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs jre
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/bump-pr.mjs jre "$FROM" "$TO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+
+  # Linux finds out whether Karate needs a PR; a branch already pushed without one gets its PR here
+  karate-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      todo: ${{ steps.pr.outputs.todo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs karate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: pr
+        if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/bump-pr.mjs karate "$FROM" "$TO" --check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+
+  # Windows only to record the event fixtures with the new bundled Java and jar
+  karate:
+    needs: karate-check
+    if: ${{ needs.karate-check.outputs.todo == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs karate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/fetch-vendor.mjs && node scripts/capture-fixtures.mjs
+        env:
+          # the default temp folder is an 8.3 short path (C:\Users\RUNNER~1\...) that the fixture sanitiser may miss
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+      - if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/bump-pr.mjs karate "$FROM" "$TO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}

@@ -4,6 +4,8 @@ name: checks
 on:
   pull_request:
     branches: [develop, main]
+    # ready_for_review: a bump PR opened by vendor-updates starts CI only when a person marks it ready
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
