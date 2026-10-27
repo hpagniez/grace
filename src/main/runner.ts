@@ -950,8 +950,9 @@ export class Runner {
       // Taken before the walk: a Cancel clicked during it must not turn a finished run into a cancelled one.
       const cancelled = this.cancelled && !fatal;
       // The walk comes before the end events: the window shows idle at `runFinished`, and a run is refused while we hold busy.
-      // A dispose is quitting the app: no second walk. A walk that rejects (a test seam only) reads as null.
-      const after = this.disposing ? null : await walk(root).catch(() => null);
+      // A dispose is quitting the app, and a first walk that gave null leaves nothing to compare: no second walk.
+      // A walk that rejects (a test seam only) reads as null.
+      const after = this.disposing || before === null ? null : await walk(root).catch(() => null);
       const done = end(fatal ? null : code, cancelled);
       store(done, before === after ? before : null);
       if (fatal) emit({ type: "notice", message: fatal.message });
