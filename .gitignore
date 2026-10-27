@@ -5,3 +5,4 @@ vendor/
 test-results/
 playwright-report/
 .superpowers/
+.impeccable/
