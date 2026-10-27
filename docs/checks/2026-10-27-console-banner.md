@@ -9,7 +9,7 @@ Spec: [Console banner](../specs/2026-10-27-console-banner.md).
 
 | Check | Result |
 |---|---|
-| `npm test` | 683/683 passed, including `src/renderer/bannerText.test.ts` (14), `src/renderer/Banner.test.tsx` (7), a new test in `src/renderer/Console.test.tsx` and 2 in `scripts/fetch-vendor.test.ts` |
+| `npm test` | 684/684 passed, including `src/renderer/bannerText.test.ts` (15), `src/renderer/Banner.test.tsx` (7), a new test in `src/renderer/Console.test.tsx` and 2 in `scripts/fetch-vendor.test.ts` |
 | `npm run e2e` | 103/103 passed, including the new `e2e/console.spec.ts` (2) |
 | `npm run typecheck`, `npm run lint` | passed |
 | `node scripts/fetch-vendor.mjs` after the pin refactor | `vendor ready`: the jar's SHA-256 still matches |

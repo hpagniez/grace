@@ -83,7 +83,8 @@ For where the versions come from:
    - no project: `Open a Karate project folder`
    - busy and no run active (opening, refreshing, or the discovery before a run): `Finding tests…`
    - a run active: `Starting Karate…`
-   - otherwise: `Ready. Press Run all, or ▶ on a test.`
+   - when Run all can run (the toolbar's rule: a tree, no discovery error, at least one test matching the tag filter): `Ready. Press Run all, or ▶ on a test.`
+   - otherwise no state line: the tests line or the tree says why (changed after the final review, 2026-10-27: "Ready" next to a disabled Run all read as a contradiction).
 2. The state line ends with a block cursor that blinks. It does not blink when the system asks for reduced motion. The cursor is hidden from screen readers.
 3. Once the console has output lines, the state line is gone and the lines follow the banner.
 
@@ -172,6 +173,11 @@ Feature: Console banner
   Scenario: Discovery failed
     Given a project is open and its discovery failed with an error
     Then the console shows "tests    could not be listed: see the message in the tree"
+    And the console shows no state line
+
+  Scenario: Nothing to run
+    Given a project is open whose tree has no scenarios, or whose tag filter matches none
+    Then the console shows no state line
 
   Scenario: The cursor stays still with reduced motion
     Given the system asks for reduced motion
