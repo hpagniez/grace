@@ -17,7 +17,7 @@
 - Branch `feature/flaky-tests`. The spec commit `767fa67` is on it. Conventional Commits with lower-case subjects. AGENTS.md rules apply: Solid 2, no `^` ranges, no new dependency (`node:crypto` and `node:fs/promises` are enough).
 - Fingerprint values, copied exactly:
   - One line per file: `<path relative to the root, / separators>\t<size in bytes>\t<Math.trunc(mtimeMs)>\n`. The lines are sorted with the default `Array.prototype.sort`. The fingerprint is the SHA-256 of the joined lines, as lowercase hex.
-  - Skipped folder names, compared in lower case at any depth: `.git`, `node_modules`, `target`, `build`, `.gradle`. Symbolic links and junctions are neither followed nor listed.
+  - Skipped folder names, compared in lower case at any depth: `.git`, `node_modules`, `.gradle`; and `target` and `build` only when the folder that contains them also directly contains `pom.xml`, `build.gradle` or `build.gradle.kts`. A test folder named `build` or `target` counts. Symbolic links and junctions are neither followed nor listed.
   - Null past `MAX_FILES = 50_000` files, past `WALK_TIMEOUT_MS = 2_000`, or on any read or stat error. Computing it never throws.
 - `run.json` keeps `version: 1`. `fingerprint` matches `/^[0-9a-f]{64}$/` or is null, and a missing field reads as null. `HistoryEntry` does not change.
 - UI copy, exactly:

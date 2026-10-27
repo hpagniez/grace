@@ -92,19 +92,52 @@ describe("projectFingerprint", () => {
     expect(after).not.toBe(before);
   });
 
-  it("skips build and tool folders at any depth and in any case", async () => {
+  it("skips tool folders at any depth and in any case", async () => {
     const root = project();
     const before = await projectFingerprint(root);
     put(root, {
       ".git/x": "1",
       "node_modules/x": "1",
-      "Target/x": "1",
-      "sub/build/x": "1",
+      "sub/Node_Modules/x": "1",
       ".GRADLE/x": "1",
     });
     expect(await projectFingerprint(root)).toBe(before);
     put(root, { "sub/targets/x": "1" });
     expect(await projectFingerprint(root)).not.toBe(before);
+  });
+
+  it("skips target and build next to a Maven or Gradle build file, at any depth and in any case", async () => {
+    const root = project();
+    put(root, {
+      "pom.xml": "<project/>",
+      "sub/build.gradle": "",
+      "sub/m/POM.XML": "",
+      "k/Build.Gradle.kts": "",
+    });
+    const before = await projectFingerprint(root);
+    put(root, {
+      "Target/x": "1",
+      "sub/build/x": "1",
+      "sub/m/target/x": "1",
+      "k/BUILD/x": "1",
+    });
+    expect(await projectFingerprint(root)).toBe(before);
+  });
+
+  it("counts a test folder named build or target", async () => {
+    const root = project();
+    const before = await projectFingerprint(root);
+    put(root, { "tests/build/x.feature": "1" });
+    const withBuild = await projectFingerprint(root);
+    expect(withBuild).not.toBe(before);
+    put(root, { "tests/target/x.feature": "1" });
+    const withBoth = await projectFingerprint(root);
+    expect(withBoth).not.toBe(withBuild);
+    // the build file is in the parent folder, not beside the folder
+    put(root, { "pom.xml": "<project/>" });
+    const withPom = await projectFingerprint(root);
+    put(root, { "tests/build/y.feature": "2" });
+    expect(await projectFingerprint(root)).not.toBe(withPom);
   });
 
   it("does not follow or list a junction", async () => {
