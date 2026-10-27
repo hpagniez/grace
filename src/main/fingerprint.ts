@@ -15,7 +15,8 @@ export const WALK_TIMEOUT_MS = 2_000;
 /**
  * The SHA-256, lower-case hex, of one `<relative path>\t<size>\t<mtime ms>\n` line per file, sorted.
  * Symbolic links and junctions are neither followed nor listed. Null past `maxFiles` files, past
- * `timeoutMs`, or on any read or stat error. Never throws; the walk is asynchronous, so it never blocks.
+ * `timeoutMs` (even if a read or a stat never returns), or on any read or stat error. Never throws; the
+ * walk is asynchronous, so it never blocks.
  */
 export async function projectFingerprint(
   root: string,
@@ -27,12 +28,18 @@ export async function projectFingerprint(
   const deadline = Date.now() + limits.timeoutMs;
   const lines: string[] = [];
   let files = 0;
+  // Set once the result is known (null or done). A walk still running then stops before its next folder
+  // or stat; one waiting on a read or stat that never returns is only abandoned.
+  let stop = false;
+  const check = () => {
+    if (stop || Date.now() >= deadline || files > limits.maxFiles) throw new Error("limit");
+  };
 
-  // A walk that is still running when another gave up stops at its next limit check, which fails too.
   async function walk(dir: string, rel: string): Promise<void> {
+    check();
     const entries = await readdir(dir, { withFileTypes: true });
     for (const e of entries) if (!e.isDirectory() && !e.isSymbolicLink()) files++;
-    if (Date.now() >= deadline || files > limits.maxFiles) throw new Error("limit");
+    check();
     const hasBuildFile = entries.some(
       (e) => e.isFile() && BUILD_FILES.includes(e.name.toLowerCase()),
     );
@@ -47,16 +54,24 @@ export async function projectFingerprint(
             await walk(entryPath, entryRel);
           return;
         }
+        check();
         const st = await lstat(entryPath);
         lines.push(`${entryRel}\t${st.size}\t${Math.trunc(st.mtimeMs)}\n`);
       }),
     );
   }
 
+  let timer: NodeJS.Timeout | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("timeout")), limits.timeoutMs);
+  });
   try {
-    await walk(root, "");
+    await Promise.race([walk(root, ""), timedOut]);
   } catch {
     return null;
+  } finally {
+    stop = true;
+    clearTimeout(timer);
   }
   return createHash("sha256").update(lines.sort().join("")).digest("hex");
 }
