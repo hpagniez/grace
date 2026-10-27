@@ -2105,6 +2105,26 @@ describe("Runner history", () => {
     expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
   });
 
+  it("the stored duration ends when Java exits, not after the second walk", T, async () => {
+    let walks = 0;
+    let secondWalkAt = 0;
+    const fake = async () => {
+      if (++walks === 2) {
+        secondWalkAt = Date.now();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      return "a".repeat(64);
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { startedAt, durationMillis } = record(dataDir, root, id);
+    // the walk starts right after the exit, so a run that ended there is over by then
+    expect(startedAt + durationMillis).toBeLessThanOrEqual(secondWalkAt);
+  });
+
   it("the second walk comes before runFinished", T, async () => {
     let walks = 0;
     let finishedAtSecondWalk: boolean | undefined;

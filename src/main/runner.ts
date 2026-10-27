@@ -846,16 +846,20 @@ export class Runner {
         tree,
         leaves.map((n) => n.key),
       );
-      /** Writes run.json (R2), applies retention and sends `history`. A failure is a notice: it must not replace the run's outcome. */
+      /**
+       * Writes run.json (R2), applies retention and sends `history`; the run lasted until `endedAt`. A
+       * failure is a notice: it must not replace the run's outcome.
+       */
       const store = (
         done: Extract<AppEvent, { type: "runFinished" }>,
         fingerprint: string | null,
+        endedAt: number,
       ) => {
         try {
           const record: RunRecord = {
             version: 1,
             startedAt,
-            durationMillis: Date.now() - startedAt,
+            durationMillis: endedAt - startedAt,
             env,
             threads,
             fingerprint,
@@ -914,7 +918,7 @@ export class Runner {
         // without the pid file a crash of the app would leave this JVM running: do not run
         await proc.kill();
         this.proc = null;
-        store(end(null, false), null);
+        store(end(null, false), null, Date.now());
         emit({ type: "notice", message: (err as Error).message });
         return;
       }
@@ -942,6 +946,7 @@ export class Runner {
       };
       const timer = setInterval(poll, this.o.pollMs ?? 100);
       const code = await proc.exit;
+      const exitedAt = Date.now(); // the run's end: the walk below is not part of its duration
       clearInterval(timer);
       poll();
       this.proc = null;
@@ -954,7 +959,7 @@ export class Runner {
       // A walk that rejects (a test seam only) reads as null.
       const after = this.disposing || before === null ? null : await walk(root).catch(() => null);
       const done = end(fatal ? null : code, cancelled);
-      store(done, before === after ? before : null);
+      store(done, before === after ? before : null, exitedAt);
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
