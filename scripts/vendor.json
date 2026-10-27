@@ -6,10 +6,10 @@
     "file": "jre.zip"
   },
   "karate": {
-    "version": "2.1.3",
-    "url": "https://github.com/karatelabs/karate/releases/download/v2.1.3/karate-2.1.3.jar",
-    "sha256": "c0126f3ad907e4e92a9944a0bfa4deae96beae599daf8513f47169516b5714c0",
-    "file": "karate-2.1.3.jar"
+    "version": "2.1.4",
+    "url": "https://github.com/karatelabs/karate/releases/download/v2.1.4/karate-2.1.4.jar",
+    "sha256": "1f743f4acc56526b39bd88c84bfe4491c46d5e94f4ab5a38c437c9400dbc2488",
+    "file": "karate-2.1.4.jar"
   },
   "license": {
     "url": "https://raw.githubusercontent.com/karatelabs/karate/v2.1.4/LICENSE",
