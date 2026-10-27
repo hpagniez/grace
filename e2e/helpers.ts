@@ -186,6 +186,7 @@ export function seedRuns(
       durationMillis: 5_000,
       env: null,
       threads: 1,
+      fingerprint: null,
       filter: { ...NO_FILTER },
       selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
       failedOf: null,

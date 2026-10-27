@@ -24,6 +24,7 @@ import {
   type FilterState,
 } from "../shared/tags";
 import { THREADS_ERROR, validThreads } from "../shared/threads";
+import { projectFingerprint } from "./fingerprint";
 import {
   clearHistory as removeRuns,
   createRunDir,
@@ -136,6 +137,8 @@ export class Runner {
   private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
   private cancelled = false;
+  /** Set by `dispose` alone (`cancel` leaves it): the app is quitting, so a run skips its second walk. */
+  private disposing = false;
   private report: string | null = null;
   private readonly pidFile: string;
 
@@ -146,6 +149,8 @@ export class Runner {
       secrets: SecretBox;
       emit: (e: AppEvent) => void;
       pollMs?: number;
+      /** A test seam; the default is `projectFingerprint`. */
+      fingerprint?: (root: string) => Promise<string | null>;
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
@@ -380,6 +385,7 @@ export class Runner {
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
   async dispose(): Promise<void> {
+    this.disposing = true;
     this.cancelled = true;
     // The kill ends the run's process; the run then writes its record before `running` settles.
     await within(Promise.allSettled([this.proc?.kill(), this.running]), 10_000);
@@ -793,6 +799,15 @@ export class Runner {
     failedOf: number | null;
   }): Promise<void> {
     const { tree, leaves, filter, threads, env, props, selection, failedOf } = o;
+    const { root } = this.project!;
+    const walk = this.o.fingerprint ?? projectFingerprint;
+    // A file saved while Java runs could be what made a test flip: the run keeps its fingerprint
+    // only if the walk after the run finds what this one does (F15).
+    const before = await walk(root);
+    if (this.cancelled) {
+      this.o.emit({ type: "notice", message: "Run cancelled" });
+      return;
+    }
     this.report = null;
     const projectDir = this.projectDir();
     const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
@@ -812,8 +827,10 @@ export class Runner {
         leaves.map((n) => n.key),
       );
       /** Writes run.json (R2), applies retention and sends `history`. A failure is a notice: it must not replace the run's outcome. */
-      const store = (done: Extract<AppEvent, { type: "runFinished" }>) => {
-        ended = true;
+      const store = (
+        done: Extract<AppEvent, { type: "runFinished" }>,
+        fingerprint: string | null,
+      ) => {
         try {
           const record: RunRecord = {
             version: 1,
@@ -821,6 +838,7 @@ export class Runner {
             durationMillis: Date.now() - startedAt,
             env,
             threads,
+            fingerprint,
             filter,
             selection: selection && {
               kind: selection.kind,
@@ -845,16 +863,19 @@ export class Runner {
         }
       };
       const report = path.join(outDir, "karate-summary.html");
-      /** Sends the end events, then stores the run. An exit code of null forces outcome 'failed'. */
+      /** Sends the end events and returns `runFinished`, for `store`. An exit code of null forces outcome 'failed'. */
       const end = (code: number | null, cancelled: boolean) => {
+        ended = true;
+        let done: Extract<AppEvent, { type: "runFinished" }> | undefined;
         for (let e of state.finish(code, cancelled, false)) {
           if (e.type === "runFinished") {
             this.report = e.outcome === "finished" && existsSync(report) ? report : null;
             e = { ...e, reportAvailable: this.report !== null };
-            emit(e);
-            store(e);
-          } else emit(e);
+            done = e;
+          }
+          emit(e);
         }
+        return done!;
       };
       const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
       const proc = this.spawn(
@@ -873,7 +894,7 @@ export class Runner {
         // without the pid file a crash of the app would leave this JVM running: do not run
         await proc.kill();
         this.proc = null;
-        end(null, false);
+        store(end(null, false), null);
         emit({ type: "notice", message: (err as Error).message });
         return;
       }
@@ -906,7 +927,10 @@ export class Runner {
       this.proc = null;
       rmSync(this.pidFile, { force: true });
 
-      end(fatal ? null : code, this.cancelled && !fatal);
+      const done = end(fatal ? null : code, this.cancelled && !fatal);
+      // dispose is quitting the app: no second walk
+      const after = this.disposing ? null : await walk(root);
+      store(done, before !== null && before === after ? before : null);
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
