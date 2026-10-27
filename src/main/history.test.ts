@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -151,7 +159,8 @@ describe("run.json", () => {
     runFolder(project, idAt(2));
     expect(readRunRecord(project, idAt(2))).toBeNull();
     const text = JSON.stringify(record(3));
-    runFolder(project, idAt(3), text + " ".repeat(64 * 1024 * 1024));
+    // grown with truncate: writing 64 MB takes over 5 s on the CI runner
+    truncateSync(path.join(runFolder(project, idAt(3), text), "run.json"), 64 * 1024 * 1024 + 1);
     expect(readRunRecord(project, idAt(3))).toBeNull();
     runFolder(project, idAt(4), text);
     expect(readRunRecord(project, idAt(4))).not.toBeNull();
