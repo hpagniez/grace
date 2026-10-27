@@ -28,7 +28,7 @@ Success:
 - Dependencies Dependabot already covers: Electron (and its Chromium), npm packages, GitHub Actions.
 - Re-checking automatically that `RESERVED_KARATE_KEYS` (`src/shared/env.ts`) still lists every system property Karate reads. The PR body asks the reviewer to check it.
 - A token secret or GitHub App so CI starts without a click (approach 2, not chosen).
-- Merging on its own. The maintainer may add the `merge-when-green` label ([ADR 0011](https://github.com/Tusquito/karate-kid/pull/28), open) like on any PR.
+- Merging on its own. The maintainer may add the `merge-when-green` label ([ADR 0011](../decisions/0011-merge-labelled-prs-when-ci-is-green.md)) like on any PR.
 - Other operating systems' JREs.
 
 **Anti-goals** (failure even if everything else works):
