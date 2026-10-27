@@ -23,6 +23,7 @@ import type { RunRecord, StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import { matchingLeaves, NO_FILTER, projectTags, type TagFilter } from "../shared/tags";
 import { THREADS_ERROR } from "../shared/threads";
+import { projectFingerprint } from "./fingerprint";
 import { createRunDir, writeRunRecord } from "./history";
 import { buildArgs, detectLayout, tagArgs } from "./karate/command";
 import { readAllEvents } from "./karate/events";
@@ -58,6 +59,7 @@ function setup(
   dataDir = mkdtempSync(path.join(tmpdir(), "kk-data-")),
   secrets: SecretBox = fakeSecretBox(),
   paths: VendorPaths = vendor,
+  fingerprint?: (root: string) => Promise<string | null>,
 ) {
   temps.push(dataDir);
   const events: AppEvent[] = [];
@@ -70,6 +72,7 @@ function setup(
       events.push(e);
       listener(e);
     },
+    fingerprint,
   });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
@@ -203,6 +206,7 @@ describe("Runner discovery", () => {
     expect(events).toEqual([
       { type: "busy", busy: true },
       { type: "project", project: null, tree: null, error: `Folder not found: ${missing}` },
+      { type: "flaky", tests: [] },
       { type: "busy", busy: false },
     ]);
   });
@@ -227,6 +231,7 @@ describe("Runner discovery", () => {
       { type: "threads", count: 1 },
       last("environment"),
       last("history"),
+      last("flaky"),
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);
@@ -603,6 +608,7 @@ describe("Runner tag filter", () => {
       { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
+      second.last("flaky"),
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);
@@ -795,10 +801,12 @@ describe("Runner environment", () => {
     });
     expect(typesAfter(events, 0)).toEqual([
       "project",
+      "flaky",
       "filter",
       "threads",
       "environment",
       "history",
+      "flaky",
     ]);
   });
 
@@ -812,10 +820,12 @@ describe("Runner environment", () => {
     await runner.setEnv("qa");
     expect(typesAfter(events, from)).toEqual([
       "project",
+      "flaky",
       "filter",
       "threads",
       "environment",
       "history",
+      "flaky",
     ]);
     expect(names(last("project").tree)).toContain("qa only");
     expect(last("environment").view.env).toBe("qa");
@@ -864,6 +874,7 @@ describe("Runner environment", () => {
       { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
+      second.last("flaky"),
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);
@@ -932,6 +943,7 @@ describe("Runner environment", () => {
       "threads",
       "environment",
       "history",
+      "flaky",
       "notice",
     ]);
     expect(all("project").at(-1)).toEqual(before);
@@ -1394,50 +1406,52 @@ describe("Runner properties", () => {
   });
 });
 
+/** The run folder names of the project, oldest first. */
+const folders = (dataDir: string, root: string) => {
+  try {
+    return readdirSync(path.join(projectDir(dataDir, root), "runs")).sort();
+  } catch {
+    return [];
+  }
+};
+const recordFile = (dataDir: string, root: string, id: string) =>
+  path.join(projectDir(dataDir, root), "runs", id, "run.json");
+const record = (dataDir: string, root: string, id: string): RunRecord =>
+  JSON.parse(readFileSync(recordFile(dataDir, root, id), "utf8"));
+/** Run All records, oldest first, with `over` applied to each. */
+const seed = (dataDir: string, root: string, count: number, over: Partial<RunRecord> = {}) =>
+  Array.from({ length: count }, (_, i) => {
+    const at = new Date(2020, 0, 1, 0, 0, i);
+    const { id, dir } = createRunDir(projectDir(dataDir, root), at);
+    writeRunRecord(dir, {
+      version: 1,
+      startedAt: at.getTime(),
+      durationMillis: 1000,
+      env: null,
+      threads: 1,
+      fingerprint: null,
+      filter: NO_FILTER,
+      selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
+      failedOf: null,
+      outcome: "finished",
+      exitCode: 0,
+      tests: [],
+      ...over,
+    });
+    return id;
+  });
+const stored = (n: TestNode, status: StoredTest["status"]): StoredTest => ({
+  kind: n.kind as StoredTest["kind"],
+  file: n.file,
+  refId: n.refId!,
+  name: n.name,
+  line: n.line,
+  key: n.key,
+  status,
+});
+
 describe("Runner history", () => {
   const SECRET = "s3cret-token-123";
-  /** The run folder names of the project, oldest first. */
-  const folders = (dataDir: string, root: string) => {
-    try {
-      return readdirSync(path.join(projectDir(dataDir, root), "runs")).sort();
-    } catch {
-      return [];
-    }
-  };
-  const recordFile = (dataDir: string, root: string, id: string) =>
-    path.join(projectDir(dataDir, root), "runs", id, "run.json");
-  const record = (dataDir: string, root: string, id: string): RunRecord =>
-    JSON.parse(readFileSync(recordFile(dataDir, root, id), "utf8"));
-  /** Run All records, oldest first, with `over` applied to each. */
-  const seed = (dataDir: string, root: string, count: number, over: Partial<RunRecord> = {}) =>
-    Array.from({ length: count }, (_, i) => {
-      const at = new Date(2020, 0, 1, 0, 0, i);
-      const { id, dir } = createRunDir(projectDir(dataDir, root), at);
-      writeRunRecord(dir, {
-        version: 1,
-        startedAt: at.getTime(),
-        durationMillis: 1000,
-        env: null,
-        threads: 1,
-        filter: NO_FILTER,
-        selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
-        failedOf: null,
-        outcome: "finished",
-        exitCode: 0,
-        tests: [],
-        ...over,
-      });
-      return id;
-    });
-  const stored = (n: TestNode, status: StoredTest["status"]): StoredTest => ({
-    kind: n.kind as StoredTest["kind"],
-    file: n.file,
-    refId: n.refId!,
-    name: n.name,
-    line: n.line,
-    key: n.key,
-    status,
-  });
   const smoke = { include: ["smoke"], exclude: [], hideNonMatching: false };
   const GONE = "This run is no longer in the history";
 
@@ -1601,6 +1615,7 @@ describe("Runner history", () => {
       { type: "threads", count: 1 },
       last("environment"),
       last("history"),
+      last("flaky"),
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);
@@ -2029,6 +2044,229 @@ describe("Runner history", () => {
     expect(runner.runReportPath(cancelled)).toBeNull();
     expect(runner.runReportPath("20200101-000000-000")).toBeNull();
     expect(runner.runReportPath(`${done}\\..\\${done}`)).toBeNull();
+  });
+
+  it("a run of an unchanged project stores its fingerprint", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { fingerprint } = record(dataDir, root, id);
+    expect(fingerprint).not.toBeNull();
+    expect(fingerprint).toBe(await projectFingerprint(root));
+  });
+
+  it("a file saved during a run stores no fingerprint", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    writeFileSync(path.join(root, "note.txt"), "saved during the run");
+    await run;
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("different walks store no fingerprint", T, async () => {
+    const walks = ["a".repeat(64), "b".repeat(64)];
+    const fake = async () => walks.shift()!;
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toEqual([]);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("a cancel during the first walk starts no Java", T, async () => {
+    let runner: Runner | undefined;
+    const fake = async () => {
+      await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.all("runStarted")).toHaveLength(0);
+    expect(s.last("notice").message).toBe("Run cancelled");
+    expect(folders(s.dataDir, root)).toEqual([]);
+  });
+
+  it("dispose skips the second walk", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return "a".repeat(64);
+    };
+    const { runner, all, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    await runner.dispose();
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "cancelled", fingerprint: null });
+    await run;
+  });
+
+  it("a first walk that gave null skips the second", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return null;
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+
+  it("the stored duration ends when Java exits, not after the second walk", T, async () => {
+    let walks = 0;
+    let secondWalkAt = 0;
+    const fake = async () => {
+      if (++walks === 2) {
+        secondWalkAt = Date.now();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      return "a".repeat(64);
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { startedAt, durationMillis } = record(dataDir, root, id);
+    // the walk starts right after the exit, so a run that ended there is over by then
+    expect(startedAt + durationMillis).toBeLessThanOrEqual(secondWalkAt);
+  });
+
+  it("the second walk comes before runFinished", T, async () => {
+    let walks = 0;
+    let finishedAtSecondWalk: boolean | undefined;
+    const fake = async () => {
+      if (++walks === 2) finishedAtSecondWalk = s.all("runFinished").length > 0;
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await s.runner.open(root);
+    await s.runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(finishedAtSecondWalk).toBe(false);
+    const types = s.events.map((e) => e.type);
+    expect(types.lastIndexOf("runFinished")).toBeLessThan(types.lastIndexOf("history"));
+  });
+
+  it("a cancel during the second walk keeps the run's outcome", T, async () => {
+    let runner: Runner | undefined;
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.last("runFinished").outcome).toBe("finished");
+    const [id] = folders(s.dataDir, root);
+    expect(record(s.dataDir, root, id)).toMatchObject({
+      outcome: "finished",
+      fingerprint: "a".repeat(64),
+    });
+  });
+
+  it("a failing second walk still ends the run", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) throw new Error("walk failed");
+      return "a".repeat(64);
+    };
+    const { runner, all, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(all("runFinished")).toHaveLength(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+});
+
+describe("Runner flaky", () => {
+  const FP = "a".repeat(64);
+  const hello = (status: StoredTest["status"]): StoredTest => ({
+    kind: "scenario",
+    file: "tests/basic.feature",
+    refId: "[1:7]",
+    name: "passing hello",
+    line: 7,
+    key: "s:tests/basic.feature#1",
+    status,
+  });
+  /** Two runs of the same files: `passing hello` passed in the older and failed in the newer. */
+  function seedFlaky(dataDir: string, root: string) {
+    const [, newer] = seed(dataDir, root, 2, { fingerprint: FP, tests: [hello("passed")] });
+    const file = recordFile(dataDir, root, newer);
+    writeFileSync(
+      file,
+      JSON.stringify({ ...record(dataDir, root, newer), tests: [hello("failed")] }),
+    );
+  }
+
+  it("sends the flaky tests with the history", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    expect(last("flaky").tests).toMatchObject([
+      { key: "s:tests/basic.feature#1", envs: [{ env: null, passed: 1, failed: 1 }] },
+    ]);
+    expect(runner.replay()).toContainEqual(last("flaky"));
+  });
+
+  it("follows a new tree", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    const file = path.join(root, "tests", "basic.feature");
+    writeFileSync(
+      file,
+      readFileSync(file, "utf8").replace(
+        /(@smoke\r?\nScenario: passing hello)/,
+        "Scenario: added\n  * match 1 == 1\n\n$1",
+      ),
+    );
+    await runner.refresh();
+    const key = byName(last("project").tree!, "passing hello").key;
+    expect(key).not.toBe("s:tests/basic.feature#1");
+    // sent with the new tree, before the history that follows it
+    expect(events[events.lastIndexOf(last("project")) + 1]).toMatchObject({
+      type: "flaky",
+      tests: [{ key }],
+    });
+    expect(last("flaky").tests.map((t) => t.key)).toEqual([key]);
+  });
+
+  it("clear history leaves no flaky tests", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    expect(last("flaky").tests).toHaveLength(1);
+    runner.clearHistory();
+    expect(last("history").runs).toEqual([]);
+    expect(last("flaky").tests).toEqual([]);
   });
 });
 
