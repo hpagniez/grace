@@ -23,8 +23,11 @@ export function titleFor(dep, from, to) {
   return `build(deps): bump ${dep === "jre" ? "temurin jre" : "karate"} from ${from} to ${to}`;
 }
 
-/** Older open bump PRs of `dep`: bot-only drafts to close, the others to name in the new PR. */
-export function supersedePlan(prs, dep, to) {
+/**
+ * Older open bump PRs of `dep`: bot-only drafts to close, the others to name in the new PR.
+ * `commitsOf(number)` is asked only for older drafts: listing every PR's commit authors at once exceeds GitHub's GraphQL node limit.
+ */
+export function supersedePlan(prs, dep, to, commitsOf) {
   const parse = PARSE[dep];
   const target = parse(to);
   const close = [];
@@ -32,16 +35,18 @@ export function supersedePlan(prs, dep, to) {
   for (const pr of prs) {
     const v = parse(versionFromBranch(dep, pr.headRefName) ?? "");
     if (!v || compareVersions(v, target) >= 0) continue;
-    const botOnly = pr.commits.every((c) => c.authors.every((a) => a.email === BOT_EMAIL));
-    (pr.isDraft && botOnly ? close : keep).push(pr.number);
+    const botOnly =
+      pr.isDraft &&
+      commitsOf(pr.number).every((c) => c.authors.every((a) => a.email === BOT_EMAIL));
+    (botOnly ? close : keep).push(pr.number);
   }
   return { close, keep };
 }
 
-/** Whether Karate's RunCommand.java is among the files of a GitHub compare, which lists at most 300. */
-export function runCommandStatus(files) {
-  if (files.some((f) => f.filename.endsWith("/RunCommand.java"))) return "changed";
-  return files.length >= 300 ? "unknown" : "unchanged";
+/** Whether Karate's RunCommand.java is among the file names of a GitHub compare, which lists at most 300. */
+export function runCommandStatus(filenames) {
+  if (filenames.some((f) => f.endsWith("/RunCommand.java"))) return "changed";
+  return filenames.length >= 300 ? "unknown" : "unchanged";
 }
 
 /** @param {{ dep: string, from: string, to: string, keep: number[], runCommand?: string }} o */
@@ -76,78 +81,84 @@ export function prBody({ dep, from, to, keep, runCommand }) {
   return parts.join("\n\n") + "\n";
 }
 
-const run = (cmd, args, input) => execFileSync(cmd, args, { encoding: "utf8", input });
-const gitCommit = (message) =>
-  run("git", [
-    "-c",
-    "user.name=github-actions[bot]",
-    "-c",
-    `user.email=${BOT_EMAIL}`,
-    "commit",
-    "-m",
-    message,
-  ]);
+/** Runs `git` or `gh` without a shell and returns stdout; throws on a non-zero exit. */
+const execRun = (cmd, args, input) =>
+  execFileSync(cmd, args, { encoding: "utf8", input, maxBuffer: 64 << 20 });
 
-function output(todo) {
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `todo=${todo}\n`);
-}
-
-function main() {
-  const [dep, from, to, flag] = process.argv.slice(2);
-  if (!PARSE[dep] || !from || !to || (flag && flag !== "--check")) {
-    console.error("usage: node scripts/bump-pr.mjs <jre|karate> <from> <to> [--check]");
-    process.exit(2);
-  }
+/**
+ * Opens the draft PR for `dep` moving from `from` to `to`, committing and pushing the branch first unless it exists.
+ * Returns true only in check mode, when the branch is new and the Windows job must record the fixtures.
+ * @param {{ dep: string, from: string, to: string, check: boolean }} o
+ * @param {(cmd: string, args: string[], input?: string) => string} run
+ */
+export function openBumpPr({ dep, from, to, check }, run = execRun) {
+  const gh = (...args) => JSON.parse(run("gh", args));
+  const commit = (message) =>
+    run("git", [
+      "-c",
+      "user.name=github-actions[bot]",
+      "-c",
+      `user.email=${BOT_EMAIL}`,
+      "commit",
+      "-m",
+      message,
+    ]);
   const branch = branchName(dep, to);
-  const prs = JSON.parse(
-    run("gh", ["pr", "list", "--head", branch, "--state", "all", "--json", "number"]),
-  );
+  const prs = gh("pr", "list", "--head", branch, "--state", "all", "--json", "number");
   if (prs.length) {
     console.log(`${branch}: already has a PR (#${prs[0].number})`);
-    return output(false);
+    return false;
   }
   const exists =
     run("git", ["ls-remote", "--heads", "origin", `refs/heads/${branch}`]).trim() !== "";
-  if (flag === "--check" && !exists) {
+  if (check && !exists) {
     console.log(`${branch}: new, the Windows job records the fixtures`);
-    return output(true);
+    return true;
   }
   if (!exists) {
     run("git", ["switch", "-c", branch]);
     run("git", ["add", "scripts/vendor.json"]);
-    gitCommit(titleFor(dep, from, to));
+    commit(titleFor(dep, from, to));
     if (dep === "karate") {
       run("git", ["add", "test/fixtures/events"]);
       try {
         run("git", ["diff", "--cached", "--quiet"]);
       } catch {
-        gitCommit(`test(fixtures): record events with karate ${to}`);
+        commit(`test(fixtures): record events with karate ${to}`);
       }
     }
     run("git", ["push", "origin", branch]);
   }
-  const open = JSON.parse(
-    run("gh", [
-      "pr",
-      "list",
-      "--state",
-      "open",
-      "--base",
-      "develop",
-      "--limit",
-      "100",
-      "--json",
-      "number,headRefName,isDraft,commits",
-    ]),
+  const open = gh(
+    "pr",
+    "list",
+    "--state",
+    "open",
+    "--base",
+    "develop",
+    "--limit",
+    "100",
+    "--json",
+    "number,headRefName,isDraft",
   );
-  const { close, keep } = supersedePlan(open, dep, to);
-  let runCommand;
-  if (dep === "karate") {
-    const compare = JSON.parse(
-      run("gh", ["api", `repos/karatelabs/karate/compare/v${from}...v${to}`]),
-    );
-    runCommand = runCommandStatus(compare.files ?? []);
-  }
+  const { close, keep } = supersedePlan(
+    open,
+    dep,
+    to,
+    (n) => gh("pr", "view", String(n), "--json", "commits").commits,
+  );
+  // file names only: the full compare is over 1 MB
+  const runCommand =
+    dep === "karate"
+      ? runCommandStatus(
+          gh(
+            "api",
+            `repos/karatelabs/karate/compare/v${from}...v${to}`,
+            "--jq",
+            "[.files[]?.filename]",
+          ),
+        )
+      : undefined;
   const body = prBody({ dep, from, to, keep, runCommand });
   const url = run(
     "gh",
@@ -177,7 +188,17 @@ function main() {
       `Superseded by #${number}`,
       "--delete-branch",
     ]);
-  output(false);
+  return false;
+}
+
+function main() {
+  const [dep, from, to, flag] = process.argv.slice(2);
+  if (!PARSE[dep] || !from || !to || (flag && flag !== "--check")) {
+    console.error("usage: node scripts/bump-pr.mjs <jre|karate> <from> <to> [--check]");
+    process.exit(2);
+  }
+  const todo = openBumpPr({ dep, from, to, check: flag === "--check" });
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `todo=${todo}\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
