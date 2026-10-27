@@ -91,6 +91,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
             >
               <span
                 data-testid="flaky-mark"
+                role="img" // aria-label names only an element with a role
                 title={FLAKY_TITLE}
                 aria-label={FLAKY_TITLE}
                 class={FLAKY_CHIP}

@@ -326,7 +326,7 @@ describe("flaky marks", () => {
             node("feature", "f:tests/x.feature", "x", {
               file: "tests/x.feature",
               children: [
-                node("scenario", SCENARIO, "coin", { line: 3 }),
+                node("scenario", SCENARIO, "coin", { line: 3, tags: ["slow"] }),
                 node("scenario", STEADY, "steady", { line: 6 }),
                 node("outline", "o:tests/x.feature#3", "sum <a>", {
                   children: [
@@ -376,9 +376,24 @@ describe("flaky marks", () => {
       expect(markOf(key)).toBeNull();
       expect(countOf(key)).toBeNull();
     }
-    // the mark sits after the tags and before the run button
-    const order = [...rowOf(SCENARIO).children].map((c) => (c as HTMLElement).dataset.testid);
-    expect(order.indexOf("flaky-mark")).toBe(order.indexOf("run-node") - 1);
+    // the mark sits right after the tags and right before the run button
+    const cells = [...rowOf(SCENARIO).children] as HTMLElement[];
+    const tag = cells.findIndex((c) => c.textContent === "slow");
+    expect(tag).toBeGreaterThan(-1);
+    expect(cells[tag + 1].dataset.testid).toBe("flaky-mark");
+    expect(cells[tag + 2].dataset.testid).toBe("run-node");
+  });
+
+  it("names the mark for a screen reader", () => {
+    const { send } = setup();
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: flakyTree(),
+      error: null,
+    });
+    send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
+    expect(screen.getByRole("img", { name: FLAKY_TITLE })).toBe(markOf(SCENARIO));
   });
 
   it("counts a flaky test the tag filter hides", () => {
