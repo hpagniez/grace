@@ -9,6 +9,7 @@ import {
   clearHistory,
   createRunDir,
   listHistory,
+  listRuns,
   pruneHistory,
   readRunRecord,
   removeLeftoverRuns,
@@ -208,6 +209,21 @@ describe("listHistory", () => {
       [idAt(2), false],
       [idAt(1), true],
     ]);
+  });
+});
+
+describe("listRuns", () => {
+  it("returns what listHistory lists", () => {
+    const project = tmp();
+    const records = [record(200, { env: "qa" }), record(300), record(100)];
+    records.forEach((r, i) => runFolder(project, idAt(i + 1), JSON.stringify(r)));
+    runFolder(project, idAt(4), "{not json");
+    writeFileSync(path.join(project, "runs", idAt(2), "karate-summary.html"), "<html></html>");
+    const runs = listRuns(project);
+    expect(runs.map((r) => r.id)).toEqual(listHistory(project).map((e) => e.id));
+    expect(runs.map((r) => r.id)).toEqual([idAt(2), idAt(1), idAt(3)]);
+    expect(runs.map((r) => r.record)).toEqual([records[1], records[0], records[2]]);
+    expect(runs.map((r) => r.reportAvailable)).toEqual([true, false, false]);
   });
 });
 

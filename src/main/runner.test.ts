@@ -198,6 +198,7 @@ describe("Runner discovery", () => {
     expect(events).toEqual([
       { type: "busy", busy: true },
       { type: "project", project: null, tree: null, error: `Folder not found: ${missing}` },
+      { type: "flaky", tests: [] },
       { type: "busy", busy: false },
     ]);
   });
@@ -215,6 +216,7 @@ describe("Runner discovery", () => {
       { type: "threads", count: 1 },
       last("environment"),
       last("history"),
+      last("flaky"),
       { type: "busy", busy: false },
     ]);
   });
@@ -590,6 +592,7 @@ describe("Runner tag filter", () => {
       { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
+      second.last("flaky"),
       { type: "busy", busy: false },
     ]);
   });
@@ -779,10 +782,12 @@ describe("Runner environment", () => {
     });
     expect(typesAfter(events, 0)).toEqual([
       "project",
+      "flaky",
       "filter",
       "threads",
       "environment",
       "history",
+      "flaky",
     ]);
   });
 
@@ -796,10 +801,12 @@ describe("Runner environment", () => {
     await runner.setEnv("qa");
     expect(typesAfter(events, from)).toEqual([
       "project",
+      "flaky",
       "filter",
       "threads",
       "environment",
       "history",
+      "flaky",
     ]);
     expect(names(last("project").tree)).toContain("qa only");
     expect(last("environment").view.env).toBe("qa");
@@ -848,6 +855,7 @@ describe("Runner environment", () => {
       { type: "threads", count: 1 },
       second.last("environment"),
       second.last("history"),
+      second.last("flaky"),
       { type: "busy", busy: false },
     ]);
   });
@@ -915,6 +923,7 @@ describe("Runner environment", () => {
       "threads",
       "environment",
       "history",
+      "flaky",
       "notice",
     ]);
     expect(all("project").at(-1)).toEqual(before);
@@ -1373,51 +1382,52 @@ describe("Runner properties", () => {
   });
 });
 
+/** The run folder names of the project, oldest first. */
+const folders = (dataDir: string, root: string) => {
+  try {
+    return readdirSync(path.join(projectDir(dataDir, root), "runs")).sort();
+  } catch {
+    return [];
+  }
+};
+const recordFile = (dataDir: string, root: string, id: string) =>
+  path.join(projectDir(dataDir, root), "runs", id, "run.json");
+const record = (dataDir: string, root: string, id: string): RunRecord =>
+  JSON.parse(readFileSync(recordFile(dataDir, root, id), "utf8"));
+/** Run All records, oldest first, with `over` applied to each. */
+const seed = (dataDir: string, root: string, count: number, over: Partial<RunRecord> = {}) =>
+  Array.from({ length: count }, (_, i) => {
+    const at = new Date(2020, 0, 1, 0, 0, i);
+    const { id, dir } = createRunDir(projectDir(dataDir, root), at);
+    writeRunRecord(dir, {
+      version: 1,
+      startedAt: at.getTime(),
+      durationMillis: 1000,
+      env: null,
+      threads: 1,
+      fingerprint: null,
+      filter: NO_FILTER,
+      selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
+      failedOf: null,
+      outcome: "finished",
+      exitCode: 0,
+      tests: [],
+      ...over,
+    });
+    return id;
+  });
+const stored = (n: TestNode, status: StoredTest["status"]): StoredTest => ({
+  kind: n.kind as StoredTest["kind"],
+  file: n.file,
+  refId: n.refId!,
+  name: n.name,
+  line: n.line,
+  key: n.key,
+  status,
+});
+
 describe("Runner history", () => {
   const SECRET = "s3cret-token-123";
-  /** The run folder names of the project, oldest first. */
-  const folders = (dataDir: string, root: string) => {
-    try {
-      return readdirSync(path.join(projectDir(dataDir, root), "runs")).sort();
-    } catch {
-      return [];
-    }
-  };
-  const recordFile = (dataDir: string, root: string, id: string) =>
-    path.join(projectDir(dataDir, root), "runs", id, "run.json");
-  const record = (dataDir: string, root: string, id: string): RunRecord =>
-    JSON.parse(readFileSync(recordFile(dataDir, root, id), "utf8"));
-  /** Run All records, oldest first, with `over` applied to each. */
-  const seed = (dataDir: string, root: string, count: number, over: Partial<RunRecord> = {}) =>
-    Array.from({ length: count }, (_, i) => {
-      const at = new Date(2020, 0, 1, 0, 0, i);
-      const { id, dir } = createRunDir(projectDir(dataDir, root), at);
-      writeRunRecord(dir, {
-        version: 1,
-        startedAt: at.getTime(),
-        durationMillis: 1000,
-        env: null,
-        threads: 1,
-        fingerprint: null,
-        filter: NO_FILTER,
-        selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
-        failedOf: null,
-        outcome: "finished",
-        exitCode: 0,
-        tests: [],
-        ...over,
-      });
-      return id;
-    });
-  const stored = (n: TestNode, status: StoredTest["status"]): StoredTest => ({
-    kind: n.kind as StoredTest["kind"],
-    file: n.file,
-    refId: n.refId!,
-    name: n.name,
-    line: n.line,
-    key: n.key,
-    status,
-  });
   const smoke = { include: ["smoke"], exclude: [], hideNonMatching: false };
   const GONE = "This run is no longer in the history";
 
@@ -1581,6 +1591,7 @@ describe("Runner history", () => {
       { type: "threads", count: 1 },
       last("environment"),
       last("history"),
+      last("flaky"),
       { type: "busy", busy: false },
     ]);
   });
@@ -2128,5 +2139,73 @@ describe("Runner history", () => {
     expect(all("runFinished")).toHaveLength(1);
     const [id] = folders(dataDir, root);
     expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+});
+
+describe("Runner flaky", () => {
+  const FP = "a".repeat(64);
+  const hello = (status: StoredTest["status"]): StoredTest => ({
+    kind: "scenario",
+    file: "tests/basic.feature",
+    refId: "[1:7]",
+    name: "passing hello",
+    line: 7,
+    key: "s:tests/basic.feature#1",
+    status,
+  });
+  /** Two runs of the same files: `passing hello` passed in the older and failed in the newer. */
+  function seedFlaky(dataDir: string, root: string) {
+    const [, newer] = seed(dataDir, root, 2, { fingerprint: FP, tests: [hello("passed")] });
+    const file = recordFile(dataDir, root, newer);
+    writeFileSync(
+      file,
+      JSON.stringify({ ...record(dataDir, root, newer), tests: [hello("failed")] }),
+    );
+  }
+
+  it("sends the flaky tests with the history", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    expect(last("flaky").tests).toMatchObject([
+      { key: "s:tests/basic.feature#1", envs: [{ env: null, passed: 1, failed: 1 }] },
+    ]);
+    expect(runner.replay()).toContainEqual(last("flaky"));
+  });
+
+  it("follows a new tree", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    const file = path.join(root, "tests", "basic.feature");
+    writeFileSync(
+      file,
+      readFileSync(file, "utf8").replace(
+        /(@smoke\r?\nScenario: passing hello)/,
+        "Scenario: added\n  * match 1 == 1\n\n$1",
+      ),
+    );
+    await runner.refresh();
+    const key = byName(last("project").tree!, "passing hello").key;
+    expect(key).not.toBe("s:tests/basic.feature#1");
+    // sent with the new tree, before the history that follows it
+    expect(events[events.lastIndexOf(last("project")) + 1]).toMatchObject({
+      type: "flaky",
+      tests: [{ key }],
+    });
+    expect(last("flaky").tests.map((t) => t.key)).toEqual([key]);
+  });
+
+  it("clear history leaves no flaky tests", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    seedFlaky(dataDir, root);
+    await runner.open(root);
+    expect(last("flaky").tests).toHaveLength(1);
+    runner.clearHistory();
+    expect(last("history").runs).toEqual([]);
+    expect(last("flaky").tests).toEqual([]);
   });
 });
