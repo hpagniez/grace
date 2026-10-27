@@ -1,7 +1,7 @@
 # App check: home screen (F27)
 
 Date: 2026-10-27
-Branch: `feature/home-screen` at c7d5c59 (the code under test; this record is the commit after it)
+Branch: `feature/home-screen` at bb6ca7d (the code under test, after the final review fixes and a merge of `develop`; this record is the commit after it)
 Machine: Windows 11 Pro 10.0.26300 (x64), Node 24.15.0, bundled Temurin 21.0.12.1 and Karate 2.1.4.
 Spec: [Home screen](../specs/2026-10-27-home-screen.md).
 
@@ -10,7 +10,7 @@ Spec: [Home screen](../specs/2026-10-27-home-screen.md).
 | Check | Result |
 |---|---|
 | `npm test` | 707/707 passed in 43 files, in about 4 minutes |
-| `npm run e2e` | 114/114 passed, including the new `e2e/home.spec.ts` (13). `e2e/panel.spec.ts` (12) changed: its helper now opens a sample project, because the bottom panel and splitter belong to the project view and a first start now shows the home screen. `e2e/open.spec.ts` (1 line) expects the home screen on a first start |
+| `npm run e2e` | 114/114 passed in 6.4 minutes, including the new `e2e/home.spec.ts` (13). `e2e/panel.spec.ts` (12) changed: its helper now opens a sample project, because the bottom panel and splitter belong to the project view and a first start now shows the home screen. `e2e/open.spec.ts` (1 line) expects the home screen on a first start |
 | `npm run typecheck`, `npm run lint` | passed |
 
 Not covered by the automated part: the three by-hand checks below (the first paint, the dark theme, the light theme against the mockup), a folder on a network share that is slow or gone (the 1 s cap on the existence check is a unit test with a stub that never answers), and a second screen.
