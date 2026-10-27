@@ -34,6 +34,10 @@ export const STATUS_DOT: Record<Status, string> = {
   interrupted: "bg-amber-500",
 };
 
+/** The amber of everything flaky (F15): the tree's mark and count, and the proof boxes. */
+export const FLAKY_TONE =
+  "border-amber-500 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200";
+
 export function formatMillis(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
 }

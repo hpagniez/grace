@@ -1,5 +1,6 @@
 import type { EnvView } from "../shared/env";
 import type { AppEvent, Project, RecentEntry, RunOutcome, Step, Summary } from "../shared/events";
+import type { FlakyEnv } from "../shared/flaky";
 import type { HistoryEntry } from "../shared/history";
 import type { HttpCall, HttpGroup } from "../shared/http";
 import type { Status, TestNode } from "../shared/model";
@@ -47,6 +48,8 @@ export interface AppState {
   busy: boolean;
   /** The open project's listed runs, newest first, as main sends them. */
   history: HistoryEntry[];
+  /** Proof per flaky test key of the tree shown (F15). Main's `flaky` event follows every tree and every history. */
+  flaky: Record<string, FlakyEnv[]>;
   /** The status groups switched on in the HTTP tab; none means All. Lasts for the session. */
   httpGroups: HttpGroup[];
   /** The call shown in the details pane in place of the node; null shows the node. */
@@ -98,6 +101,7 @@ export function initialState(): AppState {
     threads: null,
     busy: false,
     history: [],
+    flaky: {},
     httpGroups: [],
     selectedCall: null,
     panel: "console",
@@ -131,6 +135,7 @@ export function reduce(s: AppState, e: AppEvent): void {
           env: null, // and its `environment` event
           threads: null, // main's `threads` event follows
           history: [], // main's `history` follows a project that opens
+          flaky: {}, // and its `flaky` follows the tree
         });
         if (!e.project) s.console = []; // a closed project leaves no console behind
       }
@@ -144,7 +149,10 @@ export function reduce(s: AppState, e: AppEvent): void {
       };
       if (s.selected && !same(s.selected)) s.selected = null;
       if (s.selectedCall && !same(s.selectedCall.key)) s.selectedCall = null;
-      for (const map of [s.statuses, s.results, s.steps, s.calls] as Record<string, unknown>[])
+      for (const map of [s.statuses, s.results, s.steps, s.calls, s.flaky] as Record<
+        string,
+        unknown
+      >[])
         for (const key of Object.keys(map)) if (!same(key)) delete map[key];
       s.project = e.project;
       s.tree = e.tree;
@@ -212,6 +220,9 @@ export function reduce(s: AppState, e: AppEvent): void {
       // the toolbar Report opens a run's report: it needs the run to still be listed with one
       if (!e.runs.some((r) => r.id === s.run.runId && r.reportAvailable))
         s.run.reportAvailable = false;
+      break;
+    case "flaky":
+      s.flaky = Object.fromEntries(e.tests.map((t) => [t.key, t.envs]));
       break;
     case "environment":
       if (!s.project) break; // main can still hold the previous project's view

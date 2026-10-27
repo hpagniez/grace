@@ -19,6 +19,7 @@ const specExample = (): RunRecord => ({
   durationMillis: 72000,
   env: "qa",
   threads: 4,
+  fingerprint: "ab".repeat(32),
   filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false },
   selection: {
     kind: "feature",
@@ -110,6 +111,15 @@ describe("parseRunRecord", () => {
     });
   });
 
+  it("reads a record stored before F15 as no fingerprint", () => {
+    const { fingerprint: _fingerprint, ...old } = specExample();
+    expect(parseRunRecord(old)).toEqual({ ...specExample(), fingerprint: null });
+    expect(parseRunRecord({ ...specExample(), fingerprint: null })).toEqual({
+      ...specExample(),
+      fingerprint: null,
+    });
+  });
+
   it("rejects bad shapes", () => {
     const { outcome: _outcome, ...noOutcome } = specExample();
     const bad: unknown[] = [
@@ -128,6 +138,10 @@ describe("parseRunRecord", () => {
       { ...specExample(), threads: 0 },
       { ...specExample(), threads: "2" },
       { ...specExample(), threads: 1.5 },
+      { ...specExample(), fingerprint: "AB".repeat(32) },
+      { ...specExample(), fingerprint: "ab" },
+      { ...specExample(), fingerprint: 1 },
+      { ...specExample(), fingerprint: "g".repeat(64) },
       noOutcome,
     ];
     for (const b of bad) expect(parseRunRecord(b)).toBeNull();
@@ -148,6 +162,7 @@ describe("toEntry", () => {
     expect(e.threads).toBe(4);
     expect(e.reportAvailable).toBe(false);
     expect(e).not.toHaveProperty("tests");
+    expect(e).not.toHaveProperty("fingerprint");
   });
 });
 
