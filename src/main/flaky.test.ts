@@ -206,6 +206,57 @@ describe("findFlaky", () => {
     it("a vanished test gives nothing", () => {
       expect(findFlaky(flakyOne, tree([["two", 2]]))).toEqual([]);
     });
+
+    // two scenarios named "x": #1 stable, #2 flaky
+    const x = (n: string, status: StoredTest["status"]) => stored("scenario", "x", n, status);
+    const twins = [
+      run(2, "failed", { tests: [x("1", "passed"), x("2", "failed")] }),
+      run(1, "passed", { tests: [x("1", "passed"), x("2", "passed")] }),
+    ];
+
+    it("same-named scenarios are told apart by their keys", () => {
+      const both = tree([
+        ["x", 1],
+        ["x", 2],
+      ]);
+      expect(keys(findFlaky(twins, both))).toEqual(["s:tests/a.feature#2"]);
+    });
+
+    it("a name the group's runs stored twice is not placed by name", () => {
+      // #2 was renamed: its key now holds "y", and "x" is unique in the tree, but it is #1
+      const renamed = tree([
+        ["x", 1],
+        ["y", 2],
+      ]);
+      expect(findFlaky(twins, renamed)).toEqual([]);
+    });
+
+    it("both twins flipped list each run once when one is gone", () => {
+      const runs = [
+        run(4, "failed", { tests: [x("1", "failed"), x("2", "failed")] }),
+        run(3, "passed", { tests: [x("1", "passed"), x("2", "passed")] }),
+      ];
+      const [flaky, ...more] = findFlaky(runs, tree([["x", 1]]));
+      expect(more).toEqual([]);
+      expect(flaky.key).toBe("s:tests/a.feature#1");
+      expect(flaky.envs).toHaveLength(1);
+      expect(flaky.envs[0]).toMatchObject({ passed: 1, failed: 1 });
+      expect(flaky.envs[0].runs.map((r) => r.id)).toEqual(["run-4", "run-3"]);
+    });
+
+    it("a node is placed from one stored key of a group only", () => {
+      // no run stored both twins, so only the second rule keeps #2's proof off the one "x" left
+      const runs = [
+        run(4, "failed", { tests: [x("1", "failed")] }),
+        run(3, "passed", { tests: [x("1", "passed")] }),
+        run(2, "failed", { tests: [x("2", "failed")] }),
+        run(1, "passed", { tests: [x("2", "passed")] }),
+      ];
+      const [flaky, ...more] = findFlaky(runs, tree([["x", 1]]));
+      expect(more).toEqual([]);
+      expect(flaky.envs[0]).toMatchObject({ passed: 1, failed: 1 });
+      expect(flaky.envs[0].runs.map((r) => r.id)).toEqual(["run-4", "run-3"]);
+    });
   });
 
   it("an outline row is marked by its row key", () => {
