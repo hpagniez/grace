@@ -49,6 +49,21 @@ export function project(
   return dir;
 }
 
+/**
+ * A fresh copy of the flaky sample project, deleted after the test. `coin(heads)` writes the `coin.json`
+ * that `tests/coin.feature` reads from beside the project folder: outside the project, so it does not
+ * change the project's fingerprint.
+ */
+export function flakyProject(): { dir: string; coin(heads: boolean): void } {
+  const dir = copyFixture("flaky");
+  dirs.push(path.dirname(dir));
+  return {
+    dir,
+    coin: (heads) =>
+      writeFileSync(path.join(path.dirname(dir), "coin.json"), JSON.stringify({ heads })),
+  };
+}
+
 /** An empty folder, deleted after the test. */
 export const emptyProject = () => tempDir("kk-empty-");
 
