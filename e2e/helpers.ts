@@ -87,6 +87,17 @@ export async function launch(
   return { app, win, userData };
 }
 
+/** Starts the built app with a fresh userData folder whose settings.json already holds `settings`. */
+export async function launchWithSettings(settings: Record<string, unknown>) {
+  const userData = tempDir("kk-userdata-");
+  writeFileSync(path.join(userData, "settings.json"), JSON.stringify(settings));
+  return launch(userData);
+}
+
+/** The parsed settings.json of an app data folder. */
+export const settingsOf = (userData: string): Record<string, unknown> =>
+  JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8"));
+
 /** Makes the folder picker return `dir`, then clicks Open. */
 export async function openProject(app: ElectronApplication, dir: string): Promise<void> {
   await app.evaluate(({ dialog }, d) => {

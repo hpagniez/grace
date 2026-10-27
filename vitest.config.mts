@@ -1,8 +1,17 @@
 import { defineConfig } from "vitest/config";
 import solid from "@solidjs/vite-plugin";
+import { define } from "./vite.renderer.config.mjs";
 
 // spike tests under docs/ are reference only; e2e/ belongs to Playwright
-const exclude = ["docs/**", "node_modules/**", "out/**", ".vite/**", "e2e/**", ".superpowers/**"];
+const exclude = [
+  "docs/**",
+  "node_modules/**",
+  "out/**",
+  ".vite/**",
+  "e2e/**",
+  ".superpowers/**",
+  ".claude/**",
+];
 
 export default defineConfig({
   test: {
@@ -14,6 +23,7 @@ export default defineConfig({
       },
       {
         plugins: [solid()],
+        define,
         // jsdom tests need Solid's browser build, not its server build
         resolve: { conditions: ["browser", "development"] },
         test: {

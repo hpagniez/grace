@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* The console banner's cursor (F24). */
+@theme {
+  --animate-blink: blink 1.1s steps(1) infinite;
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
 @layer base {
   /* Thin themed scrollbars everywhere: scrollbar-width is not inherited, scrollbar-color is. */
   * {

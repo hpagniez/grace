@@ -39,7 +39,7 @@ jobs:
           path: |
             vendor
             !vendor/.download
-          key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs') }}
+          key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
       - run: npm ci
       - run: npm run vendor
       # one job runs both suites in turn: their Java leak checks must not overlap (AGENTS.md)

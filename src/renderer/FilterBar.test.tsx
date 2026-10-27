@@ -63,7 +63,9 @@ afterEach(cleanup);
 
 describe("filter bar", () => {
   it("shows a chip per tag", () => {
-    const { load } = setup();
+    const { send, load } = setup();
+    send({ type: "opening", root: "D:/p" }); // the project view, no tree yet
+    expect(screen.getByTestId("project-path")).toBeTruthy();
     expect(screen.queryByTestId("filter-bar")).toBeNull();
     load();
     const chips = screen.getAllByTestId("tag-chip");

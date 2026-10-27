@@ -5,12 +5,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_FILTER, type FilterState } from "../shared/tags";
 import {
   emptyEnvSettings,
+  forgetLastProject,
   loadLastProject,
   loadProjectEnv,
   loadProjectFilter,
   loadProjectThreads,
+  loadRecentProjects,
   loadWindowState,
-  saveLastProject,
+  RECENT_LIMIT,
+  removeRecentProject,
+  saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
   saveProjectThreads,
@@ -50,7 +54,7 @@ describe("settings", () => {
     const data = tmp();
     const project = path.join(tmp(), "proj");
     mkdirSync(project);
-    saveLastProject(data, project);
+    saveOpenedProject(data, project);
     expect(loadLastProject(data)).toBe(project);
   });
 
@@ -58,7 +62,7 @@ describe("settings", () => {
     const data = tmp();
     const project = path.join(tmp(), "gone");
     mkdirSync(project);
-    saveLastProject(data, project);
+    saveOpenedProject(data, project);
     rmSync(project, { recursive: true });
     expect(loadLastProject(data)).toBeNull();
   });
@@ -71,6 +75,99 @@ describe("settings", () => {
     const data = tmp();
     writeFileSync(path.join(data, "settings.json"), "{not json");
     expect(loadLastProject(data)).toBeNull();
+  });
+
+  describe("recent projects", () => {
+    const writeSettings = (data: string, settings: unknown) =>
+      writeFileSync(
+        path.join(data, "settings.json"),
+        typeof settings === "string" ? settings : JSON.stringify(settings),
+      );
+    const readSettings = (data: string) =>
+      JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8"));
+
+    it("saveOpenedProject puts the folder first and saves lastProject", () => {
+      const data = tmp();
+      const a = path.join(tmp(), "a");
+      const b = path.join(tmp(), "b");
+      mkdirSync(a);
+      mkdirSync(b);
+      saveOpenedProject(data, a);
+      saveOpenedProject(data, b);
+      saveOpenedProject(data, a);
+      expect(loadRecentProjects(data)).toEqual([a, b]);
+      expect(loadLastProject(data)).toBe(a);
+    });
+
+    it("keeps the 10 newest folders", () => {
+      const data = tmp();
+      for (let i = 0; i <= 10; i++) saveOpenedProject(data, `D:\\p${i}`);
+      expect(RECENT_LIMIT).toBe(10);
+      expect(loadRecentProjects(data)).toEqual(
+        Array.from({ length: 10 }, (_, i) => `D:\\p${10 - i}`),
+      );
+    });
+
+    it("same folder with a trailing separator or another case is one entry", () => {
+      const data = tmp();
+      writeSettings(data, { recentProjects: ["D:\\work\\api", "d:\\WORK\\API\\"] });
+      expect(loadRecentProjects(data)).toEqual(["D:\\work\\api"]);
+      saveOpenedProject(data, "d:\\WORK\\api");
+      expect(loadRecentProjects(data)).toEqual(["d:\\WORK\\api"]);
+    });
+
+    it("a broken list reads as what can be kept", () => {
+      const data = tmp();
+      const v = Array.from({ length: 12 }, (_, i) => `D:\\v${i}`);
+      writeSettings(data, { recentProjects: [42, "rel\\path", "D:\\a", "d:\\A", ...v] });
+      expect(loadRecentProjects(data)).toEqual(["D:\\a", ...v.slice(0, 9)]);
+      writeSettings(data, { recentProjects: "x" });
+      expect(loadRecentProjects(data)).toEqual([]);
+      writeSettings(data, { lastProject: "D:\\a" });
+      expect(loadRecentProjects(data)).toEqual([]);
+      writeSettings(data, "{not json");
+      expect(loadRecentProjects(data)).toEqual([]);
+      expect(loadRecentProjects(tmp())).toEqual([]);
+      readFails.code = "EBUSY";
+      try {
+        expect(loadRecentProjects(data)).toEqual([]);
+      } finally {
+        readFails.code = null;
+      }
+    });
+
+    it("removeRecentProject drops the row and a matching lastProject", () => {
+      const data = tmp();
+      writeSettings(data, {
+        lastProject: "D:\\gone",
+        recentProjects: ["D:\\gone", "D:\\b"],
+        projects: { "D:\\gone": { threads: 2 } },
+      });
+      removeRecentProject(data, "D:\\gone");
+      const saved = readSettings(data);
+      expect(Object.hasOwn(saved, "lastProject")).toBe(false);
+      expect(saved.recentProjects).toEqual(["D:\\b"]);
+      expect(saved.projects).toEqual({ "D:\\gone": { threads: 2 } });
+    });
+
+    it("removeRecentProject keeps a lastProject that is another folder", () => {
+      const data = tmp();
+      writeSettings(data, { lastProject: "D:\\b", recentProjects: ["D:\\gone", "D:\\b"] });
+      removeRecentProject(data, "D:\\gone");
+      expect(readSettings(data)).toEqual({ lastProject: "D:\\b", recentProjects: ["D:\\b"] });
+    });
+
+    it("forgetLastProject keeps the other keys", () => {
+      const data = tmp();
+      const saved = {
+        recentProjects: ["D:\\a"],
+        window: { x: 1, y: 2, width: 700, height: 500, maximized: false },
+        projects: { "D:\\a": { threads: 2 } },
+      };
+      writeSettings(data, { lastProject: "D:\\a", ...saved });
+      forgetLastProject(data);
+      expect(readSettings(data)).toEqual(saved);
+    });
   });
 
   describe("tag filter", () => {
@@ -86,12 +183,12 @@ describe("settings", () => {
       expect(loadProjectFilter(data, "proj-three")).toEqual(NO_FILTER);
     });
 
-    it("saveLastProject keeps saved filters", () => {
+    it("saveOpenedProject keeps saved filters", () => {
       const data = tmp();
       const project = path.join(tmp(), "proj");
       mkdirSync(project);
       saveProjectFilter(data, project, a);
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       expect(loadProjectFilter(data, project)).toEqual(a);
       expect(loadLastProject(data)).toBe(project);
     });
@@ -100,7 +197,7 @@ describe("settings", () => {
       const data = tmp();
       const project = path.join(tmp(), "proj");
       mkdirSync(project);
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       saveProjectFilter(data, project, a);
       expect(loadLastProject(data)).toBe(project);
     });
@@ -129,7 +226,7 @@ describe("settings", () => {
       readFails.code = "EBUSY";
       try {
         expect(() => saveProjectFilter(data, "y", b)).toThrow("EBUSY");
-        expect(() => saveLastProject(data, "q")).toThrow("EBUSY");
+        expect(() => saveOpenedProject(data, "q")).toThrow("EBUSY");
         expect(loadProjectFilter(data, "x")).toEqual(NO_FILTER);
         expect(loadLastProject(data)).toBeNull();
       } finally {
@@ -387,7 +484,7 @@ describe("settings", () => {
         env: "qa",
         properties: { shared: [{ name: "timeout", value: "5000" }], byEnv: {} },
       };
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       saveWindowState(data, w);
       saveProjectFilter(data, project, f);
       saveProjectEnv(data, project, e);
@@ -458,7 +555,7 @@ describe("settings", () => {
       const project = path.join(tmp(), "proj");
       mkdirSync(project);
       const f: FilterState = { include: ["smoke"], exclude: [], hideNonMatching: false };
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       saveProjectFilter(data, project, f);
       saveWindowState(data, ok);
       expect(loadLastProject(data)).toBe(project);
@@ -470,7 +567,7 @@ describe("settings", () => {
       const data = tmp();
       const project = path.join(tmp(), "proj");
       mkdirSync(project);
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       const settings = path.join(data, "settings.json");
       const before = readFileSync(settings, "utf8");
       renameFails.code = "EPERM";
@@ -489,7 +586,7 @@ describe("settings", () => {
       const data = tmp();
       const project = path.join(tmp(), "proj");
       mkdirSync(project);
-      saveLastProject(data, project);
+      saveOpenedProject(data, project);
       writeFileSync(path.join(data, "settings.json.tmp"), "{junk");
       expect(loadLastProject(data)).toBe(project);
       saveWindowState(data, ok);
