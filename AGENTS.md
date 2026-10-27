@@ -67,16 +67,18 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 ### Pull requests and CI
 
-Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done: that runs the e2e suite.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
+- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` are merged by hand.
 
 | Workflow | When | What it runs |
 |---|---|---|
 | `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
-| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | `npm test`; `npm run e2e` too unless the PR is a draft |
+| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | `npm test`; `npm run e2e` too unless the PR is a draft (the step named `e2e`) |
+| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` passed and `test` passed with e2e on its head commit (no `test` run only for docs-only PRs) |
 | `release` | Push of a `vX.Y.Z` tag | Tag must match `package.json`; `npm run make`; GitHub Release with the zip |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI |
 
