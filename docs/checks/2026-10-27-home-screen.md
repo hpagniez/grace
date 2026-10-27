@@ -9,7 +9,7 @@ Spec: [Home screen](../specs/2026-10-27-home-screen.md).
 
 | Check | Result |
 |---|---|
-| `npm test` | 702/702 passed in 43 files, run with a temporary config that adds `.claude/**` to the excludes. Plain `npm test` on this machine also loads the tests of the other branches' worktrees under `.claude/worktrees/`: 10 of their renderer test files fail there (`__KK_VERSIONS__ is not defined`), and the run takes 18 minutes instead of 4. None of the repo's own files fails |
+| `npm test` | 707/707 passed in 43 files, in about 4 minutes |
 | `npm run e2e` | 114/114 passed, including the new `e2e/home.spec.ts` (13). `e2e/panel.spec.ts` (12) changed: its helper now opens a sample project, because the bottom panel and splitter belong to the project view and a first start now shows the home screen. `e2e/open.spec.ts` (1 line) expects the home screen on a first start |
 | `npm run typecheck`, `npm run lint` | passed |
 
@@ -27,7 +27,7 @@ Setup: Windows in dark mode (Settings, Personalisation, Colours). Start the app,
    - Result: not checked yet.
 2. B's row is greyed out and shows "not found" in a colour that stays readable. Clicking it does nothing. A's row is not greyed and opens A.
    - Result: not checked yet.
-3. Press Tab. The focus ring shows on `Open folder…`, then on A's row, then on its `×`, and is visible on each.
+3. Press Tab. The focus ring shows on `Open folder…`, then on B's `×` (B's row is disabled, so Tab skips it), then on A's row, then on A's `×`, and is visible on each.
    - Result: not checked yet.
 
 ### B. No home screen flash at start
