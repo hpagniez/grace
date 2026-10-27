@@ -2079,12 +2079,54 @@ describe("Runner history", () => {
     await run;
   });
 
-  it("runFinished comes before the run's history", T, async () => {
-    const { runner, events, last } = setup();
+  it("the second walk comes before runFinished", T, async () => {
+    let walks = 0;
+    let finishedAtSecondWalk: boolean | undefined;
+    const fake = async () => {
+      if (++walks === 2) finishedAtSecondWalk = s.all("runFinished").length > 0;
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await s.runner.open(root);
+    await s.runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(finishedAtSecondWalk).toBe(false);
+    const types = s.events.map((e) => e.type);
+    expect(types.lastIndexOf("runFinished")).toBeLessThan(types.lastIndexOf("history"));
+  });
+
+  it("a cancel during the second walk keeps the run's outcome", T, async () => {
+    let runner: Runner | undefined;
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.last("runFinished").outcome).toBe("finished");
+    const [id] = folders(s.dataDir, root);
+    expect(record(s.dataDir, root, id)).toMatchObject({
+      outcome: "finished",
+      fingerprint: "a".repeat(64),
+    });
+  });
+
+  it("a failing second walk still ends the run", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) throw new Error("walk failed");
+      return "a".repeat(64);
+    };
+    const { runner, all, last, dataDir } = setup(undefined, undefined, undefined, fake);
     const root = fixture("clean");
     await runner.open(root);
     await runner.run(byName(last("project").tree!, "passing hello").key);
-    const types = events.map((e) => e.type);
-    expect(types.lastIndexOf("runFinished")).toBeLessThan(types.lastIndexOf("history"));
+    expect(all("runFinished")).toHaveLength(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
   });
 });

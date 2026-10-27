@@ -927,10 +927,13 @@ export class Runner {
       this.proc = null;
       rmSync(this.pidFile, { force: true });
 
-      const done = end(fatal ? null : code, this.cancelled && !fatal);
-      // dispose is quitting the app: no second walk
-      const after = this.disposing ? null : await walk(root);
-      store(done, before !== null && before === after ? before : null);
+      // Taken before the walk: a Cancel clicked during it must not turn a finished run into a cancelled one.
+      const cancelled = this.cancelled && !fatal;
+      // The walk comes before the end events: the window shows idle at `runFinished`, and a run is refused while we hold busy.
+      // A dispose is quitting the app: no second walk. A walk that rejects (a test seam only) reads as null.
+      const after = this.disposing ? null : await walk(root).catch(() => null);
+      const done = end(fatal ? null : code, cancelled);
+      store(done, before === after ? before : null);
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
