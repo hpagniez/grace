@@ -16,7 +16,7 @@ test("Open a project and see its tests", async () => {
   const dir = project("clean");
   const { app, win, userData } = await launch();
   expect(await app.evaluate(({ app }) => app.getPath("userData"))).toBe(userData);
-  await expect(win.getByTestId("tree-message")).toHaveText("Open a Karate project folder");
+  await expect(win.getByTestId("home")).toBeVisible();
 
   await openProject(app, dir);
   await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 2000 });

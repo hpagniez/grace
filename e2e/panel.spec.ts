@@ -37,8 +37,16 @@ const dragBy = async (win: Page, dy: number) => dragTo(win, (await splitterY(win
 const setWindowHeight = (app: ElectronApplication, h: number) =>
   app.evaluate(({ BrowserWindow }, h) => BrowserWindow.getAllWindows()[0].setSize(1200, h), h);
 
-async function started(userData?: string) {
+/**
+ * The panel belongs to the project view, so a fresh start opens a sample project (clean unless `dir` is
+ * given) and waits until it is saved as the last project; a restart reopens that one by itself.
+ */
+async function started(userData?: string, dir?: string) {
   const r = await launch(userData);
+  if (!userData) {
+    await openProject(r.app, dir ?? project("clean"));
+    await expect(r.win.getByTestId("run-all-button")).toBeEnabled({ timeout: 15_000 });
+  }
   await expect(splitter(r.win)).toBeVisible();
   return r;
 }
@@ -50,8 +58,7 @@ test("the bottom panel starts at its default height", async () => {
 
 test("dragging the splitter resizes the bottom panel", async () => {
   const dir = project("http");
-  const { app, win } = await started();
-  await openProject(app, dir);
+  const { win } = await started(undefined, dir);
   await expect(nodeByKey(win, "f:tests/http.feature")).toBeVisible({ timeout: 15_000 });
   await win.getByTestId("run-all-button").click();
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 60_000 });
