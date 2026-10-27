@@ -203,7 +203,8 @@ describe("Runner discovery", () => {
     const { runner, events } = setup();
     const missing = path.join(tmpdir(), "kk-does-not-exist");
     expect(await runner.open(missing)).toBe(false);
-    expect(events).toEqual([
+    // the recent list check is asynchronous: it may or may not have arrived
+    expect(events.filter((e) => e.type !== "recent")).toEqual([
       { type: "busy", busy: true },
       { type: "project", project: null, tree: null, error: `Folder not found: ${missing}` },
       { type: "flaky", tests: [] },
@@ -2352,6 +2353,29 @@ describe("Runner home screen", () => {
     expect(all("notice")).toEqual([]);
   });
 
+  it("a second openRecent is ignored whichever way the entry is spelled", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const listed = fixture("clean") + path.sep; // open resolves it, a listed entry may not be
+    saveOpenedProject(dataDir, listed);
+    const first = runner.openRecent(listed);
+    await until(() => all("opening").length > 0);
+    await runner.openRecent(listed);
+    await first;
+    expect(all("notice")).toEqual([]);
+  });
+
+  it("removeRecent says so when the list cannot be saved", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const clean = fixture("clean");
+    saveOpenedProject(dataDir, clean);
+    mkdirSync(path.join(dataDir, "settings.json.tmp")); // the list stays readable, its new copy cannot be written
+    runner.removeRecent(clean);
+    expect(all("notice").map((n) => n.message)).toEqual([
+      expect.stringMatching(/^The recent list could not be saved: /),
+    ]);
+    expect(loadRecentProjects(dataDir)).toEqual([clean]);
+  });
+
   it("removeRecent drops a saved folder only", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const clean = fixture("clean");
@@ -2383,6 +2407,16 @@ describe("Runner home screen", () => {
     ]);
     await runner.open(clean);
     expect(last("threads")).toEqual({ type: "threads", count: 2 });
+  });
+
+  it("close shows the notice after the project event, which the window clears", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    await runner.open(fixture("clean"));
+    rmSync(path.join(dataDir, "settings.json")); // open saved it: replace it with a folder
+    mkdirSync(path.join(dataDir, "settings.json")); // reading it as a file fails
+    runner.close();
+    expect(last("notice").message).toMatch(/^The last project could not be forgotten: /);
+    expect(events.lastIndexOf(last("notice"))).toBeGreaterThan(events.lastIndexOf(last("project")));
   });
 
   it("close is refused while busy", T, async () => {

@@ -222,7 +222,7 @@ export class Runner {
 
   /** Opens a folder of the recent list; refused if not listed, ignored while it is the one being opened. */
   async openRecent(root: string): Promise<void> {
-    if (this.busy && this.opening === root) return;
+    if (this.busy && this.opening === path.resolve(root)) return;
     if (!loadRecentProjects(this.o.dataDir).includes(root)) {
       this.o.emit({ type: "notice", message: "Invalid request" });
       return;
@@ -257,15 +257,16 @@ export class Runner {
     this.envs = emptyEnvSettings();
     this.overlays = [];
     this.tagEnvs = [];
+    this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
     try {
       forgetLastProject(this.o.dataDir);
     } catch (err) {
+      // after the project event: the window clears its notice on every project event
       this.o.emit({
         type: "notice",
         message: `The last project could not be forgotten: ${(err as Error).message}`,
       });
     }
-    this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
     void this.sendRecent();
   }
 
