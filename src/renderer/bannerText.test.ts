@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeKind, TestNode } from "../shared/model";
-import { bannerState, testsText } from "./banner";
+import { bannerState, testsText } from "./bannerText";
 import { initialState, type AppState } from "./reduce";
 
 const node = (kind: NodeKind, key: string, children: TestNode[] = []): TestNode => ({
