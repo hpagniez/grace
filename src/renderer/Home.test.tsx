@@ -116,6 +116,19 @@ describe("home screen", () => {
     expect(api.removeRecent).toHaveBeenCalledExactlyOnceWith("E:\\usb\\old");
   });
 
+  it("removing a row moves the focus to Open folder…", () => {
+    const { api, send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const remove = screen.getAllByTestId("recent-remove");
+    remove[0].focus();
+    fireEvent.click(remove[0]);
+    expect(api.removeRecent).toHaveBeenCalledWith("D:\\work\\api");
+    expect(document.activeElement).toBe(button("open-button"));
+    // main answers with a new list: the rows are rebuilt, the focus stays
+    send(recent([list[1]]));
+    expect(document.activeElement).toBe(button("open-button"));
+  });
+
   it("names a folder by its last segment, whichever slash it uses", () => {
     const { send } = setup();
     send(
