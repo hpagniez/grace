@@ -661,6 +661,7 @@ describe("properties dialog", () => {
 
   it("the Properties button is disabled with no project, while busy and while running", () => {
     const { send, load } = setup();
+    send({ type: "opening", root: "D:/p" }); // no project yet: the project view, not home
     const button = () => screen.getByTestId("properties-button") as HTMLButtonElement;
     expect(button().disabled).toBe(true);
     load(saved);

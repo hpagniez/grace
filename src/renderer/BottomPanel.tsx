@@ -1,6 +1,7 @@
 import { Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
+import { Banner } from "./Banner";
 import { Console } from "./Console";
 import { ClearHistory, History } from "./History";
 import { narrowedCalls, shownCalls, type CallRef } from "./http";
@@ -91,7 +92,9 @@ export function BottomPanel(props: {
       <div role="tabpanel" aria-labelledby={`tab-${panel()}`} class="flex min-h-0 flex-1 flex-col">
         <Switch>
           <Match when={panel() === "console"}>
-            <Console lines={props.state.console} />
+            <Console lines={props.state.console}>
+              <Banner state={props.state} />
+            </Console>
           </Match>
           <Match when={panel() === "history"}>
             <History state={props.state} api={props.api} />

@@ -50,12 +50,17 @@ import {
   rowLines,
 } from "./karate/tree";
 import { makeMasker, maskEvent } from "./mask";
+import { recentSender } from "./recent";
 import type { SecretBox } from "./secrets";
 import {
   emptyEnvSettings,
+  forgetLastProject,
   loadProjectEnv,
   loadProjectFilter,
   loadProjectThreads,
+  loadRecentProjects,
+  removeRecentProject,
+  saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
   saveProjectThreads,
@@ -135,6 +140,8 @@ export class Runner {
   private overlays: string[] = [];
   private tagEnvs: string[] = [];
   private busy = false;
+  /** The folder `open` is discovering, for a second request of it to be ignored and for `replay`. */
+  private opening: string | null = null;
   /** The operation `guarded` is running, for `dispose` to wait on. */
   private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
@@ -143,6 +150,8 @@ export class Runner {
   private disposing = false;
   private report: string | null = null;
   private readonly pidFile: string;
+  /** Checks the saved recent list and emits it as a `recent` event; main calls it after the `ready` replay. */
+  readonly sendRecent: () => Promise<void>;
 
   constructor(
     private readonly o: {
@@ -156,9 +165,13 @@ export class Runner {
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
+    this.sendRecent = recentSender(() => loadRecentProjects(o.dataDir), o.emit);
   }
 
-  /** True only if the folder is now the open project. */
+  /**
+   * True only if the folder is now the open project, which is then saved first in the recent list and
+   * as the last project. Sends `opening` around the discovery and the recent list after it.
+   */
   async open(root: string): Promise<boolean> {
     let opened = false;
     await this.guarded(async () => {
@@ -173,23 +186,88 @@ export class Runner {
         });
         return;
       }
-      const report = this.report;
-      this.report = null; // a report of the project open before
-      const skipped = skippedProperties(this.o.dataDir, root);
-      opened = await this.rediscover(
-        { root, layout: detectLayout(root).layout },
-        loadProjectFilter(this.o.dataDir, root),
-        loadProjectEnv(this.o.dataDir, root),
-        loadProjectThreads(this.o.dataDir, root),
-      );
-      if (!opened) this.report = report;
-      else if (skipped.length)
-        this.o.emit({
-          type: "notice",
-          message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
-        });
+      this.opening = root;
+      this.o.emit({ type: "opening", root });
+      try {
+        const report = this.report;
+        this.report = null; // a report of the project open before
+        const skipped = skippedProperties(this.o.dataDir, root);
+        opened = await this.rediscover(
+          { root, layout: detectLayout(root).layout },
+          loadProjectFilter(this.o.dataDir, root),
+          loadProjectEnv(this.o.dataDir, root),
+          loadProjectThreads(this.o.dataDir, root),
+        );
+        if (!opened) this.report = report;
+        else {
+          if (skipped.length)
+            this.o.emit({
+              type: "notice",
+              message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
+            });
+          try {
+            saveOpenedProject(this.o.dataDir, root);
+          } catch (err) {
+            this.recentNotice(err);
+          }
+        }
+      } finally {
+        this.opening = null;
+        this.o.emit({ type: "opening", root: null });
+      }
     });
+    void this.sendRecent();
     return opened;
+  }
+
+  /** Opens a folder of the recent list; refused if not listed, ignored while it is the one being opened. */
+  async openRecent(root: string): Promise<void> {
+    if (this.busy && this.opening === path.resolve(root)) return;
+    if (!loadRecentProjects(this.o.dataDir).includes(root)) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await this.open(root);
+  }
+
+  /** Drops a folder of the recent list; refused if not listed. Allowed while busy: it touches only settings.json. */
+  removeRecent(root: string): void {
+    if (!loadRecentProjects(this.o.dataDir).includes(root)) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    try {
+      removeRecentProject(this.o.dataDir, root);
+    } catch (err) {
+      this.recentNotice(err);
+      return;
+    }
+    void this.sendRecent();
+  }
+
+  /** Back to the home screen: forgets the project and its state in memory, not its saved settings. Refused while busy. */
+  close(): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      return;
+    }
+    this.project = this.tree = this.last = this.report = null;
+    this.filter = { ...NO_FILTER, include: [], exclude: [] };
+    this.threads = 1;
+    this.envs = emptyEnvSettings();
+    this.overlays = [];
+    this.tagEnvs = [];
+    this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
+    try {
+      forgetLastProject(this.o.dataDir);
+    } catch (err) {
+      // after the project event: the window clears its notice on every project event
+      this.o.emit({
+        type: "notice",
+        message: `The last project could not be forgotten: ${(err as Error).message}`,
+      });
+    }
+    void this.sendRecent();
   }
 
   async refresh(): Promise<void> {
@@ -372,6 +450,7 @@ export class Runner {
 
   /** What a window that just loaded needs: events sent before it subscribed are lost. */
   replay(): AppEvent[] {
+    const opening: AppEvent = { type: "opening", root: this.opening };
     const busy: AppEvent = { type: "busy", busy: this.busy };
     return this.last
       ? [
@@ -380,9 +459,10 @@ export class Runner {
           { type: "threads", count: this.threads },
           this.envEvent(),
           ...this.historyEvents(),
+          opening,
           busy,
         ]
-      : [busy];
+      : [opening, busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
@@ -398,6 +478,13 @@ export class Runner {
     this.last = e;
     this.o.emit(e);
     this.o.emit(this.flakyEvent(this.listed())); // the marks follow the tree that is shown
+  }
+
+  private recentNotice(err: unknown) {
+    this.o.emit({
+      type: "notice",
+      message: `The recent list could not be saved: ${(err as Error).message}`,
+    });
   }
 
   private sendFilter() {

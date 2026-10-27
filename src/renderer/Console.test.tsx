@@ -51,6 +51,28 @@ describe("Console", () => {
     expect(el.scrollTop).toBe((CONSOLE_LIMIT + 15) * 10);
   });
 
+  it("keeps its children above the lines past the line cap", () => {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: async () => {},
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    } as unknown as Api;
+    const store = createAppStore(api);
+    render(() => (
+      <Console lines={store.state.console}>
+        <p data-testid="head">h</p>
+      </Console>
+    ));
+    const el = screen.getByTestId("console");
+    Object.defineProperty(el, "scrollHeight", { get: () => (store.state.console.length + 1) * 10 });
+    Object.defineProperty(el, "clientHeight", { value: 100 });
+    emit({ type: "console", lines: Array.from({ length: CONSOLE_LIMIT + 10 }, (_, i) => `l${i}`) });
+    flush();
+    expect(store.state.console).toHaveLength(CONSOLE_LIMIT);
+    expect(el.firstElementChild).toBe(screen.getByTestId("head"));
+    expect(el.scrollTop).toBe((CONSOLE_LIMIT + 1) * 10);
+  });
+
   it("styles ERROR and WARN lines", () => {
     const { add } = setup();
     add("plain", "12:00 [main] ERROR boom", "12:00 [main] WARN careful");

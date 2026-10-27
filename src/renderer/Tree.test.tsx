@@ -215,8 +215,9 @@ describe("main screen", () => {
 
   it("disables Run all without a tree or without leaves, and says why", () => {
     const { send } = setup();
+    send({ type: "opening", root: "D:/p" });
     expect(button("run-all-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("Open a Karate project folder");
+    expect(screen.getByTestId("tree-message").textContent).toBe("Discovering tests…");
     send({
       type: "project",
       project: { root: "D:/p", layout: "maven" },
