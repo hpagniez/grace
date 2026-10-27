@@ -133,12 +133,13 @@ async function fitScreen(app: ElectronApplication, win: Page) {
 test("the height survives a restart", async () => {
   const first = await started();
   await fitScreen(first.app, first.win);
-  await dragBy(first.win, 108);
-  await expectHeights(first.win, { panel: 300 });
+  // 250, not 300: the project view's header leaves CI's 600 px window room for a panel of only about 290
+  await dragBy(first.win, 58);
+  await expectHeights(first.win, { panel: 250 });
   await first.app.close();
 
   const { win } = await started(first.userData);
-  await expectHeights(win, { panel: 300 });
+  await expectHeights(win, { panel: 250 });
 });
 
 test("a smaller window shrinks the panel without forgetting its height", async () => {
