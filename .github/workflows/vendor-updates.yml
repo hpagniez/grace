@@ -1,0 +1,140 @@
+# Weekly draft PRs for a newer bundled JRE or Karate jar (ADR 0012). Marking one ready for review runs checks and test.
+name: vendor-updates
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# write access only in the Linux jobs that push and open PRs; never where the new Java or jar runs
+permissions:
+  contents: read
+
+# a run is never cut off between its push and its PR
+concurrency:
+  group: vendor-updates
+  cancel-in-progress: false
+
+jobs:
+  jre:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs jre
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/bump-pr.mjs jre "$FROM" "$TO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+
+  # Linux finds out whether Karate needs a PR; a branch already pushed without one gets its PR here
+  karate-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      todo: ${{ steps.pr.outputs.todo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs karate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: pr
+        if: ${{ steps.bump.outputs.changed == 'true' }}
+        run: node scripts/bump-pr.mjs karate "$FROM" "$TO" --check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+
+  # Windows only to record the event fixtures with the new bundled Java and jar. It runs unreviewed
+  # upstream binaries, so it holds a read-only token, keeps no git credentials and hands the fixtures on
+  karate:
+    needs: karate-check
+    if: ${{ needs.karate-check.outputs.todo == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      to: ${{ steps.bump.outputs.to }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs karate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: node scripts/fetch-vendor.mjs && node scripts/capture-fixtures.mjs
+        env:
+          # the default temp folder is an 8.3 short path (C:\Users\RUNNER~1\...) that the fixture sanitiser may miss
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: karate-fixtures
+          path: test/fixtures/events/*.jsonl
+          if-no-files-found: error
+          retention-days: 1
+
+  # Linux commits the fixtures with a pin it bumps itself, so only the recordings come from the Windows job
+  karate-pr:
+    needs: karate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: bump
+        run: node scripts/bump-vendor.mjs karate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: karate-fixtures
+          path: ${{ runner.temp }}/karate-fixtures
+      # only the fixture files the repo already has, and only when both jobs bumped to the same version
+      - run: |
+          if [ "$TO" != "$RECORDED" ]; then
+            echo "::error::recorded with Karate $RECORDED, but the newest is now $TO; the next run retries"
+            exit 1
+          fi
+          for f in test/fixtures/events/*.jsonl; do cp "$FIXTURES/$(basename "$f")" "$f"; done
+        env:
+          TO: ${{ steps.bump.outputs.to }}
+          RECORDED: ${{ needs.karate.outputs.to }}
+          FIXTURES: ${{ runner.temp }}/karate-fixtures
+      - run: node scripts/bump-pr.mjs karate "$FROM" "$TO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
