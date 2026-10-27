@@ -84,7 +84,7 @@ How many runs to judge from:
 ### R1. Project fingerprint
 
 1. The fingerprint is the SHA-256, as 64 lowercase hex characters, of one line per file under the project root: `<path relative to the root, with / separators>\t<size in bytes>\t<modified time in whole milliseconds>\n`. The lines are sorted by path, comparing UTF-16 code units, which is JavaScript's default sort.
-2. Every file under the project root counts, at any depth, except what is inside a folder named `.git`, `node_modules`, `target`, `build` or `.gradle`. The names are compared ignoring case. Symbolic links and junctions are neither followed nor listed. The whole root counts, not only the classpath roots, because Karate also reads config overlays, `karate-pom.json` and `file:` paths relative to the project root (spec author's call).
+2. Every file under the project root counts, at any depth, except what is inside a folder named `.git`, `node_modules` or `.gradle`, and inside a folder named `target` or `build` that sits next to a `pom.xml`, `build.gradle` or `build.gradle.kts` (a Maven or Gradle output folder). A test folder named `build` or `target` counts. The names are compared ignoring case. Symbolic links and junctions are neither followed nor listed. The whole root counts, not only the classpath roots, because Karate also reads config overlays, `karate-pom.json` and `file:` paths relative to the project root (spec author's call).
 3. The fingerprint is null when:
    - the project holds more than 50,000 files after the skips;
    - any folder or file under the root cannot be read or stat'ed;
@@ -239,7 +239,7 @@ Also automated (Vitest):
 - Fingerprint:
   - the same tree of files gives the same value;
   - a changed size, a changed modified time, an added file, a removed file and a renamed file each give a new value;
-  - files under `.git`, `node_modules`, `target`, `build` and `.gradle`, at any depth and in any case, do not count;
+  - files under `.git`, `node_modules` and `.gradle`, and under `target` and `build` next to a `pom.xml`, `build.gradle` or `build.gradle.kts`, at any depth and in any case, do not count; a test folder named `build` or `target` does;
   - a symbolic link or junction is not followed;
   - more than 50,000 files, an unreadable folder, or the 2 s bound give null;
   - it never throws.
