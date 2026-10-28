@@ -10,7 +10,7 @@ decision-makers: Tusquito
 
 The backlog is a table in `docs/features.md`: 45 rows (23 done, 22 idea), with notes for 7 of them. Every spec or feature PR edits it, so parallel branches collide on one file (the F44/F45 research PR and the rename PR both edited it). Agents move a row's status by hand, and forget. Once the repo is public, outside users will report bugs and ideas as GitHub issues (F35) anyway.
 
-The repo is `hpagniez/karate-kid`, on the maintainer's personal account on GitHub Free. The account was renamed from `Tusquito` to `hpagniez`; `gh` still labels its saved login `Tusquito`. What GitHub offers, checked on 2026-10-28:
+The repo is `hpagniez/grace`, on the maintainer's personal account on GitHub Free. The account was renamed from `Tusquito` to `hpagniez`; `gh` still labels its saved login `Tusquito`. What GitHub offers, checked on 2026-10-28:
 
 - A project (Projects v2) belongs to a user or an organisation, not to a repo. Its board columns must be a single-select or iteration field. Labels cannot be columns, and a table view cannot group by labels.
 - Built-in project workflows set the `Status` field when an item is added, when a PR is linked to an issue (added November 2025), and when an item is closed. They are set up in the web UI only. GitHub Free allows one auto-add workflow. It adds only items created or updated after it is turned on.
@@ -31,7 +31,7 @@ Chosen: option 3.
 - One issue per feature. Its body holds the feature, a `Karate surface:` line, a `Spec:` line (the file on `develop`, or "none") and any notes.
 - Priority: labels `must`, `should` and `could`.
 - One project, `Grace`, owned by `hpagniez`. Its `Status` field has the options `idea`, `building` and `done`:
-  - Auto-add to project: issues of `hpagniez/karate-kid` (filter `is:issue`).
+  - Auto-add to project: issues of `hpagniez/grace` (filter `is:issue`).
   - Item added to project: `idea`.
   - Pull request linked to issue: `building`.
   - Item closed: `done`.
