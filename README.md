@@ -1,5 +1,7 @@
 # Grace
 
+<img src="assets/mascot.svg" alt="Grace, a martial artist in a white gi and green belt, punching a moth with a strip of tape on its wing" width="320">
+
 A free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. Named after Grace Hopper, whose team taped a moth into a logbook in 1947 as the "first actual case of bug being found".
 
 The walking skeleton (open a project, browse the test tree, run, watch progress, read failures, open the report) works from source (`npm start`) and under the end-to-end suite (`npm run e2e`). Version 1.0.0 adds the tag filter and the environment switcher. Its packaged Windows zip was checked by hand on 2026-10-25: see [docs/checks/2026-10-25-release-1.0.0-packaged.md](docs/checks/2026-10-25-release-1.0.0-packaged.md). See [docs/features.md](docs/features.md) for what it does and what is planned, and [AGENTS.md](AGENTS.md) for how the repo is organised.
