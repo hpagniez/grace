@@ -25,13 +25,12 @@ jobs:
       matrix:
         half: [1, 2]
     env:
-      # half 2 runs these runner files (about 242 s on CI), half 1 every other test file (about 226 s).
+      # half 2 runs these runner files (about 200 s on CI), half 1 every other test file (about 185 s).
       # Not vitest --shard: it splits by file count. Move files between the halves to keep them even.
       SECOND_HALF: >-
         src/main/runner.discovery.test.ts
         src/main/runner.runs.test.ts
         src/main/runner.tags.test.ts
-        src/main/runner.threads.test.ts
         src/main/runner.env.test.ts
         src/main/runner.properties.test.ts
     defaults:
