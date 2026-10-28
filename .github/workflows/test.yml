@@ -27,11 +27,15 @@ jobs:
       matrix:
         half: [1, 2]
     env:
-      # half 2 runs these files: runner.history alone takes about 135 s on CI, the slowest file. Half 1 runs
-      # every other test file (about 315 s in all) on its 3 workers. Not vitest --shard: it splits by file
-      # count. Move files between the halves to keep them even.
+      # half 2 runs these runner files (about 225 s of tests on CI), half 1 every other test file (about 225 s),
+      # each on 3 workers. Not vitest --shard: it splits by file count. Move files between the halves to keep
+      # them even.
       SECOND_HALF: >-
-        src/main/runner.history.test.ts
+        src/main/runner.discovery.test.ts
+        src/main/runner.runs.test.ts
+        src/main/runner.tags.test.ts
+        src/main/runner.rerun.test.ts
+        src/main/runner.properties.test.ts
     defaults:
       run:
         shell: bash
