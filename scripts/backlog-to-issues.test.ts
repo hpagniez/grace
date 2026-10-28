@@ -69,6 +69,14 @@ describe("issueBody", () => {
     expect(body).not.toContain("](#");
   });
 
+  it("leaves no relative or same-page link in any of the 45 bodies", () => {
+    for (const r of rows) {
+      const body = issueBody(r);
+      expect(body, r.id).not.toContain("](#");
+      expect(body, r.id).not.toMatch(/\]\((?!https?:)/);
+    }
+  });
+
   it("says none for a row without a spec and skips empty notes", () => {
     const body = issueBody(row("F13"));
     expect(body).toContain("**Spec:** none");
@@ -144,6 +152,29 @@ describe("migrate", () => {
     expect(numbers.get("F01")).toBe(41);
     expect(numbers.get("F45")).toBe(85);
     expect(log).toHaveBeenCalledWith("F01 #41");
+  });
+
+  it("stops when gh prints no issue URL, naming the row", () => {
+    const f = fakeGh();
+    const empty = (cmd: string, args: string[], input?: string) =>
+      args[1] === "create" ? "" : f.run(cmd, args, input);
+    expect(() => migrate({ apply: true }, empty)).toThrow(
+      /^F01: gh issue create printed no issue URL/,
+    );
+    const slash = (cmd: string, args: string[], input?: string) =>
+      args[1] === "create"
+        ? "https://github.com/hpagniez/grace/issues/\n"
+        : f.run(cmd, args, input);
+    expect(() => migrate({ apply: true }, slash)).toThrow(/^F01: /);
+  });
+
+  it("refuses an already migrated backlog before any gh call", () => {
+    const f = fakeGh();
+    const frozen = frozenBacklog(rows, new Map(rows.map((r, i) => [r.id, 41 + i])));
+    expect(() => migrate({ apply: true, markdown: frozen }, f.run)).toThrow(
+      "docs/features.md has no backlog rows (already migrated?)",
+    );
+    expect(f.calls).toEqual([]);
   });
 
   it("skips a row whose issue exists and keeps its number", () => {

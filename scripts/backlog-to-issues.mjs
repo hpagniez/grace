@@ -27,25 +27,28 @@ export function parseBacklog(markdown) {
   const notes = new Map();
   const sections = markdown.split(/^### (F\d+)\b.*$/m);
   for (let i = 1; i < sections.length; i += 2) notes.set(sections[i], sections[i + 1].trim());
-  return markdown
-    .split("\n")
-    .filter((line) => /^\| F\d+ \|/.test(line))
-    .map((line) => {
-      const [id, feature, priority, status, surface, spec] = line
-        .split("|")
-        .slice(1, -1)
-        .map((cell) => cell.trim());
-      return {
-        id,
-        title: feature.split(": ")[0].replaceAll("`", ""),
-        feature,
-        priority: /** @type {Row["priority"]} */ (priority),
-        status,
-        surface,
-        spec,
-        notes: notes.get(id) ?? "",
-      };
-    });
+  return (
+    markdown
+      .split("\n")
+      // six cells: the frozen ID-to-issue table has two and is not a backlog
+      .filter((line) => /^\| F\d+ \|([^|]*\|){5}\s*$/.test(line))
+      .map((line) => {
+        const [id, feature, priority, status, surface, spec] = line
+          .split("|")
+          .slice(1, -1)
+          .map((cell) => cell.trim());
+        return {
+          id,
+          title: feature.split(": ")[0].replaceAll("`", ""),
+          feature,
+          priority: /** @type {Row["priority"]} */ (priority),
+          status,
+          surface,
+          spec,
+          notes: notes.get(id) ?? "",
+        };
+      })
+  );
 }
 
 /** Links that work outside the repo: same-page anchors lose their link, relative paths point at `develop` on GitHub. */
@@ -92,12 +95,13 @@ export function frozenBacklog(rows, numbers) {
 /**
  * Creates the labels and the issues that do not exist yet (found by their `Old backlog ID:` line, so a second run resumes), then closes the done ones.
  * Without `apply` it only reads, and prints what it would create.
- * @param {{ apply: boolean }} o
+ * @param {{ apply: boolean, markdown?: string }} o `markdown` is the backlog to read, docs/features.md by default
  * @param {(cmd: string, args: string[], input?: string) => string} run
  * @returns {Map<string, number>} old ID to issue number
  */
-export function migrate({ apply }, run = execRun) {
-  const rows = parseBacklog(readFileSync(FEATURES, "utf8"));
+export function migrate({ apply, markdown = readFileSync(FEATURES, "utf8") }, run = execRun) {
+  const rows = parseBacklog(markdown);
+  if (!rows.length) throw new Error("docs/features.md has no backlog rows (already migrated?)");
   const numbers = new Map();
   const existing = JSON.parse(
     run("gh", [
@@ -139,10 +143,10 @@ export function migrate({ apply }, run = execRun) {
           "-",
         ],
         issueBody(row),
-      ).trim();
-      const number = Number(url.split("/").pop());
-      if (!Number.isInteger(number)) throw new Error(`${row.id}: no issue URL from gh: ${url}`);
-      numbers.set(row.id, number);
+      );
+      const number = /\/issues\/(\d+)\s*$/.exec(url)?.[1];
+      if (!number) throw new Error(`${row.id}: gh issue create printed no issue URL: "${url}"`);
+      numbers.set(row.id, Number(number));
     }
     console.log(
       numbers.has(row.id) ? `${row.id} #${numbers.get(row.id)}` : `${row.id} would create`,
