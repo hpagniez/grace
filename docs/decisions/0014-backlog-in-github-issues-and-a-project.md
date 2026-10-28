@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-28
 decision-makers: Tusquito
 ---
@@ -8,7 +8,7 @@ decision-makers: Tusquito
 
 ## Context and Problem Statement
 
-The backlog is a table in `docs/features.md`: 45 rows (23 done, 22 idea), with notes for 7 of them. Every spec or feature PR edits it, so parallel branches collide on one file (the F44/F45 research PR and the rename PR both edited it). Agents move a row's status by hand, and forget. Once the repo is public, outside users will report bugs and ideas as GitHub issues (F35) anyway.
+The backlog is a table in `docs/features.md`: 45 rows (25 done, 20 idea), with notes for 7 of them. Every spec or feature PR edits it, so parallel branches collide on one file (the F44/F45 research PR and the rename PR both edited it). Agents move a row's status by hand, and forget. Once the repo is public, outside users will report bugs and ideas as GitHub issues (F35) anyway.
 
 The repo is `hpagniez/grace`, on the maintainer's personal account on GitHub Free. The account was renamed from `Tusquito` to `hpagniez`; `gh` still labels its saved login `Tusquito`. What GitHub offers, checked on 2026-10-28:
 
