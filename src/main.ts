@@ -329,7 +329,6 @@ app.whenReady().then(async () => {
   removeLeftoverArgFiles(dataDir);
   removeLeftoverRuns(dataDir);
   createWindow(dataDir);
-  const result = takeResult(dataDir);
   if (app.isPackaged) void removeLeftovers(installDir);
   try {
     const last = loadLastProject(dataDir);
@@ -338,8 +337,9 @@ app.whenReady().then(async () => {
     emit({ type: "notice", message: err instanceof Error ? err.message : String(err) });
   }
   // After the reopen, whose project event would clear the result's notice (R10.7), and never
-  // awaited: the check delays neither the window nor the reopening (R2.2).
-  void updater.startup(result);
+  // awaited: the check delays neither the window nor the reopening (R2.2). The result file is
+  // deleted only here, as it is applied, so a Grace that dies during the reopen reads it again.
+  void updater.startup(takeResult(dataDir));
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
