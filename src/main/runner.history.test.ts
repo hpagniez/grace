@@ -1,0 +1,787 @@
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { holdFolder } from "../../test/hold";
+import {
+  cleanUp,
+  T,
+  setup,
+  fixture,
+  byName,
+  until,
+  projectDir,
+  javaCommandLines,
+  folders,
+  recordFile,
+  record,
+  seed,
+  stored,
+} from "../../test/runner";
+import type { StoredTest } from "../shared/history";
+import { NO_FILTER } from "../shared/tags";
+import { projectFingerprint } from "./fingerprint";
+import { Runner } from "./runner";
+import { fakeSecretBox } from "./secrets";
+import { loadProjectEnv, loadProjectFilter, saveProjectEnv } from "./settings";
+
+afterEach(cleanUp);
+
+describe("Runner history", () => {
+  const SECRET = "s3cret-token-123";
+  const smoke = { include: ["smoke"], exclude: [], hideNonMatching: false };
+  const GONE = "This run is no longer in the history";
+
+  it("a run writes run.json in its own folder", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run("d:");
+    const [id, ...more] = folders(dataDir, root);
+    expect(more).toEqual([]);
+    expect(last("runStarted").runId).toBe(id);
+    const r = record(dataDir, root, id);
+    expect(r).toMatchObject({
+      version: 1,
+      startedAt: last("runStarted").startedAt,
+      env: null,
+      threads: 1,
+      filter: NO_FILTER,
+      selection: { kind: "folder", file: "", line: null, key: "d:" },
+      failedOf: null,
+      outcome: "finished",
+      exitCode: 1,
+    });
+    expect(r.durationMillis).toBeGreaterThan(0);
+    expect(r.tests).toHaveLength(9);
+    expect(r.tests.filter((t) => t.status === "failed")).toMatchObject([
+      { kind: "scenario", file: "tests/basic.feature", name: "failing match" },
+    ]);
+    expect(r.tests.filter((t) => t.status === "passed")).toHaveLength(8);
+    expect(existsSync(path.join(projectDir(dataDir, root), "run"))).toBe(false);
+    // listed once the run's end events were sent, with its report
+    const types = events.map((e) => e.type);
+    expect(types.lastIndexOf("history")).toBeGreaterThan(types.indexOf("runFinished"));
+    expect(last("history").runs).toMatchObject([
+      { id, passed: 8, failed: 1, total: 9, outcome: "finished", reportAvailable: true },
+    ]);
+    expect(runner.reportPath()).toBe(
+      path.join(path.dirname(recordFile(dataDir, root, id)), "karate-summary.html"),
+    );
+  });
+
+  it("run.json holds no secret", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    runner.saveProperties({
+      shared: [],
+      byEnv: { qa: [{ name: "api.token", value: SECRET, secret: true }] },
+    });
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(last("runFinished").outcome).toBe("finished");
+    const [id] = folders(dataDir, root);
+    const text = readFileSync(recordFile(dataDir, root, id), "utf8");
+    expect(text).not.toContain(SECRET);
+    expect(JSON.parse(text)).toMatchObject({ env: "qa", outcome: "finished" });
+  });
+
+  it("two runs keep two folders, newest first", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    const key = byName(last("project").tree!, "always").key;
+    await runner.run(key);
+    await runner.run(key);
+    const ids = folders(dataDir, root);
+    expect(ids).toHaveLength(2);
+    const runs = last("history").runs;
+    expect(runs.map((r) => r.id)).toEqual([...ids].reverse());
+    expect(runs[0].startedAt).toBeGreaterThan(runs[1].startedAt);
+  });
+
+  it("retention keeps 20", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    const seeded = seed(dataDir, root, 20);
+    await runner.open(root);
+    expect(last("history").runs).toHaveLength(20);
+    await runner.run(byName(last("project").tree!, "always").key);
+    const ids = folders(dataDir, root);
+    expect(ids).toHaveLength(20);
+    expect(ids).not.toContain(seeded[0]);
+    expect(ids.slice(0, 19)).toEqual(seeded.slice(1));
+    expect(last("history").runs).toHaveLength(20);
+    expect(last("history").runs[0].id).toBe(ids[19]);
+  });
+
+  it("a refused run creates no folder", T, async () => {
+    const first = setup();
+    const root = fixture("env");
+    await first.runner.open(root);
+    first.runner.saveProperties({
+      shared: [{ name: "api.token", value: SECRET, secret: true }],
+      byEnv: {},
+    });
+    await first.runner.dispose();
+    const settings = path.join(first.dataDir, "settings.json");
+    const cipher = fakeSecretBox().encrypt(SECRET);
+    writeFileSync(settings, readFileSync(settings, "utf8").replace(cipher, "Zm9v"));
+
+    const { runner, all, last, dataDir } = setup(first.dataDir);
+    await runner.open(root);
+    await runner.run("d:");
+    expect(last("notice").message).toContain("can't be read");
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([]);
+    expect(last("history").runs).toEqual([]);
+    expect(all("history")).toHaveLength(1); // the one of open
+  });
+
+  it(
+    "a cancelled run is recorded as cancelled with notRun for tests that never started",
+    T,
+    async () => {
+      const { runner, all, last, dataDir } = setup();
+      const root = fixture("clean");
+      await runner.open(root);
+      const run = runner.run("f:tests/slow.feature");
+      await until(() =>
+        all("scenarios").some((e) => e.updates.some((u) => u.status === "running")),
+      );
+      await runner.cancel();
+      await run;
+      const [id] = folders(dataDir, root);
+      const r = record(dataDir, root, id);
+      expect(r).toMatchObject({ outcome: "cancelled", exitCode: null });
+      expect(r.tests.map((t) => [t.name, t.status])).toEqual([
+        ["slow loop", "interrupted"],
+        ["smoke and slow", "notRun"],
+      ]);
+      expect(last("history").runs).toMatchObject([
+        { id, outcome: "cancelled", passed: 0, failed: 0, total: 2, reportAvailable: false },
+      ]);
+    },
+  );
+
+  it("dispose records the killed run as cancelled", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    await runner.dispose();
+    // written before dispose returned, not when the run's promise settles
+    const [id, ...more] = folders(dataDir, root);
+    expect(more).toEqual([]);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "cancelled" });
+    await run;
+  });
+
+  it("replay includes history", T, async () => {
+    const { runner, last } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    expect(last("history").runs).toEqual([]);
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(last("history").runs).toHaveLength(1);
+    expect(runner.replay()).toEqual([
+      runner.current(),
+      { type: "filter", filter: NO_FILTER },
+      { type: "threads", count: 1 },
+      last("environment"),
+      last("history"),
+      last("flaky"),
+      { type: "opening", root: null },
+      { type: "busy", busy: false },
+    ]);
+  });
+
+  it("every rediscovery sends history, also a cancelled one", T, async () => {
+    const { runner, events, last, dataDir } = setup();
+    const root = fixture("env");
+    const [id] = seed(dataDir, root, 1);
+    await runner.open(root);
+    expect(last("history").runs.map((r) => r.id)).toEqual([id]);
+    await runner.refresh();
+    await runner.setEnv("qa");
+    expect(events.filter((e) => e.type === "history")).toHaveLength(3);
+    const from = events.length;
+    const switching = runner.setEnv("prod");
+    await runner.cancel();
+    await switching;
+    expect(events.slice(from).filter((e) => e.type === "history")).toHaveLength(1);
+    expect(last("history").runs.map((r) => r.id)).toEqual([id]);
+  });
+
+  it("a run that fails to start is recorded as failed", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    const pidFile = path.join(dataDir, "running.pid");
+    mkdirSync(pidFile); // writing a file there fails
+    try {
+      const before = Date.now();
+      await runner.run("f:tests/slow.feature");
+      expect(all("runStarted")).toHaveLength(0);
+      const [id] = folders(dataDir, root);
+      const r = record(dataDir, root, id);
+      expect(r).toMatchObject({ outcome: "failed", exitCode: null });
+      expect(r.startedAt).toBeGreaterThanOrEqual(before);
+      expect(r.startedAt).toBeLessThanOrEqual(Date.now());
+      expect(r.tests.map((t) => t.status)).toEqual(["notRun", "notRun"]);
+      expect(last("history").runs).toMatchObject([{ id, outcome: "failed", total: 2 }]);
+    } finally {
+      rmSync(pidFile, { recursive: true, force: true });
+    }
+  });
+
+  it("an error before the run ends leaves no folder", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({
+      shared: [{ name: "timeout", value: "5000", secret: false }],
+      byEnv: {},
+    });
+    const blocker = path.join(projectDir(dataDir, root), "run-args.txt");
+    mkdirSync(blocker); // writing the argument file there fails
+    try {
+      await expect(runner.run(byName(last("project").tree!, "always").key)).rejects.toThrow();
+      expect(folders(dataDir, root)).toEqual([]);
+    } finally {
+      rmSync(blocker, { recursive: true, force: true });
+    }
+  });
+
+  it("a record that cannot be written is a notice, not an error", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length > 0);
+    // a folder where the file goes: writing it fails
+    mkdirSync(recordFile(dataDir, root, last("runStarted").runId));
+    await run;
+    expect(last("runFinished").outcome).toBe("finished");
+    expect(last("notice").message).toContain("EISDIR");
+    expect(runner.reportPath()).not.toBeNull();
+  });
+
+  it("the history sample project fails where the spec says", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("history");
+    await runner.open(root);
+    await runner.run("d:");
+    const [id] = folders(dataDir, root);
+    const failed = record(dataDir, root, id)
+      .tests.filter((t) => t.status === "failed")
+      .map((t) => t.name);
+    expect(failed).toEqual(["fixable", "row 2", "dynamic 2"]);
+    expect(last("history").runs).toMatchObject([{ passed: 3, failed: 3, total: 6 }]);
+  });
+
+  it("rerunFailed runs only the failed tests that can run", T, async () => {
+    const { runner, events, all, last, dataDir } = setup();
+    const root = fixture("history");
+    await runner.open(root);
+    await runner.run("d:");
+    const first = last("history").runs[0];
+    writeFileSync(path.join(root, "flag.json"), '{ "fixed": true }');
+    const tree = last("project").tree!;
+    const keys = [byName(tree, "fixable").key, byName(tree, "row 2").key];
+    const from = events.length;
+    await runner.rerunFailed(first.id);
+    expect(last("runStarted")).toMatchObject({ keys, total: 2 });
+    const updated = all("scenarios")
+      .filter((e) => events.indexOf(e) > from)
+      .flatMap((e) => e.updates.map((u) => u.key));
+    expect([...new Set(updated)].sort()).toEqual([...keys].sort());
+    expect(events.slice(from).flatMap((e) => (e.type === "notice" ? [e.message] : []))).toEqual([
+      "1 failed row of a dynamic Examples table can't be run alone. Run its outline.",
+    ]);
+    const [, id] = folders(dataDir, root);
+    const r = record(dataDir, root, id);
+    expect(r).toMatchObject({ selection: null, failedOf: first.startedAt, outcome: "finished" });
+    expect(r.tests.map((t) => [t.name, t.status])).toEqual([
+      ["fixable", "passed"],
+      ["row 2", "failed"],
+    ]);
+    expect(last("history").runs[0]).toMatchObject({
+      id,
+      failedOf: first.startedAt,
+      passed: 1,
+      failed: 1,
+      total: 2,
+    });
+  });
+
+  it("rerunFailed passes its targets in a file", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    const slow = byName(last("project").tree!, "slow");
+    const [id] = seed(dataDir, root, 1, {
+      selection: null,
+      failedOf: 1,
+      tests: [stored(slow, "failed")],
+    });
+    const file = path.join(projectDir(dataDir, root), "run-targets.txt");
+    const run = runner.rerunFailed(id);
+    await until(() => all("runStarted").length > 0);
+    const target = `${path.join(root, "tests", "env.feature")}:${slow.line}`;
+    expect(readFileSync(file, "utf8")).toBe(`"${target.replace(/\\/g, "\\\\")}"\r\n`);
+    const lines = javaCommandLines(root);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(`@${file}`);
+    expect(lines[0]).not.toContain("env.feature");
+    await run;
+    expect(last("runFinished").outcome).toBe("finished");
+    expect(last("runStarted").keys).toEqual([slow.key]);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("rerun switches environment and filter back", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("history");
+    await runner.open(root);
+    await runner.setEnv("qa");
+    runner.setFilter(smoke);
+    await runner.run("f:tests/fix.feature");
+    const green = byName(last("project").tree!, "stays green").key;
+    expect(last("runStarted").keys).toEqual([green]);
+    const { id } = last("history").runs[0];
+    await runner.setEnv(null);
+    runner.setFilter(NO_FILTER);
+    await runner.rerun(id);
+    expect(last("environment").view.env).toBe("qa");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+    expect(last("filter").filter).toEqual(smoke);
+    expect(loadProjectFilter(dataDir, root)).toEqual(smoke);
+    expect(last("runStarted")).toMatchObject({ keys: [green], total: 1, env: "qa" });
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+    const [, second] = folders(dataDir, root);
+    expect(record(dataDir, root, second)).toMatchObject({
+      env: "qa",
+      filter: smoke,
+      selection: { kind: "feature", key: "f:tests/fix.feature" },
+      failedOf: null,
+    });
+  });
+
+  it("rerun with a vanished included tag runs nothing, never more", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    runner.setFilter({ include: ["wip"], exclude: [], hideNonMatching: false });
+    await runner.run("d:");
+    expect(last("runStarted").total).toBe(2);
+    const { id } = last("history").runs[0];
+    runner.setFilter(NO_FILTER);
+    const file = path.join(root, "tests", "basic.feature");
+    writeFileSync(file, readFileSync(file, "utf8").replace(/ ?@wip/g, ""));
+    await runner.rerun(id);
+    expect(last("notice").message).toBe("Nothing to run");
+    expect(all("runStarted")).toHaveLength(1);
+    expect(folders(dataDir, root)).toEqual([id]);
+  });
+
+  it("rerun of a deleted test says the tests of this run no longer exist", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "failing match").key);
+    const { id } = last("history").runs[0];
+    const file = path.join(root, "tests", "basic.feature");
+    const text = readFileSync(file, "utf8");
+    const edited = text.replace(/@wip\r?\nScenario: failing match[\s\S]*?(?=Scenario:)/, "");
+    expect(edited).not.toBe(text);
+    writeFileSync(file, edited);
+    await runner.rerun(id);
+    expect(last("notice").message).toBe("The tests of this run no longer exist");
+    expect(all("runStarted")).toHaveLength(1);
+    expect(folders(dataDir, root)).toEqual([id]);
+  });
+
+  it("rerun of a rerun-failed run runs all its tests and keeps failedOf", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("history");
+    await runner.open(root);
+    const tree = last("project").tree!;
+    const fixable = byName(tree, "fixable");
+    const row2 = byName(tree, "row 2");
+    const gone: StoredTest = {
+      ...stored(fixable, "failed"),
+      refId: "[9:99]",
+      name: "gone",
+      line: 99,
+      key: "s:tests/fix.feature#9",
+    };
+    const [id] = seed(dataDir, root, 1, {
+      selection: null,
+      failedOf: 1234,
+      tests: [
+        stored(fixable, "passed"),
+        stored(row2, "failed"),
+        stored(byName(tree, "dynamic 2"), "failed"),
+        gone,
+      ],
+    });
+    await runner.rerun(id);
+    expect(last("notice").message).toBe(
+      "1 failed test no longer exists. 1 failed row of a dynamic Examples table can't be run alone. Run its outline.",
+    );
+    expect(last("runStarted")).toMatchObject({ keys: [fixable.key, row2.key], total: 2 });
+    const [, second] = folders(dataDir, root);
+    const r = record(dataDir, root, second);
+    expect(r).toMatchObject({ selection: null, failedOf: 1234 });
+    expect(r.tests.map((t) => [t.name, t.status])).toEqual([
+      ["fixable", "failed"],
+      ["row 2", "failed"],
+    ]);
+
+    // with no test left, nothing runs
+    const [onlyGone] = seed(dataDir, root, 1, { selection: null, failedOf: 1234, tests: [gone] });
+    await runner.rerunFailed(onlyGone);
+    expect(last("notice").message).toBe("1 failed test no longer exists. Nothing to run.");
+    expect(folders(dataDir, root)).toHaveLength(3);
+  });
+
+  it("cancel during a re-run's environment switch runs nothing", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    const qa = { include: ["env=qa"], exclude: [], hideNonMatching: false };
+    const [id] = seed(dataDir, root, 1, { env: "qa", filter: qa });
+    await runner.open(root);
+    const rerun = runner.rerun(id); // its dry run is spawned before rerun() first awaits
+    await runner.cancel();
+    await rerun;
+    expect(last("notice").message).toBe("Cancelled");
+    expect(last("environment").view.env).toBeNull();
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+    expect(last("filter").filter).toEqual(NO_FILTER);
+    expect(loadProjectFilter(dataDir, root)).toEqual(NO_FILTER);
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([id]);
+  });
+
+  it("cancel after a re-run's environment switch, with no process, runs nothing", T, async () => {
+    const { runner, all, last, dataDir, onEvent } = setup();
+    const root = fixture("env");
+    const [id] = seed(dataDir, root, 1, { env: "qa" });
+    await runner.open(root);
+    let cancel: Promise<void> | null = null;
+    onEvent((e) => {
+      // the switch's dry run has exited and its filter is sent: the env tags are read next, no JVM is up
+      if (e.type === "filter" && all("project").length === 2) cancel ??= runner.cancel();
+    });
+    await runner.rerun(id);
+    await cancel;
+    expect(last("notice").message).toBe("Run cancelled");
+    expect(all("project")).toHaveLength(2); // open, then the switch: no pre-run dry run
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([id]);
+    expect(last("history").runs.map((r) => r.id)).toEqual([id]);
+  });
+
+  it("a re-run whose environment has a parse error switches and runs nothing", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("broken");
+    const [id] = seed(dataDir, root, 1, { env: "qa" });
+    await runner.open(root);
+    await runner.rerun(id);
+    expect(last("project").error).toContain("syntax.feature");
+    expect(all("project")).toHaveLength(2); // open, then the switch: no pre-run dry run
+    expect(last("environment").view.env).toBe("qa");
+    expect(loadProjectEnv(dataDir, root).env).toBe("qa");
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([id]);
+  });
+
+  it("rerun checks the target environment's secrets first", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    saveProjectEnv(dataDir, root, {
+      env: null,
+      properties: { shared: [], byEnv: { qa: [{ name: "api.token", secret: "Zm9v" }] } },
+    });
+    const [id] = seed(dataDir, root, 1, { env: "qa" });
+    await runner.open(root);
+    for (const action of [() => runner.rerun(id), () => runner.rerunFailed(id)]) {
+      await action();
+      expect(last("notice").message).toBe(
+        "Secret api.token (qa) can't be read. Replace it in Properties.",
+      );
+    }
+    expect(all("project")).toHaveLength(1); // no discovery
+    expect(last("environment").view.env).toBeNull();
+    expect(loadProjectEnv(dataDir, root).env).toBeNull();
+    expect(all("runStarted")).toHaveLength(0);
+    expect(folders(dataDir, root)).toEqual([id]);
+  });
+
+  it("rerun refuses an unknown id", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    // a damaged record is not listed either
+    const damaged = path.join(projectDir(dataDir, root), "runs", "20200101-000000-001");
+    mkdirSync(damaged, { recursive: true });
+    writeFileSync(path.join(damaged, "run.json"), "{");
+    const ids = [
+      "20200101-000000-000",
+      "20200101-000000-001",
+      "..\\..\\x",
+      "20261025-143205-123\\..",
+    ];
+    for (const id of ids) {
+      await runner.rerun(id);
+      expect(last("notice").message).toBe(GONE);
+      await runner.rerunFailed(id);
+      expect(last("notice").message).toBe(GONE);
+    }
+    expect(all("notice")).toHaveLength(ids.length * 2);
+    expect(all("project")).toHaveLength(1);
+    expect(all("runStarted")).toHaveLength(0);
+  });
+
+  it("clearHistory deletes the runs and emits an empty history", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    seed(dataDir, root, 2);
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(runner.reportPath()).not.toBeNull();
+    expect(last("history").runs).toHaveLength(3);
+
+    // refused while busy
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length === 2);
+    runner.clearHistory();
+    expect(last("notice").message).toBe("A run is already in progress");
+    expect(folders(dataDir, root)).toHaveLength(4);
+    await runner.cancel();
+    await run;
+
+    // a process running inside a run folder holds it
+    const [held] = folders(dataDir, root);
+    const release = await holdFolder(path.join(projectDir(dataDir, root), "runs", held));
+    try {
+      runner.clearHistory();
+      expect(last("notice").message).toBe("Some runs could not be deleted");
+      expect(folders(dataDir, root)).toEqual([held]);
+    } finally {
+      await release();
+    }
+
+    const notices = all("notice").length;
+    runner.clearHistory();
+    expect(all("notice")).toHaveLength(notices);
+    expect(folders(dataDir, root)).toEqual([]);
+    expect(last("history").runs).toEqual([]);
+    expect(runner.reportPath()).toBeNull();
+  });
+
+  it("clearHistory keeps the toolbar report of a run it could not delete", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "always").key);
+    const report = runner.reportPath()!;
+    expect(report).not.toBeNull();
+    const fd = openSync(report, 0x10000000); // libuv's UV_FS_O_EXLOCK: no sharing, so no delete
+    try {
+      runner.clearHistory();
+      expect(last("notice").message).toBe("Some runs could not be deleted");
+    } finally {
+      closeSync(fd);
+    }
+    expect(last("history").runs).toMatchObject([{ reportAvailable: true }]);
+    expect(runner.reportPath()).toBe(report);
+    runner.clearHistory();
+    expect(folders(dataDir, root)).toEqual([]);
+    expect(runner.reportPath()).toBeNull();
+  });
+
+  it("runReportPath is null for a cancelled run and for an unknown id", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "always").key);
+    const done = last("runStarted").runId;
+    const run = runner.run(byName(last("project").tree!, "slow").key);
+    await until(() => all("runStarted").length === 2);
+    await runner.cancel();
+    await run;
+    const cancelled = last("runStarted").runId;
+    expect(runner.runReportPath(done)).toBe(
+      path.join(projectDir(dataDir, root), "runs", done, "karate-summary.html"),
+    );
+    expect(runner.runReportPath(cancelled)).toBeNull();
+    expect(runner.runReportPath("20200101-000000-000")).toBeNull();
+    expect(runner.runReportPath(`${done}\\..\\${done}`)).toBeNull();
+  });
+
+  it("a run of an unchanged project stores its fingerprint", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { fingerprint } = record(dataDir, root, id);
+    expect(fingerprint).not.toBeNull();
+    expect(fingerprint).toBe(await projectFingerprint(root));
+  });
+
+  it("a file saved during a run stores no fingerprint", T, async () => {
+    const { runner, all, dataDir } = setup();
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    writeFileSync(path.join(root, "note.txt"), "saved during the run");
+    await run;
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("different walks store no fingerprint", T, async () => {
+    const walks = ["a".repeat(64), "b".repeat(64)];
+    const fake = async () => walks.shift()!;
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toEqual([]);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id).fingerprint).toBeNull();
+  });
+
+  it("a cancel during the first walk starts no Java", T, async () => {
+    let runner: Runner | undefined;
+    const fake = async () => {
+      await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.all("runStarted")).toHaveLength(0);
+    expect(s.last("notice").message).toBe("Run cancelled");
+    expect(folders(s.dataDir, root)).toEqual([]);
+  });
+
+  it("dispose skips the second walk", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return "a".repeat(64);
+    };
+    const { runner, all, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    const run = runner.run("f:tests/slow.feature");
+    await until(() => all("runStarted").length > 0);
+    await runner.dispose();
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "cancelled", fingerprint: null });
+    await run;
+  });
+
+  it("a first walk that gave null skips the second", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      walks++;
+      return null;
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(walks).toBe(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+
+  it("the stored duration ends when Java exits, not after the second walk", T, async () => {
+    let walks = 0;
+    let secondWalkAt = 0;
+    const fake = async () => {
+      if (++walks === 2) {
+        secondWalkAt = Date.now();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      return "a".repeat(64);
+    };
+    const { runner, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    const [id] = folders(dataDir, root);
+    const { startedAt, durationMillis } = record(dataDir, root, id);
+    // the walk starts right after the exit, so a run that ended there is over by then
+    expect(startedAt + durationMillis).toBeLessThanOrEqual(secondWalkAt);
+  });
+
+  it("the second walk comes before runFinished", T, async () => {
+    let walks = 0;
+    let finishedAtSecondWalk: boolean | undefined;
+    const fake = async () => {
+      if (++walks === 2) finishedAtSecondWalk = s.all("runFinished").length > 0;
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await s.runner.open(root);
+    await s.runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(finishedAtSecondWalk).toBe(false);
+    const types = s.events.map((e) => e.type);
+    expect(types.lastIndexOf("runFinished")).toBeLessThan(types.lastIndexOf("history"));
+  });
+
+  it("a cancel during the second walk keeps the run's outcome", T, async () => {
+    let runner: Runner | undefined;
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) await runner!.cancel();
+      return "a".repeat(64);
+    };
+    const s = setup(undefined, undefined, undefined, fake);
+    runner = s.runner;
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(s.last("project").tree!, "passing hello").key);
+    expect(s.last("runFinished").outcome).toBe("finished");
+    const [id] = folders(s.dataDir, root);
+    expect(record(s.dataDir, root, id)).toMatchObject({
+      outcome: "finished",
+      fingerprint: "a".repeat(64),
+    });
+  });
+
+  it("a failing second walk still ends the run", T, async () => {
+    let walks = 0;
+    const fake = async () => {
+      if (++walks === 2) throw new Error("walk failed");
+      return "a".repeat(64);
+    };
+    const { runner, all, last, dataDir } = setup(undefined, undefined, undefined, fake);
+    const root = fixture("clean");
+    await runner.open(root);
+    await runner.run(byName(last("project").tree!, "passing hello").key);
+    expect(all("runFinished")).toHaveLength(1);
+    const [id] = folders(dataDir, root);
+    expect(record(dataDir, root, id)).toMatchObject({ outcome: "finished", fingerprint: null });
+  });
+});
