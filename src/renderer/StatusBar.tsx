@@ -14,6 +14,13 @@ export function StatusBar(props: { state: AppState; api: Api; openSettings(): vo
     const l = u && latestOn(u.releases ?? [], u.settings.channel);
     return l && compareVersions(l.version, u.running) > 0 ? l.version : null;
   };
+  // R6.4, R13.1: why Update cannot install now; restarting would kill the run
+  const blocked = () =>
+    props.state.busy || props.state.run.active
+      ? "Finish or cancel the run first"
+      : props.state.updates?.packaged === false
+        ? "Updates install only in the packaged app"
+        : undefined;
   return (
     <footer
       data-testid="status-bar"
@@ -38,7 +45,9 @@ export function StatusBar(props: { state: AppState; api: Api; openSettings(): vo
                   <button
                     type="button"
                     data-testid="update-link"
-                    class="rounded px-1 text-sky-700 underline hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-300"
+                    disabled={!!blocked()}
+                    title={blocked()}
+                    class="rounded px-1 text-sky-700 underline hover:text-sky-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-400 dark:hover:text-sky-300"
                     onClick={() => void props.api.installVersion(v(), false)}
                   >
                     Update

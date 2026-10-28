@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
 import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
-import { initialState } from "./reduce";
+import { initialState, type AppState } from "./reduce";
 import { StatusBar } from "./StatusBar";
 
 afterEach(cleanup);
@@ -26,12 +26,12 @@ const view = (more: Partial<UpdateView> = {}): UpdateView => ({
   ...more,
 });
 
-function show(updates: UpdateView | null) {
+function show(updates: UpdateView | null, more: Partial<AppState> = {}) {
   const api = { installVersion: vi.fn(async () => {}) };
   const openSettings = vi.fn();
   render(() => (
     <StatusBar
-      state={{ ...initialState(), updates }}
+      state={{ ...initialState(), updates, ...more }}
       api={api as unknown as Api}
       openSettings={openSettings}
     />
@@ -79,6 +79,31 @@ describe("StatusBar", () => {
     const { api } = show(view());
     fireEvent.click(screen.getByTestId("update-link"));
     expect(api.installVersion).toHaveBeenCalledWith("1.0.0-rc.6", false);
+  });
+
+  it("Update is disabled while a run or a discovery is active (R6.4)", () => {
+    const busy = "Finish or cancel the run first";
+    show(view(), { busy: true });
+    const link = () => screen.getByTestId("update-link") as HTMLButtonElement;
+    expect([link().disabled, link().title]).toEqual([true, busy]);
+    cleanup();
+    show(view(), { run: { ...initialState().run, active: true } });
+    expect([link().disabled, link().title]).toEqual([true, busy]);
+    cleanup();
+    show(view({ packaged: false }), { busy: true }); // the run comes first
+    expect([link().disabled, link().title]).toEqual([true, busy]);
+  });
+
+  it("Update is disabled in a build that is not packaged (R13.1)", () => {
+    show(view({ packaged: false }));
+    const link = screen.getByTestId("update-link") as HTMLButtonElement;
+    expect([link.disabled, link.title]).toEqual([true, "Updates install only in the packaged app"]);
+  });
+
+  it("Update is enabled when packaged and idle", () => {
+    show(view());
+    const link = screen.getByTestId("update-link") as HTMLButtonElement;
+    expect([link.disabled, link.title]).toEqual([false, ""]);
   });
 
   it("the marker, the version and Settings open the settings", () => {

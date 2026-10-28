@@ -49,6 +49,12 @@ test("out of date on the pre-release channel shows the marker (R3.2)", async () 
   const { win } = await launch(undefined, { GRACE_UPDATE_FEED: feedFile(rc99) });
   await expect(win.getByTestId("update-marker")).toHaveText(/1\.0\.0-rc\.99 available/);
   await expect(win.getByTestId("update-link")).toHaveText("Update");
+  // e2e runs a build that is not packaged (R13.1)
+  await expect(win.getByTestId("update-link")).toBeDisabled();
+  await expect(win.getByTestId("update-link")).toHaveAttribute(
+    "title",
+    "Updates install only in the packaged app",
+  );
   await expect(
     win.getByRole("button", { name: `Grace ${pkg.version}, 1.0.0-rc.99 available` }),
   ).toBeVisible();
