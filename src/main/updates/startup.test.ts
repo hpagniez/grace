@@ -154,6 +154,11 @@ describe("a switch on disk", () => {
   let install: string;
   let staging: string;
   const switching = () => path.join(staging, "switching");
+  /** Sets the `switching` file's modified time `ms` back. */
+  const age = (ms: number) => {
+    const t = new Date(Date.now() - ms);
+    utimesSync(switching(), t, t);
+  };
   const plan = (to: string) =>
     writeFileSync(path.join(staging, "plan.json"), JSON.stringify({ to }));
   beforeEach(() => {
@@ -199,6 +204,15 @@ describe("a switch on disk", () => {
       expect(switchInProgress(install, "1.0.0-rc.5")).toBe(false);
       writeFileSync(switching(), "not a pid");
       utimesSync(switching(), old, old);
+      expect(switchInProgress(install, "1.0.0-rc.5")).toBe(false);
+    });
+
+    it("ignores a switching file older than 30 minutes, even one naming a live pid", () => {
+      plan("1.0.0-rc.6");
+      writeFileSync(switching(), String(process.pid));
+      age(29 * 60_000);
+      expect(switchInProgress(install, "1.0.0-rc.5")).toBe(true);
+      age(31 * 60_000);
       expect(switchInProgress(install, "1.0.0-rc.5")).toBe(false);
     });
   });
@@ -251,6 +265,15 @@ describe("a switch on disk", () => {
       await removeLeftovers(install, fast);
       expect(existsSync(`${install}.old`)).toBe(true);
       expect(existsSync(staging)).toBe(true);
+    });
+
+    it("does not wait for a switching file older than 30 minutes", async () => {
+      leftovers();
+      writeFileSync(switching(), String(process.pid));
+      age(31 * 60_000);
+      await removeLeftovers(install, { pollMs: 10, timeoutMs: 5_000 });
+      expect(existsSync(staging)).toBe(false);
+      expect(existsSync(`${install}.old`)).toBe(false);
     });
 
     it("is fine when there is nothing to remove", async () => {

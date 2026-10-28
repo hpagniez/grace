@@ -47,17 +47,21 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-/**
- * True when `<install>.update\switching` names a live process. The script writes the file
- * non-atomically, so an empty or unreadable one counts for 30 s. Never throws.
- */
+// The script writes `switching` non-atomically, so an empty or unreadable one counts for 30 s. One
+// older than 30 min is never a running script (its longest run is far shorter): a killed script's
+// pid may since belong to an unrelated process.
+const EMPTY_FILE_MS = 30_000;
+const STALE_FILE_MS = 30 * 60_000;
+
+/** True when `<install>.update\switching` names a live process. Never throws. */
 function scriptRunning(installDir: string): boolean {
   const file = path.join(staging(installDir), "switching");
   try {
+    const age = Date.now() - statSync(file).mtimeMs;
+    if (age > STALE_FILE_MS) return false;
     const text = readFileSync(file, "utf8").trim();
     const pid = Number(text);
-    if (/^\d+$/.test(text) && pid > 0) return pidAlive(pid);
-    return Date.now() - statSync(file).mtimeMs < 30_000;
+    return /^\d+$/.test(text) && pid > 0 ? pidAlive(pid) : age < EMPTY_FILE_MS;
   } catch {
     return false;
   }
