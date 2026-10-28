@@ -37,4 +37,9 @@ No app code changed, so the packaged app was not checked by hand. CI runs e2e on
    3. Expected: a draft PR "build(deps): bump karate from 2.1.3 to 2.1.4" from `feature/bump-karate-2.1.4`, with a fixtures commit recorded on the Windows runner and committed by the `karate-pr` job; the JRE job opens nothing.
    4. Mark it ready: `checks` and `test` run and pass.
    5. Close the PR without merging and delete both branches.
-   - Result: not run yet. When it passes, set F33 to `done` in `docs/features.md`.
+   - Result: passed on 2026-10-28, after one fix. Run [40589689602](https://github.com/Tusquito/karate-kid/actions/runs/40589689602) on `feature/vendor-updates-check`: all four jobs passed. The JRE job opened nothing (Temurin `21.0.12.1+1` is still the newest). `karate-pr` opened draft PR #35 "build(deps): bump karate from 2.1.3 to 2.1.4" with the bump commit and a fixtures commit (six `*.jsonl` files), and its body said `RunCommand.java` is unchanged.
+   - Found on the way:
+     - `test` failed on the new recordings: `run-state.test.ts` "keep durations" had the old recording's durations written in (285, 7 and 8074 ms; the new one gave 677). Fixed by `test(runner): read scenario durations from the recorded fixture`.
+     - The `e2e` step then failed `console.spec.ts` "the console is darker than the window in dark mode only". That break is on `develop`, not from Karate: F24 (#30) and F27 (#31) merged without running e2e together, and the test now lands on the home screen, which has no console. Its fix (`5bd510d`, on `feature/rename-to-grace`) was borrowed onto PR #35 only.
+     - A PR opened with `GITHUB_TOKEN` does get `checks` and `test` runs, held as `action_required` behind an approve button; the spec and ADR 0012 say it gets none. Approving them or marking the PR ready both start CI. Doing both makes the later pair cancel the earlier one, which shows as failed runs.
+     - With both fixes on its head, `checks` and `test` (e2e included) passed on PR #35. It was closed without merging, and both branches deleted.
