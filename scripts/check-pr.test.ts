@@ -31,11 +31,11 @@ describe("branchError", () => {
   it.each([
     ["feature/ci-cd", "develop"],
     ["dependabot/npm_and_yarn/x", "develop"],
-    ["release/v1.0.0", "main"],
-    ["release/v1.0.0", "develop"],
-    ["hotfix/v1.0.1", "main"],
-    ["hotfix/v1.0.1", "develop"],
-    ["release/v10.20.30", "main"],
+    ["release/v1.0.0-rc.1", "main"],
+    ["release/v1.0.0-rc.1", "develop"],
+    ["hotfix/v1.0.1-rc.1", "main"],
+    ["hotfix/v1.0.1-rc.1", "develop"],
+    ["release/v10.20.30-rc.12", "main"],
   ])("accepts %s into %s", (head, base) => {
     expect(branchError(head, base)).toBeNull();
   });
@@ -44,10 +44,14 @@ describe("branchError", () => {
     ["feature/x", "main"],
     ["develop", "main"],
     ["fix-thing", "develop"],
-    ["release/1.0.0", "main"],
-    ["hotfix/1.0.1", "main"],
-    ["release/v1.0", "main"],
+    ["release/1.0.0-rc.1", "main"],
+    ["hotfix/1.0.1-rc.1", "main"],
+    ["release/v1.0.0", "main"],
+    ["hotfix/v1.0.1", "develop"],
+    ["release/v1.0-rc.1", "main"],
     ["release/v1.0.0-rc", "main"],
+    ["release/v1.0.0-rc1", "main"],
+    ["release/v1.0.0-beta.1", "main"],
     ["hotfix/latest", "develop"],
   ])("rejects %s into %s", (head, base) => {
     expect(branchError(head, base)).toEqual(expect.any(String));
@@ -67,8 +71,8 @@ describe("check-pr CLI", () => {
   const base = git("rev-parse", "HEAD");
   git("commit", "-q", "--allow-empty", "-m", "Merge pull request #4 from x/y");
   git("update-ref", "refs/remotes/origin/develop", "HEAD");
-  git("switch", "-q", "-c", "release/v1.0.0");
-  git("commit", "-q", "--allow-empty", "-m", "build: bump version to 1.0.0");
+  git("switch", "-q", "-c", "release/v1.0.0-rc.1");
+  git("commit", "-q", "--allow-empty", "-m", "build: bump version to 1.0.0-rc.1");
 
   const run = () =>
     spawnSync(process.execPath, [join(__dirname, "check-pr.mjs")], {
@@ -76,7 +80,7 @@ describe("check-pr CLI", () => {
       encoding: "utf8",
       env: {
         ...process.env,
-        HEAD_REF: "release/v1.0.0",
+        HEAD_REF: "release/v1.0.0-rc.1",
         BASE_REF: "main",
         BASE_SHA: base,
         HEAD_SHA: git("rev-parse", "HEAD"),

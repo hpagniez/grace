@@ -43,7 +43,7 @@ The app is still in development. Never write code that keeps older versions work
 
 ## Git workflow
 
-Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md).
+Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md); release candidates only in [ADR 0015](docs/decisions/0015-release-candidates-until-a-stable-release-is-decided.md).
 
 ### Commits
 
@@ -59,11 +59,13 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 | Branch | Cut from | Merges into | Notes |
 |---|---|---|---|
-| `main` | | | Released code only. Tagged `vX.Y.Z` (SemVer). |
+| `main` | | | Released code only. Tagged `vX.Y.Z-rc.N` (SemVer pre-release). |
 | `develop` | `main` | | Integration branch. |
 | `feature/<topic>` | `develop` | `develop` | Via PR. Kebab-case topic. |
-| `release/vX.Y.Z` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.0.0`. Version bump and fixes only. Tag on `main`. |
-| `hotfix/vX.Y.Z` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.1`. Urgent fix to a released version. |
+| `release/vX.Y.Z-rc.N` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.2.0-rc.1`. Version bump and fixes only. Tag on `main`. |
+| `hotfix/vX.Y.Z-rc.N` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.2.1-rc.1`. Urgent fix to a released version. |
+
+- No stable release while the app is in development: every version is a release candidate `X.Y.Z-rc.N` in the branch, `package.json` and tag. The first stable `vX.Y.Z` needs a decision record that supersedes ADR 0015.
 
 - Merge with `--no-ff`.
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
@@ -83,7 +85,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 | `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
 | `test` | PRs that change more than `docs/**` and `*.md` (Windows) | `npm test`; `npm run e2e` too unless the PR is a draft (the step named `e2e`) |
 | `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` passed and `test` passed with e2e on its head commit (no `test` run only for docs-only PRs) |
-| `release` | Push of a `vX.Y.Z` tag | Tag must match `package.json`; `npm run make`; GitHub Release with the zip |
+| `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing) | Tag must match `package.json`; `npm run make`; GitHub pre-release with the zip |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI |
 
 Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not see the JRE and Karate pins in `scripts/vendor.json`: `vendor-updates` bumps them (`npm run vendor:bump -- <jre|karate>` by hand).
