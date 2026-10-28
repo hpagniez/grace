@@ -81,7 +81,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 | Workflow | When | What it runs |
 |---|---|---|
 | `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
-| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | Two jobs, each on its own VM ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test`; `e2e` runs `npm run e2e` unless the PR is a draft (the step named `e2e`) |
+| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the runner files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` unless the PR is a draft (the step named `e2e`) |
 | `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` passed and `test` passed with e2e on its head commit (no `test` run only for docs-only PRs) |
 | `release` | Push of a `vX.Y.Z` tag | Tag must match `package.json`; `npm run make`; GitHub Release with the zip |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI |

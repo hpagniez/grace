@@ -21,6 +21,19 @@ jobs:
   unit:
     runs-on: windows-latest
     timeout-minutes: 20
+    strategy:
+      matrix:
+        half: [1, 2]
+    env:
+      # half 2 runs these runner files (about 242 s on CI), half 1 every other test file (about 226 s).
+      # Not vitest --shard: it splits by file count. Move files between the halves to keep them even.
+      SECOND_HALF: >-
+        src/main/runner.discovery.test.ts
+        src/main/runner.runs.test.ts
+        src/main/runner.tags.test.ts
+        src/main/runner.threads.test.ts
+        src/main/runner.env.test.ts
+        src/main/runner.properties.test.ts
     defaults:
       run:
         shell: bash
@@ -43,7 +56,10 @@ jobs:
           key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
       - run: npm ci
       - run: npm run vendor
-      - run: npm test
+      # UNIT_EXCLUDE is read by vitest.config.mts
+      - name: npm test
+        run: |
+          if [ ${{ matrix.half }} = 1 ]; then UNIT_EXCLUDE="$SECOND_HALF" npm test; else npm test -- $SECOND_HALF; fi
 
   e2e:
     runs-on: windows-latest
