@@ -15,7 +15,7 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run lint` | oxlint and oxfmt check |
 | `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
 
-Never run `npm test` and `npm run e2e` at the same time: their Java leak checks scan every `java.exe` under `vendor/jre` and see each other's processes.
+Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
 ## Docs map
 
@@ -85,7 +85,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 | Workflow | When | What it runs |
 |---|---|---|
 | `checks` | Every PR to `develop` or `main`, except a `release/*` or `hotfix/*` merge back into `develop` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
-| `test` | PRs that change more than `docs/**` and `*.md`, except a `release/*` or `hotfix/*` merge back into `develop` (Windows); by hand | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the runner files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards only on PRs into `main` that are not drafts, and on runs by hand (`gh workflow run test.yml --ref <branch>`) |
+| `test` | PRs that change more than `docs/**` and `*.md`, except a `release/*` or `hotfix/*` merge back into `develop` (Windows); by hand | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards only on PRs into `main` that are not drafts, and on runs by hand (`gh workflow run test.yml --ref <branch>`) |
 | `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` from a branch of this repo (never a fork) that has the `merge-when-green` label and is not a draft, once `checks` and `test` passed on its head commit (no `test` run only for docs-only PRs). A back-merge from `release/*` or `hotfix/*` needs those runs from its PR into `main`, with every `e2e` step passed |
 | `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing) | Tag must match `package.json`; `npm run make`; GitHub pre-release with the zip |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI (unit tests, no e2e) |

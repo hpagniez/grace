@@ -10,7 +10,7 @@ import {
   byName,
   until,
   hashTree,
-  ourJava,
+  javaCommandLines,
 } from "../../test/runner";
 
 afterEach(cleanUp);
@@ -125,19 +125,21 @@ describe("Runner runs", () => {
 
   it("cancel during the pre-run discovery runs nothing", T, async () => {
     const { runner, all } = setup();
-    await runner.open(fixture("clean"));
+    const root = fixture("clean");
+    await runner.open(root);
     const run = runner.run("d:"); // its dry run is spawned before run() first awaits
     await runner.cancel();
     await run;
     expect(all("runStarted")).toHaveLength(0);
     expect(all("runFinished")).toHaveLength(0);
     expect(all("notice").map((n) => n.message)).toEqual(["Run cancelled"]);
-    expect(ourJava()).toBe(false);
+    expect(javaCommandLines(root)).toEqual([]);
   });
 
   it("cancel interrupts and leaves no java", T, async () => {
     const { runner, all, last, dataDir } = setup();
-    await runner.open(fixture("clean"));
+    const root = fixture("clean");
+    await runner.open(root);
     const pidFile = path.join(dataDir, "running.pid");
     const run = runner.run("f:tests/slow.feature");
     await until(() => all("scenarios").some((e) => e.updates.some((u) => u.status === "running")));
@@ -149,7 +151,7 @@ describe("Runner runs", () => {
       true,
     );
     expect(runner.reportPath()).toBeNull();
-    expect(ourJava()).toBe(false);
+    expect(javaCommandLines(root)).toEqual([]);
     expect(existsSync(pidFile)).toBe(false);
   });
 
@@ -168,7 +170,8 @@ describe("Runner runs", () => {
 
   it("a pid file that cannot be written fails the run and leaves no java", T, async () => {
     const { runner, all, last, dataDir } = setup();
-    await runner.open(fixture("clean"));
+    const root = fixture("clean");
+    await runner.open(root);
     const pidFile = path.join(dataDir, "running.pid");
     mkdirSync(pidFile); // writing a file there fails
     try {
@@ -176,7 +179,7 @@ describe("Runner runs", () => {
       expect(last("runFinished")).toMatchObject({ outcome: "failed", reportAvailable: false });
       expect(last("notice").message).toContain("EISDIR");
       expect(all("runStarted")).toHaveLength(0);
-      expect(ourJava()).toBe(false);
+      expect(javaCommandLines(root)).toEqual([]);
     } finally {
       rmSync(pidFile, { recursive: true, force: true });
     }
@@ -184,12 +187,13 @@ describe("Runner runs", () => {
 
   it("dispose kills a run and removes the pid file", T, async () => {
     const { runner, all, dataDir } = setup();
-    await runner.open(fixture("clean"));
+    const root = fixture("clean");
+    await runner.open(root);
     const run = runner.run("f:tests/slow.feature");
     await until(() => all("runStarted").length > 0);
     await runner.dispose();
     await run;
-    expect(ourJava()).toBe(false);
+    expect(javaCommandLines(root)).toEqual([]);
     expect(existsSync(path.join(dataDir, "running.pid"))).toBe(false);
   });
 });
