@@ -31,7 +31,7 @@ test("the window opens painted in the app's theme", async () => {
 // `show: false` itself cannot be observed from a test; the by-hand flash check covers it.
 test("the page starts with a static startup screen", () => {
   const html = readFileSync(".vite/renderer/main_window/index.html", "utf8");
-  expect(html).toContain('<div id="startup" role="status" aria-label="Loading karate-kid">');
+  expect(html).toContain('<div id="startup" role="status" aria-label="Loading Grace">');
   expect(html).toMatch(/prefers-color-scheme:\s*dark/);
   expect(html).toMatch(/prefers-reduced-motion:\s*reduce/);
   expect(html).toContain('<div id="root"></div>');

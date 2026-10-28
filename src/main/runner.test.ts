@@ -239,7 +239,7 @@ describe("Runner discovery", () => {
   });
 
   it("cancel during open keeps the project open before", T, async () => {
-    const { runner, all, events } = setup();
+    const { runner, all } = setup();
     expect(await runner.open(fixture("clean"))).toBe(true);
     const before = runner.current();
     const opening = runner.open(fixture("maven"));
@@ -248,7 +248,8 @@ describe("Runner discovery", () => {
     expect(all("project").at(-1)).toEqual(before);
     expect(runner.current()).toBe(before);
     expect(all("notice").map((n) => n.message)).toEqual(["Cancelled"]);
-    expect(events.at(-1)).toEqual({ type: "busy", busy: false });
+    // the recent list is sent after its folder checks, so it may come after busy
+    expect(all("busy").at(-1)).toEqual({ type: "busy", busy: false });
     // the restored project is the one that runs
     await runner.run("s:tests/basic.feature#1");
     expect(all("runStarted")).toHaveLength(1);
