@@ -19,7 +19,11 @@ describe("Runner runs", () => {
   it("runs all with live progress", T, async () => {
     const { runner, events, last } = setup();
     await runner.open(fixture("clean"));
-    await runner.run("d:");
+    expect(runner.isBusy()).toBe(false);
+    const run = runner.run("d:");
+    expect(runner.isBusy()).toBe(true);
+    await run;
+    expect(runner.isBusy()).toBe(false);
     expect(last("runStarted")).toMatchObject({ selection: "d:", total: 9 });
     const types = events.map((e) => e.type);
     const firstUpdate = types.indexOf("scenarios");

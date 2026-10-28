@@ -53,8 +53,8 @@ function pidAlive(pid: number): boolean {
 const EMPTY_FILE_MS = 30_000;
 const STALE_FILE_MS = 30 * 60_000;
 
-/** True when `<install>.update\switching` names a live process. Never throws. */
-function scriptRunning(installDir: string): boolean {
+/** True when `<install>.update\switching` names a live process, whatever version runs. Never throws. */
+export function switchRunning(installDir: string): boolean {
   const file = path.join(staging(installDir), "switching");
   try {
     const age = Date.now() - statSync(file).mtimeMs;
@@ -72,7 +72,7 @@ function scriptRunning(installDir: string): boolean {
  * quit. The new version is exempt: the script waits for it to start (R10.6). Never throws.
  */
 export function switchInProgress(installDir: string, running: string): boolean {
-  return scriptRunning(installDir) && planTo(installDir) !== running;
+  return switchRunning(installDir) && planTo(installDir) !== running;
 }
 
 /** R10.6: tells the script the new version started, once its window has shown. */
@@ -139,7 +139,7 @@ export async function removeLeftovers(
   { pollMs = 1000, timeoutMs = 3 * 60_000 } = {},
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (scriptRunning(installDir)) {
+  while (switchRunning(installDir)) {
     if (Date.now() >= deadline) return;
     await sleep(pollMs);
   }

@@ -11,6 +11,7 @@ import {
   resultNotice,
   settingsAfter,
   switchInProgress,
+  switchRunning,
   takeResult,
   type SwitchResult,
 } from "./startup";
@@ -214,6 +215,18 @@ describe("a switch on disk", () => {
       expect(switchInProgress(install, "1.0.0-rc.5")).toBe(true);
       age(31 * 60_000);
       expect(switchInProgress(install, "1.0.0-rc.5")).toBe(false);
+    });
+  });
+
+  describe("switchRunning", () => {
+    it("sees a live script whatever version runs, never a dead or stale one", async () => {
+      plan("1.0.0-rc.6");
+      writeFileSync(switching(), String(process.pid));
+      expect(switchRunning(install)).toBe(true);
+      age(31 * 60_000);
+      expect(switchRunning(install)).toBe(false);
+      writeFileSync(switching(), String(await deadPid()));
+      expect(switchRunning(install)).toBe(false);
     });
   });
 

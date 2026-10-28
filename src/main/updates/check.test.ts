@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { downloadPrefix, RELEASES_API, zipName } from "../../shared/updates";
 import { fetchReleases, updateFeed } from "./check";
 
@@ -88,6 +88,13 @@ describe("fetchReleases", () => {
     await expect(fetchReleases(`http://127.0.0.1:${port}/`)).rejects.toThrow(
       "GitHub could not be reached",
     );
+  });
+
+  it("fetches with the function it is given: the app passes Electron's net.fetch", async () => {
+    const f = vi.fn<typeof fetch>(async () => new Response(feedJson));
+    const rs = await fetchReleases("https://example.test/releases", 1000, f);
+    expect(f).toHaveBeenCalledOnce();
+    expect(rs.map((r) => r.version)).toEqual(["1.0.0-rc.5", "1.0.0-rc.4"]);
   });
 
   it("fails when the feed file is missing", async () => {

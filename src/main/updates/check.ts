@@ -18,9 +18,9 @@ const fail = (e: unknown): never => {
   );
 };
 
-async function load(feed: string, timeoutMs: number): Promise<string> {
+async function load(feed: string, timeoutMs: number, fetchFn: typeof fetch): Promise<string> {
   if (!/^https?:\/\//.test(feed)) return readFile(feed, "utf8").catch(fail);
-  const res = await fetch(feed, {
+  const res = await fetchFn(feed, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "Grace" },
     signal: AbortSignal.timeout(timeoutMs),
   }).catch(fail);
@@ -29,9 +29,16 @@ async function load(feed: string, timeoutMs: number): Promise<string> {
   return res.text().catch(fail);
 }
 
-/** The installable releases of a feed (a URL or a file). Rejects with the R2.5 reason. */
-export async function fetchReleases(feed: string, timeoutMs = 15000): Promise<Release[]> {
-  const text = await load(feed, timeoutMs);
+/**
+ * The installable releases of a feed (a URL or a file). Rejects with the R2.5 reason.
+ * `fetchFn` is Electron's `net.fetch` in the app, which honours the system proxy.
+ */
+export async function fetchReleases(
+  feed: string,
+  timeoutMs = 15000,
+  fetchFn: typeof fetch = fetch,
+): Promise<Release[]> {
+  const text = await load(feed, timeoutMs, fetchFn);
   let json: unknown;
   try {
     json = JSON.parse(text);
