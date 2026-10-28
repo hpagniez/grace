@@ -27,9 +27,9 @@ jobs:
       matrix:
         half: [1, 2]
     env:
-      # half 2 runs these runner files (about 225 s of tests on CI), half 1 every other test file (about 225 s),
-      # each on 3 workers. Not vitest --shard: it splits by file count. Move files between the halves to keep
-      # them even.
+      # half 2 runs these runner files, half 1 every other test file, each on 3 workers. On CI each half's
+      # npm test took 75 to 110 s. Not vitest --shard: it splits by file count. Move files between the halves to
+      # keep them even.
       SECOND_HALF: >-
         src/main/runner.discovery.test.ts
         src/main/runner.runs.test.ts
