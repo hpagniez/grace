@@ -31,7 +31,7 @@ Chosen: option 3.
 - One issue per feature. Its body holds the feature, a `Karate surface:` line, a `Spec:` line (the file on `develop`, or "none") and any notes.
 - Priority: labels `must`, `should` and `could`.
 - One project, `Grace`, owned by `hpagniez`. Its `Status` field has the options `idea`, `building` and `done`:
-  - Auto-add to project: issues of `hpagniez/grace` (filter `is:issue`).
+  - Auto-add to project: issues of `hpagniez/grace` (filter `is:issue is:open`).
   - Item added to project: `idea`.
   - Pull request linked to issue: `building`.
   - Item closed: `done`.
