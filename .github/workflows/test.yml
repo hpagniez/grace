@@ -1,4 +1,5 @@
-# Windows unit and e2e tests (ADR 0007). Drafts run unit tests only; e2e runs once the PR is ready for review.
+# Windows unit and e2e tests (ADR 0007, ADR 0016). Each job runs on its own VM, so the suites' Java leak
+# checks never see each other's processes. Drafts run unit tests only; e2e runs once the PR is ready for review.
 name: test
 
 on:
@@ -17,9 +18,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  unit:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
@@ -42,8 +43,33 @@ jobs:
           key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
       - run: npm ci
       - run: npm run vendor
-      # one job runs both suites in turn: their Java leak checks must not overlap (AGENTS.md)
       - run: npm test
+
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # the unpacked JRE and jar only; fetch-vendor.mjs re-verifies the jar
+          path: |
+            vendor
+            !vendor/.download
+          key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
+      - run: npm ci
+      - run: npm run vendor
       # the event's draft flag is stale when a push and "ready for review" land together; ask GitHub now
       - id: pr
         if: ${{ github.event_name == 'pull_request' }}
