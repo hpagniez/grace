@@ -16,6 +16,7 @@ test("Run all with live progress", async () => {
   const { win } = await openClean();
 
   await win.getByTestId("run-all-button").click();
+  await expect(win.getByTestId("progress-stripe")).toBeVisible({ timeout: 15_000 });
   await expect(win.getByTestId("progress-text")).toHaveText("0 / 9", { timeout: 15_000 });
   await expect(node(win, "slow loop")).toHaveAttribute("data-status", "running", {
     timeout: 45_000,
@@ -31,6 +32,8 @@ test("Run all with live progress", async () => {
 
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 45_000 });
   await expect(win.getByTestId("progress-text")).toHaveText("9 / 9");
+  await expect(win.getByTestId("progress-stripe")).toHaveCount(0);
+  await expect(win.getByTestId("progress-bar")).toHaveAttribute("aria-valuenow", "9");
   await expect(win.getByTestId("progress-passed")).toHaveText("8");
   await expect(win.getByTestId("progress-failed")).toHaveText("1");
   await expect(nodeByKey(win, "f:tests/basic.feature")).toHaveAttribute("data-status", "failed");

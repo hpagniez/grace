@@ -178,7 +178,7 @@ describe("main screen", () => {
     expect(screen.getByTestId("run-outcome").textContent).toBe("Running…");
   });
 
-  it("shows discovery as busy: actions off, Cancel on, Preparing…", () => {
+  it("shows discovery as busy: actions off, Cancel on, Finding tests…", () => {
     const { send, load } = setup();
     load();
     send({ type: "busy", busy: true });
@@ -187,11 +187,93 @@ describe("main screen", () => {
     for (const b of screen.getAllByTestId("run-node"))
       expect((b as HTMLButtonElement).disabled).toBe(true);
     expect(button("cancel-button").disabled).toBe(false);
-    expect(screen.getByTestId("run-outcome").textContent).toBe("Preparing…");
+    expect(screen.getByTestId("run-outcome").textContent).toBe("Finding tests…");
+    expect(screen.getByTestId("progress-stripe")).toBeTruthy();
+    expect(screen.getByTestId("progress-bar").getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByTestId("progress-bar").hasAttribute("aria-valuenow")).toBe(false);
     send({ type: "busy", busy: false });
     expect(button("run-all-button").disabled).toBe(false);
     expect(button("cancel-button").disabled).toBe(true);
     expect(screen.getByTestId("run-outcome").textContent).toBe("");
+    expect(screen.queryByTestId("progress-stripe")).toBeNull();
+    expect(screen.getByTestId("progress-bar").getAttribute("aria-busy")).toBe("false");
+  });
+
+  const startRun = (send: (e: AppEvent) => void) =>
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261025-120000-000",
+      keys: [],
+      total: 4,
+      startedAt: Date.now(),
+      env: null,
+    });
+
+  it("keeps the stripe until the first result, then reports progress", () => {
+    const { send, load } = setup();
+    load();
+    startRun(send);
+    expect(screen.getByTestId("progress-stripe")).toBeTruthy();
+    send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "running" }] });
+    expect(screen.getByTestId("progress-stripe")).toBeTruthy();
+    send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "failed" }] });
+    expect(screen.queryByTestId("progress-stripe")).toBeNull();
+    const bar = screen.getByTestId("progress-bar");
+    expect(bar.getAttribute("role")).toBe("progressbar");
+    expect(bar.getAttribute("aria-label")).toBe("Run progress");
+    expect(bar.getAttribute("aria-valuemin")).toBe("0");
+    expect(bar.getAttribute("aria-valuemax")).toBe("4");
+    expect(bar.getAttribute("aria-valuenow")).toBe("1");
+    send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#2", status: "passed" }] });
+    expect(bar.getAttribute("aria-valuenow")).toBe("2");
+  });
+
+  it("drops the stripe when a run is cancelled before any result", () => {
+    const { send, load } = setup();
+    load();
+    startRun(send);
+    send({
+      type: "runFinished",
+      outcome: "cancelled",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    expect(screen.queryByTestId("progress-stripe")).toBeNull();
+  });
+
+  it("fills smoothly and keeps the stripe still under reduced motion", () => {
+    const { send, load } = setup();
+    load();
+    send({ type: "busy", busy: true });
+    const stripe = screen.getByTestId("progress-stripe");
+    expect(stripe.className).toContain("animate-slide");
+    expect(stripe.className).toContain("motion-reduce:animate-none");
+    const segments = [...screen.getByTestId("progress-bar").children].filter((c) => c !== stripe);
+    expect(segments).toHaveLength(2);
+    for (const s of segments) {
+      expect(s.className).toContain("transition-[width]");
+      expect(s.className).toContain("motion-reduce:transition-none");
+    }
+  });
+
+  it("draws the stripe over the last run's results", () => {
+    const { send, load } = setup();
+    load();
+    startRun(send);
+    send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "passed" }] });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 0,
+      summary: null,
+      reportAvailable: false,
+    });
+    send({ type: "busy", busy: true });
+    // last of the positioned children paints on top: the old bar must not hide the stripe
+    const bar = screen.getByTestId("progress-bar");
+    expect(bar.lastElementChild).toBe(screen.getByTestId("progress-stripe"));
   });
 
   it("labels an unnamed scenario by its line", () => {
@@ -217,7 +299,7 @@ describe("main screen", () => {
     const { send } = setup();
     send({ type: "opening", root: "D:/p" });
     expect(button("run-all-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("Discovering tests…");
+    expect(screen.getByTestId("tree-message").textContent).toBe("Finding tests…");
     send({
       type: "project",
       project: { root: "D:/p", layout: "maven" },
