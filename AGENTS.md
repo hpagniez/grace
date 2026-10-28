@@ -21,7 +21,8 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 
 | Path | What it holds |
 |---|---|
-| [docs/features.md](docs/features.md) | Backlog: what the app does, priority, status, how it gets the data from Karate |
+| [Issues](https://github.com/hpagniez/grace/issues) and the [Grace project](https://github.com/users/hpagniez/projects/2) | Backlog: one issue per feature, priority as label must, should or could; status idea → building → done on the board |
+| [docs/features.md](docs/features.md) | Frozen map of the old backlog IDs F01–F45 to their issues |
 | [docs/inventory/karate-core.md](docs/inventory/karate-core.md) | Every open-source Karate v2 feature, tagged by GUI use; §19 = how the app drives Karate |
 | [docs/inventory/commercial.md](docs/inventory/commercial.md) | What Karate Labs' paid tools offer, and the gaps |
 | [docs/research/](docs/research/) | Dated research notes with sources |
@@ -33,7 +34,7 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 ## Doc rules
 
 - Design specs go in `docs/specs/YYYY-MM-DD-<topic>.md` (this overrides the superpowers default `docs/superpowers/specs/`). Write requirements, then acceptance criteria in Gherkin.
-- When a spec is written or a feature ships, update its row in `docs/features.md` in the same change.
+- Every feature has an issue with a priority label. Its body holds the feature, a `Karate surface:` line and a `Spec:` line. When a spec is written, point the issue's `Spec:` line at the file on `develop` (`gh issue edit <N> --body-file -`). A PR that builds a feature says `Closes #N`; a spec-only PR, or one of several, says `Part of #N`. The project's workflows move the status. For a feature built over several PRs, move its card to `building` when the first PR opens: `gh project item-add 2 --owner hpagniez --url <issue URL> --format json --jq .id` gives the item ID, then `gh project item-edit --id <item ID> --project-id PVT_kwHOAka2MM4BpJIV --field-id PVTSSF_lAHOAka2MM4BpJIVzhnmDmA --single-select-option-id 47fc9ee4` ([ADR 0014](docs/decisions/0014-backlog-in-github-issues-and-a-project.md)).
 - A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
 - Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
 
@@ -53,7 +54,7 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 - Scope is optional: the area touched (`docs`, `runner`, `ui`, `ipc`, `deps`). Reuse an existing scope before inventing one.
 - Subject: imperative, lower case, no trailing period, 72 characters max.
 - Breaking change: `!` after the scope, plus a `BREAKING CHANGE:` footer.
-- One logical change per commit. A spec or feature commit includes its `docs/features.md` row update.
+- One logical change per commit.
 
 ### Branches (git flow)
 
