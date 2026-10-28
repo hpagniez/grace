@@ -1,6 +1,6 @@
 # App updates
 
-Date 2026-10-28. Status: draft. Covers [#77](https://github.com/hpagniez/grace/issues/77). Decision: [ADR 0019](../decisions/0019-update-the-zip-install-from-github-releases.md).
+Date 2026-10-28. Status: approved. Covers [#77](https://github.com/hpagniez/grace/issues/77). Decision: [ADR 0019](../decisions/0019-update-the-zip-install-from-github-releases.md).
 
 ## Intent
 
