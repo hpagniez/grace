@@ -37,7 +37,7 @@ Chosen: option 3.
   - Item closed: `done`.
 - `specced` is no longer a status. The issue's `Spec:` line shows it.
 - A PR that builds a feature says `Closes #N`. A spec-only PR, or one of several PRs for a feature, says `Part of #N`.
-- Agents leave the status to the workflows. They move a card by hand only where no workflow fires: a feature built over several PRs goes to `building` when its first `Part of #N` PR opens. `AGENTS.md` holds the project, field and option IDs for that.
+- Agents leave the status to the workflows. They move a card by hand only where no workflow fires: a feature built over several PRs goes to `building` when its first `Part of #N` PR that builds it (not a spec-only PR) opens. `AGENTS.md` holds the project, field and option IDs for that.
 - `docs/features.md` becomes a frozen map from F01–F45 to their issues, because specs, plans, research notes, decision records and commits name features by those IDs. New features have only an issue number.
 - Specs, plans, decision records, research notes and check records stay Markdown in the repo.
 - This supersedes the `features.md` line of ADR 0002's layout and its mitigation ("update `docs/features.md` ... in the same change"). The rest of ADR 0002 stands.
