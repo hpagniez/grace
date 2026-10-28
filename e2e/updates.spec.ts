@@ -246,20 +246,36 @@ test("Back returns to the open project unchanged (R6.1)", async () => {
   const dir = project("clean");
   const { app, win } = await launch();
   await openProject(app, dir);
-  await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
+  const folder = nodeByKey(win, "d:tests");
+  const feature = nodeByKey(win, "f:tests/basic.feature");
+  await expect(feature).toBeVisible({ timeout: 15_000 });
+  await folder.getByRole("button", { name: /^Collapse / }).click(); // local state of the tree
+  await expect(feature).toBeHidden();
   await win.getByTestId("settings-button").click();
   await expect(win.getByTestId("settings")).toBeVisible();
-  await expect(nodeByKey(win, "d:tests")).toHaveCount(0);
+  // under the page the project view takes no clicks, no focus and no screen reader's attention
+  await expect(folder).toBeHidden();
+  await expect(win.getByRole("tree")).toHaveCount(0);
+  await expect(win.getByRole("button", { name: "Run all" })).toHaveCount(0);
+  for (let i = 0; i < 20; i++) {
+    await win.keyboard.press("Tab");
+    expect(
+      await win.evaluate(() => !!document.activeElement?.closest("[data-testid=project-view]")),
+    ).toBe(false);
+  }
   await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
   await win.getByRole("button", { name: "← Back" }).click();
   await expect(win.getByTestId("settings")).toHaveCount(0);
-  await expect(nodeByKey(win, "d:tests")).toBeVisible();
+  await expect(folder).toBeVisible();
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
+  // still collapsed: the tree was not rebuilt
+  await expect(folder.getByRole("button", { name: /^Expand / })).toBeVisible();
+  await expect(feature).toBeHidden();
   // Escape goes back too
   await win.getByTestId("settings-button").click();
   await win.keyboard.press("Escape");
   await expect(win.getByTestId("settings")).toHaveCount(0);
-  await expect(nodeByKey(win, "d:tests")).toBeVisible();
+  await expect(folder.getByRole("button", { name: /^Expand / })).toBeVisible();
 });
 
 test("a failed check shows its reason in the settings (R2.5)", async () => {
