@@ -1,4 +1,5 @@
 /// <reference types="@electron-forge/plugin-vite/forge-vite-env" />
+/// <reference types="vite/client" />
 declare module "*.css";
 
 /** The app's and the bundled Karate's and Java's versions, set at build time by vite.renderer.config.mts. */

@@ -1,5 +1,7 @@
 import { For, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
+// a file, never a data: URL, which the CSP (default-src 'self') would block
+import mascot from "../../assets/mascot.svg?no-inline";
 import { primary } from "./buttons";
 import type { AppState } from "./reduce";
 
@@ -15,6 +17,8 @@ export function Home(props: { state: AppState; api: Api }) {
   return (
     <div data-testid="home" class="min-h-0 flex-1 overflow-auto px-4 py-12">
       <div class="mx-auto flex max-w-[540px] flex-col items-start">
+        {/* decorative: the heading says what the screen is for (ADR 0013) */}
+        <img data-testid="mascot" src={mascot} alt="" width="240" height="180" class="mb-6" />
         <h1 class="text-xl font-semibold">Open a Karate project</h1>
         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Pick a folder, or reopen one you used before.

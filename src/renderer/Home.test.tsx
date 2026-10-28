@@ -84,6 +84,21 @@ describe("home screen", () => {
     check();
   });
 
+  it("the mascot is decorative", () => {
+    const { send } = setup();
+    send({ type: "project", project: null, tree: null, error: null });
+    const mascot = screen.getByTestId("mascot") as HTMLImageElement;
+    expect(mascot.tagName).toBe("IMG");
+    expect(mascot.getAttribute("alt")).toBe("");
+    expect(mascot.getAttribute("src")).toMatch(/mascot\.svg/);
+  });
+
+  it("an open project hides the mascot", () => {
+    const { open } = setup();
+    open();
+    expect(screen.queryByTestId("mascot")).toBeNull();
+  });
+
   it("Open folder… opens the folder dialog", () => {
     const { api, send } = setup();
     send({ type: "opening", root: null });
