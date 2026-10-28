@@ -10,13 +10,13 @@ const PARSE = { jre: parseJreVersion, karate: parseKarateVersion };
 
 /** `feature/bump-<dep>-<version>`, with `+` as `_`. */
 export function branchName(dep, version) {
-  return `feature/bump-${dep}-${version.replace("+", "_")}`;
+  return `feature/bump-${dep}-${version.replaceAll("+", "_")}`;
 }
 
 /** The version a bump branch of `dep` names, or null for any other branch. */
 export function versionFromBranch(dep, branch) {
   const prefix = `feature/bump-${dep}-`;
-  return branch.startsWith(prefix) ? branch.slice(prefix.length).replace("_", "+") : null;
+  return branch.startsWith(prefix) ? branch.slice(prefix.length).replaceAll("_", "+") : null;
 }
 
 export function titleFor(dep, from, to) {
@@ -67,7 +67,7 @@ export function prBody({ dep, from, to, keep, runCommand }) {
       ].join("\n"),
     );
   } else {
-    const tag = `jdk-${to}`.replace("+", "%2B");
+    const tag = `jdk-${to}`.replaceAll("+", "%2B");
     parts.push(
       `JRE:\n- Release: https://github.com/adoptium/temurin21-binaries/releases/tag/${tag}`,
     );
