@@ -123,19 +123,23 @@ export class Updater {
       }
       if (!this.settings.checkAtStartup) return;
       await this.check();
-      if (!this.releases) return;
+      const rs = this.releases;
+      if (!rs) return;
       const { running } = this.d;
       // R5.3: never right after a failed switch, so a file held open cannot loop downloads and restarts
-      const auto =
-        result?.ok === false ? null : autoUpdateTo(this.releases, this.settings, running);
-      if (auto) {
-        // a build that is not packaged never installs, and a Runner still busy after the wait (the
-        // reopen's discovery, a run) is not killed: the person then decides through the modal
-        if (this.d.packaged && (await this.idle())) return await this.install(auto.version, false);
-        this.d.emit({ type: "updatePrompt", release: auto });
-        return;
+      const auto = () =>
+        result?.ok === false || !this.settings.checkAtStartup
+          ? null
+          : autoUpdateTo(rs, this.settings, running);
+      let release = auto();
+      // a build that is not packaged never installs, and a Runner still busy after the wait (the
+      // reopen's discovery, a run) is not killed: the person then decides through the modal
+      if (release && this.d.packaged) {
+        const idle = await this.idle();
+        release = auto(); // the settings may have changed during the wait
+        if (release && idle) return await this.install(release.version, false);
       }
-      const release = promptFor(this.releases, this.settings, running);
+      release ??= promptFor(rs, this.settings, running);
       if (release) this.d.emit({ type: "updatePrompt", release });
     } catch {
       // a startup that cannot check or prompt still starts

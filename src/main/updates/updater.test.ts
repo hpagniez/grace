@@ -159,6 +159,21 @@ describe("startup", () => {
     expect(notices()).toEqual([]);
   });
 
+  it("auto-update re-reads the settings after the wait", async () => {
+    saveSettings({ autoUpdate: true });
+    let polls = 0;
+    const u = make({
+      isBusy: () => {
+        if (++polls === 2) u.setSettings({ autoUpdate: false });
+        return polls < 4;
+      },
+      idlePollMs: 1,
+    });
+    await u.startup(null);
+    expect(download).not.toHaveBeenCalled();
+    expect(ofType("updatePrompt").map((e) => e.release.version)).toEqual(["1.0.0-rc.6"]);
+  });
+
   it("auto-update prompts instead when the Runner stays busy", async () => {
     saveSettings({ autoUpdate: true });
     busy = true;
