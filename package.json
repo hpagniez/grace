@@ -19,7 +19,8 @@
     "e2e": "npm run package && npx electron --version && playwright test",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",
-    "fixtures": "node scripts/capture-fixtures.mjs"
+    "fixtures": "node scripts/capture-fixtures.mjs",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "@solidjs/web": "2.0.0-rc.18",
