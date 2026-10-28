@@ -15,7 +15,7 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run lint` | oxlint and oxfmt check |
 | `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
 
-Never run `npm test` and `npm run e2e` at the same time: their Java leak checks scan every `java.exe` under `vendor/jre` and see each other's processes.
+Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
 ## Docs map
 
