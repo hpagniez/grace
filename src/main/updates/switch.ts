@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { UpdateSettings } from "../../shared/updates";
 import script from "./switch.ps1?raw";
@@ -36,11 +36,14 @@ export const POWERSHELL = path.join(
  */
 export function startSwitch(plan: SwitchPlan, env: NodeJS.ProcessEnv = process.env): void {
   const file = path.join(plan.stagingDir, "switch.ps1");
+  const switching = path.join(plan.stagingDir, "switching");
+  // files left by an earlier try would pass for this one running (R10.9) or the new version starting (R10.6)
+  for (const f of [switching, path.join(plan.stagingDir, "started")]) rmSync(f, { force: true });
   writeFileSync(path.join(plan.stagingDir, "plan.json"), JSON.stringify(plan));
   writeFileSync(file, script);
   // Not `detached`: a detached powershell.exe has no console and exits without running anything.
   // This one would die with Grace (Node kills its children on exit), so the script starts a copy of
-  // itself that outlives Grace, writes that copy's id to `switching` and exits (switch.ps1).
+  // itself that outlives Grace, waits until that copy wrote its id to `switching` and exits 0 (switch.ps1).
   // cwd: a process whose current folder is inside the install folder stops it being renamed, and
   // Grace started from Explorer runs in its install folder.
   const args = [
@@ -51,13 +54,12 @@ export function startSwitch(plan: SwitchPlan, env: NodeJS.ProcessEnv = process.e
     "-WindowStyle",
     "Hidden",
   ];
-  spawnSync(POWERSHELL, [...args, "-File", file], {
+  const r = spawnSync(POWERSHELL, [...args, "-File", file], {
     cwd: plan.stagingDir,
     env,
     windowsHide: true,
     stdio: "ignore",
     timeout: 60_000,
   });
-  if (!existsSync(path.join(plan.stagingDir, "switching")))
-    throw new Error("The switch script did not start");
+  if (r.status !== 0 || !existsSync(switching)) throw new Error("The switch script did not start");
 }

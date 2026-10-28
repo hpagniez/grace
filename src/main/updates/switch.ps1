@@ -25,12 +25,18 @@ $switching = Join-Path $PSScriptRoot 'switching'
 
 if (-not $Detached) {
   # Grace started this copy, which dies when Grace exits (Node kills the processes it started).
-  # A copy started from here is outside that group and outlives Grace. Grace waits until switching
-  # exists, so it quits only once the real switch runs (R10.9).
+  # A copy started from here is outside that group and outlives Grace. That copy writes its id to
+  # switching first: Grace quits only once the file exists, the proof that the switch runs (R10.9).
   $arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Detached"
   $p = Start-Program (Join-Path $PSHOME 'powershell.exe') $arguments $PSScriptRoot
-  Write-Utf8 $switching "$($p.Id)"
-  exit
+  for ($i = 0; $i -lt 100; $i++) {
+    if (Test-Path -LiteralPath $switching) { exit 0 }
+    if ($p.HasExited) { exit 1 }
+    Start-Sleep -Milliseconds 100
+  }
+  # Grace stays: a copy that ran late would switch once the person quits Grace, unasked
+  try { $p.Kill() } catch {}
+  exit 1
 }
 
 function Write-Json($path, $value) { Write-Utf8 $path (ConvertTo-Json $value -Depth 5) }
@@ -46,10 +52,21 @@ function Remove-Tree($path) {
   if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
 }
 
-# Undoing must not leave Grace without an install folder: retry while an antivirus holds a file.
+# A saved copy without its backup.json is never restored or kept (R9.3, R9.5): removing that file
+# first means a copy removed half-way is never trusted.
+function Remove-Copy($dir) {
+  $meta = Join-Path $dir 'backup.json'
+  if (Test-Path -LiteralPath $meta) { Remove-Item -LiteralPath $meta -Force }
+  Remove-Tree $dir
+}
+
+# Undoing must not leave Grace without an install folder: retry while an antivirus or a dying
+# process holds a file, as long as the wait for Grace to quit (60 s).
 function Move-Back($from, $to) {
-  for ($i = 1; ; $i++) {
-    try { [IO.Directory]::Move($from, $to); return } catch { if ($i -ge 10) { throw }; Start-Sleep 1 }
+  $deadline = [DateTime]::UtcNow.AddSeconds($plan.exitTimeoutSec)
+  for (;;) {
+    try { [IO.Directory]::Move($from, $to); return } catch { if ([DateTime]::UtcNow -gt $deadline) { throw } }
+    Start-Sleep 1
   }
 }
 
@@ -76,51 +93,52 @@ function Set-Data($copy) {
   if ($failed) { throw $failed }
 }
 
-function Write-Result($ok, $err) {
+function Write-Result($ok, $err, $reverted) {
   Write-Json (Join-Path $data 'update-result.json') ([ordered]@{
       from = $plan.from; to = $plan.to; rollback = $plan.rollback; ok = $ok
-      reverted = $false; error = $err; updates = $plan.updates
+      reverted = $reverted; error = $err; updates = $plan.updates
     })
 }
 
 # Grace, its helpers (renderer, GPU, crash handler) and the bundled Java all run from the install
 # folder. StartsWith, not -like: a [ in a folder name is a wildcard.
-function Test-Running {
-  foreach ($p in Get-Process) {
-    if ($p.Path -and $p.Path.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase)) { return $true }
-  }
-  $false
+function Get-Grace {
+  Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase) }
 }
 
-function Start-Grace { [void](Start-Program (Join-Path $install 'Grace.exe') '' $install) }
+function Start-Grace { Start-Program (Join-Path $install 'Grace.exe') '' $install }
 
+# Each flag says what to undo (R9.6, R10.4, R10.6). Set before the try: the catch reads them all.
+$plan = $null; $exited = $false; $copying = $false; $copied = $false; $restored = $false
+$movedOld = $false; $movedNew = $false; $startedNew = $false; $ok = $false
 try {
-  $plan = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'plan.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-  # no trailing backslash: PowerShell would quote it into an escaped quote for robocopy
-  $install = $plan.installDir.TrimEnd('\')
-  $data = $plan.dataDir.TrimEnd('\')
-  $app = Join-Path $PSScriptRoot 'app'
-  $old = "$install.old"
-  $backups = Join-Path $data 'backups'
-  $backup = Join-Path $backups $plan.from
-  $robocopy = Join-Path $env:SystemRoot 'System32\Robocopy.exe'
-
-  # R10.2: wait for Grace to exit
-  $deadline = [DateTime]::UtcNow.AddSeconds($plan.exitTimeoutSec)
-  while (Test-Running) {
-    if ([DateTime]::UtcNow -gt $deadline) {
-      Write-Result $false "Grace didn't quit within $($plan.exitTimeoutSec) seconds"
-      return
-    }
-    Start-Sleep -Milliseconds 250
-  }
-
-  # R10.3, in order: back up, restore, rename, rename. Each flag says what to undo (R9.6, R10.4).
-  $copying = $false; $copied = $false; $restored = $false; $movedOld = $false; $movedNew = $false; $ok = $false
   try {
+    # first: the proof that the switch runs (R10.9)
+    Write-Utf8 $switching "$PID"
+    $plan = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'plan.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    # no trailing backslash: PowerShell would quote it into an escaped quote for robocopy
+    $install = $plan.installDir.TrimEnd('\')
+    $data = $plan.dataDir.TrimEnd('\')
+    $app = Join-Path $PSScriptRoot 'app'
+    $old = "$install.old"
+    $aside = "$install.failed"
+    $backups = Join-Path $data 'backups'
+    $backup = Join-Path $backups $plan.from
+    $robocopy = Join-Path $env:SystemRoot 'System32\Robocopy.exe'
+    $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+
+    # R10.2: wait for Grace to exit. On timeout: a failure result, nothing else, Grace still runs.
+    $deadline = [DateTime]::UtcNow.AddSeconds($plan.exitTimeoutSec)
+    while (Get-Grace) {
+      if ([DateTime]::UtcNow -gt $deadline) { throw "Grace didn't quit within $($plan.exitTimeoutSec) seconds" }
+      Start-Sleep -Milliseconds 250
+    }
+    $exited = $true
+
+    # R10.3, in order: back up, restore, rename, rename
     Remove-Tree $old  # left by an earlier switch
     $copying = $true
-    Remove-Tree $backup  # R9.1: an older copy of this version is replaced
+    Remove-Copy $backup  # R9.1: an older copy of this version is replaced
     $skip = 'backups', 'update-result.json', 'Cache', 'Code Cache', 'GPUCache', 'GrShaderCache', 'ShaderCache',
       'GPUPersistentCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'Crashpad', 'DevToolsActivePort', 'lockfile',
       'SingletonLock'
@@ -142,25 +160,61 @@ try {
     $movedNew = $true
 
     # R10.5: the result first, since the new version reads it when it starts
-    Write-Result $true $null
-    Start-Grace
+    Write-Result $true $null $false
+    $grace = Start-Grace
+    $startedNew = $true
+
+    # R10.6: the new version writes started once its window shows. One that quit never will.
+    $deadline = [DateTime]::UtcNow.AddSeconds($plan.startTimeoutSec)
+    for (;;) {
+      $quit = $grace.HasExited  # read first: it may write started just before it quits
+      if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'started')) { break }
+      # the wording stays at 2 minutes: startTimeoutSec is shorter only in tests
+      if ($quit -or [DateTime]::UtcNow -gt $deadline) { throw "$($plan.to) didn't start within 2 minutes" }
+      Start-Sleep -Milliseconds 250
+    }
     $ok = $true
   } catch {
     $err = Get-Message $_
-    # undo in reverse order, each step on its own so that one failure does not skip the rest
-    if ($movedNew) { try { Move-Back $install $app } catch {} }
-    if ($movedOld) { try { Move-Back $old $install } catch {} }
-    # R10.4: the running version's data back from the copy just made, so a later try does not
-    # overwrite the real backup with the target's data
-    if ($restored) { try { Set-Data $backup } catch {} }
-    if ($copying -and -not $copied) { try { Remove-Tree $backup } catch {} }
-    try { Write-Result $false $err } catch {}
-    Start-Grace
+    # Undo in reverse order, each step on its own so that one failure does not skip the rest. Each
+    # failure goes in the result: Grace must not say the old version is back when it may not be.
+    if ($startedNew) {
+      # R10.6: stop the new version and everything it started, then keep it aside
+      try {
+        foreach ($p in Get-Grace) { try { & $taskkill /PID $p.Id /T /F | Out-Null } catch {} }
+        Remove-Tree $aside  # left by an earlier switch
+        Move-Back $install $aside
+      } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
+    } elseif ($movedNew) {
+      try { Move-Back $install $app } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
+    }
+    if ($movedOld -and -not (Test-Path -LiteralPath $install)) {
+      try { Move-Back $old $install } catch {
+        $err += "; putting $($plan.from) back failed: $(Get-Message $_)"
+        # never no install folder: the new version goes back in rather than none
+        try {
+          Move-Back $(if ($startedNew) { $aside } else { $app }) $install
+          $err += ", so $($plan.to) stays installed"
+        } catch { $err += "; putting $($plan.to) back failed too: $(Get-Message $_)" }
+      }
+    }
+    # R10.4, R10.6: the running version's data back from the copy just made, so a later try does
+    # not overwrite the real backup with the target's data
+    if ($restored -or $startedNew) {
+      try { Set-Data $backup } catch { $err += "; putting the data back failed: $(Get-Message $_)" }
+    }
+    if ($copying -and -not $copied) { try { Remove-Copy $backup } catch {} }
+    if ($plan) { try { Write-Result $false $err $startedNew } catch {} }
+    if ($exited) {
+      # a Grace other than the new version quits at once while switching names a live process (R10.9)
+      Remove-Item -LiteralPath $switching -Force -ErrorAction SilentlyContinue
+      try { [void](Start-Grace) } catch {}
+    }
   }
 
   if ($ok) {
-    # R9.5: keep the copies of the most recently backed-up versions. A folder without a valid
-    # backup.json is not a copy: leave it alone.
+    # R9.5, only after a confirmed start: keep the copies of the most recently backed-up versions.
+    # A folder without a valid backup.json is not a copy: leave it alone.
     try {
       $copies = foreach ($d in Get-ChildItem -LiteralPath $backups -Directory) {
         try {
@@ -169,7 +223,7 @@ try {
         } catch {}
       }
       $copies | Sort-Object SavedAt -Descending | Select-Object -Skip $plan.keepBackups |
-        ForEach-Object { Remove-Tree $_.Path }
+        ForEach-Object { try { Remove-Copy $_.Path } catch {} }
     } catch {}
   }
 } finally {
