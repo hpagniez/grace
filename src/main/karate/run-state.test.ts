@@ -219,13 +219,35 @@ describe("RunState", () => {
     });
 
     it("keep durations", () => {
+      const run = events("run-clean.jsonl");
+      // from the recording: every `npm run fixtures` records other durations
+      const took = (feature: string, refId: string) => {
+        const exit = run.find(
+          (e) =>
+            e.type === "SCENARIO_EXIT" &&
+            e.data.callDepth === 0 &&
+            e.data.feature === feature &&
+            e.data.refId === refId,
+        );
+        expect(exit?.data.durationMillis).toBeTypeOf("number");
+        return exit!.data.durationMillis;
+      };
       const state = newState();
-      state.apply(events("run-clean.jsonl"));
+      state.apply(run);
       state.finish(1, false, true);
       const r = state.results();
-      expect(r.get("s:tests/basic.feature#1")).toEqual({ status: "passed", durationMillis: 285 });
-      expect(r.get("s:tests/basic.feature#2")).toEqual({ status: "failed", durationMillis: 7 });
-      expect(r.get("s:tests/slow.feature#1")).toEqual({ status: "passed", durationMillis: 8074 });
+      expect(r.get("s:tests/basic.feature#1")).toEqual({
+        status: "passed",
+        durationMillis: took("tests/basic.feature", "[1:7]"),
+      });
+      expect(r.get("s:tests/basic.feature#2")).toEqual({
+        status: "failed",
+        durationMillis: took("tests/basic.feature", "[2:15]"),
+      });
+      expect(r.get("s:tests/slow.feature#1")).toEqual({
+        status: "passed",
+        durationMillis: took("tests/slow.feature", "[1:7]"),
+      });
     });
 
     it("leave durationMillis out when Karate gave none", () => {

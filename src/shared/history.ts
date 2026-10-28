@@ -10,6 +10,9 @@ export const HISTORY_LIMIT = 20;
 /** The folder name of a run: local start time `yyyyMMdd-HHmmss-SSS`, plus `-2`, `-3`… if taken. */
 export const RUN_ID = /^\d{8}-\d{6}-\d{3}(-\d+)?$/;
 
+/** A project fingerprint: SHA-256 as lowercase hex. */
+export const FINGERPRINT = /^[0-9a-f]{64}$/;
+
 export type TestStatusFinal = "passed" | "failed" | "notRun" | "interrupted";
 
 export interface StoredTest {
@@ -37,6 +40,13 @@ export interface RunRecord {
   startedAt: number;
   durationMillis: number;
   env: string | null;
+  /** The count passed with `-T`; null for a run stored before F12. */
+  threads: number | null;
+  /**
+   * SHA-256 of the project files' paths, sizes and times, the same before Java started and after it
+   * exited (F15). Null otherwise, and for a run stored before F15.
+   */
+  fingerprint: string | null;
   filter: FilterState;
   /** Null for a Re-run failed, whose `failedOf` is then the `startedAt` of its source run. */
   selection: StoredSelection | null;
@@ -52,6 +62,7 @@ export interface HistoryEntry {
   startedAt: number;
   durationMillis: number;
   env: string | null;
+  threads: number | null;
   filter: FilterState;
   selection: StoredSelection | null;
   failedOf: number | null;
@@ -99,6 +110,14 @@ export function parseRunRecord(x: unknown): RunRecord | null {
   if (!num(startedAt) || !num(durationMillis) || !numOrNull(failedOf) || !numOrNull(exitCode))
     return null;
   if (env !== null && !(str(env) && validEnvName(env))) return null;
+  const threads = x.threads ?? null; // a record stored before F12 has none
+  if (
+    threads !== null &&
+    !(typeof threads === "number" && Number.isInteger(threads) && threads >= 1)
+  )
+    return null;
+  const fingerprint = x.fingerprint ?? null; // a record stored before F15 has none
+  if (fingerprint !== null && !(str(fingerprint) && FINGERPRINT.test(fingerprint))) return null;
   if (!str(outcome) || !OUTCOMES.includes(outcome)) return null;
   const filter = parseFilterState(x.filter);
   if (!filter) return null;
@@ -112,6 +131,8 @@ export function parseRunRecord(x: unknown): RunRecord | null {
     startedAt,
     durationMillis,
     env,
+    threads,
+    fingerprint,
     filter,
     selection: sel,
     failedOf,
@@ -123,7 +144,7 @@ export function parseRunRecord(x: unknown): RunRecord | null {
 
 export function toEntry(id: string, r: RunRecord, reportAvailable: boolean): HistoryEntry {
   const count = (s: TestStatusFinal) => r.tests.filter((t) => t.status === s).length;
-  const { tests, version: _version, ...rest } = r;
+  const { tests, version: _version, fingerprint: _fingerprint, ...rest } = r;
   return {
     id,
     ...rest,

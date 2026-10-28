@@ -82,16 +82,28 @@ export function readRunRecord(projectDir: string, id: string): RunRecord | null 
   }
 }
 
+/** A listed run: its folder id, its record and whether its report exists. */
+export interface ListedRun {
+  id: string;
+  record: RunRecord;
+  reportAvailable: boolean;
+}
+
 /** The valid runs, newest `startedAt` first, at most 20. Never throws. */
-export function listHistory(projectDir: string): HistoryEntry[] {
+export function listRuns(projectDir: string): ListedRun[] {
   return runIds(projectDir)
     .flatMap((id) => {
-      const r = readRunRecord(projectDir, id);
+      const record = readRunRecord(projectDir, id);
       const report = path.join(runsDir(projectDir), id, "karate-summary.html");
-      return r ? [toEntry(id, r, existsSync(report))] : [];
+      return record ? [{ id, record, reportAvailable: existsSync(report) }] : [];
     })
-    .sort((a, b) => b.startedAt - a.startedAt)
+    .sort((a, b) => b.record.startedAt - a.record.startedAt)
     .slice(0, HISTORY_LIMIT);
+}
+
+/** `listRuns` as the window gets it. */
+export function listHistory(projectDir: string): HistoryEntry[] {
+  return listRuns(projectDir).map((r) => toEntry(r.id, r.record, r.reportAvailable));
 }
 
 /**

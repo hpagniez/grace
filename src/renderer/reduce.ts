@@ -1,5 +1,6 @@
 import type { EnvView } from "../shared/env";
-import type { AppEvent, Project, RunOutcome, Step, Summary } from "../shared/events";
+import type { AppEvent, Project, RecentEntry, RunOutcome, Step, Summary } from "../shared/events";
+import type { FlakyEnv } from "../shared/flaky";
 import type { HistoryEntry } from "../shared/history";
 import type { HttpCall, HttpGroup } from "../shared/http";
 import type { Status, TestNode } from "../shared/model";
@@ -38,16 +39,29 @@ export interface AppState {
   filter: FilterState;
   /** The open project's environment and run properties, as main holds them; null with no project. */
   env: EnvView | null;
+  /**
+   * The open project's thread count, as main holds it. A fresh object per `threads` event, so the
+   * box resets even when main re-sends the count it held. Null with no project.
+   */
+  threads: { count: number } | null;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
   /** The open project's listed runs, newest first, as main sends them. */
   history: HistoryEntry[];
+  /** Proof per flaky test key of the tree shown (F15). Main's `flaky` event follows every tree and every history. */
+  flaky: Record<string, FlakyEnv[]>;
   /** The status groups switched on in the HTTP tab; none means All. Lasts for the session. */
   httpGroups: HttpGroup[];
   /** The call shown in the details pane in place of the node; null shows the node. */
   selectedCall: CallRef | null;
   /** The tab shown in the bottom panel. */
   panel: "console" | "history" | "http";
+  /** The folder main is opening, or null. */
+  opening: string | null;
+  /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
+  loaded: boolean;
+  /** The saved recent folders, newest first; null until main sends them. */
+  recent: RecentEntry[] | null;
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -84,11 +98,16 @@ export function initialState(): AppState {
     selected: null,
     filter: noFilter(),
     env: null,
+    threads: null,
     busy: false,
     history: [],
+    flaky: {},
     httpGroups: [],
     selectedCall: null,
     panel: "console",
+    opening: null,
+    loaded: false,
+    recent: null,
   };
 }
 
@@ -114,8 +133,11 @@ export function reduce(s: AppState, e: AppEvent): void {
           run: idleRun(),
           filter: noFilter(), // main's `filter` event follows
           env: null, // and its `environment` event
+          threads: null, // main's `threads` event follows
           history: [], // main's `history` follows a project that opens
+          flaky: {}, // and its `flaky` follows the tree
         });
+        if (!e.project) s.console = []; // a closed project leaves no console behind
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
       const before = byKey(s.tree);
@@ -127,12 +149,16 @@ export function reduce(s: AppState, e: AppEvent): void {
       };
       if (s.selected && !same(s.selected)) s.selected = null;
       if (s.selectedCall && !same(s.selectedCall.key)) s.selectedCall = null;
-      for (const map of [s.statuses, s.results, s.steps, s.calls] as Record<string, unknown>[])
+      for (const map of [s.statuses, s.results, s.steps, s.calls, s.flaky] as Record<
+        string,
+        unknown
+      >[])
         for (const key of Object.keys(map)) if (!same(key)) delete map[key];
       s.project = e.project;
       s.tree = e.tree;
       s.error = e.error;
       s.notice = null;
+      s.loaded = true;
       break;
     }
     case "runStarted":
@@ -195,6 +221,9 @@ export function reduce(s: AppState, e: AppEvent): void {
       if (!e.runs.some((r) => r.id === s.run.runId && r.reportAvailable))
         s.run.reportAvailable = false;
       break;
+    case "flaky":
+      s.flaky = Object.fromEntries(e.tests.map((t) => [t.key, t.envs]));
+      break;
     case "environment":
       if (!s.project) break; // main can still hold the previous project's view
       // a result from another environment must not pass for the state of this one
@@ -210,11 +239,23 @@ export function reduce(s: AppState, e: AppEvent): void {
         });
       s.env = e.view;
       break;
+    case "threads":
+      if (!s.project) break; // main can still hold the previous project's count
+      s.threads = { count: e.count };
+      break;
     case "busy":
       s.busy = e.busy;
       break;
     case "notice":
       s.notice = e.message;
+      break;
+    case "opening":
+      s.opening = e.root;
+      s.loaded = true;
+      if (e.root && !s.project) s.error = null; // the last open's "Folder not found" is not this one's
+      break;
+    case "recent":
+      s.recent = e.entries;
       break;
   }
 }

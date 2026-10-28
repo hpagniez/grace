@@ -1,6 +1,6 @@
 {
-  "name": "karate-kid",
-  "version": "1.1.0",
+  "name": "grace",
+  "version": "1.0.0-rc.3",
   "private": true,
   "description": "Free desktop test-suite runner for Karate",
   "keywords": [],
@@ -18,7 +18,9 @@
     "test": "vitest run",
     "e2e": "npm run package && npx electron --version && playwright test",
     "vendor": "node scripts/fetch-vendor.mjs",
-    "fixtures": "node scripts/capture-fixtures.mjs"
+    "vendor:bump": "node scripts/bump-vendor.mjs",
+    "fixtures": "node scripts/capture-fixtures.mjs",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "@solidjs/web": "2.0.0-rc.18",
@@ -44,5 +46,5 @@
     "vite": "8.3.5",
     "vitest": "5.0.5"
   },
-  "productName": "karate-kid"
+  "productName": "Grace"
 }

@@ -1,7 +1,8 @@
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
+import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
@@ -214,8 +215,9 @@ describe("main screen", () => {
 
   it("disables Run all without a tree or without leaves, and says why", () => {
     const { send } = setup();
+    send({ type: "opening", root: "D:/p" });
     expect(button("run-all-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("Open a Karate project folder");
+    expect(screen.getByTestId("tree-message").textContent).toBe("Discovering tests…");
     send({
       type: "project",
       project: { root: "D:/p", layout: "maven" },
@@ -309,5 +311,155 @@ describe("main screen", () => {
     expect(button("report-button").disabled).toBe(false);
     send({ type: "notice", message: "Nothing to run" });
     expect(screen.getByTestId("notice").textContent).toBe("Nothing to run");
+  });
+});
+
+describe("flaky marks", () => {
+  const SCENARIO = "s:tests/x.feature#1";
+  const STEADY = "s:tests/x.feature#2";
+  const ROW = "s:tests/x.feature#3.1";
+  // a feature holding a flaky scenario, a steady one, and an outline with a flaky row
+  const flakyTree = (): TestNode =>
+    node("folder", "d:", "p", {
+      children: [
+        node("folder", "d:tests", "tests", {
+          children: [
+            node("feature", "f:tests/x.feature", "x", {
+              file: "tests/x.feature",
+              children: [
+                node("scenario", SCENARIO, "coin", { line: 3, tags: ["slow"] }),
+                node("scenario", STEADY, "steady", { line: 6 }),
+                node("outline", "o:tests/x.feature#3", "sum <a>", {
+                  children: [
+                    node("row", ROW, "sum 1", { line: 10 }),
+                    node("row", "s:tests/x.feature#3.2", "sum 2", { line: 11 }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  const proof: FlakyEnv[] = [{ env: null, passed: 1, failed: 1, runs: [] }];
+  const rowOf = (key: string) =>
+    screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
+  const markOf = (key: string) => within(rowOf(key)).queryByTestId("flaky-mark");
+  const countOf = (key: string) => within(rowOf(key)).queryByTestId("flaky-count");
+
+  it("marks flaky tests and counts them above", () => {
+    const { send } = setup();
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: flakyTree(),
+      error: null,
+    });
+    send({
+      type: "flaky",
+      tests: [
+        { key: SCENARIO, envs: proof },
+        { key: ROW, envs: proof },
+      ],
+    });
+    for (const key of [SCENARIO, ROW]) {
+      const mark = markOf(key)!;
+      expect(mark.textContent).toBe("flaky");
+      expect(mark.title).toBe(FLAKY_TITLE);
+      expect(mark.getAttribute("aria-label")).toBe(FLAKY_TITLE);
+      expect(countOf(key)).toBeNull();
+    }
+    expect(countOf("o:tests/x.feature#3")!.textContent).toBe("1 flaky");
+    expect(markOf("o:tests/x.feature#3")).toBeNull();
+    expect(countOf("f:tests/x.feature")!.textContent).toBe("2 flaky");
+    expect(countOf("d:tests")!.textContent).toBe("2 flaky");
+    for (const key of [STEADY, "s:tests/x.feature#3.2"]) {
+      expect(markOf(key)).toBeNull();
+      expect(countOf(key)).toBeNull();
+    }
+    // the mark sits right after the tags and right before the run button
+    const cells = [...rowOf(SCENARIO).children] as HTMLElement[];
+    const tag = cells.findIndex((c) => c.textContent === "slow");
+    expect(tag).toBeGreaterThan(-1);
+    expect(cells[tag + 1].dataset.testid).toBe("flaky-mark");
+    expect(cells[tag + 2].dataset.testid).toBe("run-node");
+  });
+
+  it("names the mark for a screen reader", () => {
+    const { send } = setup();
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: flakyTree(),
+      error: null,
+    });
+    send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
+    expect(screen.getByRole("img", { name: FLAKY_TITLE })).toBe(markOf(SCENARIO));
+  });
+
+  it("counts a flaky test the tag filter hides", () => {
+    const { send, load } = setup();
+    load();
+    send({
+      type: "filter",
+      filter: { include: ["smoke"], exclude: [], hideNonMatching: true },
+    });
+    send({ type: "flaky", tests: [{ key: "s:tests/basic.feature#2", envs: proof }] });
+    // "failing match" has no tag: the filter hides it, its feature still counts it
+    expect(screen.queryByText("failing match")).toBeNull();
+    expect(within(rowOf("f:tests/basic.feature")).getByTestId("flaky-count").textContent).toBe(
+      "1 flaky",
+    );
+  });
+
+  it("keeps the mark of a dimmed test", () => {
+    const { send, load } = setup();
+    load();
+    send({
+      type: "filter",
+      filter: { include: ["smoke"], exclude: [], hideNonMatching: false },
+    });
+    send({ type: "flaky", tests: [{ key: "s:tests/basic.feature#2", envs: proof }] });
+    expect(rowOf("s:tests/basic.feature#2").dataset.match).toBe("false");
+    expect(markOf("s:tests/basic.feature#2")).toBeTruthy();
+  });
+
+  it("clears the marks for a new project", () => {
+    const { send, load } = setup();
+    load();
+    send({ type: "flaky", tests: [{ key: "s:tests/basic.feature#2", envs: proof }] });
+    expect(screen.getAllByTestId("flaky-mark")).toHaveLength(1);
+    send({
+      type: "project",
+      project: { root: "D:/other", layout: "standalone" },
+      tree: tree(),
+      error: null,
+    });
+    expect(screen.queryByTestId("flaky-mark")).toBeNull();
+    expect(screen.queryByTestId("flaky-count")).toBeNull();
+  });
+
+  it("drops the mark of a key that now holds another test, keeps the rest", () => {
+    const { send, load } = setup();
+    load();
+    send({
+      type: "flaky",
+      tests: [
+        { key: "s:tests/basic.feature#1", envs: proof },
+        { key: "s:tests/basic.feature#2", envs: proof },
+      ],
+    });
+    // the same tree but for a scenario renamed in place: its key now names another test
+    const renamed = tree();
+    renamed.children[0].children[0].children[1].name = "another test";
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: renamed,
+      error: null,
+    });
+    expect(markOf("s:tests/basic.feature#1")).toBeTruthy();
+    expect(markOf("s:tests/basic.feature#2")).toBeNull();
+    expect(countOf("f:tests/basic.feature")!.textContent).toBe("1 flaky");
   });
 });

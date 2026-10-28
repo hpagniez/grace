@@ -49,26 +49,54 @@ export function project(
   return dir;
 }
 
+/**
+ * A fresh copy of the flaky sample project, deleted after the test. `coin(heads)` writes the `coin.json`
+ * that `tests/coin.feature` reads from beside the project folder: outside the project, so it does not
+ * change the project's fingerprint.
+ */
+export function flakyProject(): { dir: string; coin(heads: boolean): void } {
+  const dir = copyFixture("flaky");
+  dirs.push(path.dirname(dir));
+  return {
+    dir,
+    coin: (heads) =>
+      writeFileSync(path.join(path.dirname(dir), "coin.json"), JSON.stringify({ heads })),
+  };
+}
+
 /** An empty folder, deleted after the test. */
 export const emptyProject = () => tempDir("kk-empty-");
 
 /**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
- * first app before), and `extraEnv` added to the app's environment.
+ * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
  */
 export async function launch(
   userDataDir?: string,
   extraEnv: Record<string, string> = {},
+  opts: { colorScheme?: "light" | "dark" } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const app = await _electron.launch({
     args: ["."],
-    env: { ...process.env, ...extraEnv, KARATE_KID_USER_DATA: userData },
+    env: { ...process.env, ...extraEnv, GRACE_USER_DATA: userData },
+    colorScheme: opts.colorScheme,
   });
   apps.push(app);
   const win = await app.firstWindow();
   return { app, win, userData };
 }
+
+/** Starts the built app with a fresh userData folder whose settings.json already holds `settings`. */
+export async function launchWithSettings(settings: Record<string, unknown>) {
+  const userData = tempDir("kk-userdata-");
+  writeFileSync(path.join(userData, "settings.json"), JSON.stringify(settings));
+  return launch(userData);
+}
+
+/** The parsed settings.json of an app data folder. */
+export const settingsOf = (userData: string): Record<string, unknown> =>
+  JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8"));
 
 /** Makes the folder picker return `dir`, then clicks Open. */
 export async function openProject(app: ElectronApplication, dir: string): Promise<void> {
@@ -77,6 +105,30 @@ export async function openProject(app: ElectronApplication, dir: string): Promis
   }, dir);
   const win = await app.firstWindow();
   await win.getByTestId("open-button").click();
+}
+
+/**
+ * Replaces the folder picker with a recorder that cancels; the returned function reads each call's
+ * parent window (whether one was passed) and starting folder.
+ */
+export async function recordOpenDialog(
+  app: ElectronApplication,
+): Promise<() => Promise<{ parent: boolean; defaultPath?: string }[]>> {
+  await app.evaluate(({ dialog }) => {
+    const calls: { parent: boolean; defaultPath?: string }[] = [];
+    (globalThis as { openDialogCalls?: typeof calls }).openDialogCalls = calls;
+    dialog.showOpenDialog = (async (...args: unknown[]) => {
+      const options = args[args.length - 1] as { defaultPath?: string };
+      calls.push({ parent: args.length === 2, defaultPath: options.defaultPath });
+      return { canceled: true, filePaths: [] };
+    }) as never;
+  });
+  return () =>
+    app.evaluate(
+      () =>
+        (globalThis as { openDialogCalls?: { parent: boolean; defaultPath?: string }[] })
+          .openDialogCalls ?? [],
+    );
 }
 
 /** Replaces `shell.openPath` with a recorder; the returned function reads the recorded paths. */
@@ -159,6 +211,8 @@ export function seedRuns(
       startedAt,
       durationMillis: 5_000,
       env: null,
+      threads: 1,
+      fingerprint: null,
       filter: { ...NO_FILTER },
       selection: { kind: "folder", file: "", name: path.basename(root), line: null, key: "d:" },
       failedOf: null,
@@ -191,6 +245,21 @@ export function seedRuns(
     if (opts.report) writeFileSync(path.join(dir, "karate-summary.html"), "<html></html>");
     return id;
   });
+}
+
+/** `data.threads` of the first `SUITE_ENTER` line of a run's event stream: the count Karate ran with. */
+export function ranThreads(userData: string, root: string, id: string): number {
+  const events = path.join(
+    projectDataDir(userData, root),
+    "runs",
+    id,
+    "karate-json",
+    "karate-events.jsonl",
+  );
+  const suite = readFileSync(events, "utf8")
+    .split(/\r?\n/)
+    .find((line) => line.includes('"SUITE_ENTER"'));
+  return JSON.parse(suite!).data.threads;
 }
 
 export const SECRET = "s3cret-token-123";

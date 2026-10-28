@@ -18,6 +18,8 @@ const specExample = (): RunRecord => ({
   startedAt: 1792937525123,
   durationMillis: 72000,
   env: "qa",
+  threads: 4,
+  fingerprint: "ab".repeat(32),
   filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false },
   selection: {
     kind: "feature",
@@ -68,6 +70,7 @@ const entry = (over: Partial<HistoryEntry> = {}): HistoryEntry => ({
   startedAt: new Date(2026, 9, 25, 14, 32).getTime(),
   durationMillis: 1000,
   env: null,
+  threads: 1,
   filter: { include: [], exclude: [], hideNonMatching: false },
   selection: { kind: "folder", file: "", name: "clean", line: null, key: "d:" },
   failedOf: null,
@@ -99,6 +102,24 @@ describe("parseRunRecord", () => {
     expect(parseRunRecord(r)).toEqual(r);
   });
 
+  it("reads a record stored before F12 as no thread count", () => {
+    const { threads: _threads, ...old } = specExample();
+    expect(parseRunRecord(old)).toEqual({ ...specExample(), threads: null });
+    expect(parseRunRecord({ ...specExample(), threads: null })).toEqual({
+      ...specExample(),
+      threads: null,
+    });
+  });
+
+  it("reads a record stored before F15 as no fingerprint", () => {
+    const { fingerprint: _fingerprint, ...old } = specExample();
+    expect(parseRunRecord(old)).toEqual({ ...specExample(), fingerprint: null });
+    expect(parseRunRecord({ ...specExample(), fingerprint: null })).toEqual({
+      ...specExample(),
+      fingerprint: null,
+    });
+  });
+
   it("rejects bad shapes", () => {
     const { outcome: _outcome, ...noOutcome } = specExample();
     const bad: unknown[] = [
@@ -114,6 +135,13 @@ describe("parseRunRecord", () => {
       { ...specExample(), outcome: "done" },
       { ...specExample(), exitCode: "1" },
       { ...specExample(), startedAt: "now" },
+      { ...specExample(), threads: 0 },
+      { ...specExample(), threads: "2" },
+      { ...specExample(), threads: 1.5 },
+      { ...specExample(), fingerprint: "AB".repeat(32) },
+      { ...specExample(), fingerprint: "ab" },
+      { ...specExample(), fingerprint: 1 },
+      { ...specExample(), fingerprint: "g".repeat(64) },
       noOutcome,
     ];
     for (const b of bad) expect(parseRunRecord(b)).toBeNull();
@@ -131,8 +159,10 @@ describe("toEntry", () => {
     const e = toEntry("20261025-143205-123", { ...specExample(), tests }, false);
     expect([e.passed, e.failed, e.total]).toEqual([3, 2, 7]);
     expect(e.id).toBe("20261025-143205-123");
+    expect(e.threads).toBe(4);
     expect(e.reportAvailable).toBe(false);
     expect(e).not.toHaveProperty("tests");
+    expect(e).not.toHaveProperty("fingerprint");
   });
 });
 

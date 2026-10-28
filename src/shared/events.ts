@@ -1,5 +1,6 @@
 // Shared by main and renderer: keep this file free of Node imports.
 import type { EnvView } from "./env";
+import type { FlakyTest } from "./flaky";
 import type { HistoryEntry } from "./history";
 import type { HttpCall } from "./http";
 import type { Layout, Status, TestNode } from "./model";
@@ -34,6 +35,11 @@ export interface Project {
   root: string;
   layout: Layout;
 }
+/** A saved recent folder and whether it is still a folder on disk. */
+export interface RecentEntry {
+  path: string;
+  exists: boolean;
+}
 export type AppEvent =
   | { type: "project"; project: Project | null; tree: TestNode | null; error: string | null }
   | {
@@ -60,9 +66,17 @@ export type AppEvent =
   | { type: "notice"; message: string }
   /** The open project's tag filter, as main holds and applies it. */
   | { type: "filter"; filter: FilterState }
+  /** The open project's thread count, as main holds it and passes to every run. */
+  | { type: "threads"; count: number }
   /** The open project's environment, suggestions and run properties, as main holds them. */
   | { type: "environment"; view: EnvView }
   /** The open project's listed runs, newest first. */
   | { type: "history"; runs: HistoryEntry[] }
+  /** The flaky tests of the tree last sent, by their key in it (F15). Follows every `project` and every `history` event. */
+  | { type: "flaky"; tests: FlakyTest[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
-  | { type: "busy"; busy: boolean };
+  | { type: "busy"; busy: boolean }
+  /** The folder main is opening, or null. Sent around each open and in every replay. */
+  | { type: "opening"; root: string | null }
+  /** The saved recent folders, newest first, each checked for existence. */
+  | { type: "recent"; entries: RecentEntry[] };

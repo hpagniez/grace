@@ -1,6 +1,6 @@
 # AGENTS.md
 
-karate-kid is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents.
+Grace is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents. The app was called karate-kid until [ADR 0013](docs/decisions/0013-rename-the-app-to-grace.md); the GitHub repository and its folder keep that name until the maintainer renames them.
 
 ## Commands
 
@@ -37,9 +37,13 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 - A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
 - Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
 
+## No backward compatibility
+
+The app is still in development. Never write code that keeps older versions working: no migration of settings, run history or data folders, no fallback to an old name, key, environment variable or file format, no deprecated alias. Change the name or format, and update every place that uses it. Data from an older version may be lost: say so in the commit's `BREAKING CHANGE:` footer.
+
 ## Git workflow
 
-Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md).
+Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md); release candidates only in [ADR 0015](docs/decisions/0015-release-candidates-until-a-stable-release-is-decided.md).
 
 ### Commits
 
@@ -55,11 +59,13 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 | Branch | Cut from | Merges into | Notes |
 |---|---|---|---|
-| `main` | | | Released code only. Tagged `vX.Y.Z` (SemVer). |
+| `main` | | | Released code only. Tagged `vX.Y.Z-rc.N` (SemVer pre-release). |
 | `develop` | `main` | | Integration branch. |
 | `feature/<topic>` | `develop` | `develop` | Via PR. Kebab-case topic. |
-| `release/vX.Y.Z` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.0.0`. Version bump and fixes only. Tag on `main`. |
-| `hotfix/vX.Y.Z` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.1`. Urgent fix to a released version. |
+| `release/vX.Y.Z-rc.N` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.0.0-rc.3`. Version bump and fixes only. Tag on `main`. |
+| `hotfix/vX.Y.Z-rc.N` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.0-rc.4`. Urgent fix to a released version. |
+
+- No stable release while the app is in development: every version is a release candidate of the first stable release, `1.0.0-rc.N`, in the branch, `package.json` and tag. Each release or hotfix bumps `N`. Stable `v1.0.0` needs a decision record that supersedes ADR 0015.
 
 - Merge with `--no-ff`.
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
@@ -67,19 +73,22 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 ### Pull requests and CI
 
-Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done: that runs the e2e suite.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
+- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` are merged by hand.
 
 | Workflow | When | What it runs |
 |---|---|---|
 | `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
-| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | `npm test`; `npm run e2e` too unless the PR is a draft |
-| `release` | Push of a `vX.Y.Z` tag | Tag must match `package.json`; `npm run make`; GitHub Release with the zip |
+| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the runner files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards unless the PR is a draft (the steps named `e2e`) |
+| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` passed and `test` passed with every `e2e` step on its head commit (no `test` run only for docs-only PRs) |
+| `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing) | Tag must match `package.json`; `npm run make`; GitHub pre-release with the zip |
+| `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI |
 
-Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not update the JRE and Karate pins in `scripts/fetch-vendor.mjs`.
+Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not see the JRE and Karate pins in `scripts/vendor.json`: `vendor-updates` bumps them (`npm run vendor:bump -- <jre|karate>` by hand).
 
 ## Subagents
 
@@ -133,4 +142,4 @@ Full detail: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#
 - Exit codes: `0` pass, `1` test failures (also after `taskkill`), `2` usage error, `3` parse or runtime error (one broken feature aborts the whole run). A missing path, unknown `-e` or unmatched `-n` exit `0` silently: preflight with a dry run and warn on 0 scenarios.
 - On Windows, cancel with `taskkill /PID <pid> /T /F` and record "cancelled" in the app. `child.kill()` leaves the JVM running when spawned through a shell or launcher.
 - HTTP request/response detail exists only as text in step logs inside `FEATURE_EXIT`. OSS Karate v2 has no debug server. Live step and HTTP events need our own Java `RunListener` passed with `--listener`.
-- The HTTP inspector (F11) parses that step-log text in `src/main/karate/http.ts`; the text is Karate's, not a contract. After any Karate version change, run `npm run fixtures` to re-record `test/fixtures/events/` (including `run-http*.jsonl`), check the recordings still hold the http sample project's calls (spec `docs/specs/2026-10-25-http-inspector.md`, Acceptance criteria), and keep `src/main/karate/http.test.ts` green.
+- The HTTP inspector (F11) parses that step-log text in `src/main/karate/http.ts`; the text is Karate's, not a contract. After any Karate version change, run `npm run fixtures` to re-record `test/fixtures/events/` (including `run-http*.jsonl`), check the recordings still hold the http sample project's calls (spec `docs/specs/2026-10-25-http-inspector.md`, Acceptance criteria), and keep `src/main/karate/http.test.ts` green. The `vendor-updates` bump PR re-records them on its own.

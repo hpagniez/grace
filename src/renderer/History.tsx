@@ -108,6 +108,7 @@ export function History(props: { state: AppState; api: Api }) {
             <tr>
               <th class={th}>When</th>
               <th class={th}>Env</th>
+              <th class={th}>Threads</th>
               <th class={th}>Tags</th>
               <th class={th}>What ran</th>
               <th class={th}>Result</th>
@@ -132,6 +133,9 @@ export function History(props: { state: AppState; api: Api }) {
                     </td>
                     <td data-testid="history-env" class={td}>
                       {run.env ?? "—"}
+                    </td>
+                    <td data-testid="history-threads" class={td}>
+                      {run.threads ?? "—"}
                     </td>
                     <td data-testid="history-tags" class={td}>
                       <Show when={filterOn(run.filter)} fallback="—">

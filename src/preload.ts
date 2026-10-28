@@ -10,12 +10,16 @@ const api: Api = {
   cancel: () => ipcRenderer.invoke(CH.cancel),
   openReport: () => ipcRenderer.invoke(CH.report),
   setFilter: (f) => ipcRenderer.invoke(CH.filter, f),
+  setThreads: (n) => ipcRenderer.invoke(CH.threads, n),
   setEnv: (name) => ipcRenderer.invoke(CH.env, name),
   saveProperties: (edit) => ipcRenderer.invoke(CH.properties, edit),
   rerun: (id) => ipcRenderer.invoke(CH.rerun, id),
   rerunFailed: (id) => ipcRenderer.invoke(CH.rerunFailed, id),
   openRunReport: (id) => ipcRenderer.invoke(CH.runReport, id),
   clearHistory: () => ipcRenderer.invoke(CH.clearHistory),
+  openRecent: (root) => ipcRenderer.invoke(CH.openRecent, root),
+  removeRecent: (root) => ipcRenderer.invoke(CH.removeRecent, root),
+  closeProject: () => ipcRenderer.invoke(CH.close),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

@@ -1,7 +1,8 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
+import { validThreads } from "../shared/threads";
 
 const file = (dataDir: string) => path.join(dataDir, "settings.json");
 
@@ -34,17 +35,109 @@ function read(dataDir: string): Record<string, unknown> {
     : {};
 }
 
-/** Read-modify-write, so one key never drops the others. */
+/**
+ * Read-modify-write, so one key never drops the others. Written to a temp file, flushed, then renamed
+ * over the old one: a save cut off by a crash or a power loss leaves the old file whole.
+ */
 function update(dataDir: string, change: (s: Record<string, unknown>) => void): void {
   const settings = read(dataDir);
   change(settings);
   mkdirSync(dataDir, { recursive: true });
-  writeFileSync(file(dataDir), JSON.stringify(settings));
+  const tmp = `${file(dataDir)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(settings), { flush: true });
+  renameSync(tmp, file(dataDir));
 }
 
-export function saveLastProject(dataDir: string, root: string): void {
+/** How many project folders the recent list keeps. */
+export const RECENT_LIMIT = 10;
+
+/** Two paths are the same folder when they resolve alike, ignoring case (Windows) and a trailing separator. */
+const sameFolder = (a: string, b: string) =>
+  path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/** The absolute paths of a saved list, newest first, one per folder, at most RECENT_LIMIT; anything else is dropped. */
+function parseRecent(x: unknown): string[] {
+  const kept: string[] = [];
+  if (!Array.isArray(x)) return kept;
+  for (const p of x) {
+    if (kept.length === RECENT_LIMIT) break;
+    if (typeof p === "string" && path.isAbsolute(p) && !kept.some((k) => sameFolder(k, p)))
+      kept.push(p);
+  }
+  return kept;
+}
+
+/** The recent project folders, newest first, as saved (they may no longer exist). `[]` if none or the file cannot be read. Never throws. */
+export function loadRecentProjects(dataDir: string): string[] {
+  try {
+    return parseRecent(read(dataDir).recentProjects);
+  } catch {
+    return [];
+  }
+}
+
+/** Saves `root` as the last project and moves it to the top of the recent list. Throws if the file cannot be saved. */
+export function saveOpenedProject(dataDir: string, root: string): void {
   update(dataDir, (s) => {
     s.lastProject = root;
+    s.recentProjects = [
+      root,
+      ...parseRecent(s.recentProjects).filter((p) => !sameFolder(p, root)),
+    ].slice(0, RECENT_LIMIT);
+  });
+}
+
+/** Drops `root` from the recent list, and from lastProject if that is the same folder. Throws if the file cannot be saved. */
+export function removeRecentProject(dataDir: string, root: string): void {
+  update(dataDir, (s) => {
+    s.recentProjects = parseRecent(s.recentProjects).filter((p) => p !== root);
+    if (typeof s.lastProject === "string" && sameFolder(s.lastProject, root)) delete s.lastProject;
+  });
+}
+
+/** Forgets the last project, so the next start shows the home screen. Throws if the file cannot be saved. */
+export function forgetLastProject(dataDir: string): void {
+  update(dataDir, (s) => {
+    delete s.lastProject;
+  });
+}
+
+/** The window's normal-state bounds and whether it was maximized. */
+export interface WindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+}
+
+/** The saved window state, or null if none is saved, it is malformed or the file cannot be read. Never throws. */
+export function loadWindowState(dataDir: string): WindowState | null {
+  try {
+    const { window: w } = read(dataDir);
+    if (!isObject(w)) return null;
+    const { x, y, width, height, maximized } = w;
+    const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+    return finite(x) &&
+      finite(y) &&
+      finite(width) &&
+      finite(height) &&
+      width > 0 &&
+      height > 0 &&
+      typeof maximized === "boolean"
+      ? { x, y, width, height, maximized }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveWindowState(
+  dataDir: string,
+  { x, y, width, height, maximized }: WindowState,
+): void {
+  update(dataDir, (s) => {
+    s.window = { x, y, width, height, maximized };
   });
 }
 
@@ -155,6 +248,23 @@ export function loadProjectEnv(dataDir: string, root: string): EnvSettings {
   } catch {
     return emptyEnvSettings();
   }
+}
+
+/** The saved thread count of a project; 1 if none is saved, it is malformed or the file cannot be read. Never throws. */
+export function loadProjectThreads(dataDir: string, root: string): number {
+  try {
+    const entry = savedEntry(dataDir, root);
+    const threads = isObject(entry) ? entry.threads : null;
+    return validThreads(threads) ? threads : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function saveProjectThreads(dataDir: string, root: string, n: number): void {
+  updateEntry(dataDir, root, (e) => {
+    e.threads = n;
+  });
 }
 
 /** The rows of a saved list that the rules of today reject, as written. */

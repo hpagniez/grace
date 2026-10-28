@@ -11,12 +11,16 @@ export const CH = {
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
+  threads: "threads:set",
   env: "env:set",
   properties: "properties:save",
   rerun: "history:rerun",
   rerunFailed: "history:rerunFailed",
   runReport: "history:report",
   clearHistory: "history:clear",
+  openRecent: "recent:open",
+  removeRecent: "recent:remove",
+  close: "project:close",
   event: "app:event",
 } as const;
 
@@ -28,6 +32,7 @@ export interface Api {
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
+  setThreads(n: number): Promise<void>;
   setEnv(name: string | null): Promise<void>;
   /** True once main applied the edit; false if it refused it (a notice says why). */
   saveProperties(edit: PropertiesEdit): Promise<boolean>;
@@ -36,5 +41,10 @@ export interface Api {
   rerunFailed(id: string): Promise<void>;
   openRunReport(id: string): Promise<void>;
   clearHistory(): Promise<void>;
+  /** Both send a folder as saved in the recent list; main refuses any other. */
+  openRecent(root: string): Promise<void>;
+  removeRecent(root: string): Promise<void>;
+  /** Closes the open project and goes back to the home screen. */
+  closeProject(): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }

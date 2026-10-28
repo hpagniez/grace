@@ -7,6 +7,7 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: "assets/icon", // .ico on Windows, embedded in Grace.exe
     extraResource: ["vendor/jre", "vendor/karate.jar", "vendor/licenses"],
   },
   rebuildConfig: {},

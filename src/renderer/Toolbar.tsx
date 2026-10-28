@@ -4,6 +4,7 @@ import { matchingLeaves } from "../shared/tags";
 import { btn, primary } from "./buttons";
 import { EnvPicker } from "./EnvPicker";
 import { PropertiesDialog } from "./PropertiesDialog";
+import { Threads } from "./Threads";
 
 const LAYOUT_LABEL = { maven: "Maven", gradle: "Gradle", standalone: "Standalone" } as const;
 
@@ -14,17 +15,22 @@ export function Toolbar(props: { state: AppState; api: Api }) {
     !busy() &&
     !!props.state.tree &&
     matchingLeaves(props.state.tree, props.state.filter).length > 0;
+  const path = () => props.state.project?.root ?? props.state.opening ?? "No project";
   const newest = () => props.state.history[0]; // main sends the newest run first
   const failedCount = () => newest()?.failed ?? 0;
   return (
     <header class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
+      <button
+        data-testid="home-button"
+        class={btn}
+        disabled={busy()}
+        onClick={() => void props.api.closeProject()}
+      >
+        Home
+      </button>
       <div class="flex min-w-0 flex-1 items-baseline gap-2">
-        <span
-          data-testid="project-path"
-          class="truncate font-mono text-sm"
-          title={props.state.project?.root}
-        >
-          {props.state.project?.root ?? "No project"}
+        <span data-testid="project-path" class="truncate font-mono text-sm" title={path()}>
+          {path()}
         </span>
         <span
           data-testid="project-layout"
@@ -34,6 +40,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         </span>
       </div>
       <EnvPicker state={props.state} api={props.api} />
+      <Threads state={props.state} api={props.api} />
       <PropertiesDialog state={props.state} api={props.api} />
       <button
         data-testid="open-button"

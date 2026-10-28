@@ -13,7 +13,7 @@ import {
   type RowView,
 } from "../shared/env";
 import type { AppEvent, Project } from "../shared/events";
-import type { RunRecord, StoredTest } from "../shared/history";
+import { toEntry, type RunRecord, type StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import {
   matches,
@@ -23,13 +23,17 @@ import {
   pruneFilter,
   type FilterState,
 } from "../shared/tags";
+import { THREADS_ERROR, validThreads } from "../shared/threads";
+import { projectFingerprint } from "./fingerprint";
+import { findFlaky } from "./flaky";
 import {
   clearHistory as removeRuns,
   createRunDir,
-  listHistory,
+  listRuns,
   pruneHistory,
   readRunRecord,
   writeRunRecord,
+  type ListedRun,
 } from "./history";
 import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import { buildArgs, detectLayout, lineTargets, selectionTargets, tagArgs } from "./karate/command";
@@ -46,13 +50,20 @@ import {
   rowLines,
 } from "./karate/tree";
 import { makeMasker, maskEvent } from "./mask";
+import { recentSender } from "./recent";
 import type { SecretBox } from "./secrets";
 import {
   emptyEnvSettings,
+  forgetLastProject,
   loadProjectEnv,
   loadProjectFilter,
+  loadProjectThreads,
+  loadRecentProjects,
+  removeRecentProject,
+  saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
+  saveProjectThreads,
   skippedProperties,
   type EnvSettings,
   type StoredLists,
@@ -115,25 +126,32 @@ function storedTests(leaves: TestNode[], results: ReturnType<RunState["results"]
 }
 
 /**
- * Owns the project, its test tree, its tag filter, its environment and run properties, and the one
- * Karate process (dry run or run) at a time.
+ * Owns the project, its test tree, its tag filter, its thread count, its environment and run
+ * properties, and the one Karate process (dry run or run) at a time.
  */
 export class Runner {
   private project: Project | null = null;
   private tree: TestNode | null = null;
   private last: Extract<AppEvent, { type: "project" }> | null = null;
   private filter: FilterState = { ...NO_FILTER, include: [], exclude: [] };
+  private threads = 1;
   private envs: EnvSettings = emptyEnvSettings();
   /** Environments of overlay files and env tags, scanned at each discovery of open, refresh and setEnv. */
   private overlays: string[] = [];
   private tagEnvs: string[] = [];
   private busy = false;
+  /** The folder `open` is discovering, for a second request of it to be ignored and for `replay`. */
+  private opening: string | null = null;
   /** The operation `guarded` is running, for `dispose` to wait on. */
   private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
   private cancelled = false;
+  /** Set by `dispose` alone (`cancel` leaves it): the app is quitting, so a run skips its second walk. */
+  private disposing = false;
   private report: string | null = null;
   private readonly pidFile: string;
+  /** Checks the saved recent list and emits it as a `recent` event; main calls it after the `ready` replay. */
+  readonly sendRecent: () => Promise<void>;
 
   constructor(
     private readonly o: {
@@ -142,12 +160,18 @@ export class Runner {
       secrets: SecretBox;
       emit: (e: AppEvent) => void;
       pollMs?: number;
+      /** A test seam; the default is `projectFingerprint`. */
+      fingerprint?: (root: string) => Promise<string | null>;
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
+    this.sendRecent = recentSender(() => loadRecentProjects(o.dataDir), o.emit);
   }
 
-  /** True only if the folder is now the open project. */
+  /**
+   * True only if the folder is now the open project, which is then saved first in the recent list and
+   * as the last project. Sends `opening` around the discovery and the recent list after it.
+   */
   async open(root: string): Promise<boolean> {
     let opened = false;
     await this.guarded(async () => {
@@ -162,27 +186,95 @@ export class Runner {
         });
         return;
       }
-      const report = this.report;
-      this.report = null; // a report of the project open before
-      const skipped = skippedProperties(this.o.dataDir, root);
-      opened = await this.rediscover(
-        { root, layout: detectLayout(root).layout },
-        loadProjectFilter(this.o.dataDir, root),
-        loadProjectEnv(this.o.dataDir, root),
-      );
-      if (!opened) this.report = report;
-      else if (skipped.length)
-        this.o.emit({
-          type: "notice",
-          message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
-        });
+      this.opening = root;
+      this.o.emit({ type: "opening", root });
+      try {
+        const report = this.report;
+        this.report = null; // a report of the project open before
+        const skipped = skippedProperties(this.o.dataDir, root);
+        opened = await this.rediscover(
+          { root, layout: detectLayout(root).layout },
+          loadProjectFilter(this.o.dataDir, root),
+          loadProjectEnv(this.o.dataDir, root),
+          loadProjectThreads(this.o.dataDir, root),
+        );
+        if (!opened) this.report = report;
+        else {
+          if (skipped.length)
+            this.o.emit({
+              type: "notice",
+              message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
+            });
+          try {
+            saveOpenedProject(this.o.dataDir, root);
+          } catch (err) {
+            this.recentNotice(err);
+          }
+        }
+      } finally {
+        this.opening = null;
+        this.o.emit({ type: "opening", root: null });
+      }
     });
+    void this.sendRecent();
     return opened;
+  }
+
+  /** Opens a folder of the recent list; refused if not listed, ignored while it is the one being opened. */
+  async openRecent(root: string): Promise<void> {
+    if (this.busy && this.opening === path.resolve(root)) return;
+    if (!loadRecentProjects(this.o.dataDir).includes(root)) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await this.open(root);
+  }
+
+  /** Drops a folder of the recent list; refused if not listed. Allowed while busy: it touches only settings.json. */
+  removeRecent(root: string): void {
+    if (!loadRecentProjects(this.o.dataDir).includes(root)) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    try {
+      removeRecentProject(this.o.dataDir, root);
+    } catch (err) {
+      this.recentNotice(err);
+      return;
+    }
+    void this.sendRecent();
+  }
+
+  /** Back to the home screen: forgets the project and its state in memory, not its saved settings. Refused while busy. */
+  close(): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      return;
+    }
+    this.project = this.tree = this.last = this.report = null;
+    this.filter = { ...NO_FILTER, include: [], exclude: [] };
+    this.threads = 1;
+    this.envs = emptyEnvSettings();
+    this.overlays = [];
+    this.tagEnvs = [];
+    this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
+    try {
+      forgetLastProject(this.o.dataDir);
+    } catch (err) {
+      // after the project event: the window clears its notice on every project event
+      this.o.emit({
+        type: "notice",
+        message: `The last project could not be forgotten: ${(err as Error).message}`,
+      });
+    }
+    void this.sendRecent();
   }
 
   async refresh(): Promise<void> {
     if (this.project)
-      await this.guarded(() => this.rediscover(this.project!, this.filter, this.envs));
+      await this.guarded(() =>
+        this.rediscover(this.project!, this.filter, this.envs, this.threads),
+      );
   }
 
   /**
@@ -212,6 +304,34 @@ export class Runner {
     if (!this.project) return;
     this.storeFilter({ ...f, include: [...f.include], exclude: [...f.exclude] });
     this.sendFilter();
+  }
+
+  /**
+   * Refused while busy or for anything but a whole number from 1 to 32 (the count in force is
+   * re-sent); ignored with no project. Applied even if it cannot be saved, as the filter is.
+   */
+  setThreads(n: unknown): void {
+    if (this.busy) {
+      this.o.emit({ type: "notice", message: BUSY });
+      this.sendThreads();
+      return;
+    }
+    if (!this.project) return;
+    if (!validThreads(n)) {
+      this.o.emit({ type: "notice", message: THREADS_ERROR });
+      this.sendThreads();
+      return;
+    }
+    this.threads = n;
+    try {
+      saveProjectThreads(this.o.dataDir, this.project.root, n);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `The thread count could not be saved: ${(err as Error).message}`,
+      });
+    }
+    this.sendThreads();
   }
 
   /**
@@ -303,7 +423,7 @@ export class Runner {
     // the toolbar Report stays: reportPath() checks the file, which a held folder can keep
     if (!removeRuns(this.projectDir()))
       this.o.emit({ type: "notice", message: "Some runs could not be deleted" });
-    this.o.emit(this.historyEvent());
+    this.sendHistory();
   }
 
   /** The report of a listed run of the open project (R4); null if it has none. Never takes a path. */
@@ -330,20 +450,24 @@ export class Runner {
 
   /** What a window that just loaded needs: events sent before it subscribed are lost. */
   replay(): AppEvent[] {
+    const opening: AppEvent = { type: "opening", root: this.opening };
     const busy: AppEvent = { type: "busy", busy: this.busy };
     return this.last
       ? [
           this.last,
           { type: "filter", filter: this.filter },
+          { type: "threads", count: this.threads },
           this.envEvent(),
-          this.historyEvent(),
+          ...this.historyEvents(),
+          opening,
           busy,
         ]
-      : [busy];
+      : [opening, busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
   async dispose(): Promise<void> {
+    this.disposing = true;
     this.cancelled = true;
     // The kill ends the run's process; the run then writes its record before `running` settles.
     await within(Promise.allSettled([this.proc?.kill(), this.running]), 10_000);
@@ -353,10 +477,22 @@ export class Runner {
   private publish(e: Extract<AppEvent, { type: "project" }>) {
     this.last = e;
     this.o.emit(e);
+    this.o.emit(this.flakyEvent(this.listed())); // the marks follow the tree that is shown
+  }
+
+  private recentNotice(err: unknown) {
+    this.o.emit({
+      type: "notice",
+      message: `The recent list could not be saved: ${(err as Error).message}`,
+    });
   }
 
   private sendFilter() {
     this.o.emit({ type: "filter", filter: this.filter });
+  }
+
+  private sendThreads() {
+    this.o.emit({ type: "threads", count: this.threads });
   }
 
   /** The plain value of a saved secret; null if it cannot be decrypted or Java cannot take it exactly. */
@@ -400,9 +536,26 @@ export class Runner {
     };
   }
 
-  /** The open project's runs, newest first; none with no project. */
-  private historyEvent(): AppEvent {
-    return { type: "history", runs: this.project ? listHistory(this.projectDir()) : [] };
+  /** The open project's listed runs, newest first; none with no project. */
+  private listed(): ListedRun[] {
+    return this.project ? listRuns(this.projectDir()) : [];
+  }
+
+  private flakyEvent(runs: ListedRun[]): AppEvent {
+    return { type: "flaky", tests: findFlaky(runs, this.tree) };
+  }
+
+  /** `history`, then `flaky`, from one read of the runs. */
+  private historyEvents(): AppEvent[] {
+    const runs = this.listed();
+    return [
+      { type: "history", runs: runs.map((r) => toEntry(r.id, r.record, r.reportAvailable)) },
+      this.flakyEvent(runs),
+    ];
+  }
+
+  private sendHistory() {
+    for (const e of this.historyEvents()) this.o.emit(e);
   }
 
   /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
@@ -437,14 +590,16 @@ export class Runner {
 
   /**
    * Discovery of open, refresh and setEnv with `envs`, then `filter` without the tags the new tree
-   * lacks (a failed dry run drops nothing), then `environment`. `envs` replaces the environment only
-   * once the discovery succeeded, so nothing shows or uses it before. Cancel puts the project and tree
-   * from before back and re-sends them, the filter, which it leaves unchanged, and the environment.
+   * lacks (a failed dry run drops nothing), then `threads`, then `environment`. `envs` and `threads`
+   * replace those in force only once the discovery succeeded, so nothing shows or uses them before.
+   * Cancel puts the project and tree from before back and re-sends them, the filter and the thread
+   * count, which it leaves unchanged, and the environment.
    */
   private async rediscover(
     project: Project,
     filter: FilterState,
     envs: EnvSettings,
+    threads: number,
   ): Promise<boolean> {
     const before = { project: this.project, tree: this.tree };
     this.project = project;
@@ -459,6 +614,7 @@ export class Runner {
     if (!this.cancelled) {
       this.envs = envs;
       this.filter = filter;
+      this.threads = threads;
       const pruned = tree && pruneFilter(filter, projectTags(tree));
       if (
         pruned &&
@@ -467,18 +623,20 @@ export class Runner {
       )
         this.storeFilter(pruned);
       this.sendFilter();
+      this.sendThreads();
       const { classpath, featureRoots } = detectLayout(project.root);
       this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
-      this.o.emit(this.historyEvent());
+      this.sendHistory();
       return true;
     }
     ({ project: this.project, tree: this.tree } = before);
     this.o.emit(this.last ?? { type: "project", project: null, tree: null, error: null });
     this.sendFilter();
+    this.sendThreads();
     this.o.emit(this.envEvent());
-    this.o.emit(this.historyEvent());
+    this.sendHistory();
     this.o.emit({ type: "notice", message: "Cancelled" });
     return false;
   }
@@ -489,7 +647,7 @@ export class Runner {
    */
   private async switchEnv(env: string | null, filter: FilterState): Promise<boolean> {
     const envs = { ...this.envs, env };
-    if (!(await this.rediscover(this.project!, filter, envs))) return false;
+    if (!(await this.rediscover(this.project!, filter, envs, this.threads))) return false;
     this.report = null; // a result from another environment
     try {
       saveProjectEnv(this.o.dataDir, this.project!.root, envs);
@@ -524,6 +682,7 @@ export class Runner {
     onLines: (l: string[]) => void,
     argFile: string | null,
     filter: FilterState, // required: a run that forgot it would run unfiltered
+    threads: number, // required: a run that forgot it would run on one thread
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
@@ -540,6 +699,7 @@ export class Runner {
       tags,
       env,
       argFile,
+      threads,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
@@ -564,6 +724,7 @@ export class Runner {
         (l) => lines.push(...l),
         null,
         NO_FILTER,
+        this.threads, // buildArgs passes 1 on a dry run
       );
       const code = await proc.exit;
       this.proc = null;
@@ -666,7 +827,7 @@ export class Runner {
     if (!tree) return;
     const notice = (message: string) => this.o.emit({ type: "notice", message });
     const { root } = this.project!;
-    const run = { tree, filter, env, props };
+    const run = { tree, filter, threads: this.threads, env, props };
 
     if ("tests" in target) {
       // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
@@ -738,12 +899,22 @@ export class Runner {
     targets: string[];
     targetFile: boolean;
     filter: FilterState;
+    threads: number;
     env: string | null;
     props: { rows: PlainRow[]; secrets: string[] };
     selection: TestNode | null;
     failedOf: number | null;
   }): Promise<void> {
-    const { tree, leaves, filter, env, props, selection, failedOf } = o;
+    const { tree, leaves, filter, threads, env, props, selection, failedOf } = o;
+    const { root } = this.project!;
+    const walk = this.o.fingerprint ?? projectFingerprint;
+    // A file saved while Java runs could be what made a test flip: the run keeps its fingerprint
+    // only if the walk after the run finds what this one does (F15).
+    const before = await walk(root);
+    if (this.cancelled) {
+      this.o.emit({ type: "notice", message: "Run cancelled" });
+      return;
+    }
     this.report = null;
     const projectDir = this.projectDir();
     const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
@@ -762,15 +933,23 @@ export class Runner {
         tree,
         leaves.map((n) => n.key),
       );
-      /** Writes run.json (R2), applies retention and sends `history`. A failure is a notice: it must not replace the run's outcome. */
-      const store = (done: Extract<AppEvent, { type: "runFinished" }>) => {
-        ended = true;
+      /**
+       * Writes run.json (R2), applies retention and sends `history`; the run lasted until `endedAt`. A
+       * failure is a notice: it must not replace the run's outcome.
+       */
+      const store = (
+        done: Extract<AppEvent, { type: "runFinished" }>,
+        fingerprint: string | null,
+        endedAt: number,
+      ) => {
         try {
           const record: RunRecord = {
             version: 1,
             startedAt,
-            durationMillis: Date.now() - startedAt,
+            durationMillis: endedAt - startedAt,
             env,
+            threads,
+            fingerprint,
             filter,
             selection: selection && {
               kind: selection.kind,
@@ -786,7 +965,7 @@ export class Runner {
           };
           writeRunRecord(outDir, record);
           pruneHistory(projectDir);
-          this.o.emit(this.historyEvent());
+          this.sendHistory();
         } catch (err) {
           emit({
             type: "notice",
@@ -795,16 +974,19 @@ export class Runner {
         }
       };
       const report = path.join(outDir, "karate-summary.html");
-      /** Sends the end events, then stores the run. An exit code of null forces outcome 'failed'. */
+      /** Sends the end events and returns `runFinished`, for `store`. An exit code of null forces outcome 'failed'. */
       const end = (code: number | null, cancelled: boolean) => {
+        ended = true;
+        let done: Extract<AppEvent, { type: "runFinished" }> | undefined;
         for (let e of state.finish(code, cancelled, false)) {
           if (e.type === "runFinished") {
             this.report = e.outcome === "finished" && existsSync(report) ? report : null;
             e = { ...e, reportAvailable: this.report !== null };
-            emit(e);
-            store(e);
-          } else emit(e);
+            done = e;
+          }
+          emit(e);
         }
+        return done!;
       };
       const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
       const proc = this.spawn(
@@ -815,6 +997,7 @@ export class Runner {
         (lines) => emit({ type: "console", lines }),
         argFile,
         filter,
+        threads,
       );
       try {
         if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
@@ -822,7 +1005,7 @@ export class Runner {
         // without the pid file a crash of the app would leave this JVM running: do not run
         await proc.kill();
         this.proc = null;
-        end(null, false);
+        store(end(null, false), null, Date.now());
         emit({ type: "notice", message: (err as Error).message });
         return;
       }
@@ -850,12 +1033,20 @@ export class Runner {
       };
       const timer = setInterval(poll, this.o.pollMs ?? 100);
       const code = await proc.exit;
+      const exitedAt = Date.now(); // the run's end: the walk below is not part of its duration
       clearInterval(timer);
       poll();
       this.proc = null;
       rmSync(this.pidFile, { force: true });
 
-      end(fatal ? null : code, this.cancelled && !fatal);
+      // Taken before the walk: a Cancel clicked during it must not turn a finished run into a cancelled one.
+      const cancelled = this.cancelled && !fatal;
+      // The walk comes before the end events: the window shows idle at `runFinished`, and a run is refused while we hold busy.
+      // A dispose is quitting the app, and a first walk that gave null leaves nothing to compare: no second walk.
+      // A walk that rejects (a test seam only) reads as null.
+      const after = this.disposing || before === null ? null : await walk(root).catch(() => null);
+      const done = end(fatal ? null : code, cancelled);
+      store(done, before === after ? before : null, exitedAt);
       if (fatal) emit({ type: "notice", message: fatal.message });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node

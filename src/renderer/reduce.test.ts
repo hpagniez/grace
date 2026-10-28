@@ -44,6 +44,7 @@ const entry = (id: string, over: Partial<HistoryEntry> = {}): HistoryEntry => ({
   startedAt: 1000,
   durationMillis: 2000,
   env: null,
+  threads: 1,
   filter: { include: [], exclude: [], hideNonMatching: false },
   selection: null,
   failedOf: null,
@@ -439,5 +440,66 @@ describe("reduce", () => {
     const s = initialState();
     apply(s, { type: "notice", message: "hi" });
     expect(s.notice).toBe("hi");
+  });
+
+  describe("home screen", () => {
+    it("starts not loaded, with nothing opening and no list", () => {
+      const s = initialState();
+      expect([s.loaded, s.opening, s.recent]).toEqual([false, null, null]);
+    });
+
+    it("an opening event sets opening and loaded, and null clears opening", () => {
+      const s = initialState();
+      apply(s, { type: "opening", root: "D:/p" });
+      expect([s.opening, s.loaded]).toEqual(["D:/p", true]);
+      apply(s, { type: "opening", root: null });
+      expect([s.opening, s.loaded]).toEqual([null, true]);
+    });
+
+    it("opening a folder with no project open drops the last open's error", () => {
+      const s = initialState();
+      apply(s, { type: "project", project: null, tree: null, error: "Folder not found: D:/x" });
+      apply(s, { type: "opening", root: null });
+      expect(s.error).toBe("Folder not found: D:/x");
+      apply(s, { type: "opening", root: "D:/p" });
+      expect(s.error).toBeNull();
+    });
+
+    it("opening another folder keeps the open project's error", () => {
+      const s = initialState();
+      apply(s, { ...(project(null) as Extract<AppEvent, { type: "project" }>), error: "syntax" });
+      apply(s, { type: "opening", root: "D:/q" });
+      expect(s.error).toBe("syntax");
+    });
+
+    it("a project event sets loaded, even a null project", () => {
+      const s = initialState();
+      apply(s, { type: "project", project: null, tree: null, error: null });
+      expect(s.loaded).toBe(true);
+    });
+
+    it("a recent event stores the entries", () => {
+      const s = initialState();
+      const entries = [
+        { path: "D:\\work\\api", exists: true },
+        { path: "E:\\usb\\old", exists: false },
+      ];
+      apply(s, { type: "recent", entries });
+      expect(s.recent).toEqual(entries);
+    });
+
+    it("a null project empties the console", () => {
+      const s = initialState();
+      apply(s, project(), { type: "console", lines: ["a", "b"] });
+      apply(s, { type: "project", project: null, tree: null, error: null });
+      expect(s.console).toEqual([]);
+    });
+
+    it("a project for another folder keeps the console", () => {
+      const s = initialState();
+      apply(s, project(), { type: "console", lines: ["a"] });
+      apply(s, { ...(project() as Extract<AppEvent, { type: "project" }>), project: other });
+      expect(s.console).toEqual(["a"]);
+    });
   });
 });
