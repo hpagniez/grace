@@ -39,6 +39,10 @@ test("A first start shows the home screen", async () => {
   await expect(win.getByRole("heading", { level: 1 })).toHaveText("Open a Karate project");
   await expect(win.getByText("Pick a folder, or reopen one you used before.")).toBeVisible();
   await expect(win.getByTestId("open-button")).toHaveText("Open folder…");
+  const mascot = win.getByTestId("mascot");
+  await expect(mascot).toBeVisible();
+  // loaded, so the CSP let it through
+  await expect.poll(() => mascot.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(400);
   await expect(win.getByText("Recent folders")).toHaveCount(0);
   for (const id of [
     "recent-list",
