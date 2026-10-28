@@ -76,6 +76,8 @@ const createWindow = (dataDir: string) => {
     minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
     show: false, // shown once painted, so it never flashes white
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#18181b" : "#ffffff", // the app root's two backgrounds
+    // packaged, the window takes Grace.exe's icon; from source it would get electron.exe's
+    ...(app.isPackaged ? {} : { icon: path.join(app.getAppPath(), "assets", "icon.ico") }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
