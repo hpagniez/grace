@@ -39,12 +39,14 @@ jobs:
           skip() { echo "::notice::not merging #$PR: $1"; exit 0; }
           [ -n "$PR" ] || skip "no PR in this event"
           pr=$(gh api "repos/$GH_REPO/pulls/$PR" \
-            --jq '"\(.state) \(.draft) \(.base.ref) \(any(.labels[]; .name == "merge-when-green")) \(.head.sha) \(.head.ref)"')
-          read -r state draft base labelled sha head <<<"$pr"
+            --jq '"\(.state) \(.draft) \(.base.ref) \(any(.labels[]; .name == "merge-when-green")) \(.head.repo.full_name != .base.repo.full_name) \(.head.sha) \(.head.ref)"')
+          read -r state draft base labelled fork sha head <<<"$pr"
           [ "$state" = open ] || skip "it is not open"
           [ "$draft" = false ] || skip "it is a draft"
           [ "$base" = develop ] || skip "it does not target develop"
           [ "$labelled" = true ] || skip "it has no merge-when-green label"
+          # the label stays when new commits come in, and a fork's author can push, then mark the PR ready (ADR 0018)
+          [ "$fork" = false ] || skip "it comes from a fork"
 
           # a release/* or hotfix/* merge back into develop runs no CI of its own (its runs are skipped):
           # the same head must have passed checks and test, e2e included, on its PR into main
