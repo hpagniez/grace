@@ -19,6 +19,7 @@ import {
   until,
   projectDir,
   javaCommandLines,
+  holdSlow,
   folders,
   recordFile,
   record,
@@ -327,6 +328,7 @@ describe("Runner history", () => {
   it("rerunFailed passes its targets in a file", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");
+    const release = holdSlow(root);
     await runner.open(root);
     const slow = byName(last("project").tree!, "slow");
     const [id] = seed(dataDir, root, 1, {
@@ -343,6 +345,7 @@ describe("Runner history", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(`@${file}`);
     expect(lines[0]).not.toContain("env.feature");
+    release();
     await run;
     expect(last("runFinished").outcome).toBe("finished");
     expect(last("runStarted").keys).toEqual([slow.key]);
