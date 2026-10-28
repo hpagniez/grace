@@ -64,9 +64,9 @@ jobs:
             done <<<"$files"
           else
             [ "$conclusion" = success ] || skip "test is not green on $sha"
-            # a run started while the PR was a draft skipped e2e
-            e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e")][0].conclusion')
-            [ "$e2e" = success ] || skip "e2e has not passed on $sha"
+            # every e2e shard must pass; a run started while the PR was a draft skipped them
+            e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e") | .conclusion] | length > 0 and all(. == "success")')
+            [ "$e2e" = true ] || skip "e2e has not passed on $sha"
           fi
 
           # --match-head-commit refuses the merge if a push landed after these checks
