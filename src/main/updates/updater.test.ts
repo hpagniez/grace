@@ -150,6 +150,32 @@ describe("startup", () => {
     expect(ofType("updatePrompt")).toEqual([]);
   });
 
+  it("auto-update waits for the Runner to be idle, then installs", async () => {
+    saveSettings({ autoUpdate: true });
+    let polls = 0;
+    await make({ isBusy: () => ++polls < 3, idlePollMs: 1 }).startup(null);
+    expect(polls).toBeGreaterThanOrEqual(3);
+    expect(startSwitch).toHaveBeenCalledWith(expect.objectContaining({ to: "1.0.0-rc.6" }));
+    expect(notices()).toEqual([]);
+  });
+
+  it("auto-update prompts instead when the Runner stays busy", async () => {
+    saveSettings({ autoUpdate: true });
+    busy = true;
+    await make({ idlePollMs: 1, idleWaitMs: 20 }).startup(null);
+    expect(ofType("updatePrompt").map((e) => e.release.version)).toEqual(["1.0.0-rc.6"]);
+    expect(download).not.toHaveBeenCalled();
+    expect(notices()).toEqual([]);
+  });
+
+  it("auto-update prompts instead in a build that is not packaged (R13.1)", async () => {
+    saveSettings({ autoUpdate: true });
+    await make({ packaged: false }).startup(null);
+    expect(ofType("updatePrompt").map((e) => e.release.version)).toEqual(["1.0.0-rc.6"]);
+    expect(preflight).not.toHaveBeenCalled();
+    expect(notices()).toEqual([]);
+  });
+
   it("no auto-update right after a failed switch (R5.3)", async () => {
     saveSettings({ autoUpdate: true });
     const result: SwitchResult = {
@@ -406,6 +432,23 @@ describe("install", () => {
       unpack.mockResolvedValue();
       startSwitch.mockImplementation(() => {});
     }
+  });
+
+  it("does not hand over when a run started during the download (R6.4)", async () => {
+    download.mockImplementation(async (_url, dest) => {
+      writeZip(dest);
+      busy = true;
+    });
+    const u = await checked();
+    await u.install("1.0.0-rc.6", false);
+    expect(u.progress()).toEqual({
+      version: "1.0.0-rc.6",
+      rollback: false,
+      error: "Finish or cancel the run first",
+    });
+    expect(existsSync(staging)).toBe(false);
+    expect(startSwitch).not.toHaveBeenCalled();
+    expect(quit).not.toHaveBeenCalled();
   });
 
   it("hands over with the right plan, then quits (R8.5)", async () => {

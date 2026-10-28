@@ -2,6 +2,7 @@
 // (docs/specs/2026-10-28-app-updates.md R2, R4, R5, R8, R9.3).
 import { rm } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { AppEvent } from "../../shared/events";
 import {
   autoUpdateTo,
@@ -47,9 +48,13 @@ export interface UpdaterDeps {
   verify?: typeof verify;
   unpack?: typeof unpack;
   startSwitch?: typeof startSwitch;
+  /** How often, and how long, auto-update waits for the Runner to be idle. 500 ms and 120 s by default. */
+  idlePollMs?: number;
+  idleWaitMs?: number;
 }
 
 const DAMAGED = "The download was damaged. Try again, or get it from the release page.";
+const BUSY = "Finish or cancel the run first";
 const UNKNOWN = "Grace can't install that version. Check for updates and try again.";
 /** Download progress goes to the window at most this often. */
 const PROGRESS_MS = 100;
@@ -74,7 +79,17 @@ export class Updater {
   private shown: UpdateProgress | null = null;
 
   constructor(deps: UpdaterDeps) {
-    this.d = { fetchReleases, preflight, download, verify, unpack, startSwitch, ...deps };
+    this.d = {
+      fetchReleases,
+      preflight,
+      download,
+      verify,
+      unpack,
+      startSwitch,
+      idlePollMs: 500,
+      idleWaitMs: 120_000,
+      ...deps,
+    };
     this.settings = loadUpdateSettings(deps.dataDir, deps.running);
   }
 
@@ -113,7 +128,13 @@ export class Updater {
       // R5.3: never right after a failed switch, so a file held open cannot loop downloads and restarts
       const auto =
         result?.ok === false ? null : autoUpdateTo(this.releases, this.settings, running);
-      if (auto) return await this.install(auto.version, false);
+      if (auto) {
+        // a build that is not packaged never installs, and a Runner still busy after the wait (the
+        // reopen's discovery, a run) is not killed: the person then decides through the modal
+        if (this.d.packaged && (await this.idle())) return await this.install(auto.version, false);
+        this.d.emit({ type: "updatePrompt", release: auto });
+        return;
+      }
       const release = promptFor(this.releases, this.settings, running);
       if (release) this.d.emit({ type: "updatePrompt", release });
     } catch {
@@ -178,7 +199,7 @@ export class Updater {
       : !this.d.packaged
         ? "Updates install only in the packaged app"
         : this.d.isBusy()
-          ? "Finish or cancel the run first"
+          ? BUSY
           : switchRunning(installDir)
             ? "Grace is still finishing the last update. Try again in a minute."
             : null;
@@ -219,6 +240,8 @@ export class Updater {
       step("unpack");
       await this.d.unpack(zip, path.join(stagingDir, "app")).catch(named("Unpacking"));
       job.signal.throwIfAborted();
+      // quitting would kill a run started during the download
+      if (this.d.isBusy()) throw new Error(BUSY);
       const saved = listBackups(dataDir).some((b) => b.version === version);
       try {
         this.d.startSwitch({
@@ -253,6 +276,16 @@ export class Updater {
   cancel(): void {
     this.job?.abort();
     if (this.shown) this.show(null);
+  }
+
+  /** True once the Runner is idle; false if it is still busy after `idleWaitMs`. */
+  private async idle(): Promise<boolean> {
+    const deadline = Date.now() + this.d.idleWaitMs;
+    while (this.d.isBusy()) {
+      if (Date.now() >= deadline) return false;
+      await sleep(this.d.idlePollMs);
+    }
+    return true;
   }
 
   private send(): void {
