@@ -24,7 +24,7 @@ const jreAsset = (version: string, checksum: string | null = HEX) => [
     binary: {
       package: {
         name: "OpenJDK21U-jre_x64_windows_hotspot.zip",
-        link: `https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${version.replace("+", "%2B")}/OpenJDK21U-jre_x64_windows_hotspot.zip`,
+        link: `https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${version.replaceAll("+", "%2B")}/OpenJDK21U-jre_x64_windows_hotspot.zip`,
         checksum,
       },
     },
