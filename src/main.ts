@@ -198,8 +198,7 @@ app.whenReady().then(async () => {
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
   );
   const runner = new Runner({ vendor, dataDir, secrets: safeStorageBox(), emit });
-  // The Updater's notice (R10.7) and prompt (R4.1) are sent once: the window loses those sent before
-  // it subscribed, so they wait for its first `ready`. Its view and progress go out on every `ready`.
+  // The window loses events sent before it subscribes: the one-shot notice and prompt wait for `ready`.
   let held: AppEvent[] | null = [];
   const updater = new Updater({
     dataDir,
@@ -330,8 +329,7 @@ app.whenReady().then(async () => {
   removeLeftoverArgFiles(dataDir);
   removeLeftoverRuns(dataDir);
   createWindow(dataDir);
-  // never awaited: the check never delays the window or the project reopening (R2.2)
-  void updater.startup(takeResult(dataDir));
+  const result = takeResult(dataDir);
   if (app.isPackaged) void removeLeftovers(installDir);
   try {
     const last = loadLastProject(dataDir);
@@ -339,6 +337,9 @@ app.whenReady().then(async () => {
   } catch (err) {
     emit({ type: "notice", message: err instanceof Error ? err.message : String(err) });
   }
+  // After the reopen, whose project event would clear the result's notice (R10.7), and never
+  // awaited: the check delays neither the window nor the reopening (R2.2).
+  void updater.startup(result);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

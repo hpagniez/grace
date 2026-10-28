@@ -15,6 +15,25 @@ import {
 
 const rc99 = [{ version: "1.0.0-rc.99", prerelease: true }];
 
+/** A fresh userData folder holding the result of a switch to this version, as the script writes it. */
+function updatedTo(version: string): { userData: string; result: string } {
+  const userData = tempDir("kk-userdata-");
+  const result = path.join(userData, "update-result.json");
+  writeFileSync(
+    result,
+    JSON.stringify({
+      from: "1.0.0-rc.2",
+      to: version,
+      rollback: false,
+      ok: true,
+      reverted: false,
+      error: null,
+      updates: null,
+    }),
+  );
+  return { userData, result };
+}
+
 test("the status bar shows the version on every view (R3.1)", async () => {
   const { app, win } = await launch();
   await expect(win.getByTestId("home")).toBeVisible();
@@ -44,23 +63,23 @@ test("the startup check reads an http feed once, through main (R2.1)", async () 
 });
 
 test("the last switch's result shows as a notice once the window is ready (R10.7)", async () => {
-  const userData = tempDir("kk-userdata-");
-  const result = path.join(userData, "update-result.json");
-  writeFileSync(
-    result,
-    JSON.stringify({
-      from: "1.0.0-rc.2",
-      to: pkg.version,
-      rollback: false,
-      ok: true,
-      reverted: false,
-      error: null,
-      updates: null,
-    }),
-  );
+  const { userData, result } = updatedTo(pkg.version);
   const { win } = await launch(userData);
   await expect(win.getByTestId("notice")).toHaveText(`Updated to ${pkg.version}.`);
   expect(existsSync(result)).toBe(false);
+});
+
+test("the last switch's result outlasts the last project's reopening (R10.7)", async () => {
+  const dir = project("clean");
+  const { userData } = updatedTo(pkg.version);
+  writeFileSync(
+    path.join(userData, "settings.json"),
+    JSON.stringify({ lastProject: path.resolve(dir) }),
+  );
+  const { win } = await launch(userData);
+  await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
+  await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByTestId("notice")).toHaveText(`Updated to ${pkg.version}.`);
 });
 
 test("main refuses update requests with invalid arguments", async () => {
