@@ -210,7 +210,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.run.outcome = e.outcome;
       s.run.summary = e.summary;
       s.run.reportAvailable = e.reportAvailable;
-      s.busy = false; // nothing follows a run; avoids "Preparing…" until the busy event arrives
+      s.busy = false; // nothing follows a run; avoids "Finding tests…" until the busy event arrives
       break;
     case "filter":
       s.filter = e.filter;
