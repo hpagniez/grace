@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Grace's icon, 48 px and up (ADR 0013): the 1947 logbook moth, cut in two by a green strike. -->
+  <defs>
+    <clipPath id="above"><polygon points="316,-69 -62,338 -62,-69"/></clipPath>
+    <clipPath id="below"><polygon points="316,-69 -62,338 316,338"/></clipPath>
+    <g id="moth">
+      <g fill="#ece6d8">
+        <path d="M124 104 C100 92 64 80 40 84 C40 112 56 134 80 142 L124 134 Z"/>
+        <path d="M124 136 L82 146 C80 166 94 182 112 186 L126 156 Z"/>
+        <path d="M132 104 C156 92 192 80 216 84 C216 112 200 134 176 142 L132 134 Z"/>
+        <path d="M132 136 L174 146 C176 166 162 182 144 186 L130 156 Z"/>
+        <ellipse cx="128" cy="138" rx="12" ry="44"/>
+        <circle cx="128" cy="92" r="12"/>
+        <ellipse cx="106" cy="68" rx="20" ry="6" transform="rotate(38 106 68)"/>
+        <ellipse cx="150" cy="68" rx="20" ry="6" transform="rotate(-38 150 68)"/>
+      </g>
+      <g fill="#c9bfa8">
+        <circle cx="76" cy="106" r="8"/>
+        <circle cx="180" cy="106" r="8"/>
+      </g>
+    </g>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#151821"/>
+  <g clip-path="url(#above)"><use href="#moth" transform="translate(-4 -4)"/></g>
+  <g clip-path="url(#below)"><use href="#moth" transform="translate(4 4)"/></g>
+  <!-- tapered: thin where the strike comes from, thick where it lands -->
+  <polygon points="212,48 208,44 39.4,215.9 52.6,228.1" fill="#3fcf6e"/>
+  <circle cx="46" cy="222" r="9" fill="#3fcf6e"/>
+</svg>
