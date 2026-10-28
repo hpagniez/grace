@@ -1,26 +1,14 @@
 import { Show } from "solid-js";
 import type { Api } from "../shared/ipc";
-import { latestOn } from "../shared/updates";
-import { compareVersions } from "../shared/version";
 import type { AppState } from "./reduce";
+import { latestAvailable, updateBlocked } from "./updateState";
 
 const item = "rounded px-1 hover:text-zinc-900 dark:hover:text-zinc-100";
 
 /** The bar along the bottom of every view (R3): the update marker, the running version and Settings. */
 export function StatusBar(props: { state: AppState; api: Api; openSettings(): void }) {
-  // R3.2: out of date on the channel, the skipped version included
-  const latest = () => {
-    const u = props.state.updates;
-    const l = u && latestOn(u.releases ?? [], u.settings.channel);
-    return l && compareVersions(l.version, u.running) > 0 ? l.version : null;
-  };
-  // R6.4, R13.1: why Update cannot install now; restarting would kill the run
-  const blocked = () =>
-    props.state.busy || props.state.run.active
-      ? "Finish or cancel the run first"
-      : props.state.updates?.packaged === false
-        ? "Updates install only in the packaged app"
-        : undefined;
+  const latest = () => latestAvailable(props.state.updates);
+  const blocked = () => updateBlocked(props.state);
   return (
     <footer
       data-testid="status-bar"

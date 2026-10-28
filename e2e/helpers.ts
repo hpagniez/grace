@@ -91,11 +91,17 @@ export async function launch(
   return { app, win, userData };
 }
 
-/** Starts the built app with a fresh userData folder whose settings.json already holds `settings`. */
-export async function launchWithSettings(settings: Record<string, unknown>) {
+/**
+ * Starts the built app with a fresh userData folder whose settings.json already holds `settings`, and
+ * `extraEnv` added to its environment.
+ */
+export async function launchWithSettings(
+  settings: Record<string, unknown>,
+  extraEnv?: Record<string, string>,
+) {
   const userData = tempDir("kk-userdata-");
   writeFileSync(path.join(userData, "settings.json"), JSON.stringify(settings));
-  return launch(userData);
+  return launch(userData, extraEnv);
 }
 
 /** The parsed settings.json of an app data folder. */

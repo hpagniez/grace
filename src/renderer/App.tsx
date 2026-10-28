@@ -6,6 +6,7 @@ import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
 import { loadPanelHeight } from "./panelHeight";
 import { Progress } from "./Progress";
+import { Settings } from "./Settings";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { Tree } from "./Tree";
@@ -29,6 +30,8 @@ export function App(props: { api: Api }) {
   const notice = () => state.notice ?? (home() ? state.error : null);
   const [height, setHeight] = createSignal(loadPanelHeight()); // read before the first paint
   const [dragging, setDragging] = createSignal(false);
+  // the Settings page (R6.1) replaces the view; the project and the run live in the store, so Back finds them as they were
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
   let main: HTMLElement | undefined;
   return (
     <Show when={state.loaded}>
@@ -38,7 +41,7 @@ export function App(props: { api: Api }) {
       >
         {/* the view cuts off at the status bar, so a short window never hides the bar */}
         <div data-testid="view" class="flex min-h-0 flex-1 flex-col overflow-clip">
-          <Show when={!home()}>
+          <Show when={!home() && !settingsOpen()}>
             <Toolbar state={state} api={props.api} />
             <Progress state={state} />
             <FilterBar state={state} api={props.api} />
@@ -51,30 +54,36 @@ export function App(props: { api: Api }) {
               {notice()}
             </div>
           </Show>
-          <Show when={!home()} fallback={<Home state={state} api={props.api} />}>
-            <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
-              <div class="flex min-h-0 w-1/2 flex-col">
-                <Tree state={state} select={select} api={props.api} />
-              </div>
-              <div class="flex min-h-0 w-1/2 flex-col">
-                <Details state={state} api={props.api} />
-              </div>
-            </main>
-            <BottomPanel
-              state={state}
-              api={props.api}
-              showPanel={showPanel}
-              selectCall={selectCall}
-              toggleGroup={toggleGroup}
-              height={height()}
-              setHeight={setHeight}
-              main={() => main}
-              setDragging={setDragging}
-            />
+          <Show
+            when={!settingsOpen()}
+            fallback={
+              <Settings state={state} api={props.api} back={() => setSettingsOpen(false)} />
+            }
+          >
+            <Show when={!home()} fallback={<Home state={state} api={props.api} />}>
+              <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
+                <div class="flex min-h-0 w-1/2 flex-col">
+                  <Tree state={state} select={select} api={props.api} />
+                </div>
+                <div class="flex min-h-0 w-1/2 flex-col">
+                  <Details state={state} api={props.api} />
+                </div>
+              </main>
+              <BottomPanel
+                state={state}
+                api={props.api}
+                showPanel={showPanel}
+                selectCall={selectCall}
+                toggleGroup={toggleGroup}
+                height={height()}
+                setHeight={setHeight}
+                main={() => main}
+                setDragging={setDragging}
+              />
+            </Show>
           </Show>
         </div>
-        {/* the Settings page (R6) is not built yet */}
-        <StatusBar state={state} api={props.api} openSettings={() => {}} />
+        <StatusBar state={state} api={props.api} openSettings={() => setSettingsOpen(true)} />
         <UpdateModal state={state} api={props.api} dismiss={dismissPrompt} />
         <UpdateProgress state={state} api={props.api} />
       </div>

@@ -5,6 +5,7 @@ import { feedFile, feedServer } from "./feed";
 import {
   expect,
   launch,
+  launchWithSettings,
   nodeByKey,
   openProject,
   project,
@@ -192,4 +193,101 @@ test("a failed check is quiet (R2.5)", async () => {
   await expect(win.getByTestId("update-marker")).toHaveCount(0);
   await expect(win.getByTestId("notice")).toHaveCount(0);
   expect(await app.evaluate(() => (globalThis as { shown?: string[] }).shown)).toEqual([]);
+});
+
+test("default channel follows the running version (R1.3)", async () => {
+  const { win } = await launch();
+  await win.getByTestId("settings-button").click();
+  // the running version is a release candidate
+  await expect(win.getByRole("radio", { name: "Stable and pre-releases" })).toBeChecked();
+  await expect(win.getByRole("radio", { name: "Stable releases only" })).not.toBeChecked();
+});
+
+/** The settings of a person who skipped rc.99, so the startup modal does not cover the page. */
+const skippedRc99 = { updates: { skipped: "1.0.0-rc.99" } };
+
+test("version list and dev-build install button (R6.3, R6.4)", async () => {
+  const { win } = await launchWithSettings(skippedRc99, { GRACE_UPDATE_FEED: feedFile(rc99) });
+  await expect(win.getByTestId("update-marker")).toBeVisible();
+  await win.getByTestId("settings-button").click();
+  await expect(win.getByTestId("settings-update")).toHaveText("Update to 1.0.0-rc.99");
+  const rows = win.getByTestId("version-row");
+  await expect(rows).toHaveCount(2); // the release and the running version, which no release lists
+  await expect(rows.first()).toContainText("1.0.0-rc.99");
+  await expect(rows.first()).toContainText("2026-10-29");
+  await expect(rows.first()).toContainText("pre-release");
+  // e2e runs a build that is not packaged (R13.1)
+  const install = rows.first().getByRole("button", { name: "Install" });
+  await expect(install).toBeDisabled();
+  await expect(install).toHaveAttribute("title", "Updates install only in the packaged app");
+  await expect(win.getByTestId("settings-update")).toBeDisabled();
+  await expect(rows.last()).toContainText(pkg.version);
+  await expect(rows.last()).toContainText("installed");
+  await expect(rows.last().getByRole("button")).toHaveCount(0);
+});
+
+test("a channel change follows from the last check without a new request (R6.2)", async () => {
+  const feed = await feedServer(rc99);
+  const { win, userData } = await launchWithSettings(skippedRc99, { GRACE_UPDATE_FEED: feed.url });
+  await expect(win.getByTestId("update-marker")).toBeVisible();
+  await win.getByTestId("settings-button").click();
+  await win.getByRole("radio", { name: "Stable releases only" }).check();
+  await expect(win.getByTestId("update-marker")).toHaveCount(0);
+  await expect(win.getByTestId("settings-marker")).toHaveCount(0);
+  await expect(win.getByTestId("version-row")).toHaveCount(1);
+  await expect
+    .poll(() => (settingsOf(userData).updates as { channel?: string }).channel)
+    .toBe("stable");
+  expect(feed.requests()).toBe(1);
+  await feed.close();
+});
+
+test("Back returns to the open project unchanged (R6.1)", async () => {
+  const dir = project("clean");
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
+  await win.getByTestId("settings-button").click();
+  await expect(win.getByTestId("settings")).toBeVisible();
+  await expect(nodeByKey(win, "d:tests")).toHaveCount(0);
+  await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
+  await win.getByRole("button", { name: "← Back" }).click();
+  await expect(win.getByTestId("settings")).toHaveCount(0);
+  await expect(nodeByKey(win, "d:tests")).toBeVisible();
+  await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
+  // Escape goes back too
+  await win.getByTestId("settings-button").click();
+  await win.keyboard.press("Escape");
+  await expect(win.getByTestId("settings")).toHaveCount(0);
+  await expect(nodeByKey(win, "d:tests")).toBeVisible();
+});
+
+test("a failed check shows its reason in the settings (R2.5)", async () => {
+  const missing = path.join(tempDir("kk-feed-"), "missing.json");
+  const { win } = await launch(undefined, { GRACE_UPDATE_FEED: missing });
+  await win.getByTestId("settings-button").click();
+  await win.getByRole("button", { name: "Check for updates" }).click();
+  await expect(win.getByTestId("settings-error")).toContainText("Couldn't check for updates: ");
+  await expect(win.getByTestId("update-modal")).toBeHidden();
+});
+
+test("no network when the startup check is off (R2.3)", async () => {
+  const feed = await feedServer(rc99);
+  const { win } = await launchWithSettings(
+    { updates: { checkAtStartup: false } },
+    { GRACE_UPDATE_FEED: feed.url },
+  );
+  await win.getByTestId("settings-button").click();
+  await expect(win.getByRole("checkbox", { name: "Check for updates" })).not.toBeChecked();
+  await expect(
+    win.getByRole("checkbox", { name: "Update automatically, without asking" }),
+  ).toBeDisabled();
+  await expect(win.getByText("Check for updates to see other versions")).toBeVisible();
+  await win.waitForTimeout(3000);
+  expect(feed.requests()).toBe(0);
+  await win.getByRole("button", { name: "Check for updates" }).click();
+  await expect(win.getByTestId("settings-marker")).toHaveText("1.0.0-rc.99 available");
+  expect(feed.requests()).toBe(1);
+  await expect(win.getByTestId("settings-last-checked")).toContainText("Last checked");
+  await feed.close();
 });
