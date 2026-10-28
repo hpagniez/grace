@@ -169,14 +169,14 @@ describe("home screen", () => {
     expect(screen.getByTestId("project-path").textContent).toBe("D:\\p");
     expect(button("cancel-button").disabled).toBe(false);
     expect(button("home-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("Discovering tests…");
+    expect(screen.getByTestId("tree-message").textContent).toBe("Finding tests…");
   });
 
   it("a stale folder error does not show while the next folder opens", () => {
     const { send } = setup();
     send({ type: "project", project: null, tree: null, error: "Folder not found: D:\\x" });
     send({ type: "opening", root: "D:\\p" });
-    expect(screen.getByTestId("tree-message").textContent).toBe("Discovering tests…");
+    expect(screen.getByTestId("tree-message").textContent).toBe("Finding tests…");
   });
 
   it("opening another folder keeps the open project on screen", () => {

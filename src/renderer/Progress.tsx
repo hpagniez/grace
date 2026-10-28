@@ -1,4 +1,4 @@
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import type { AppState } from "./reduce";
 
 const OUTCOME_TEXT = {
@@ -35,16 +35,37 @@ export function Progress(props: { state: AppState }) {
     run().active
       ? "Running…"
       : props.state.busy
-        ? "Preparing…"
+        ? "Finding tests…"
         : run().outcome
           ? OUTCOME_TEXT[run().outcome!]
           : "";
+  // finding tests, or a run whose first test has not finished: nothing in the bar moves otherwise
+  const waiting = () => (props.state.busy && !run().active) || (run().active && run().done === 0);
+  const value = (n: number) => (waiting() ? undefined : n);
+  const fill = "transition-[width] duration-300 ease-out motion-reduce:transition-none";
 
   return (
     <section class="border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
-      <div class="flex h-2 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-700">
-        <div class="bg-green-500" style={`width:${pct(run().passed)}%`} />
-        <div class="bg-red-500" style={`width:${pct(run().failed)}%`} />
+      <div
+        data-testid="progress-bar"
+        role="progressbar"
+        aria-label="Run progress"
+        aria-busy={waiting() ? "true" : "false"}
+        aria-valuemin={value(0)}
+        aria-valuemax={value(run().total)}
+        aria-valuenow={value(run().done)}
+        class="relative flex h-2 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-700"
+      >
+        <div class={`${fill} bg-green-500`} style={`width:${pct(run().passed)}%`} />
+        <div class={`${fill} bg-red-500`} style={`width:${pct(run().failed)}%`} />
+        {/* over the segments: during a Refresh they still show the last run, often a full bar */}
+        <Show when={waiting()}>
+          <div
+            data-testid="progress-stripe"
+            aria-hidden="true"
+            class="absolute inset-y-0 left-0 w-[30%] animate-slide rounded bg-sky-600 motion-reduce:animate-none dark:bg-sky-500"
+          />
+        </Show>
       </div>
       <div class="mt-1 flex gap-4 text-sm">
         <span data-testid="progress-text">{`${run().done} / ${run().total}`}</span>
