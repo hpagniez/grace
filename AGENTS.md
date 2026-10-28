@@ -62,10 +62,10 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 | `main` | | | Released code only. Tagged `vX.Y.Z-rc.N` (SemVer pre-release). |
 | `develop` | `main` | | Integration branch. |
 | `feature/<topic>` | `develop` | `develop` | Via PR. Kebab-case topic. |
-| `release/vX.Y.Z-rc.N` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.2.0-rc.1`. Version bump and fixes only. Tag on `main`. |
-| `hotfix/vX.Y.Z-rc.N` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.2.1-rc.1`. Urgent fix to a released version. |
+| `release/vX.Y.Z-rc.N` | `develop` | `main` and `develop` | Named after its tag, e.g. `release/v1.0.0-rc.3`. Version bump and fixes only. Tag on `main`. |
+| `hotfix/vX.Y.Z-rc.N` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.0-rc.4`. Urgent fix to a released version. |
 
-- No stable release while the app is in development: every version is a release candidate `X.Y.Z-rc.N` in the branch, `package.json` and tag. The first stable `vX.Y.Z` needs a decision record that supersedes ADR 0015.
+- No stable release while the app is in development: every version is a release candidate of the first stable release, `1.0.0-rc.N`, in the branch, `package.json` and tag. Each release or hotfix bumps `N`. Stable `v1.0.0` needs a decision record that supersedes ADR 0015.
 
 - Merge with `--no-ff`.
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
