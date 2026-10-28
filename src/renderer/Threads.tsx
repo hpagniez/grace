@@ -12,11 +12,12 @@ export function Threads(props: { state: AppState; api: Api }) {
   let box!: HTMLInputElement;
 
   // Every new view resets the box, so a refused count never stays in it. Set by hand: a `value=`
-  // binding would not change when main re-sends the count it held.
+  // binding would not change when main re-sends the count it held. The compute returns a fresh
+  // object, so a count re-sent unchanged still resets the box.
   createEffect(
-    () => props.state.threads,
-    (t) => {
-      box.value = String(t?.count ?? 1);
+    () => ({ count: props.state.threads?.count ?? 1 }),
+    ({ count }) => {
+      box.value = String(count);
     },
   );
 

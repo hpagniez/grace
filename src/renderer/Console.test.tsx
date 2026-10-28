@@ -1,5 +1,5 @@
 import { render, screen, cleanup } from "@solidjs/testing-library";
-import { createSignal, flush } from "solid-js";
+import { createSignal, flush, untrack } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
@@ -14,7 +14,7 @@ function setup() {
   render(() => <Console lines={lines()} />);
   const el = screen.getByTestId("console");
   // jsdom has no layout: fake a 10px-per-line scroller 100px tall
-  Object.defineProperty(el, "scrollHeight", { get: () => lines().length * 10 });
+  Object.defineProperty(el, "scrollHeight", { get: () => untrack(() => lines().length * 10) });
   Object.defineProperty(el, "clientHeight", { value: 100 });
   const add = (...more: string[]) => {
     setLines((l) => [...l, ...more]);
@@ -35,7 +35,7 @@ describe("Console", () => {
     const el = screen.getByTestId("console");
     // scrollHeight grows with the newest line number, not with the array length
     Object.defineProperty(el, "scrollHeight", {
-      get: () => (Number(store.state.console.at(-1)?.slice(1) ?? -1) + 1) * 10,
+      get: () => untrack(() => (Number(store.state.console.at(-1)?.slice(1) ?? -1) + 1) * 10),
     });
     Object.defineProperty(el, "clientHeight", { value: 100 });
     let n = 0;
@@ -64,7 +64,9 @@ describe("Console", () => {
       </Console>
     ));
     const el = screen.getByTestId("console");
-    Object.defineProperty(el, "scrollHeight", { get: () => (store.state.console.length + 1) * 10 });
+    Object.defineProperty(el, "scrollHeight", {
+      get: () => untrack(() => (store.state.console.length + 1) * 10),
+    });
     Object.defineProperty(el, "clientHeight", { value: 100 });
     emit({ type: "console", lines: Array.from({ length: CONSOLE_LIMIT + 10 }, (_, i) => `l${i}`) });
     flush();
