@@ -11,6 +11,8 @@ const exclude = [
   "e2e/**",
   ".superpowers/**",
   ".claude/**",
+  // CI's first unit job skips the files its second job runs (.github/workflows/test.yml)
+  ...(process.env.UNIT_EXCLUDE?.split(" ").filter(Boolean) ?? []),
 ];
 
 export default defineConfig({
