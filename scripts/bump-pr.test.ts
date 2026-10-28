@@ -201,6 +201,7 @@ describe("prBody", () => {
     });
     expect(body.startsWith("Mark this PR ready for review to run `checks` and `test`")).toBe(true);
     expect(body).toContain("To skip this version, close this PR.");
+    expect(body).toContain("`gh workflow run test.yml --ref feature/bump-karate-2.1.5`");
     expect(body).toContain("https://github.com/karatelabs/karate/releases/tag/v2.1.5");
     expect(body).toContain("https://github.com/karatelabs/karate/compare/v2.1.4...v2.1.5");
     expect(body).toContain("`RunCommand.java`: unchanged.");

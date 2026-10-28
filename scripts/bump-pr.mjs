@@ -52,7 +52,7 @@ export function runCommandStatus(filenames) {
 /** @param {{ dep: string, from: string, to: string, keep: number[], runCommand?: string }} o */
 export function prBody({ dep, from, to, keep, runCommand }) {
   const parts = [
-    "Mark this PR ready for review to run `checks` and `test` (e2e included) on the new version. To skip this version, close this PR.",
+    `Mark this PR ready for review to run \`checks\` and \`test\` on the new version. CI runs no e2e on PRs into \`develop\` (ADR 0017): run \`npm run e2e\` on this branch, or \`gh workflow run test.yml --ref ${branchName(dep, to)}\`, before merging. To skip this version, close this PR.`,
   ];
   if (dep === "karate") {
     const status = runCommand === "unknown" ? "unknown, check by hand" : runCommand;
