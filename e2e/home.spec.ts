@@ -73,7 +73,7 @@ test("The last project opens at start without the home screen", async () => {
 
   const { win } = await launch(first.userData);
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
-  await expect(win.getByTestId("tree-message")).toHaveText("Discovering tests…");
+  await expect(win.getByTestId("tree-message")).toHaveText("Finding tests…");
   await expect(win.getByTestId("home")).toHaveCount(0);
   await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
   await expect(win.getByTestId("home")).toHaveCount(0);
