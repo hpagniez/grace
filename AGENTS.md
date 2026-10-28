@@ -74,7 +74,7 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 ### Pull requests and CI
 
-Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md); e2e on CI only for PRs into `main` in [ADR 0017](docs/decisions/0017-e2e-on-ci-only-for-prs-into-main.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md); e2e on CI only for PRs into `main` in [ADR 0017](docs/decisions/0017-e2e-on-ci-only-for-prs-into-main.md); the public repo in [ADR 0018](docs/decisions/0018-make-the-repository-public.md). The repo is public on GitHub Free: Actions minutes on standard runners are free, and a ruleset blocks force-pushing or deleting `main` and `develop`.
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done.
