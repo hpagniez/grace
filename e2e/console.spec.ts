@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import vendor from "../scripts/vendor.json";
-import { expect, launch, nodeByKey, openProject, project, test } from "./helpers";
+import { emptyProject, expect, launch, nodeByKey, openProject, project, test } from "./helpers";
 
 const runAll = async (win: Page) => {
   await win.getByTestId("run-all-button").click();
@@ -41,6 +41,7 @@ test("open, run and run again", async () => {
 
 const backgrounds = async (colorScheme: "light" | "dark") => {
   const { app, win } = await launch(undefined, {}, { colorScheme });
+  await openProject(app, emptyProject()); // the home screen has no console
   const bg = (id: string) =>
     win.getByTestId(id).evaluate((e) => getComputedStyle(e).backgroundColor);
   const found = { console: await bg("console"), app: await bg("app") };
