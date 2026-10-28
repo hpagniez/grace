@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Grace's icon, 16 to 32 px (ADR 0013): no antennae, no wing spots, a thicker strike. -->
+  <defs>
+    <clipPath id="above"><polygon points="316,-69 -62,338 -62,-69"/></clipPath>
+    <clipPath id="below"><polygon points="316,-69 -62,338 316,338"/></clipPath>
+    <g id="moth" fill="#ece6d8">
+      <path d="M124 100 C96 86 56 72 28 78 C28 114 48 140 78 148 L124 136 Z"/>
+      <path d="M124 138 L76 152 C74 176 92 194 114 198 L126 160 Z"/>
+      <path d="M132 100 C160 86 200 72 228 78 C228 114 208 140 178 148 L132 136 Z"/>
+      <path d="M132 138 L180 152 C182 176 164 194 142 198 L130 160 Z"/>
+      <ellipse cx="128" cy="138" rx="14" ry="48"/>
+    </g>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#151821"/>
+  <g clip-path="url(#above)"><use href="#moth" transform="translate(-7 -7)"/></g>
+  <g clip-path="url(#below)"><use href="#moth" transform="translate(7 7)"/></g>
+  <polygon points="214,50 204,40 32.8,209.8 59.2,234.2" fill="#3fcf6e"/>
+  <circle cx="46" cy="222" r="18" fill="#3fcf6e"/>
+</svg>
