@@ -9,10 +9,13 @@ import { Progress } from "./Progress";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { Tree } from "./Tree";
+import { UpdateModal } from "./UpdateModal";
+import { UpdateProgress } from "./UpdateProgress";
 import { createAppStore } from "./store";
 
 export function App(props: { api: Api }) {
-  const { state, select, showPanel, selectCall, toggleGroup, dispose } = createAppStore(props.api);
+  const { state, select, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
+    createAppStore(props.api);
   onCleanup(dispose);
   // index.html's startup screen stays until main says what is open, so home never flashes
   createEffect(
@@ -72,6 +75,8 @@ export function App(props: { api: Api }) {
         </div>
         {/* the Settings page (R6) is not built yet */}
         <StatusBar state={state} api={props.api} openSettings={() => {}} />
+        <UpdateModal state={state} api={props.api} dismiss={dismissPrompt} />
+        <UpdateProgress state={state} api={props.api} />
       </div>
     </Show>
   );

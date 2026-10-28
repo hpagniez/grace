@@ -122,3 +122,74 @@ test("main refuses update requests with invalid arguments", async () => {
   await expect(win.getByTestId("update-marker")).toHaveCount(0);
   expect(settingsOf(userData).updates).toMatchObject({ channel: "stable" });
 });
+
+const rc98 = [{ version: "1.0.0-rc.98", prerelease: true }];
+
+/** The startup modal's view of what the person saved about updates. */
+const updatesOf = (userData: string) =>
+  settingsOf(userData).updates as { skipped?: string | null } | undefined;
+
+test("skipping a version keeps the marker but not the modal (R4.3)", async () => {
+  const env = { GRACE_UPDATE_FEED: feedFile(rc99) };
+  const first = await launch(undefined, env);
+  const modal = first.win.getByTestId("update-modal");
+  await expect(modal).toBeVisible();
+  await expect(modal).toContainText("Grace 1.0.0-rc.99 is available");
+  await expect(modal).toContainText(`You have ${pkg.version}. Download: 219 MB.`);
+  await expect(first.win.getByRole("button", { name: "Update and restart" })).toBeFocused();
+  await first.win.getByRole("button", { name: "Skip this version" }).click();
+  await expect(modal).toBeHidden();
+  await expect.poll(() => updatesOf(first.userData)?.skipped).toBe("1.0.0-rc.99");
+  await first.app.close();
+
+  const { win } = await launch(first.userData, env);
+  await expect(win.getByTestId("update-marker")).toHaveText(/1\.0\.0-rc\.99 available/);
+  await expect(win.getByTestId("update-modal")).toBeHidden();
+});
+
+test("a newer version after a skip shows the modal again", async () => {
+  const first = await launch(undefined, { GRACE_UPDATE_FEED: feedFile(rc98) });
+  await first.win.getByRole("button", { name: "Skip this version" }).click();
+  await expect.poll(() => updatesOf(first.userData)?.skipped).toBe("1.0.0-rc.98");
+  await first.app.close();
+
+  const { win } = await launch(first.userData, { GRACE_UPDATE_FEED: feedFile(rc99) });
+  await expect(win.getByTestId("update-modal")).toContainText("Grace 1.0.0-rc.99 is available");
+});
+
+test("closing the modal without a choice asks again (R4.5)", async () => {
+  const env = { GRACE_UPDATE_FEED: feedFile(rc99) };
+  const first = await launch(undefined, env);
+  const modal = first.win.getByTestId("update-modal");
+  await expect(modal).toBeVisible();
+  await first.win.getByRole("checkbox").check(); // ticked, but nothing is saved
+  await first.win.keyboard.press("Escape");
+  await expect(modal).toBeHidden();
+  // the marker stays: the version is out, only the question is closed
+  await expect(first.win.getByTestId("update-marker")).toBeVisible();
+  const saved = settingsOf(first.userData).updates as Record<string, unknown>;
+  expect([saved.skipped ?? null, saved.autoUpdate ?? false]).toEqual([null, false]);
+  await first.app.close();
+
+  const { win } = await launch(first.userData, env);
+  await expect(win.getByTestId("update-modal")).toContainText("Grace 1.0.0-rc.99 is available");
+  await expect(win.getByRole("checkbox")).not.toBeChecked();
+});
+
+test("a failed check is quiet (R2.5)", async () => {
+  const missing = path.join(tempDir("kk-feed-"), "missing.json");
+  const { app, win } = await launch(undefined, { GRACE_UPDATE_FEED: missing });
+  await app.evaluate(({ dialog }) => {
+    const shown: string[] = [];
+    (globalThis as { shown?: string[] }).shown = shown;
+    dialog.showErrorBox = (title: string) => void shown.push(title);
+    dialog.showMessageBox = (async () => (shown.push("message"), { response: 0 })) as never;
+  });
+  await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
+  await win.evaluate(() => window.api.checkUpdates()); // waits for the startup check (R2.4)
+  await expect(win.getByTestId("update-modal")).toBeHidden();
+  await expect(win.getByTestId("update-progress")).toBeHidden();
+  await expect(win.getByTestId("update-marker")).toHaveCount(0);
+  await expect(win.getByTestId("notice")).toHaveCount(0);
+  expect(await app.evaluate(() => (globalThis as { shown?: string[] }).shown)).toEqual([]);
+});
