@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   checks:
+    # a release/* or hotfix/* merge back into develop runs nothing: its PR into main checked the same commit (ADR 0017)
+    if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
