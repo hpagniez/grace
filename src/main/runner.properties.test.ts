@@ -14,6 +14,7 @@ import {
   byName,
   until,
   javaCommandLines,
+  holdSlow,
 } from "../../test/runner";
 import type { PropertiesEdit, RowEdit } from "../shared/env";
 import { fakeSecretBox } from "./secrets";
@@ -111,6 +112,7 @@ describe("Runner properties", () => {
   it("the secret is not on the command line", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");
+    const release = holdSlow(root);
     await runner.open(root);
     runner.saveProperties({ shared: [secret("api.token", SECRET)], byEnv: {} });
     const saved = loadProjectEnv(dataDir, root);
@@ -124,6 +126,7 @@ describe("Runner properties", () => {
     expect(runner.saveProperties({ shared: [], byEnv: {} })).toBe(false);
     expect(last("notice").message).toBe("A run is already in progress");
     expect(loadProjectEnv(dataDir, root)).toEqual(saved);
+    release();
     await run;
     expect(last("runFinished").outcome).toBe("finished");
   });
@@ -353,6 +356,7 @@ describe("Runner properties", () => {
   it("no properties, no @ argument", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");
+    holdSlow(root); // the cancel ends the run
     await runner.open(root);
     // rows of another environment are not passed
     runner.saveProperties({ shared: [], byEnv: { qa: [plain("timeout", "9000")] } });

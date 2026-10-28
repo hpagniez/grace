@@ -1,7 +1,7 @@
 // Helpers shared by the runner test files, src/main/runner.*.test.ts.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { copyFixture } from "./fixtures/copy";
@@ -121,6 +121,24 @@ export const javaCommandLines = (root: string) =>
   )
     .split(/\r?\n/)
     .filter((l) => l.includes(root));
+
+/**
+ * Makes the `env` fixture's `slow` scenario at `root` wait for the returned release instead of
+ * sleeping 3 s, so a test can read the JVM's command line before the JVM exits.
+ */
+export function holdSlow(root: string): () => void {
+  const gate = `${root}.release`; // outside the project, so no walk sees it
+  temps.push(gate);
+  const feature = path.join(root, "tests", "env.feature");
+  const text = readFileSync(feature, "utf8");
+  const held = text.replace(
+    "java.lang.Thread.sleep(3000)",
+    `eval while (!new java.io.File('${gate.replace(/\\/g, "/")}').exists()) java.lang.Thread.sleep(50)`,
+  );
+  if (held === text) throw new Error(`no slow step in ${feature}`);
+  writeFileSync(feature, held);
+  return () => writeFileSync(gate, "");
+}
 
 export const ourJava = () =>
   execFileSync(
