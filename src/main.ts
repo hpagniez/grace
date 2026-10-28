@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  net,
   screen,
   shell,
   type OpenDialogOptions,
@@ -15,6 +16,8 @@ import type { AppEvent } from "./shared/events";
 import { RUN_ID } from "./shared/history";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import type { Channel } from "./shared/updates";
+import { parseVersion } from "./shared/version";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
@@ -28,6 +31,9 @@ import {
   saveWindowState,
 } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
+import { updateFeed } from "./main/updates/check";
+import { markStarted, removeLeftovers, switchInProgress, takeResult } from "./main/updates/startup";
+import { Updater } from "./main/updates/updater";
 import { placeWindow } from "./main/window";
 
 // End-to-end tests give each app instance its own settings and run folders.
@@ -35,6 +41,8 @@ if (process.env.GRACE_USER_DATA) app.setPath("userData", process.env.GRACE_USER_
 
 let win: BrowserWindow | null = null;
 let startMaximized = false;
+/** The folder Grace runs from, which an update replaces (R8.1). */
+const installDir = path.dirname(process.execPath);
 
 /** Shows the window the first time, maximized if it was saved so. A minimized window was shown already. */
 const reveal = () => {
@@ -43,6 +51,8 @@ const reveal = () => {
     win.maximize(); // shows a hidden window, but does not focus it
     win.focus();
   } else win.show();
+  // R10.6: the switch script keeps this version only once it has shown its window
+  if (app.isPackaged) markStarted(installDir, app.getVersion());
 };
 
 // One instance per userData folder: a second one would kill the first one's run as an orphan
@@ -144,6 +154,26 @@ const handleRunId = (channel: string, fn: (id: string) => unknown) =>
     emit({ type: "notice", message: "Invalid request" });
   });
 
+/** Update requests carry a version only: anything else is refused before the Updater sees it. */
+const handleVersion = (channel: string, fn: (version: string) => unknown) =>
+  handle(channel, (v) => {
+    if (typeof v === "string" && parseVersion(v)) return fn(v);
+    emit({ type: "notice", message: "Invalid request" });
+  });
+
+/** A settings change from the window: a plain object with only these keys, each of its type. */
+const isUpdatePatch = (
+  p: unknown,
+): p is { channel?: Channel; checkAtStartup?: boolean; autoUpdate?: boolean } =>
+  typeof p === "object" &&
+  p !== null &&
+  Object.getPrototypeOf(p) === Object.prototype &&
+  Object.entries(p).every(([k, v]) =>
+    k === "channel"
+      ? v === "stable" || v === "prerelease"
+      : (k === "checkAtStartup" || k === "autoUpdate") && typeof v === "boolean",
+  );
+
 /** Recent-list requests carry a folder path only: anything else is refused before the Runner sees it. */
 const handlePath = (channel: string, fn: (root: string) => unknown) =>
   handle(channel, (root) => {
@@ -153,6 +183,14 @@ const handlePath = (channel: string, fn: (root: string) => unknown) =>
 
 app.whenReady().then(async () => {
   if (!primary) return;
+  // R10.9: a switch script is replacing this install; the version it installs is exempt (R10.6)
+  if (app.isPackaged && switchInProgress(installDir, app.getVersion())) {
+    dialog.showMessageBoxSync({
+      message: "Grace is finishing an update and starts on its own in a moment.",
+    });
+    app.quit();
+    return;
+  }
   // No menu: its Reload would drop the window's view of a live run.
   Menu.setApplicationMenu(null);
   const dataDir = app.getPath("userData");
@@ -160,10 +198,34 @@ app.whenReady().then(async () => {
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
   );
   const runner = new Runner({ vendor, dataDir, secrets: safeStorageBox(), emit });
+  // The Updater's notice (R10.7) and prompt (R4.1) are sent once: the window loses those sent before
+  // it subscribed, so they wait for its first `ready`. Its view and progress go out on every `ready`.
+  let held: AppEvent[] | null = [];
+  const updater = new Updater({
+    dataDir,
+    installDir,
+    running: app.getVersion(),
+    packaged: app.isPackaged,
+    feed: updateFeed(process.env, app.isPackaged),
+    isBusy: () => runner.isBusy(),
+    emit: (e) => {
+      if (held && (e.type === "notice" || e.type === "updatePrompt")) held.push(e);
+      else emit(e);
+    },
+    quit: () => app.quit(),
+    openExternal: (url) => shell.openExternal(url),
+    // Electron's fetch honours the system proxy
+    fetch: (input, init) => net.fetch(input as string, init),
+  });
 
   handle(CH.ready, () => {
+    emit({ type: "updates", view: updater.view() });
+    emit({ type: "updateProgress", progress: updater.progress() });
     for (const e of runner.replay()) emit(e);
     void runner.sendRecent();
+    // after the replay, whose project event clears the notice
+    for (const e of held ?? []) emit(e);
+    held = null;
   });
   handle(CH.open, async () => {
     // Start next to the newest recent folder that still exists, so its siblings are one click away.
@@ -226,6 +288,28 @@ app.whenReady().then(async () => {
     if (report) await shell.openPath(report);
   });
   handle(CH.clearHistory, () => runner.clearHistory());
+  handle(CH.checkUpdates, () => updater.check());
+  handle(CH.installVersion, async (version, useSavedData) => {
+    if (
+      typeof version !== "string" ||
+      !parseVersion(version) ||
+      typeof useSavedData !== "boolean"
+    ) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await updater.install(version, useSavedData);
+  });
+  handle(CH.cancelUpdate, () => updater.cancel());
+  handle(CH.updateSettings, (patch) => {
+    if (!isUpdatePatch(patch)) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    updater.setSettings(patch);
+  });
+  handleVersion(CH.skipVersion, (version) => updater.skip(version));
+  handleVersion(CH.whatsNew, (version) => updater.whatsNew(version));
 
   let quitting = false;
   app.on("before-quit", (e) => {
@@ -246,6 +330,9 @@ app.whenReady().then(async () => {
   removeLeftoverArgFiles(dataDir);
   removeLeftoverRuns(dataDir);
   createWindow(dataDir);
+  // never awaited: the check never delays the window or the project reopening (R2.2)
+  void updater.startup(takeResult(dataDir));
+  if (app.isPackaged) void removeLeftovers(installDir);
   try {
     const last = loadLastProject(dataDir);
     if (last) await runner.open(last);

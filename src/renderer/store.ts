@@ -10,6 +10,7 @@ export function createAppStore(api: Api): {
   showPanel(panel: AppState["panel"]): void;
   selectCall(ref: CallRef): void;
   toggleGroup(g: HttpGroup | "all"): void;
+  dismissPrompt(): void;
   dispose(): void;
 } {
   const [state, setState] = createStore(initialState());
@@ -39,6 +40,7 @@ export function createAppStore(api: Api): {
         if (open && !listed.some((l) => l.ref.key === open.key && l.ref.index === open.index))
           draft.selectedCall = null;
       }),
+    dismissPrompt: () => setState((draft) => void (draft.updatePrompt = null)),
     dispose,
   };
 }

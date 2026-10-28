@@ -6,6 +6,7 @@ import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
 import { loadPanelHeight } from "./panelHeight";
 import { Progress } from "./Progress";
+import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { Tree } from "./Tree";
 import { createAppStore } from "./store";
@@ -66,6 +67,8 @@ export function App(props: { api: Api }) {
             setDragging={setDragging}
           />
         </Show>
+        {/* the Settings page (R6) is not built yet */}
+        <StatusBar state={state} api={props.api} openSettings={() => {}} />
       </div>
     </Show>
   );

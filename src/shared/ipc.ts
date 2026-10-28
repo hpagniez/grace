@@ -2,6 +2,7 @@
 import type { PropertiesEdit } from "./env";
 import type { AppEvent } from "./events";
 import type { FilterState } from "./tags";
+import type { Channel } from "./updates";
 
 export const CH = {
   ready: "app:ready",
@@ -21,6 +22,12 @@ export const CH = {
   openRecent: "recent:open",
   removeRecent: "recent:remove",
   close: "project:close",
+  checkUpdates: "updates:check",
+  installVersion: "updates:install",
+  cancelUpdate: "updates:cancel",
+  updateSettings: "updates:settings",
+  skipVersion: "updates:skip",
+  whatsNew: "updates:whatsNew",
   event: "app:event",
 } as const;
 
@@ -46,5 +53,18 @@ export interface Api {
   removeRecent(root: string): Promise<void>;
   /** Closes the open project and goes back to the home screen. */
   closeProject(): Promise<void>;
+  /** The update calls send versions and settings only; main checks each before acting (R2, R4, R6, R8). */
+  checkUpdates(): Promise<void>;
+  installVersion(version: string, useSavedData: boolean): Promise<void>;
+  /** Stops the install under way, or closes a failed one's message. */
+  cancelUpdate(): Promise<void>;
+  setUpdateSettings(patch: {
+    channel?: Channel;
+    checkAtStartup?: boolean;
+    autoUpdate?: boolean;
+  }): Promise<void>;
+  skipVersion(version: string): Promise<void>;
+  /** Opens the version's release page in the default browser. */
+  openWhatsNew(version: string): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }

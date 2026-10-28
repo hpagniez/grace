@@ -19,7 +19,8 @@ import { copyFixture } from "../test/fixtures/copy";
 const apps: ElectronApplication[] = [];
 const dirs: string[] = [];
 
-const tempDir = (prefix: string) => {
+/** A new temp folder, deleted after the test. */
+export const tempDir = (prefix: string) => {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
   dirs.push(dir);
   return dir;
@@ -70,6 +71,7 @@ export const emptyProject = () => tempDir("kk-empty-");
 /**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
  * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
+ * Its update check reads an empty feed, never GitHub, unless `extraEnv` gives `GRACE_UPDATE_FEED`.
  */
 export async function launch(
   userDataDir?: string,
@@ -77,9 +79,11 @@ export async function launch(
   opts: { colorScheme?: "light" | "dark" } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
+  const noFeed = path.join(tempDir("kk-feed-"), "releases.json");
+  writeFileSync(noFeed, "[]");
   const app = await _electron.launch({
     args: ["."],
-    env: { ...process.env, ...extraEnv, GRACE_USER_DATA: userData },
+    env: { ...process.env, GRACE_UPDATE_FEED: noFeed, ...extraEnv, GRACE_USER_DATA: userData },
     colorScheme: opts.colorScheme,
   });
   apps.push(app);
