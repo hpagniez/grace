@@ -321,19 +321,13 @@ export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): v
 }
 
 /**
- * The saved update settings (R12). Each malformed or missing field reads as its default; `running`
- * sets the default channel. A `skipped` or `failed` that is not a valid version reads as null, as
- * `compareVersions` throws on one. An unreadable file reads as the defaults, so it never throws.
+ * Update settings from any JSON value (R12). Each malformed or missing field reads as its default;
+ * `running` sets the default channel. A `skipped` or `failed` that is not a valid version reads as
+ * null, as `compareVersions` throws on one. Never throws.
  */
-export function loadUpdateSettings(dataDir: string, running: string): UpdateSettings {
+export function parseUpdateSettings(updates: unknown, running: string): UpdateSettings {
   const d = defaultUpdateSettings(running);
-  let u: Record<string, unknown>;
-  try {
-    const { updates } = read(dataDir);
-    u = isObject(updates) ? updates : {};
-  } catch {
-    return d;
-  }
+  const u = isObject(updates) ? updates : {};
   const bool = (x: unknown, dflt: boolean) => (typeof x === "boolean" ? x : dflt);
   const version = (x: unknown) => (typeof x === "string" && parseVersion(x) ? x : null);
   return {
@@ -347,6 +341,17 @@ export function loadUpdateSettings(dataDir: string, running: string): UpdateSett
         ? u.lastChecked
         : null,
   };
+}
+
+/** The saved update settings (R12). An unreadable file reads as the defaults, so it never throws. */
+export function loadUpdateSettings(dataDir: string, running: string): UpdateSettings {
+  let updates: unknown;
+  try {
+    updates = read(dataDir).updates;
+  } catch {
+    // unreadable: the defaults
+  }
+  return parseUpdateSettings(updates, running);
 }
 
 /** Saves the update settings and keeps the other keys. Throws if the file cannot be saved. */

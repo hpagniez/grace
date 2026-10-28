@@ -4,8 +4,9 @@ import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { defaultUpdateSettings, type Backup, type UpdateSettings } from "../../shared/updates";
+import type { Backup, UpdateSettings } from "../../shared/updates";
 import { parseVersion } from "../../shared/version";
+import { parseUpdateSettings } from "../settings";
 
 /** `update-result.json`, as the script writes it (R10.5). */
 export interface SwitchResult {
@@ -19,14 +20,15 @@ export interface SwitchResult {
 }
 
 const staging = (installDir: string) => `${installDir}.update`;
-const isObject = (x: unknown): x is Record<string, unknown> =>
-  typeof x === "object" && x !== null && !Array.isArray(x);
 
 /** A JSON file's object, or null when it is missing, unreadable or not an object. Tolerates a BOM. */
 function readObject(file: string): Record<string, unknown> | null {
   try {
-    const x: unknown = JSON.parse(readFileSync(file, "utf8").replace(/^﻿/, ""));
-    return isObject(x) ? x : null;
+    // TextDecoder drops a leading byte order mark
+    const x: unknown = JSON.parse(new TextDecoder().decode(readFileSync(file)));
+    return typeof x === "object" && x !== null && !Array.isArray(x)
+      ? (x as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -79,25 +81,6 @@ export function markStarted(installDir: string, running: string): void {
   }
 }
 
-/** The update settings in a result: each malformed field reads as its default (R12), as in `loadUpdateSettings`. */
-function toUpdateSettings(u: unknown, running: string): UpdateSettings | null {
-  if (!isObject(u)) return null;
-  const d = defaultUpdateSettings(running);
-  const bool = (x: unknown, dflt: boolean) => (typeof x === "boolean" ? x : dflt);
-  const version = (x: unknown) => (typeof x === "string" && parseVersion(x) ? x : null);
-  return {
-    channel: u.channel === "stable" || u.channel === "prerelease" ? u.channel : d.channel,
-    checkAtStartup: bool(u.checkAtStartup, d.checkAtStartup),
-    autoUpdate: bool(u.autoUpdate, d.autoUpdate),
-    skipped: version(u.skipped),
-    failed: version(u.failed),
-    lastChecked:
-      typeof u.lastChecked === "string" && !Number.isNaN(Date.parse(u.lastChecked))
-        ? u.lastChecked
-        : null,
-  };
-}
-
 /** R10.7: reads and deletes `<dataDir>\update-result.json`. Null when it is missing or malformed. */
 export function takeResult(dataDir: string): SwitchResult | null {
   const file = path.join(dataDir, "update-result.json");
@@ -115,7 +98,9 @@ export function takeResult(dataDir: string): SwitchResult | null {
     return null;
   }
   if (error !== null && typeof error !== "string") return null;
-  return { from, to, rollback, ok, reverted, error, updates: toUpdateSettings(o.updates, from) };
+  const hasUpdates = typeof o.updates === "object" && o.updates !== null;
+  const updates = hasUpdates ? parseUpdateSettings(o.updates, from) : null;
+  return { from, to, rollback, ok, reverted, error, updates };
 }
 
 /**

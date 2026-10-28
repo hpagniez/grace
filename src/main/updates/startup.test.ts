@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync }
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { UpdateSettings } from "../../shared/updates";
+import { defaultUpdateSettings, type UpdateSettings } from "../../shared/updates";
 import {
   listBackups,
   markStarted,
@@ -15,6 +15,7 @@ import {
   type SwitchResult,
 } from "./startup";
 
+const BOM = String.fromCharCode(0xfeff);
 const carried: UpdateSettings = {
   channel: "prerelease",
   checkAtStartup: false,
@@ -102,7 +103,7 @@ describe("results", () => {
     afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
     it("reads a result with a BOM and deletes it", () => {
-      writeFileSync(file(), "﻿" + JSON.stringify(ok("1.0.0-rc.5", "1.0.0-rc.6")));
+      writeFileSync(file(), BOM + JSON.stringify(ok("1.0.0-rc.5", "1.0.0-rc.6")));
       expect(takeResult(dir)).toEqual(ok("1.0.0-rc.5", "1.0.0-rc.6"));
       expect(existsSync(file())).toBe(false);
     });
@@ -130,29 +131,18 @@ describe("results", () => {
       expect(existsSync(file())).toBe(false);
     });
 
-    it("reads each malformed update setting as its default and a missing block as null", () => {
+    it("reads the carried update settings with the shared rules, and none as null (R12)", () => {
       const r = ok("1.0.0-rc.5", "1.0.0-rc.6");
       writeFileSync(
         file(),
-        JSON.stringify({
-          ...r,
-          updates: {
-            channel: "nightly",
-            autoUpdate: true,
-            skipped: "soon",
-            failed: 7,
-            lastChecked: "x",
-          },
-        }),
+        JSON.stringify({ ...r, updates: { channel: "nightly", skipped: "soon" } }),
       );
       expect(takeResult(dir)?.updates).toEqual({
-        channel: "prerelease", // the default follows from: it is a pre-release
-        checkAtStartup: true,
-        autoUpdate: true,
-        skipped: null,
-        failed: null,
-        lastChecked: null,
+        ...defaultUpdateSettings("1.0.0-rc.5"), // the default channel follows `from`
+        channel: "prerelease",
       });
+      writeFileSync(file(), JSON.stringify({ ...r, updates: carried }));
+      expect(takeResult(dir)?.updates).toEqual(carried);
       writeFileSync(file(), JSON.stringify({ ...r, updates: null }));
       expect(takeResult(dir)?.updates).toBeNull();
     });
@@ -290,7 +280,7 @@ describe("listBackups", () => {
     backup("1.0.0-rc.4", { version: "1.0.0-rc.4", savedAt: "2026-10-01T09:00:00.000Z" });
     backup(
       "1.0.0-rc.6",
-      "﻿" + JSON.stringify({ version: "1.0.0-rc.6", savedAt: "2026-10-27T09:00:00.000Z" }),
+      BOM + JSON.stringify({ version: "1.0.0-rc.6", savedAt: "2026-10-27T09:00:00.000Z" }),
     );
     backup("1.0.0-rc.5", { version: "1.0.0-rc.5", savedAt: "2026-10-15T09:00:00.000Z" });
     expect(listBackups(dir)).toEqual([
