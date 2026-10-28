@@ -3,6 +3,8 @@ import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
 import { validThreads } from "../shared/threads";
+import { defaultUpdateSettings, type UpdateSettings } from "../shared/updates";
+import { parseVersion } from "../shared/version";
 
 const file = (dataDir: string) => path.join(dataDir, "settings.json");
 
@@ -314,6 +316,49 @@ export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): v
           [...rows, ...rejectedRows(Object.hasOwn(oldByEnv, env) ? oldByEnv[env] : null)],
         ]),
       ),
+    };
+  });
+}
+
+/**
+ * The saved update settings (R12). Each malformed or missing field reads as its default; `running`
+ * sets the default channel. A `skipped` or `failed` that is not a valid version reads as null, as
+ * `compareVersions` throws on one. An unreadable file reads as the defaults, so it never throws.
+ */
+export function loadUpdateSettings(dataDir: string, running: string): UpdateSettings {
+  const d = defaultUpdateSettings(running);
+  let u: Record<string, unknown>;
+  try {
+    const { updates } = read(dataDir);
+    u = isObject(updates) ? updates : {};
+  } catch {
+    return d;
+  }
+  const bool = (x: unknown, dflt: boolean) => (typeof x === "boolean" ? x : dflt);
+  const version = (x: unknown) => (typeof x === "string" && parseVersion(x) ? x : null);
+  return {
+    channel: u.channel === "stable" || u.channel === "prerelease" ? u.channel : d.channel,
+    checkAtStartup: bool(u.checkAtStartup, d.checkAtStartup),
+    autoUpdate: bool(u.autoUpdate, d.autoUpdate),
+    skipped: version(u.skipped),
+    failed: version(u.failed),
+    lastChecked:
+      typeof u.lastChecked === "string" && !Number.isNaN(Date.parse(u.lastChecked))
+        ? u.lastChecked
+        : null,
+  };
+}
+
+/** Saves the update settings and keeps the other keys. Throws if the file cannot be saved. */
+export function saveUpdateSettings(dataDir: string, s: UpdateSettings): void {
+  update(dataDir, (all) => {
+    all.updates = {
+      channel: s.channel,
+      checkAtStartup: s.checkAtStartup,
+      autoUpdate: s.autoUpdate,
+      skipped: s.skipped,
+      failed: s.failed,
+      lastChecked: s.lastChecked,
     };
   });
 }
