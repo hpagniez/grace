@@ -4,7 +4,7 @@ export const PANEL_MIN = 96;
 /** The least the tree and details area keeps. */
 export const MAIN_MIN = 120;
 export const PANEL_STEP = 16;
-export const PANEL_KEY = "karate-kid.panelHeight";
+export const PANEL_KEY = "grace.panelHeight";
 
 /** The largest panel height when the tree/details area and the panel share `room` px; never below the minimum. */
 export const maxPanel = (room: number): number => Math.max(PANEL_MIN, room - MAIN_MIN);

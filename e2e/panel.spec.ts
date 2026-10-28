@@ -161,7 +161,7 @@ test("a smaller window shrinks the panel without forgetting its height", async (
 test("a bad saved height falls back to the default", async () => {
   const { win } = await started();
   for (const v of ["abc", "-5", "50"]) {
-    await win.evaluate((v) => localStorage.setItem("karate-kid.panelHeight", v), v);
+    await win.evaluate((v) => localStorage.setItem("grace.panelHeight", v), v);
     await win.reload();
     await expect(splitter(win)).toBeVisible();
     await expectHeights(win, { panel: 192 });
@@ -170,7 +170,7 @@ test("a bad saved height falls back to the default", async () => {
 
 test("a saved height taller than the window is clamped at start", async () => {
   const { win } = await started();
-  await win.evaluate(() => localStorage.setItem("karate-kid.panelHeight", "2000"));
+  await win.evaluate(() => localStorage.setItem("grace.panelHeight", "2000"));
   await win.reload();
   await expect(splitter(win)).toBeVisible();
   await expectHeights(win, { main: 120 });

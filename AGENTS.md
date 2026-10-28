@@ -1,6 +1,6 @@
 # AGENTS.md
 
-karate-kid is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents.
+Grace is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents. The app was called karate-kid until [ADR 0013](docs/decisions/0013-rename-the-app-to-grace.md); the GitHub repository and its folder keep that name until the maintainer renames them.
 
 ## Commands
 
@@ -36,6 +36,10 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 - When a spec is written or a feature ships, update its row in `docs/features.md` in the same change.
 - A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
 - Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
+
+## No backward compatibility
+
+The app is still in development. Never write code that keeps older versions working: no migration of settings, run history or data folders, no fallback to an old name, key, environment variable or file format, no deprecated alias. Change the name or format, and update every place that uses it. Data from an older version may be lost: say so in the commit's `BREAKING CHANGE:` footer.
 
 ## Git workflow
 
