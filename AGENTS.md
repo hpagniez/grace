@@ -74,19 +74,19 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 ### Pull requests and CI
 
-Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md); e2e on CI only for PRs into `main` in [ADR 0017](docs/decisions/0017-e2e-on-ci-only-for-prs-into-main.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md); e2e on CI only for PRs into `main` in [ADR 0017](docs/decisions/0017-e2e-on-ci-only-for-prs-into-main.md); the public repo in [ADR 0018](docs/decisions/0018-make-the-repository-public.md). The repo is public on GitHub Free: Actions minutes on standard runners are free, and a ruleset blocks force-pushing or deleting `main` and `develop`.
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done.
 - CI runs no e2e on PRs into `develop`. Before marking one ready, run `npm run e2e` locally if it changes more than `docs/**` and `*.md`, and paste the summary in the PR. PRs into `main` run e2e on CI once ready.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
-- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` are merged by hand.
+- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` and PRs from forks are merged by hand.
 
 | Workflow | When | What it runs |
 |---|---|---|
 | `checks` | Every PR to `develop` or `main`, except a `release/*` or `hotfix/*` merge back into `develop` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
 | `test` | PRs that change more than `docs/**` and `*.md`, except a `release/*` or `hotfix/*` merge back into `develop` (Windows); by hand | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the runner files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards only on PRs into `main` that are not drafts, and on runs by hand (`gh workflow run test.yml --ref <branch>`) |
-| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` and `test` passed on its head commit (no `test` run only for docs-only PRs). A back-merge from `release/*` or `hotfix/*` needs those runs from its PR into `main`, with every `e2e` step passed |
+| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` from a branch of this repo (never a fork) that has the `merge-when-green` label and is not a draft, once `checks` and `test` passed on its head commit (no `test` run only for docs-only PRs). A back-merge from `release/*` or `hotfix/*` needs those runs from its PR into `main`, with every `e2e` step passed |
 | `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing) | Tag must match `package.json`; `npm run make`; GitHub pre-release with the zip |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI (unit tests, no e2e) |
 
