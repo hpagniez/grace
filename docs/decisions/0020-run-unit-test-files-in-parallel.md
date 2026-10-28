@@ -27,7 +27,7 @@ Chosen: option 3.
 - Each of the five leak checks looks only for `java.exe` processes whose command line holds the test's project root. Karate's command line always carries `-w <root>`, and each test copies its fixture to a fresh temp folder. `javaCommandLines(root)` in `test/runner.ts` already did this for other tests; `ourJava()` is removed.
 - `vitest.config.mts` drops `fileParallelism: false`. Vitest's default worker count applies.
 - The e2e suite does not change: Playwright `workers: 1`, and `ourJavaPids()` in `e2e/helpers.ts` still sees every `java.exe` from `vendor/jre`. So the AGENTS.md rule against running `npm test` and `npm run e2e` at the same time on one machine stays.
-- The two `unit` halves in `test.yml` stay. Their file lists are rebalanced once CI has timed the parallel runs.
+- The two `unit` halves in `test.yml` stay, with new file lists. On CI, `src/main/runner.history.test.ts` takes about 135 s, more than any half of the other files: half 2 runs it alone, and half 1 runs every other file (about 315 s in all) on its 3 workers.
 
 This supersedes ADR 0016's "Within each job nothing changes: `fileParallelism: false` ... stay" for the unit tests. The rest of ADR 0016 stands.
 
@@ -38,7 +38,7 @@ Why not the others:
 
 ### Consequences
 
-- Good: `npm test` takes 105 s instead of 270 s on a 16-CPU machine, and 110 s with 3 workers, the default on 4 CPUs.
+- Good: `npm test` takes 105 s instead of 270 s on a 16-CPU machine, and 110 s with 3 workers, the default on 4 CPUs. On CI, with the old file lists, the two halves took 146 s and 99 s instead of about 185 s and 200 s.
+- Bad: no half can end before `src/main/runner.history.test.ts`. Splitting it is the next speed-up.
 - Bad: a scoped check misses a leaked JVM whose command line lacks the project root. The e2e checks stay global and still catch it.
 - Bad: Java test files now share CPUs. Timing-sensitive tests (the 60 s and 120 s timeouts, `until` waits) may flake on CI's 4 CPUs.
-- Neutral: the `unit` halves in `test.yml` may need new file lists to stay even.
