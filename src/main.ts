@@ -55,10 +55,25 @@ const reveal = () => {
   if (app.isPackaged) markStarted(installDir, app.getVersion());
 };
 
+// R10.9: a switch script is replacing this install, and this is not the version it installs
+// (R10.6). Decided before the single-instance lock: a Grace holding it would make the version the
+// script starts quit, and the script would switch back.
+const finishing = app.isPackaged && switchInProgress(installDir, app.getVersion());
 // One instance per userData folder: a second one would kill the first one's run as an orphan
 // and share its run folders. It hands over to the first window instead.
-const primary = app.requestSingleInstanceLock();
-if (!primary) app.quit();
+const primary = !finishing && app.requestSingleInstanceLock();
+if (finishing) {
+  // never blocking, no window: quits when dismissed or after 5 s, before the script's swap
+  void app.whenReady().then(async () => {
+    await dialog
+      .showMessageBox({
+        message: "Grace is finishing an update and starts on its own in a moment.",
+        signal: AbortSignal.timeout(5000),
+      })
+      .catch(() => {});
+    app.quit();
+  });
+} else if (!primary) app.quit();
 app.on("second-instance", () => {
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
@@ -183,14 +198,6 @@ const handlePath = (channel: string, fn: (root: string) => unknown) =>
 
 app.whenReady().then(async () => {
   if (!primary) return;
-  // R10.9: a switch script is replacing this install; the version it installs is exempt (R10.6)
-  if (app.isPackaged && switchInProgress(installDir, app.getVersion())) {
-    dialog.showMessageBoxSync({
-      message: "Grace is finishing an update and starts on its own in a moment.",
-    });
-    app.quit();
-    return;
-  }
   // No menu: its Reload would drop the window's view of a live run.
   Menu.setApplicationMenu(null);
   const dataDir = app.getPath("userData");

@@ -104,6 +104,7 @@ describe.runIf(process.platform === "win32")("switch script", () => {
       holder.stdout.on("data", (d) => String(d).includes("held") && resolve());
       holder.on("exit", () => reject(new Error("the holder exited")));
     });
+    return { release: () => holder.stdin.end() };
   }
 
   /**
@@ -155,6 +156,7 @@ describe.runIf(process.platform === "win32")("switch script", () => {
 const dir = path.dirname(process.execPath);
 if (fs.existsSync(path.join(dir, "die.flag"))) process.exit(1);
 if (!fs.existsSync(path.join(dir, "noStart.flag"))) fs.writeFileSync(dir + ".update/started", "");
+if (process.env.GRACE_LIFE_MS) setTimeout(() => process.exit(0), Number(process.env.GRACE_LIFE_MS));
 setInterval(() => {}, 1 << 30);
 `,
     );
@@ -372,6 +374,26 @@ setInterval(() => {}, 1 << 30);
     expect(result()).toMatchObject({ ok: true });
     expect(read(`${install}.old`, "v.txt")).toBe("1.0.0-rc.5");
     expect(existsSync(path.join(`${install}.old`, "left.txt"))).toBe(false);
+  });
+
+  it("waits for a Grace started during the backup to quit before the swap (R10.9)", T, async () => {
+    // the backup retries a held file for about 2 s: time to start a Grace after the exit wait
+    const held = await hold(path.join(data, "settings.json"));
+    const done = run();
+    await until(() => existsSync(path.join(data, "backups", "1.0.0-rc.5")));
+    // it shows its message, then quits by itself a few seconds later
+    children.push(
+      spawn(path.join(install, "Grace.exe"), [], {
+        cwd: install,
+        env: { ...env, GRACE_LIFE_MS: "3000" },
+        stdio: "ignore",
+        windowsHide: true,
+      }),
+    );
+    held.release();
+    await done;
+    expect(result()).toMatchObject({ ok: true, error: null });
+    expect(read(install, "v.txt")).toBe("1.0.0-rc.6");
   });
 
   it("writes update-result.json and backup.json without a byte order mark", T, async () => {

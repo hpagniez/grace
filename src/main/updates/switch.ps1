@@ -164,6 +164,10 @@ try {
       Set-Data $saved
     }
 
+    # R10.9: a Grace started since the wait shows its message and quits within seconds
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    while ((Get-Grace) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+
     [IO.Directory]::Move($install, $old)
     $movedOld = $true
     [IO.Directory]::Move($app, $install)
