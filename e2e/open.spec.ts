@@ -10,6 +10,7 @@ import {
   openProject,
   project,
   recordOpenDialog,
+  saved,
   test,
 } from "./helpers";
 
@@ -228,6 +229,39 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     await expect(hasTooltip(win)).toHaveCount(0);
     await win.mouse.move(5, 400);
   }
+});
+
+/** The box shows its whole value: no text scrolls out of sight. */
+const showsWhole = (box: Locator) => box.evaluate((el) => el.scrollWidth <= el.clientWidth);
+
+test("The Env and Threads boxes show their longest likely values whole", async () => {
+  const dir = project("clean");
+  const { app, win, userData } = await launch();
+  await openProject(app, dir);
+  const env = win.getByTestId("env-input");
+  const threads = win.getByTestId("threads-input");
+  await expect(threads).toBeEnabled({ timeout: 15_000 });
+  await threads.fill("32");
+  await threads.press("Enter");
+  await expect.poll(() => saved(userData, dir)?.threads).toBe(32);
+  await expect(threads).toHaveValue("32");
+  expect(
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds().width),
+  ).toBe(1200);
+
+  for (const width of [1200, 1500]) {
+    if (width !== 1200) await contentWidth(app, win, width);
+    await threads.hover(); // the spin buttons show on hover and take room from the number
+    expect.soft(await showsWhole(threads), `threads at ${width}`).toBe(true);
+    await env.focus();
+    await env.pressSequentially("production");
+    await expect(env).toHaveValue("production");
+    expect.soft(await showsWhole(env), `env at ${width}`).toBe(true);
+    await env.fill(""); // an empty box commits nothing when it is left
+    await env.blur();
+    await expect(env).toHaveAttribute("placeholder", "(none)");
+  }
+  expect(saved(userData, dir)?.env ?? null).toBeNull();
 });
 
 test("Maven layout with classpath resources", async () => {
