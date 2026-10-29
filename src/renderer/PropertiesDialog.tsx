@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from "lucide";
 import { createMemo, createSignal, createStore, flush, For, Show } from "solid-js";
 import {
   MAX_ENVS,
@@ -12,6 +13,7 @@ import {
 import type { Api } from "../shared/ipc";
 import { btn, primary } from "./buttons";
 import { INVALID_ENV } from "./EnvPicker";
+import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
 
 /** A property row being edited. Scope "" is "All environments". */
@@ -218,6 +220,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
         disabled={locked() || !view()}
         onClick={show}
       >
+        <Icon icon={SlidersHorizontal} />
         Properties…
       </button>
       <dialog

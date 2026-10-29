@@ -13,6 +13,8 @@ export interface RunView {
   done: number;
   passed: number;
   failed: number;
+  /** Tests the run left running when it was cancelled; not part of `done`. */
+  interrupted: number;
   startedAt: number | null;
   outcome: RunOutcome | null;
   summary: Summary | null;
@@ -75,6 +77,7 @@ const idleRun = (): RunView => ({
   done: 0,
   passed: 0,
   failed: 0,
+  interrupted: 0,
   startedAt: null,
   outcome: null,
   summary: null,
@@ -189,6 +192,7 @@ export function reduce(s: AppState, e: AppEvent): void {
         if (u.durationMillis !== undefined) r.durationMillis = u.durationMillis;
         if (u.error !== undefined) r.error = u.error;
         s.results[u.key] = r;
+        if (u.status === "interrupted" && before !== "interrupted") s.run.interrupted++;
         if (!final && (u.status === "passed" || u.status === "failed")) {
           s.run.done++;
           if (u.status === "passed") s.run.passed++;

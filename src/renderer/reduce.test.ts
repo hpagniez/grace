@@ -200,6 +200,21 @@ describe("reduce", () => {
     expect(s.run).toMatchObject({ done: 1, passed: 1 });
   });
 
+  it("counts the tests a cancelled run interrupted, once each and apart from done", () => {
+    const s = initialState();
+    apply(s, project(), started());
+    expect(s.run.interrupted).toBe(0);
+    const running: AppEvent = { type: "scenarios", updates: [{ key: keys[0], status: "running" }] };
+    const up: AppEvent = {
+      type: "scenarios",
+      updates: [{ key: keys[0], status: "interrupted" }],
+    };
+    apply(s, running, up, up);
+    expect(s.run).toMatchObject({ done: 0, passed: 0, failed: 0, interrupted: 1 });
+    apply(s, started([keys[1]])); // the next run starts from none
+    expect(s.run.interrupted).toBe(0);
+  });
+
   it("project event keeps statuses of existing keys and drops the others", () => {
     const s = initialState();
     apply(s, project());

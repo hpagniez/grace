@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { validEnvName } from "../shared/env";
 import type { Api } from "../shared/ipc";
 import type { AppState } from "./reduce";
+import { input } from "./ui";
 
 const NONE = "(none)";
 export const INVALID_ENV =
@@ -64,13 +65,13 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
 
   return (
     <div class="flex flex-col">
-      <label class="flex items-center gap-1 text-sm">
+      <label class="flex items-center gap-2 text-sm text-muted">
         Env
         <input
           type="text"
           data-testid="env-input"
           list="env-suggestions"
-          class="w-36 rounded border border-zinc-300 bg-white px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-800"
+          class={`${input} w-32`}
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}

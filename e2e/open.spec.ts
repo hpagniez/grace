@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import {
   emptyProject,
@@ -39,6 +39,39 @@ test("Open a project and see its tests", async () => {
   );
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
   await expect(win.getByTestId("project-layout")).toHaveText("Standalone");
+});
+
+test("The toolbar cuts a long path from its start and keeps its characters in order", async () => {
+  // a folder name that ends in a neutral character: right-to-left text would move it to the front
+  const dir = path.join(emptyProject(), "final copy!");
+  mkdirSync(dir);
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const full = path.resolve(dir);
+  const box = win.getByTestId("project-path");
+  await expect(box).toHaveText(full);
+  // pin its width, so that the path is longer than the box on every machine
+  await box.evaluate((el) => void ((el.parentElement as HTMLElement).style.flex = "0 0 160px"));
+  const seen = await box.evaluate((el) => {
+    const text = el.firstElementChild!.firstChild as Text;
+    const at = (i: number) => {
+      const r = document.createRange();
+      r.setStart(text, i);
+      r.setEnd(text, i + 1);
+      return r.getBoundingClientRect();
+    };
+    const view = el.getBoundingClientRect();
+    const last = text.length - 1;
+    const probes = [0, 1, 2, last - 2, last - 1, last];
+    return {
+      startCut: at(0).right <= view.left + 0.5,
+      endShown: at(last).left >= view.left && at(last).right <= view.right + 0.5,
+      leftToRight: probes.every((i, k) => k === 0 || at(i).left > at(probes[k - 1]).left),
+    };
+  });
+  expect(seen).toEqual({ startCut: true, endShown: true, leftToRight: true });
+  await box.hover();
+  await expect(win.getByRole("tooltip")).toHaveText(full);
 });
 
 test("Maven layout with classpath resources", async () => {

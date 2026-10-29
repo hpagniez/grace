@@ -274,7 +274,7 @@ describe("home screen", () => {
     const { open } = setup();
     open();
     const header = screen.getByRole("banner");
-    expect(header.firstElementChild).toBe(button("home-button"));
-    expect(button("home-button").textContent).toBe("Home");
+    expect(header.querySelector("button")).toBe(button("home-button")); // under the logo's tooltip
+    expect(screen.getByRole("button", { name: "Home" })).toBe(button("home-button"));
   });
 });

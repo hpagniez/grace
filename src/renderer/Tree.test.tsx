@@ -251,7 +251,7 @@ describe("main screen", () => {
     expect(stripe.className).toContain("animate-slide");
     expect(stripe.className).toContain("motion-reduce:animate-none");
     const segments = [...screen.getByTestId("progress-bar").children].filter((c) => c !== stripe);
-    expect(segments).toHaveLength(2);
+    expect(segments).toHaveLength(3); // passed, failed, cancelled
     for (const s of segments) {
       expect(s.className).toContain("transition-[width]");
       expect(s.className).toContain("motion-reduce:transition-none");

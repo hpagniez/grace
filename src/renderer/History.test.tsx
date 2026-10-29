@@ -406,20 +406,21 @@ describe("toolbar Re-run failed", () => {
   it("shows the newest run's failed count and calls rerunFailed with its id", () => {
     const { api, load } = setup();
     load(entry("new", { failed: 2 }), entry("old", { failed: 5 }));
-    expect(toolbarRerunFailed().textContent).toBe("Re-run failed (2)");
+    expect(toolbarRerunFailed().textContent).toBe("Re-run failed 2");
     expect(toolbarRerunFailed().disabled).toBe(false);
     click(toolbarRerunFailed());
     expect(api.rerunFailed).toHaveBeenCalledExactlyOnceWith("new");
   });
 
-  it("sits right after Run all", () => {
+  it("sits between Report and Cancel, before Run all (spec R13.1)", () => {
     setup();
-    expect(screen.getByTestId("run-all-button").nextElementSibling).toBe(toolbarRerunFailed());
+    expect(toolbarRerunFailed().previousElementSibling).toBe(report());
+    expect(toolbarRerunFailed().nextElementSibling).toBe(screen.getByTestId("cancel-button"));
   });
 
   it("is disabled with no history, with no failure in the newest run, and while busy", () => {
     const { send, load } = setup();
-    expect(toolbarRerunFailed().textContent).toBe("Re-run failed (0)");
+    expect(toolbarRerunFailed().textContent).toBe("Re-run failed 0");
     expect(toolbarRerunFailed().disabled).toBe(true);
     load(entry("new", { failed: 0 }), entry("old", { failed: 5 }));
     expect(toolbarRerunFailed().disabled).toBe(true);
