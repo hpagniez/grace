@@ -381,6 +381,20 @@ describe("install", () => {
     expect(preflight).not.toHaveBeenCalled();
   });
 
+  it("waits for the startup cleanup before it touches the staging folder (R10.8)", async () => {
+    let cleaned!: () => void;
+    const leftovers = new Promise<void>((ok) => (cleaned = ok));
+    mkdirSync(staging);
+    const u = await checked({ leftovers });
+    const install = u.install("1.0.0-rc.6", false);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(preflight).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+    cleaned();
+    await install;
+    expect(startSwitch).toHaveBeenCalledOnce();
+  });
+
   it("refuses a second install while one runs", async () => {
     let release!: () => void;
     preflight.mockImplementation(() => new Promise((ok) => (release = () => ok(null))));

@@ -48,6 +48,8 @@ export interface UpdaterDeps {
   verify?: typeof verify;
   unpack?: typeof unpack;
   startSwitch?: typeof startSwitch;
+  /** The startup removal of what the last switch left (R10.8): an install waits for it. */
+  leftovers?: Promise<void>;
   /** How often, and how long, auto-update waits for the Runner to be idle. 500 ms and 120 s by default. */
   idlePollMs?: number;
   idleWaitMs?: number;
@@ -86,6 +88,7 @@ export class Updater {
       verify,
       unpack,
       startSwitch,
+      leftovers: Promise.resolve(),
       idlePollMs: 500,
       idleWaitMs: 120_000,
       ...deps,
@@ -223,6 +226,8 @@ export class Updater {
       rm(stagingDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     try {
       step("download");
+      // a background delete of the staging folder must not race this download
+      await this.d.leftovers;
       const why = await this.d.preflight(installDir, release.size).catch(named("The folder check"));
       if (why) throw new Error(why);
       await removeStaging().catch(named("The download"));

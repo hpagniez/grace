@@ -220,6 +220,8 @@ app.whenReady().then(async () => {
     },
     quit: () => app.quit(),
     openExternal: (url) => shell.openExternal(url),
+    // in the background from the start; an install waits for it (R10.8)
+    leftovers: app.isPackaged ? removeLeftovers(installDir) : Promise.resolve(),
     // Electron's fetch honours the system proxy
     fetch: (input, init) => net.fetch(input as string, init),
   });
@@ -336,7 +338,6 @@ app.whenReady().then(async () => {
   removeLeftoverArgFiles(dataDir);
   removeLeftoverRuns(dataDir);
   createWindow(dataDir);
-  if (app.isPackaged) void removeLeftovers(installDir);
   try {
     const last = loadLastProject(dataDir);
     if (last) await runner.open(last);
