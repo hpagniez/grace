@@ -4,6 +4,7 @@ import type { Locator, Page } from "@playwright/test";
 import { rmSync } from "node:fs";
 import path from "node:path";
 import {
+  addProperty,
   emptyProject,
   expect,
   launch,
@@ -11,6 +12,7 @@ import {
   node,
   nodeByKey,
   openProject,
+  openProperties,
   ourJavaPids,
   project,
   seedRuns,
@@ -263,6 +265,28 @@ test("A row's tooltip leaves the next row's run button to the pointer", async ()
   await expect(second).toHaveAttribute("data-status", "failed", { timeout: 60_000 });
   await expect(first).toHaveAttribute("data-status", "notRun");
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 30_000 });
+});
+
+test("Escape in a dialog closes a shown tooltip first, then the dialog", async () => {
+  const { win } = await openClean();
+  await openProperties(win);
+  await addProperty(win, "", "base.url", "http://localhost");
+  const row = win.getByTestId("property-row");
+  await row.getByTestId("prop-secret").focus();
+  await win.keyboard.press("Tab");
+  await expect(row.getByTestId("prop-delete")).toBeFocused();
+  const tip = win.getByRole("tooltip");
+  await expect(tip).toHaveText("Delete base.url", { timeout: 300 });
+
+  const dialog = win.getByTestId("properties-dialog");
+  await win.keyboard.press("Escape");
+  await expect(tip).toHaveCount(0);
+  await win.waitForTimeout(300); // past the dialog's 100 ms exit, had it begun one
+  await expect(dialog).toBeVisible();
+  await expect(row.getByTestId("prop-delete")).toBeFocused();
+
+  await win.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 });
 
 // R10: keyboard and accessibility
