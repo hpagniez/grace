@@ -36,13 +36,14 @@ Chosen: option 1. It is the only option that installs any version in both direct
 - No new dependency: Node's `fetch` and `crypto`, `%SystemRoot%\System32\tar.exe` (bsdtar reads zip; Git's GNU tar does not), and Windows PowerShell 5.1, run with `-ExecutionPolicy Bypass` for that process only.
 - Trust: the download must come from `https://github.com/hpagniez/grace/releases/download/v<version>/` and match the size and `sha256` digest the API gives for that asset. Releases are immutable. Without code signing, the trust root is the GitHub account; a signed build needs its own record.
 - The swap renames the install folder to `<install>.old` and the unpacked app into its place, on the same drive, after every Grace process has exited. A failed rename puts the old folder back. Files are copied or restored only while no Grace process runs.
-- Grace updates only a folder that holds nothing but its own files, checked against `resources\app-files.json`, a list of top-level names the build writes. A zip unpacked straight into `Downloads` is refused rather than moved and later deleted with the person's files.
+- Grace updates only a folder that holds nothing but its own files, checked against `resources\app-files.json`, a list of top-level names the build writes. A zip unpacked straight into `Downloads` is refused rather than moved and later deleted with the person's files. For the same reason, Grace and its script delete a `<install>.old`, `<install>.failed` or `<install>.update` folder only when a switch made it.
+- A new version must show its window within 2 minutes, signalled by a `started` file; otherwise the script switches back to the old one.
 - The switch script writes `update-result.json` into the data folder; the started version reads it and reports the result.
 - Data backups live in `<userData>\backups\<version>\`; the 3 most recent are kept.
 
 ### The updater is a contract between versions
 
-A version's updater installs the next one, and the next one reads what the previous one's script wrote. From the first version that ships the updater on, these do not change without a new record, pre-releases included: the tag `v<version>`, the asset name `Grace-win32-x64-<version>.zip`, the app at the zip's root, `resources\app-files.json`, `update-result.json`, the backup layout, and the `updates` key in `settings.json`.
+A version's updater installs the next one, and the next one reads what the previous one's script wrote. From the first version that ships the updater on, these do not change without a new record, pre-releases included: the tag `v<version>`, the asset name `Grace-win32-x64-<version>.zip`, the app at the zip's root, `resources\app-files.json`, `update-result.json` and its fields (a missing `reverted` reads as `false`), `<install>.update\plan.json` with its `to` and `installDir` fields, the names a switch leaves in `<install>.update` (including `old` and `failed`, where leftovers are moved before removal), `resources\app-files.json` as the mark of a Grace folder, the `started` and `switching` files, a carried `channel` of `null` or missing meaning "not picked", the backup layout, and the `updates` key in `settings.json`.
 
 ### Backward compatibility after 1.0.0
 
