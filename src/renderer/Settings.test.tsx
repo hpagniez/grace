@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
 import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
 import { initialState, type AppState } from "./reduce";
 import { Settings } from "./Settings";
+import { badge, TINT } from "./ui";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
@@ -15,7 +16,12 @@ beforeAll(() => {
     this.removeAttribute("open");
   };
 });
-afterEach(cleanup);
+// a tooltip shows after 500 ms
+beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const release = (version: string, prerelease = true): Release => ({
   version,
@@ -70,6 +76,15 @@ const click = (el: Element) => {
   flush();
 };
 const radio = (name: string) => screen.getByRole("radio", { name }) as HTMLInputElement;
+/** The tooltip `el` shows when the pointer rests on it (R9.4), or "" when it has none. */
+const tipOf = (el: HTMLElement) => {
+  const wrap = el.parentElement!;
+  fireEvent.pointerEnter(wrap);
+  vi.advanceTimersByTime(500);
+  const tip = document.querySelector('[role="tooltip"]')?.textContent ?? "";
+  fireEvent.pointerLeave(wrap);
+  return tip;
+};
 
 describe("Settings › Updates", () => {
   it("shows the running version, the marker and Update to the latest while out of date", () => {
@@ -94,7 +109,7 @@ describe("Settings › Updates", () => {
 
   it("goes back with the Back button and with Escape", () => {
     const { back } = show();
-    click(screen.getByRole("button", { name: "← Back" }));
+    click(screen.getByRole("button", { name: "Back" }));
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(back).toHaveBeenCalledTimes(2);
   });
@@ -104,6 +119,25 @@ describe("Settings › Updates", () => {
     click(action("1.0.0-rc.4")!);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(back).not.toHaveBeenCalled();
+  });
+
+  it("leaves Escape to a tooltip, which closes alone (R9.4)", () => {
+    const { back } = show(view({ packaged: false }));
+    const update = screen.getByTestId("settings-update");
+    fireEvent.pointerEnter(update.parentElement!);
+    vi.advanceTimersByTime(500);
+    expect(document.querySelector('[role="tooltip"]')).not.toBeNull();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    flush();
+    expect(document.querySelector('[role="tooltip"]')).toBeNull();
+    expect(back).not.toHaveBeenCalled();
+    // an Escape another handler already took is not this page's either
+    const taken = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    taken.preventDefault();
+    document.body.dispatchEvent(taken);
+    expect(back).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(back).toHaveBeenCalledOnce();
   });
 });
 
@@ -230,7 +264,7 @@ describe("switching (R6.4, R6.5, R7)", () => {
     action("1.0.0-rc.6")!,
     action("1.0.0-rc.4")!,
   ];
-  const states = () => buttons().map((b) => [(b as HTMLButtonElement).disabled, b.title]);
+  const states = () => buttons().map((b) => [(b as HTMLButtonElement).disabled, tipOf(b)]);
   const all = (why: string) => [true, true, true].map((d) => [d, why]);
 
   it("disables every switch button while a run or a discovery is active", () => {
@@ -322,9 +356,67 @@ describe("the settings (R2, R5, R6.2)", () => {
     expect(screen.queryByTestId("settings-error")).toBeNull();
   });
 
-  it("shows only the header before main sends the update view", () => {
+  it("shows only the header and the section's title before main sends the update view", () => {
     show(null);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
     expect(screen.queryByTestId("version-row")).toBeNull();
+  });
+});
+
+describe("the look (spec R21)", () => {
+  it("puts the page on a sheet under a header on the ground", () => {
+    show();
+    const page = screen.getByTestId("settings");
+    const header = page.querySelector("header")!;
+    expect(header.className).toContain("min-h-11");
+    expect(header.className).not.toContain("bg-"); // the ground shows through
+    const sheet = header.nextElementSibling!;
+    for (const c of ["bg-surface", "rounded-(--sheet-radius)", "mx-(--sheet-inset)"])
+      expect(sheet.className).toContain(c);
+    expect(page.outerHTML).not.toMatch(/dark:|zinc-|amber-|sky-|green-|red-|title=/);
+  });
+
+  it("lists the sections in the selectable row style, the open one selected", () => {
+    show();
+    const entry = within(screen.getByRole("navigation", { name: "Settings sections" })).getByText(
+      "Updates",
+    );
+    expect(entry.getAttribute("aria-current")).toBe("page");
+    for (const c of ["h-7", "bg-selected", "shadow-[inset_2px_0_0_var(--color-accent)]"])
+      expect(entry.className).toContain(c);
+  });
+
+  it("titles the section in text-lg", () => {
+    show();
+    const title = screen.getByRole("heading", { name: "Updates" });
+    expect(title.className).toContain("text-lg");
+    expect(screen.getByRole("region", { name: "Updates" })).toBeTruthy();
+  });
+
+  it("tags the versions with tinted badges", () => {
+    show(view({ backups: copyOf("1.0.0-rc.4") }));
+    const tag = (version: string, word: string) =>
+      within(rowOf(version)).getByText(word).closest("span")!.className;
+    expect(tag("1.0.0-rc.6", "pre-release")).toBe(`${badge} ${TINT.skipped}`);
+    expect(tag("1.0.0-rc.5", "installed")).toBe(`${badge} ${TINT.passed}`);
+    expect(tag("1.0.0-rc.4", "data saved")).toBe(`${badge} ${TINT.running}`);
+    expect(screen.getByTestId("settings-marker").className).toBe(`${badge} ${TINT.running}`);
+  });
+
+  it("shows a failed check's reason as an error message", () => {
+    show(view({ error: "Couldn't check for updates: offline" }));
+    expect(screen.getByTestId("settings-error").className).toContain("text-failed");
+  });
+
+  it("keeps the dialog's words while it fades out, and asks afresh the next time", () => {
+    show(view({ backups: copyOf("1.0.0-rc.6") }));
+    click(action("1.0.0-rc.6")!);
+    click(radio("Use the data you had in 1.0.0-rc.6 (2026-10-29)"));
+    click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = screen.getByTestId("switch-dialog") as HTMLDialogElement;
+    expect(dialog.open).toBe(false);
+    expect(dialog.textContent).toContain("Install 1.0.0-rc.6?");
+    click(action("1.0.0-rc.6")!);
+    expect(radio("Keep your current data").checked).toBe(true);
   });
 });

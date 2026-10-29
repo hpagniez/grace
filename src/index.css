@@ -239,8 +239,8 @@
   }
   /* Cursors sit in the base layer, so the `disabled:cursor-not-allowed` utilities still win. */
   button:enabled,
-  input[type="checkbox"]:enabled,
-  label:has(input[type="checkbox"]:enabled) {
+  input:is([type="checkbox"], [type="radio"]):enabled,
+  label:has(input:is([type="checkbox"], [type="radio"]):enabled) {
     cursor: pointer;
   }
   input:not([type]),
@@ -251,7 +251,7 @@
   }
   button:disabled,
   input:disabled,
-  label:has(input[type="checkbox"]:disabled) {
+  label:has(input:is([type="checkbox"], [type="radio"]):disabled) {
     cursor: not-allowed;
   }
 

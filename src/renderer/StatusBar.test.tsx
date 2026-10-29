@@ -1,11 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { CircleArrowUp, Download, Settings as Gear } from "lucide";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawn } from "../../test/drawn";
 import type { Api } from "../shared/ipc";
 import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
 import { initialState, type AppState } from "./reduce";
 import { StatusBar } from "./StatusBar";
+import { badge, TINT } from "./ui";
 
-afterEach(cleanup);
+// a tooltip shows after 500 ms
+beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const release = (version: string, prerelease = true): Release => ({
   version,
@@ -39,12 +47,22 @@ function show(updates: UpdateView | null, more: Partial<AppState> = {}) {
   return { api, openSettings };
 }
 const text = (id: string) => screen.getByTestId(id).textContent;
+/** The tooltip `el` shows when the pointer rests on it (R9.4), or null. */
+const tipOf = (el: HTMLElement) => {
+  const wrap = el.parentElement!;
+  fireEvent.pointerEnter(wrap);
+  vi.advanceTimersByTime(500);
+  const tip = document.querySelector('[role="tooltip"]')?.textContent ?? null;
+  fireEvent.pointerLeave(wrap);
+  return tip;
+};
 
 describe("StatusBar", () => {
   it("shows the running version and Settings", () => {
     show(view({ releases: null }));
     expect(text("status-version")).toBe("Grace 1.0.0-rc.5");
-    expect(text("settings-button")).toBe("⚙ Settings");
+    expect(text("settings-button")).toBe("Settings");
+    expect(drawn(screen.getByTestId("settings-button").querySelector("svg"), Gear)).toBe(true);
     expect(screen.queryByTestId("update-marker")).toBeNull();
   });
 
@@ -85,25 +103,28 @@ describe("StatusBar", () => {
     const busy = "Finish or cancel the run first";
     show(view(), { busy: true });
     const link = () => screen.getByTestId("update-link") as HTMLButtonElement;
-    expect([link().disabled, link().title]).toEqual([true, busy]);
+    expect([link().disabled, tipOf(link())]).toEqual([true, busy]);
     cleanup();
     show(view(), { run: { ...initialState().run, active: true } });
-    expect([link().disabled, link().title]).toEqual([true, busy]);
+    expect([link().disabled, tipOf(link())]).toEqual([true, busy]);
     cleanup();
     show(view({ packaged: false }), { busy: true }); // the run comes first
-    expect([link().disabled, link().title]).toEqual([true, busy]);
+    expect([link().disabled, tipOf(link())]).toEqual([true, busy]);
   });
 
   it("Update is disabled in a build that is not packaged (R13.1)", () => {
     show(view({ packaged: false }));
     const link = screen.getByTestId("update-link") as HTMLButtonElement;
-    expect([link.disabled, link.title]).toEqual([true, "Updates install only in the packaged app"]);
+    expect([link.disabled, tipOf(link)]).toEqual([
+      true,
+      "Updates install only in the packaged app",
+    ]);
   });
 
   it("Update is enabled when packaged and idle", () => {
     show(view());
     const link = screen.getByTestId("update-link") as HTMLButtonElement;
-    expect([link.disabled, link.title]).toEqual([false, ""]);
+    expect([link.disabled, tipOf(link)]).toEqual([false, null]);
   });
 
   it("the marker, the version and Settings open the settings", () => {
@@ -111,6 +132,26 @@ describe("StatusBar", () => {
     for (const id of ["update-marker", "status-version", "settings-button"])
       fireEvent.click(screen.getByTestId(id));
     expect(openSettings).toHaveBeenCalledTimes(3);
+  });
+
+  it("is a 24 px bar on the ground, in muted 12 px text (spec R21)", () => {
+    show(view());
+    const bar = screen.getByRole("contentinfo");
+    for (const c of ["h-6", "bg-ground", "text-xs", "text-muted"])
+      expect(bar.className).toContain(c);
+    for (const id of ["update-link", "status-version", "settings-button"])
+      expect(screen.getByTestId(id).className).toContain("h-6"); // a 24 px target (R10.3)
+    for (const svg of bar.querySelectorAll("button > svg"))
+      expect(svg.getAttribute("width")).toBe("14");
+    expect(drawn(screen.getByTestId("update-link").querySelector("svg"), Download)).toBe(true);
+    expect(bar.outerHTML).not.toMatch(/dark:|zinc-|amber-|sky-|title=/);
+  });
+
+  it("shows the update marker as a running tinted badge (spec R21)", () => {
+    show(view());
+    const tag = screen.getByTestId("update-marker").firstElementChild as HTMLElement;
+    expect(tag.className).toBe(`${badge} ${TINT.running}`);
+    expect(drawn(tag.querySelector("svg"), CircleArrowUp)).toBe(true);
   });
 
   it("shows nothing before main sends the update view", () => {

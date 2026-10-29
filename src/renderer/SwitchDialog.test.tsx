@@ -2,7 +2,9 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Backup, Release } from "../shared/updates";
+import { btnDialog, dangerDialog, primaryDialog } from "./buttons";
 import { SwitchDialog } from "./SwitchDialog";
+import { dialog as dialogStyle } from "./ui";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
@@ -34,6 +36,7 @@ function show(target: string, backup: Backup | null) {
   const onCancel = vi.fn();
   render(() => (
     <SwitchDialog
+      open
       target={release(target)}
       running="1.0.0-rc.5"
       backup={backup}
@@ -98,6 +101,32 @@ describe("SwitchDialog rollback (R7)", () => {
     screen.getByRole("dialog").removeAttribute("open");
     fireEvent(screen.getByRole("dialog", { hidden: true }), new Event("close"));
     expect(onCancel).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("SwitchDialog look (spec R19.1)", () => {
+  const confirm = () => screen.getByTestId("switch-confirm");
+  const cancel = () => screen.getByTestId("switch-cancel");
+
+  it("is a dialog-style box with a 16 px title, the action first and Cancel last", () => {
+    show("1.0.0-rc.6", copy("1.0.0-rc.6"));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain(dialogStyle);
+    expect(screen.getByRole("heading").className).toContain("text-lg");
+    expect(confirm().className).toContain(primaryDialog);
+    expect(cancel().className).toContain(btnDialog);
+    expect(
+      confirm().compareDocumentPosition(cancel()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(dialog.outerHTML).not.toMatch(/dark:|zinc-|amber-|sky-/);
+  });
+
+  it("styles Roll back and restart as a danger and its warning as a notice", () => {
+    show("1.0.0-rc.4", copy("1.0.0-rc.4"));
+    expect(confirm().className).toContain(dangerDialog);
+    const warning = screen.getByTestId("switch-warning");
+    expect(warning.getAttribute("role")).toBe("status");
+    expect(warning.className).toContain("bg-cancelled-tint");
   });
 });
 

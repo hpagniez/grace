@@ -14,6 +14,7 @@ import { Tree } from "./Tree";
 import { UpdateModal } from "./UpdateModal";
 import { UpdateProgress } from "./UpdateProgress";
 import { createAppStore } from "./store";
+import { sheet } from "./ui";
 
 export function App(props: { api: Api }) {
   const { state, select, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
@@ -68,11 +69,8 @@ export function App(props: { api: Api }) {
               }
             >
               <Toolbar state={state} api={props.api} />
-              {/* the sheet (spec R3.3): the project view on a surface, inset and rounded in the light theme, flat in the dark one; overflow-clip, like the root, so focus cannot scroll it */}
-              <div
-                data-testid="sheet"
-                class="relative mx-(--sheet-inset) mb-(--sheet-inset) flex min-h-0 flex-1 flex-col overflow-clip rounded-(--sheet-radius) border-x-(length:--sheet-side) border-t border-b-(length:--sheet-side) border-line bg-surface"
-              >
+              {/* the project view on the sheet (spec R3.3) */}
+              <div data-testid="sheet" class={sheet}>
                 <Progress state={state} />
                 <FilterBar state={state} api={props.api} />
                 <Show when={!settingsOpen()}>{noticeBox()}</Show>

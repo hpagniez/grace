@@ -36,6 +36,17 @@ export const TINT: Record<"passed" | "failed" | "skipped" | "running" | "cancell
 export const box = "rounded-lg bg-sunken p-2 font-mono text-xs";
 
 /**
+ * The sheet under a row on the ground (spec R3.3): inset and rounded in the light theme, flat in the dark
+ * one. overflow-clip, like the root, so focus cannot scroll it.
+ */
+export const sheet =
+  "relative mx-(--sheet-inset) mb-(--sheet-inset) flex min-h-0 flex-1 flex-col overflow-clip rounded-(--sheet-radius) border-x-(length:--sheet-side) border-t border-b-(length:--sheet-side) border-line bg-surface";
+
+/** A button that reads as a link inside a sentence: Check for updates, What's new. */
+export const link =
+  "rounded-sm font-medium text-ink underline decoration-control underline-offset-2 transition-colors duration-(--duration-fast) ease-standard enabled:hover:decoration-ink disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40";
+
+/**
  * A modal <dialog> (R19.1). It enters over --duration-base with a fade and a scale from 0.98, and its
  * backdrop fades (R5.2). transition-discrete keeps both displayed while they fade out, over the
  * shorter --duration-fast. Checked in Chromium: the enter and the exit both animate. While it fades out
