@@ -51,8 +51,10 @@ describe("filled buttons", () => {
 
   it("use the primary tokens, not the accent ones", () => {
     for (const b of [primary, primaryDialog]) {
-      expect(b).toContain("bg-primary");
-      expect(b).toContain("text-on-primary");
+      const classes = b.split(" "); // whole class names: `enabled:hover:bg-primary-hover` is not `bg-primary`
+      expect(classes).toContain("bg-primary");
+      expect(classes).toContain("text-on-primary");
+      expect(classes).toContain("enabled:hover:bg-primary-hover");
       expect(b).not.toMatch(/accent/);
     }
   });
