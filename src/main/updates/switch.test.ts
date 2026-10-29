@@ -371,7 +371,7 @@ setInterval(() => {}, 1 << 30);
     write(path.join(`${install}.old`, "resources", "app-files.json"), "[]");
     write(path.join(`${install}.old`, "left.txt"));
     await run();
-    expect(result()).toMatchObject({ ok: true });
+    expect(result()).toMatchObject({ ok: true, error: null });
     expect(read(`${install}.old`, "v.txt")).toBe("1.0.0-rc.5");
     expect(existsSync(path.join(`${install}.old`, "left.txt"))).toBe(false);
   });
@@ -394,6 +394,29 @@ setInterval(() => {}, 1 << 30);
     await done;
     expect(result()).toMatchObject({ ok: true, error: null });
     expect(read(install, "v.txt")).toBe("1.0.0-rc.6");
+  });
+
+  it("leaves a held .old whole, never without its file list (R10.8)", T, async () => {
+    const old = `${install}.old`;
+    write(path.join(old, "resources", "app-files.json"), "[]");
+    // removed after resources\ in place, so the file list would go first
+    write(path.join(old, "zz.txt"));
+    await hold(path.join(old, "zz.txt"));
+    await run();
+    expect(result()).toMatchObject({ ok: false, reverted: false });
+    expect(existsSync(path.join(old, "resources", "app-files.json"))).toBe(true);
+    expect(read(install, "v.txt")).toBe("1.0.0-rc.5");
+    expect(pidsUnder(install)).not.toHaveLength(0);
+  });
+
+  it("removes a .failed left by an earlier switch when it switches back", T, async () => {
+    write(path.join(`${install}.failed`, "resources", "app-files.json"), "[]");
+    write(path.join(`${install}.failed`, "left.txt"));
+    write(path.join(staging, "app", "noStart.flag"));
+    await run({ startTimeoutSec: 3 });
+    expect(result()).toMatchObject({ ok: false, reverted: true });
+    expect(read(`${install}.failed`, "v.txt")).toBe("1.0.0-rc.6");
+    expect(existsSync(path.join(`${install}.failed`, "left.txt"))).toBe(false);
   });
 
   it("writes update-result.json and backup.json without a byte order mark", T, async () => {

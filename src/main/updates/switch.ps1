@@ -115,6 +115,16 @@ function Assert-Leftover($dir) {
   }
 }
 
+# Moved into the staging folder whole, then removed: a removal cut short by a held file never leaves
+# half a Grace folder without its file list next to the install, which Grace would then refuse (R10.8).
+function Remove-Leftover($dir, $name) {
+  if (-not (Test-Path -LiteralPath $dir)) { return }
+  $inside = Join-Path $PSScriptRoot $name
+  Remove-Tree $inside
+  Move-Back $dir $inside  # retried: an antivirus may hold a file for a moment
+  Remove-Tree $inside
+}
+
 # Each flag says what to undo (R9.6, R10.4, R10.6). Set before the try: the catch reads them all.
 $plan = $null; $exited = $false; $copying = $false; $copied = $false; $restored = $false
 $movedOld = $false; $movedNew = $false; $startedNew = $false; $ok = $false
@@ -146,7 +156,7 @@ try {
     Assert-Leftover $aside
 
     # R10.3, in order: back up, restore, rename, rename
-    Remove-Tree $old  # left by an earlier switch
+    Remove-Leftover $old 'old'  # left by an earlier switch
     $copying = $true
     Remove-Copy $backup  # R9.1: an older copy of this version is replaced
     $skip = 'backups', 'update-result.json', 'Cache', 'Code Cache', 'GPUCache', 'GrShaderCache', 'ShaderCache',
@@ -197,7 +207,7 @@ try {
       # R10.6: stop the new version and everything it started, then keep it aside
       try {
         foreach ($p in Get-Grace) { try { & $taskkill /PID $p.Id /T /F | Out-Null } catch {} }
-        Remove-Tree $aside  # left by an earlier switch
+        Remove-Leftover $aside 'failed'  # left by an earlier switch
         Move-Back $install $aside
       } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
     } elseif ($movedNew) {
