@@ -27,6 +27,8 @@ const api: Api = {
   setUpdateSettings: (patch) => ipcRenderer.invoke(CH.updateSettings, patch),
   skipVersion: (version) => ipcRenderer.invoke(CH.skipVersion, version),
   openWhatsNew: (version) => ipcRenderer.invoke(CH.whatsNew, version),
+  getAppearance: () => ipcRenderer.invoke(CH.getAppearance),
+  setAppearance: (theme) => ipcRenderer.invoke(CH.setAppearance, theme),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

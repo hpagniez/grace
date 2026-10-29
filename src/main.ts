@@ -16,7 +16,7 @@ import type { AppEvent } from "./shared/events";
 import { RUN_ID } from "./shared/history";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
-import { GROUND } from "./shared/theme";
+import { GROUND, THEMES } from "./shared/theme";
 import type { Channel } from "./shared/updates";
 import { parseVersion } from "./shared/version";
 import { removeLeftoverRuns } from "./main/history";
@@ -26,9 +26,11 @@ import { checkRecent } from "./main/recent";
 import { Runner } from "./main/runner";
 import { safeStorageBox } from "./main/secrets";
 import {
+  loadAppearance,
   loadLastProject,
   loadRecentProjects,
   loadWindowState,
+  saveAppearance,
   saveWindowState,
 } from "./main/settings";
 import { vendorPaths } from "./main/vendor";
@@ -203,6 +205,12 @@ app.whenReady().then(async () => {
   // No menu: its Reload would drop the window's view of a live run.
   Menu.setApplicationMenu(null);
   const dataDir = app.getPath("userData");
+  // Before the window exists, so its first frame and its title bar are in the saved theme (spec R8.3)
+  nativeTheme.themeSource = loadAppearance(dataDir);
+  nativeTheme.on("updated", () => {
+    if (win && !win.isDestroyed())
+      win.setBackgroundColor(GROUND[nativeTheme.shouldUseDarkColors ? "dark" : "light"]);
+  });
   const vendor = vendorPaths(
     app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "vendor"),
   );
@@ -317,6 +325,17 @@ app.whenReady().then(async () => {
       return;
     }
     updater.setSettings(patch);
+  });
+  handle(CH.getAppearance, () => loadAppearance(dataDir));
+  handle(CH.setAppearance, (theme) => {
+    const valid = THEMES.find((t) => t === theme);
+    if (!valid) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    // applied first: a save that fails (a notice says why) still leaves the window as chosen
+    nativeTheme.themeSource = valid;
+    saveAppearance(dataDir, valid);
   });
   handleVersion(CH.skipVersion, (version) => updater.skip(version));
   handleVersion(CH.whatsNew, (version) => updater.whatsNew(version));

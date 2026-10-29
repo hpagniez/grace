@@ -1,7 +1,8 @@
 import type { JSX } from "@solidjs/web";
 import { ArrowLeft, Check, CircleArrowUp, Download } from "lucide";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
+import { parseTheme, type Theme } from "../shared/theme";
 import { channelOf, onChannel, type Release, type UpdateView } from "../shared/updates";
 import { compareVersions, isPrerelease } from "../shared/version";
 import { btnSmall, ghost, primary } from "./buttons";
@@ -17,6 +18,57 @@ import { latestAvailable, updateBlocked } from "./updateState";
 const legend = "text-sm font-medium";
 /** A radio button or a checkbox with its label: a 24 px row. */
 const choice = "flex h-6 items-center gap-2 text-sm";
+
+const SECTIONS = [
+  { id: "updates", label: "Updates" },
+  { id: "appearance", label: "Appearance" },
+] as const;
+const THEME_CHOICES: { theme: Theme; label: string }[] = [
+  { theme: "system", label: "Follow Windows" },
+  { theme: "light", label: "Light" },
+  { theme: "dark", label: "Dark" },
+];
+
+/** Settings › Appearance (spec R8): the theme main applies to the whole window at once and saves. */
+function Appearance(props: { api: Api; hidden: boolean }) {
+  const [theme, setTheme] = createSignal<Theme>("system");
+  onSettled(() => void props.api.getAppearance().then((t) => setTheme(parseTheme(t))));
+  return (
+    <section
+      aria-labelledby="settings-appearance"
+      hidden={props.hidden}
+      class="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-5"
+    >
+      <h2 id="settings-appearance" class="text-lg font-semibold">
+        Appearance
+      </h2>
+      <fieldset class="mt-4">
+        <legend class={legend}>Theme</legend>
+        <div class="mt-1">
+          <For each={THEME_CHOICES}>
+            {(c) => (
+              <label class={choice}>
+                <input
+                  type="radio"
+                  name="theme"
+                  value={c.theme}
+                  data-testid={`theme-${c.theme}`}
+                  class="accent-accent"
+                  checked={theme() === c.theme}
+                  onChange={() => {
+                    setTheme(c.theme);
+                    void props.api.setAppearance(c.theme);
+                  }}
+                />
+                {c.label}
+              </label>
+            )}
+          </For>
+        </div>
+      </fieldset>
+    </section>
+  );
+}
 
 /** What the table lists (R6.3): the channel's releases plus the running version, newest first. */
 function rowsOf(u: UpdateView): Release[] {
@@ -39,8 +91,9 @@ function rowsOf(u: UpdateView): Release[] {
 
 /**
  * The Settings page (app-updates R6), which replaces the view until Back or Escape: a header on the
- * ground, then a sheet with the list of sections and the section (spec R21). Its one section, Updates,
- * shows the running version, the check, the channel and startup settings, and the versions to switch to.
+ * ground, then a sheet with the list of sections and the section (spec R21). Updates, the one it opens
+ * on, shows the running version, the check, the channel and startup settings, and the versions to switch
+ * to. Appearance (spec R8) holds the theme.
  */
 export function Settings(props: {
   state: AppState;
@@ -58,6 +111,7 @@ export function Settings(props: {
     setAsking(true);
   };
   const blocked = () => updateBlocked(props.state);
+  const [section, setSection] = createSignal<(typeof SECTIONS)[number]["id"]>("updates");
 
   // Escape goes back, unless it closes a dialog (the SwitchDialog, or one of App's) or a tooltip. In the
   // bubble phase: a tooltip takes its Escape in the capture phase and stops it there.
@@ -87,18 +141,26 @@ export function Settings(props: {
         <div class="flex min-h-0 flex-1">
           <nav aria-label="Settings sections" class="w-48 shrink-0 border-r border-line p-2">
             <ul>
-              <li>
-                <span
-                  aria-current="page"
-                  class="flex h-7 items-center rounded-sm bg-selected px-2 text-sm font-medium shadow-[inset_2px_0_0_var(--color-accent)]"
-                >
-                  Updates
-                </span>
-              </li>
+              <For each={SECTIONS}>
+                {(s) => (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid={`settings-section-${s.id}`}
+                      aria-current={section() === s.id ? "page" : undefined}
+                      class={`flex h-7 w-full items-center rounded-sm px-2 text-left text-sm transition-colors duration-(--duration-fast) ease-standard ${section() === s.id ? "bg-selected font-medium shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"}`}
+                      onClick={() => setSection(s.id)}
+                    >
+                      {s.label}
+                    </button>
+                  </li>
+                )}
+              </For>
             </ul>
           </nav>
           <section
             aria-labelledby="settings-updates"
+            hidden={section() !== "updates"}
             class="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-5"
           >
             <h2 id="settings-updates" class="text-lg font-semibold">
@@ -317,6 +379,7 @@ export function Settings(props: {
               )}
             </Show>
           </section>
+          <Appearance api={props.api} hidden={section() !== "appearance"} />
         </div>
       </div>
     </div>

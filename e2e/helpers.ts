@@ -71,12 +71,14 @@ export const emptyProject = () => tempDir("kk-empty-");
 /**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
  * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
+ * Playwright emulates light unless told otherwise: `colorScheme: null` turns the emulation off, so the
+ * page follows `nativeTheme` (the Appearance tests).
  * Its update check reads an empty feed, never GitHub, unless `extraEnv` gives `GRACE_UPDATE_FEED`.
  */
 export async function launch(
   userDataDir?: string,
   extraEnv: Record<string, string> = {},
-  opts: { colorScheme?: "light" | "dark" } = {},
+  opts: { colorScheme?: "light" | "dark" | null } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const noFeed = path.join(tempDir("kk-feed-"), "releases.json");
@@ -92,16 +94,17 @@ export async function launch(
 }
 
 /**
- * Starts the built app with a fresh userData folder whose settings.json already holds `settings`, and
- * `extraEnv` added to its environment.
+ * Starts the built app with a fresh userData folder whose settings.json already holds `settings`,
+ * `extraEnv` added to its environment, and `opts` as `launch` takes them.
  */
 export async function launchWithSettings(
   settings: Record<string, unknown>,
   extraEnv?: Record<string, string>,
+  opts?: Parameters<typeof launch>[2],
 ) {
   const userData = tempDir("kk-userdata-");
   writeFileSync(path.join(userData, "settings.json"), JSON.stringify(settings));
-  return launch(userData, extraEnv);
+  return launch(userData, extraEnv, opts);
 }
 
 /** The parsed settings.json of an app data folder. */

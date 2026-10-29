@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@solidjs/testing-lib
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
+import type { Theme } from "../shared/theme";
 import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
 import { initialState, type AppState } from "./reduce";
 import { Settings } from "./Settings";
@@ -47,11 +48,17 @@ const view = (more: Partial<UpdateView> = {}): UpdateView => ({
 });
 const copyOf = (version: string) => [{ version, savedAt: "2026-10-29T10:00:00Z" }];
 
-function show(updates: UpdateView | null = view(), more: Partial<AppState> = {}) {
+function show(
+  updates: UpdateView | null = view(),
+  more: Partial<AppState> = {},
+  theme: Theme = "system",
+) {
   const api = {
     checkUpdates: vi.fn(async () => {}),
     installVersion: vi.fn(async () => {}),
     setUpdateSettings: vi.fn(async () => {}),
+    getAppearance: vi.fn(async () => theme),
+    setAppearance: vi.fn(async () => {}),
   };
   const back = vi.fn();
   render(() => (
@@ -418,5 +425,89 @@ describe("the look (spec R21)", () => {
     expect(dialog.textContent).toContain("Install 1.0.0-rc.6?");
     click(action("1.0.0-rc.6")!);
     expect(radio("Keep your current data").checked).toBe(true);
+  });
+});
+
+describe("Settings › Appearance (spec R8)", () => {
+  const section = (name: string) => screen.getByRole("button", { name });
+  /** The page after the saved theme has arrived: Solid holds a write until the next flush. */
+  const settled = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    flush();
+  };
+  const open = async (theme: Theme = "system") => {
+    const shown = show(view(), {}, theme);
+    click(section("Appearance"));
+    await settled();
+    return shown;
+  };
+
+  it("opens on Updates, and the list switches to Appearance and back", async () => {
+    show();
+    expect(section("Updates").getAttribute("aria-current")).toBe("page");
+    expect(section("Appearance").getAttribute("aria-current")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Dark" })).toBeNull();
+    click(section("Appearance"));
+    expect(section("Appearance").getAttribute("aria-current")).toBe("page");
+    expect(section("Updates").getAttribute("aria-current")).toBeNull();
+    const title = screen.getByRole("heading", { name: "Appearance" });
+    expect(title.className).toContain("text-lg");
+    expect(screen.getByRole("region", { name: "Appearance" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Updates" })).toBeNull();
+    click(section("Updates"));
+    expect(screen.getByRole("region", { name: "Updates" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Appearance" })).toBeNull();
+  });
+
+  it("lists the three themes in a Theme group, Follow Windows checked by default", async () => {
+    const { api } = await open();
+    const group = screen.getByRole("group", { name: "Theme" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((r) => (r as HTMLInputElement).value),
+    ).toEqual(["system", "light", "dark"]);
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((r) => [r.parentElement!.textContent, (r as HTMLInputElement).checked]),
+    ).toEqual([
+      ["Follow Windows", true],
+      ["Light", false],
+      ["Dark", false],
+    ]);
+    expect(api.getAppearance).toHaveBeenCalledOnce();
+    expect(api.setAppearance).not.toHaveBeenCalled();
+  });
+
+  it("selects the saved theme once main answers", async () => {
+    await open("dark");
+    expect([radio("Follow Windows"), radio("Light"), radio("Dark")].map((r) => r.checked)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it("choosing a theme saves it and selects it at once", async () => {
+    const { api } = await open();
+    click(radio("Dark"));
+    expect(api.setAppearance).toHaveBeenLastCalledWith("dark");
+    expect(radio("Dark").checked).toBe(true);
+    expect(radio("Follow Windows").checked).toBe(false);
+    click(radio("Follow Windows"));
+    expect(api.setAppearance).toHaveBeenLastCalledWith("system");
+    click(radio("Light"));
+    expect(api.setAppearance).toHaveBeenLastCalledWith("light");
+    expect(api.setAppearance).toHaveBeenCalledTimes(3);
+  });
+
+  it("styles the radios like the channel's, with the accent", async () => {
+    await open();
+    for (const name of ["Follow Windows", "Light", "Dark"]) {
+      expect(radio(name).className).toContain("accent-accent");
+      expect(radio(name).parentElement!.className).toContain("h-6");
+    }
   });
 });
