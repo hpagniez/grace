@@ -33,7 +33,7 @@ export function StatusBar(props: { state: AppState; api: Api; openSettings(): vo
                     type="button"
                     data-testid="update-marker"
                     aria-label={`Grace ${u().running}, ${v()} available`}
-                    class={`${item} px-0.5`}
+                    class={item}
                     onClick={() => props.openSettings()}
                   >
                     <span class={`${badge} ${TINT.running}`}>
