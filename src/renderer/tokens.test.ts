@@ -48,8 +48,9 @@ describe("colour tokens (spec R1)", () => {
     ).toEqual([...TOKENS].sort());
   });
 
-  it("overrides only tokens the light theme defines", () => {
-    for (const name of Object.keys(darkOverrides)) expect(TOKENS, name).toContain(name);
+  // `readTokens().dark` falls back to light for a token the dark block lacks, so check the block itself.
+  it("overrides every token in the dark theme except brand, the one that is the same", () => {
+    expect(Object.keys(darkOverrides).sort()).toEqual(TOKENS.filter((n) => n !== "brand").sort());
   });
 
   for (const theme of ["light", "dark"] as const) {

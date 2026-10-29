@@ -238,11 +238,12 @@
     cursor: not-allowed;
   }
 
-  /* One rule turns every transition and animation off (R5.3). */
+  /* One rule turns every transition and animation off (R5.3); `*` does not match a dialog's ::backdrop. */
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
-    ::after {
+    ::after,
+    ::backdrop {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

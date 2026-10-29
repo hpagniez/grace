@@ -18,7 +18,10 @@ function block(css: string, header: RegExp): string {
 
 const colors = (css: string): Record<string, string> =>
   Object.fromEntries(
-    [...css.matchAll(/--color-([a-z-]+):\s*(#[0-9a-f]{6})\s*;/g)].map((m) => [m[1], m[2]]),
+    [...css.matchAll(/--color-([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi)].map((m) => [
+      m[1],
+      m[2].toLowerCase(),
+    ]),
   );
 
 /** The `#rrggbb` colour tokens of src/index.css: the light ones from `@theme`, the dark overrides from the dark media block. */
