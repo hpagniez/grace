@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Grace",
+  "mainBinaryName": "Grace",
+  "version": "1.0.0-rc.3",
+  "identifier": "io.github.hpagniez.grace.spike",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5199",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "title": "Grace",
+        "width": 1200,
+        "height": 800,
+        "minHeight": 480
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": ["../../../../assets/icon.ico"],
+    "resources": {
+      "../../../../vendor/jre/": "jre/",
+      "../../../../vendor/karate.jar": "karate.jar",
+      "../../../../vendor/licenses/": "licenses/"
+    }
+  }
+}
