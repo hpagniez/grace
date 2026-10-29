@@ -52,7 +52,6 @@ function Appearance(props: { api: Api; hidden: boolean }) {
                   type="radio"
                   name="theme"
                   value={c.theme}
-                  data-testid={`theme-${c.theme}`}
                   class="accent-accent"
                   checked={theme() === c.theme}
                   onChange={() => {
