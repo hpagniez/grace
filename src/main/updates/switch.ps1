@@ -183,8 +183,9 @@ try {
     for (;;) {
       $quit = $grace.HasExited  # read first: it may write started just before it quits
       if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'started')) { break }
+      if ($quit) { throw "$($plan.to) quit right after starting" }
       # the wording stays at 2 minutes: startTimeoutSec is shorter only in tests
-      if ($quit -or [DateTime]::UtcNow -gt $deadline) { throw "$($plan.to) didn't start within 2 minutes" }
+      if ([DateTime]::UtcNow -gt $deadline) { throw "$($plan.to) didn't start within 2 minutes" }
       Start-Sleep -Milliseconds 250
     }
     $ok = $true

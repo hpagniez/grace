@@ -439,7 +439,8 @@ setInterval(() => {}, 1 << 30);
     expect(result()).toMatchObject({
       ok: false,
       reverted: true,
-      error: "1.0.0-rc.6 didn't start within 2 minutes",
+      // reverted: Grace saves it as failed, as after a timeout (R10.6)
+      error: "1.0.0-rc.6 quit right after starting",
     });
   });
 
