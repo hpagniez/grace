@@ -5,6 +5,7 @@ import type { HistoryEntry } from "./history";
 import type { HttpCall } from "./http";
 import type { Layout, Status, TestNode } from "./model";
 import type { FilterState } from "./tags";
+import type { Release, UpdateProgress, UpdateView } from "./updates";
 
 export interface Step {
   /** Gherkin prefix as written: Given, When, Then, And, or `*`. */
@@ -79,4 +80,10 @@ export type AppEvent =
   /** The folder main is opening, or null. Sent around each open and in every replay. */
   | { type: "opening"; root: string | null }
   /** The saved recent folders, newest first, each checked for existence. */
-  | { type: "recent"; entries: RecentEntry[] };
+  | { type: "recent"; entries: RecentEntry[] }
+  /** What main holds about updates: settings, the last check and the saved copies of the data. */
+  | { type: "updates"; view: UpdateView }
+  /** The startup modal's release (R4.1). */
+  | { type: "updatePrompt"; release: Release }
+  /** The install in progress or its failure; null when there is none to show (R8). */
+  | { type: "updateProgress"; progress: UpdateProgress | null };

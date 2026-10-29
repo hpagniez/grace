@@ -5,6 +5,7 @@ import type { AppEvent } from "../shared/events";
 import type { HistoryEntry } from "../shared/history";
 import type { HttpCall } from "../shared/http";
 import type { TestNode } from "../shared/model";
+import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
 import { readAllEvents } from "../main/karate/events";
 import { RunState } from "../main/karate/run-state";
 import { buildTree, leafKeys } from "../main/karate/tree";
@@ -500,6 +501,48 @@ describe("reduce", () => {
       apply(s, project(), { type: "console", lines: ["a"] });
       apply(s, { ...(project() as Extract<AppEvent, { type: "project" }>), project: other });
       expect(s.console).toEqual(["a"]);
+    });
+  });
+
+  describe("updates", () => {
+    const release: Release = {
+      version: "1.0.0-rc.6",
+      prerelease: true,
+      publishedAt: "2026-10-29T10:00:00Z",
+      url: "https://github.com/hpagniez/grace/releases/download/v1.0.0-rc.6/Grace-win32-x64-1.0.0-rc.6.zip",
+      size: 218_557_130,
+      sha256: "a".repeat(64),
+    };
+    const view: UpdateView = {
+      running: "1.0.0-rc.5",
+      packaged: false,
+      settings: defaultUpdateSettings(),
+      releases: [release],
+      checking: false,
+      error: null,
+      backups: [],
+    };
+
+    it("start empty", () => {
+      const s = initialState();
+      expect([s.updates, s.updatePrompt, s.updateProgress]).toEqual([null, null, null]);
+    });
+
+    it("each event sets its state, and a project event keeps them", () => {
+      const s = initialState();
+      const progress = { version: "1.0.0-rc.6", rollback: false, error: "boom" };
+      apply(
+        s,
+        { type: "updates", view },
+        { type: "updatePrompt", release },
+        { type: "updateProgress", progress },
+        project(),
+      );
+      expect(s.updates).toEqual(view);
+      expect(s.updatePrompt).toEqual(release);
+      expect(s.updateProgress).toEqual(progress);
+      apply(s, { type: "updateProgress", progress: null });
+      expect(s.updateProgress).toBeNull();
     });
   });
 });

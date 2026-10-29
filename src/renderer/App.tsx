@@ -6,12 +6,17 @@ import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
 import { loadPanelHeight } from "./panelHeight";
 import { Progress } from "./Progress";
+import { Settings } from "./Settings";
+import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { Tree } from "./Tree";
+import { UpdateModal } from "./UpdateModal";
+import { UpdateProgress } from "./UpdateProgress";
 import { createAppStore } from "./store";
 
 export function App(props: { api: Api }) {
-  const { state, select, showPanel, selectCall, toggleGroup, dispose } = createAppStore(props.api);
+  const { state, select, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
+    createAppStore(props.api);
   onCleanup(dispose);
   // index.html's startup screen stays until main says what is open, so home never flashes
   createEffect(
@@ -25,6 +30,7 @@ export function App(props: { api: Api }) {
   const notice = () => state.notice ?? (home() ? state.error : null);
   const [height, setHeight] = createSignal(loadPanelHeight()); // read before the first paint
   const [dragging, setDragging] = createSignal(false);
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
   let main: HTMLElement | undefined;
   return (
     <Show when={state.loaded}>
@@ -32,40 +38,63 @@ export function App(props: { api: Api }) {
         data-testid="app"
         class={`flex h-screen flex-col overflow-clip bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 ${dragging() ? "cursor-row-resize select-none" : state.busy || state.run.active ? "cursor-progress" : ""}`}
       >
-        <Show when={!home()}>
-          <Toolbar state={state} api={props.api} />
-          <Progress state={state} />
-          <FilterBar state={state} api={props.api} />
-        </Show>
-        <Show when={notice()}>
-          <div
-            data-testid="notice"
-            class="border-b border-amber-300 bg-amber-50 px-3 py-1 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
-          >
-            {notice()}
+        {/* the view cuts off at the status bar, so a short window never hides the bar */}
+        <div data-testid="view" class="flex min-h-0 flex-1 flex-col overflow-clip">
+          {/* The project view stays mounted under the Settings page (R6.1), so Back finds every local state
+              as it was: collapsed tree nodes, scroll positions, the console following its tail. */}
+          <div hidden={settingsOpen()} class="shrink-0">
+            <Show when={!home()}>
+              <Toolbar state={state} api={props.api} />
+              <Progress state={state} />
+              <FilterBar state={state} api={props.api} />
+            </Show>
           </div>
-        </Show>
-        <Show when={!home()} fallback={<Home state={state} api={props.api} />}>
-          <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
-            <div class="flex min-h-0 w-1/2 flex-col">
-              <Tree state={state} select={select} api={props.api} />
+          <Show when={notice()}>
+            <div
+              data-testid="notice"
+              class="border-b border-amber-300 bg-amber-50 px-3 py-1 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+            >
+              {notice()}
             </div>
-            <div class="flex min-h-0 w-1/2 flex-col">
-              <Details state={state} api={props.api} />
+          </Show>
+          <div class="relative flex min-h-0 flex-1 flex-col">
+            {/* invisible, not hidden: it keeps its layout and scroll offsets, and takes no focus or clicks */}
+            <div
+              data-testid="project-view"
+              class={`flex min-h-0 flex-1 flex-col ${settingsOpen() ? "invisible" : ""}`}
+            >
+              <Show when={!home()} fallback={<Home state={state} api={props.api} />}>
+                <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
+                  <div class="flex min-h-0 w-1/2 flex-col">
+                    <Tree state={state} select={select} api={props.api} />
+                  </div>
+                  <div class="flex min-h-0 w-1/2 flex-col">
+                    <Details state={state} api={props.api} />
+                  </div>
+                </main>
+                <BottomPanel
+                  state={state}
+                  api={props.api}
+                  showPanel={showPanel}
+                  selectCall={selectCall}
+                  toggleGroup={toggleGroup}
+                  height={height()}
+                  setHeight={setHeight}
+                  main={() => main}
+                  setDragging={setDragging}
+                />
+              </Show>
             </div>
-          </main>
-          <BottomPanel
-            state={state}
-            api={props.api}
-            showPanel={showPanel}
-            selectCall={selectCall}
-            toggleGroup={toggleGroup}
-            height={height()}
-            setHeight={setHeight}
-            main={() => main}
-            setDragging={setDragging}
-          />
-        </Show>
+            <Show when={settingsOpen()}>
+              <div class="absolute inset-0 flex flex-col">
+                <Settings state={state} api={props.api} back={() => setSettingsOpen(false)} />
+              </div>
+            </Show>
+          </div>
+        </div>
+        <StatusBar state={state} api={props.api} openSettings={() => setSettingsOpen(true)} />
+        <UpdateModal state={state} api={props.api} dismiss={dismissPrompt} />
+        <UpdateProgress state={state} api={props.api} />
       </div>
     </Show>
   );
