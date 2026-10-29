@@ -23,13 +23,13 @@ export function Threads(props: { state: AppState; api: Api }) {
   );
 
   return (
-    <label class="flex items-center gap-1.5 text-sm text-muted">
+    <label class="flex items-center gap-2 text-sm text-muted">
       Threads
       <input
         type="number"
         data-testid="threads-input"
         ref={(e) => (box = e)}
-        class={`${input} w-12`}
+        class={`${input} w-14`}
         min="1"
         max={MAX_THREADS}
         step="1"

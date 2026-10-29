@@ -1,4 +1,4 @@
-import type { ElectronApplication, Page } from "@playwright/test";
+import type { ElectronApplication, Locator, Page } from "@playwright/test";
 import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import {
@@ -143,6 +143,13 @@ async function expectChipShown(win: Page) {
   expect(room).toBeGreaterThanOrEqual(-0.01);
 }
 
+/** The folder name is in sight and wide enough to read a few letters of. */
+async function expectNameShown(win: Page) {
+  const name = win.getByTestId("project-name");
+  await expect(name).toBeVisible();
+  expect((await name.boundingBox())!.width).toBeGreaterThan(25);
+}
+
 const hasTooltip = (win: Page) => win.locator('[role="tooltip"]');
 
 test("A narrow window keeps every toolbar button on screen, with its name", async () => {
@@ -159,7 +166,7 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     await expect(win.getByTestId(id), id).toHaveAccessibleName(name);
 
   const seen = await expectToolbarFits(win);
-  // below 1150 px four labels are only spoken: those buttons are their icon, and say it in a tooltip
+  // below 1280 px four labels are only spoken: those buttons are their icon, and say it in a tooltip
   for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
     expect(seen.find((b) => b.id === id)!.width, id).toBeLessThan(40);
   await chipClearOfEnv(win);
@@ -186,35 +193,36 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     expect(box.x + box.width, `${id} inside ${floor} px`).toBeLessThanOrEqual(floor);
   }
 
-  // the breakpoint: 1149 px is icon-only and 1151 px has the labels, the toolbar at its tightest. At both
-  // the folder name shows and the chip is whole, which is what the breakpoint is set for.
-  await contentWidth(app, win, 1149);
-  await expectToolbarFits(win);
-  expect((await win.getByTestId("open-button").boundingBox())!.width).toBeLessThan(40);
-  await expectChipShown(win);
-  await contentWidth(app, win, 1151);
-  await expect
-    .poll(() =>
-      win
-        .getByTestId("open-button")
-        .boundingBox()
-        .then((b) => b!.width),
-    )
-    .toBeGreaterThan(60);
-  await expectToolbarFits(win);
-  await expectChipShown(win);
-  await expect(win.getByTestId("project-name")).toBeVisible();
-  expect((await win.getByTestId("project-name").boundingBox())!.width).toBeGreaterThan(25); // a few letters
-
-  // the common widths: labels, a whole chip, and no tooltip that only repeats a label
-  for (const width of [1200, 1500]) {
+  // the default 1200 px window and 1279 px are icon-only; 1281 px has the labels. At every one of them
+  // the folder name shows and the chip is whole.
+  for (const width of [1200, 1279]) {
     await contentWidth(app, win, width);
     await expectToolbarFits(win);
-    await expectChipShown(win);
     expect(
       (await win.getByTestId("open-button").boundingBox())!.width,
       `open at ${width}`,
-    ).toBeGreaterThan(60);
+    ).toBeLessThan(40);
+    await expectChipShown(win);
+    await expectNameShown(win);
+  }
+  await win.getByTestId("open-button").hover();
+  await expect(win.getByRole("tooltip")).toHaveText("Open…");
+  await win.mouse.move(5, 400);
+
+  // the labels, and no tooltip that only repeats one
+  for (const width of [1281, 1500]) {
+    await contentWidth(app, win, width);
+    await expect
+      .poll(() =>
+        win
+          .getByTestId("open-button")
+          .boundingBox()
+          .then((b) => b!.width),
+      )
+      .toBeGreaterThan(60);
+    await expectToolbarFits(win);
+    await expectChipShown(win);
+    await expectNameShown(win);
     await win.getByTestId("open-button").hover();
     await win.waitForTimeout(800);
     await expect(hasTooltip(win)).toHaveCount(0);

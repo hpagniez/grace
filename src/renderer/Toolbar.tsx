@@ -46,7 +46,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <img src={logo} alt="" width="20" height="20" />
         </button>
       </Tooltip>
-      {/* a container: below 1150 px the layout chip goes when the name and the chip no longer fit side by side */}
+      {/* a container: below 1280 px the layout chip goes when the name and the chip no longer fit side by side */}
       <div class="@container flex min-w-0 flex-1 items-center gap-2 pr-2">
         <Tooltip text={path()} class="min-w-0 shrink-100000">
           <span data-testid="project-name" class="truncate text-base font-medium">
@@ -55,7 +55,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         </Tooltip>
         <span
           data-testid="project-layout"
-          class="h-5 min-w-0 truncate rounded-sm bg-selected px-1.5 text-2xs leading-5 font-medium text-muted empty:hidden max-[1150px]:@max-[160px]:hidden"
+          class="h-5 min-w-0 truncate rounded-sm bg-selected px-1.5 text-2xs leading-5 font-medium text-muted empty:hidden max-[1280px]:@max-[160px]:hidden"
         >
           {props.state.project ? LAYOUT_LABEL[props.state.project.layout] : ""}
         </span>
@@ -111,7 +111,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
       <Tooltip text={spoken("Re-run failed")}>
         <button
           data-testid="rerun-failed-button"
-          class={`${btn} max-[1150px]:px-2`}
+          class={`${btn} max-[1280px]:px-2`}
           disabled={busy() || failedCount() === 0}
           onClick={() => void props.api.rerunFailed(newest()!.id)}
         >

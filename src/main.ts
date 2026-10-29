@@ -74,7 +74,7 @@ const createWindow = (dataDir: string) => {
   startMaximized = saved?.maximized ?? false;
   win = new BrowserWindow({
     ...(placed ?? { width: 1200, height: 800 }),
-    minWidth: 760, // the toolbar fits down to here (icon-only buttons below 1150 px)
+    minWidth: 760, // the toolbar fits down to here (icon-only buttons below 1280 px)
     minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
     show: false, // shown once painted, so it never flashes white
     backgroundColor: GROUND[nativeTheme.shouldUseDarkColors ? "dark" : "light"],
