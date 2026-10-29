@@ -974,9 +974,19 @@ describe("the look of the dialog (spec R19)", () => {
     expect(button.className).toContain(btnIconSmall);
     expect(button.textContent).toBe("");
     expect(drawn(button.querySelector("svg"), Trash2)).toBe(true);
-    fireEvent.pointerEnter(button.closest("span.inline-flex")!);
-    vi.advanceTimersByTime(500);
-    expect(document.querySelector('[role="tooltip"]')!.textContent).toBe("Delete timeout");
+    // rows are 36 px apart: the default tooltip below would cover the next row's Delete, so it sits on the left
+    const box = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockReturnValue(DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }));
+    try {
+      fireEvent.pointerEnter(button.closest("span.inline-flex")!);
+      vi.advanceTimersByTime(500);
+      const tip = document.querySelector<HTMLElement>('[role="tooltip"]')!;
+      expect(tip.textContent).toBe("Delete timeout");
+      expect(tip.dataset.side).toBe("left");
+    } finally {
+      box.mockRestore();
+    }
   });
 
   it("adds a property with a plus icon, and the other buttons are standard", () => {

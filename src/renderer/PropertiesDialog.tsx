@@ -416,7 +416,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         />
                         Secret
                       </label>
-                      <Tooltip text={`Delete ${row.name || "property"}`}>
+                      <Tooltip text={`Delete ${row.name || "property"}`} side="left">
                         <button
                           type="button"
                           data-testid="prop-delete"
