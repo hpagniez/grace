@@ -1,12 +1,13 @@
 // What switch.ps1 leaves behind and what Grace does with it at the next start
 // (docs/specs/2026-10-28-app-updates.md R9.5, R10.6 to R10.9, R12).
 import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Backup, UpdateSettings } from "../../shared/updates";
 import { parseVersion } from "../../shared/version";
-import { parseUpdateSettings } from "../settings";
+import { parseUpdateSettings, sameFolder } from "../settings";
+import { isGraceFolder, ownStaging } from "./preflight";
 
 /** `update-result.json`, as the script writes it (R10.5). */
 export interface SwitchResult {
@@ -131,8 +132,9 @@ export function settingsAfter(r: SwitchResult, current: UpdateSettings): UpdateS
 }
 
 /**
- * R10.8: once the script has ended, removes what a switch leaves next to the install folder. A
- * script still alive after `timeoutMs` leaves them for the next start.
+ * R10.8: once the script has ended, removes what a switch leaves next to the install folder: only
+ * the folders a switch of this install made, never someone's own `Grace.old` or `C:\Tools.old`. A
+ * script still alive after `timeoutMs` leaves them for the next start. Never rejects.
  */
 export async function removeLeftovers(
   installDir: string,
@@ -143,10 +145,22 @@ export async function removeLeftovers(
     if (Date.now() >= deadline) return;
     await sleep(pollMs);
   }
-  // the script may hold its folder for a few ms after it deleted `switching`
-  for (const p of [`${installDir}.old`, `${installDir}.failed`, staging(installDir)]) {
-    await rm(p, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+  const dir = staging(installDir);
+  if (!ownStaging(dir)) return;
+  // the plan proves a switch of this install made `.old` and `.failed`
+  const planned = readObject(path.join(dir, "plan.json"))?.installDir;
+  let kept = false;
+  if (typeof planned === "string" && sameFolder(planned, installDir)) {
+    for (const name of ["old", "failed"]) {
+      const from = `${installDir}.${name}`;
+      // moved in whole first: a removal cut short never leaves half a Grace folder outside
+      if (isGraceFolder(from)) await rename(from, path.join(dir, name)).catch(() => (kept = true));
+    }
   }
+  // the plan stays while a folder could not be moved, so the next start tries again; the script
+  // may hold its folder for a few ms after it deleted `switching`
+  if (!kept)
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
 }
 
 /** R9: the saved copies of the data, newest first. A folder without a valid `backup.json` is not a copy. */

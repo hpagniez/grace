@@ -73,6 +73,49 @@ describe("preflight", () => {
     expect(await preflight(install, 100, roomy)).toMatch(/^Grace's folder also holds other files/);
   });
 
+  describe("folders next to the install that an update uses (R8.2, R10.3, R10.6)", () => {
+    const inTheWay = (dir: string) =>
+      `Grace can't update itself while ${dir} exists: it is not a folder Grace made. Move or rename it, then try again.`;
+
+    it("refuses a .old or .failed that is not a Grace folder, so it is never deleted", async () => {
+      for (const suffix of [".old", ".failed"]) {
+        const dir = install + suffix;
+        mkdirSync(dir);
+        writeFileSync(path.join(dir, "mine.txt"), "");
+        expect(await preflight(install, 100, roomy)).toBe(inTheWay(dir));
+        rmSync(dir, { recursive: true });
+        writeFileSync(dir, "a file of that name");
+        expect(await preflight(install, 100, roomy)).toBe(inTheWay(dir));
+        rmSync(dir);
+      }
+    });
+
+    it("refuses a .update that holds anything Grace did not put there", async () => {
+      const dir = `${install}.update`;
+      mkdirSync(dir);
+      writeFileSync(path.join(dir, "notes.txt"), "");
+      expect(await preflight(install, 100, roomy)).toBe(inTheWay(dir));
+    });
+
+    it("accepts what a switch or a download leaves", async () => {
+      for (const dir of [`${install}.old`, `${install}.failed`]) {
+        mkdirSync(path.join(dir, "resources"), { recursive: true });
+        writeFileSync(path.join(dir, "resources", APP_FILES), "[]");
+      }
+      const staging = `${install}.update`;
+      mkdirSync(path.join(staging, "app"), { recursive: true });
+      for (const f of [
+        "plan.json",
+        "switch.ps1",
+        "switching",
+        "started",
+        "Grace-win32-x64-1.0.0-rc.6.zip",
+      ])
+        writeFileSync(path.join(staging, f), "");
+      expect(await preflight(install, 100, roomy)).toBeNull();
+    });
+  });
+
   describe("when the parent is read-only", () => {
     const user = process.env.USERNAME ?? "";
     // `W` and `AD` deny adding files and folders; the install folder keeps its own rights

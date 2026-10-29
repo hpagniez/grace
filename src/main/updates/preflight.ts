@@ -1,8 +1,29 @@
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readdir, readFile, rmdir, statfs } from "node:fs/promises";
 import path from "node:path";
 
 /** Written into `resources` by the Forge hook: the packaged folder's top-level names. */
 export const APP_FILES = "app-files.json";
+
+/** A folder holding a Grace install: the build's file list is inside. */
+export const isGraceFolder = (dir: string): boolean =>
+  existsSync(path.join(dir, "resources", APP_FILES));
+
+/** What Grace puts in its staging folder `<install>.update` (R8.2, R8.5, R10.6, R10.8, R10.9). */
+const STAGING =
+  /^(plan\.json|switch\.ps1|switching|started|app|old|failed|grace-win32-x64-.+\.zip)$/i;
+
+/**
+ * True when `dir` is missing or holds only what Grace puts in `<install>.update`, so Grace may
+ * delete it: never a folder of someone else's that happens to have that name.
+ */
+export function ownStaging(dir: string): boolean {
+  try {
+    return readdirSync(dir).every((n) => STAGING.test(n));
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "ENOENT";
+  }
+}
 
 /** Windows adds these to any folder it shows. */
 const IGNORED = new Set(["desktop.ini", "thumbs.db"]);
@@ -36,6 +57,16 @@ export async function preflight(
     .sort();
   if (other.length) {
     return `Grace's folder also holds other files (${other.slice(0, 3).join(", ")}). Put Grace's files in a folder of their own to update it.`;
+  }
+
+  // an update removes these: never one of someone else's (R8.2, R10.3, R10.6)
+  const leftover = [`${installDir}.old`, `${installDir}.failed`].find(
+    (d) => existsSync(d) && !isGraceFolder(d),
+  );
+  const staging = `${installDir}.update`;
+  const inTheWay = leftover ?? (ownStaging(staging) ? null : staging);
+  if (inTheWay) {
+    return `Grace can't update itself while ${inTheWay} exists: it is not a folder Grace made. Move or rename it, then try again.`;
   }
 
   const parent = path.dirname(installDir);

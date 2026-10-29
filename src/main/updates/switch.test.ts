@@ -345,6 +345,35 @@ setInterval(() => {}, 1 << 30);
     expect(existsSync(path.join(data, "backups"))).toBe(false);
   });
 
+  it.each([".old", ".failed"])(
+    "refuses a %s that is not a Grace folder and changes nothing",
+    T,
+    async (suffix) => {
+      const mine = path.join(install + suffix, "mine.txt");
+      write(mine, "mine");
+      await run();
+      expect(result()).toMatchObject({ ok: false, reverted: false });
+      expect(result().error).toBe(
+        `${install}${suffix} is in the way and Grace didn't make it; move or rename it, then try again`,
+      );
+      expect(read(path.dirname(mine), "mine.txt")).toBe("mine");
+      expect(read(install, "v.txt")).toBe("1.0.0-rc.5");
+      expect(existsSync(path.join(staging, "app", "Grace.exe"))).toBe(true);
+      expect(existsSync(path.join(data, "backups"))).toBe(false);
+      // the old version started again
+      expect(pidsUnder(install)).not.toHaveLength(0);
+    },
+  );
+
+  it("removes a .old left by an earlier switch", T, async () => {
+    write(path.join(`${install}.old`, "resources", "app-files.json"), "[]");
+    write(path.join(`${install}.old`, "left.txt"));
+    await run();
+    expect(result()).toMatchObject({ ok: true });
+    expect(read(`${install}.old`, "v.txt")).toBe("1.0.0-rc.5");
+    expect(existsSync(path.join(`${install}.old`, "left.txt"))).toBe(false);
+  });
+
   it("writes update-result.json and backup.json without a byte order mark", T, async () => {
     await run();
     expect(readFileSync(path.join(data, "update-result.json"))[0]).not.toBe(0xef);

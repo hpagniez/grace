@@ -108,6 +108,13 @@ function Get-Grace {
 
 function Start-Grace { Start-Program (Join-Path $install 'Grace.exe') '' $install }
 
+# A switch removes a leftover .old or .failed: only one Grace made, which holds the build's file list.
+function Assert-Leftover($dir) {
+  if ((Test-Path -LiteralPath $dir) -and -not (Test-Path -LiteralPath (Join-Path $dir 'resources\app-files.json'))) {
+    throw "$dir is in the way and Grace didn't make it; move or rename it, then try again"
+  }
+}
+
 # Each flag says what to undo (R9.6, R10.4, R10.6). Set before the try: the catch reads them all.
 $plan = $null; $exited = $false; $copying = $false; $copied = $false; $restored = $false
 $movedOld = $false; $movedNew = $false; $startedNew = $false; $ok = $false
@@ -134,6 +141,9 @@ try {
       Start-Sleep -Milliseconds 250
     }
     $exited = $true
+    # before touching anything: Grace starts again and nothing else changes
+    Assert-Leftover $old
+    Assert-Leftover $aside
 
     # R10.3, in order: back up, restore, rename, rename
     Remove-Tree $old  # left by an earlier switch

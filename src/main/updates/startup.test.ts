@@ -247,18 +247,87 @@ describe("a switch on disk", () => {
   });
 
   describe("removeLeftovers", () => {
+    const old = () => `${install}.old`;
+    const aside = () => `${install}.failed`;
+    /** A Grace install: its file list is inside. */
+    const graceFolder = (dir: string) => {
+      mkdirSync(path.join(dir, "resources"), { recursive: true });
+      writeFileSync(path.join(dir, "resources", "app-files.json"), "[]");
+    };
+    /** What a switch of this install leaves: both folders, and its plan in the staging folder. */
     const leftovers = () => {
-      for (const d of [`${install}.old`, `${install}.failed`]) mkdirSync(d);
+      graceFolder(old());
+      graceFolder(aside());
+      writeFileSync(
+        path.join(staging, "plan.json"),
+        JSON.stringify({ to: "1.0.0-rc.6", installDir: install }),
+      );
       writeFileSync(path.join(staging, "Grace-win32-x64-1.0.0-rc.6.zip"), "partial");
     };
     const fast = { pollMs: 10, timeoutMs: 200 };
 
-    it("removes a partial download left by a killed Grace (R10.8)", async () => {
+    it("removes what a switch of this install left (R10.8)", async () => {
       leftovers();
+      // the plan names the folder in another case, with a trailing separator
+      writeFileSync(
+        path.join(staging, "plan.json"),
+        JSON.stringify({ to: "1.0.0-rc.6", installDir: `${install.toUpperCase()}\\` }),
+      );
       await removeLeftovers(install);
-      for (const d of [`${install}.old`, `${install}.failed`, staging]) {
-        expect(existsSync(d)).toBe(false);
+      for (const d of [old(), aside(), staging]) expect(existsSync(d), d).toBe(false);
+    });
+
+    it("removes a partial download left by a killed Grace", async () => {
+      writeFileSync(path.join(staging, "Grace-win32-x64-1.0.0-rc.6.zip"), "partial");
+      mkdirSync(path.join(staging, "app"));
+      await removeLeftovers(install);
+      expect(existsSync(staging)).toBe(false);
+    });
+
+    it("never removes a .old or .failed that is not a Grace folder", async () => {
+      leftovers();
+      for (const d of [old(), aside()]) {
+        rmSync(d, { recursive: true });
+        mkdirSync(d);
+        writeFileSync(path.join(d, "mine.txt"), "");
       }
+      await removeLeftovers(install);
+      for (const d of [old(), aside()]) expect(existsSync(path.join(d, "mine.txt")), d).toBe(true);
+      expect(existsSync(staging)).toBe(false);
+    });
+
+    it("never removes a Grace folder that no switch of this install made", async () => {
+      leftovers();
+      // a plan of another install
+      writeFileSync(
+        path.join(staging, "plan.json"),
+        JSON.stringify({ to: "1.0.0-rc.6", installDir: path.join(root, "Other") }),
+      );
+      await removeLeftovers(install);
+      for (const d of [old(), aside()]) expect(existsSync(d), d).toBe(true);
+      // no plan at all
+      mkdirSync(staging);
+      await removeLeftovers(install);
+      for (const d of [old(), aside()]) expect(existsSync(d), d).toBe(true);
+    });
+
+    it("leaves a staging folder that holds anything else, and the folders its plan names", async () => {
+      leftovers();
+      writeFileSync(path.join(staging, "notes.txt"), "mine");
+      await removeLeftovers(install);
+      expect(existsSync(path.join(staging, "notes.txt"))).toBe(true);
+      expect(existsSync(path.join(staging, "plan.json"))).toBe(true);
+      for (const d of [old(), aside()]) expect(existsSync(d), d).toBe(true);
+    });
+
+    it("keeps the plan for the next start when a folder cannot be moved away", async () => {
+      leftovers();
+      // a copy cut short at an earlier start stands where .old goes
+      mkdirSync(path.join(staging, "old"));
+      writeFileSync(path.join(staging, "old", "x"), "");
+      await removeLeftovers(install);
+      expect(existsSync(path.join(old(), "resources", "app-files.json"))).toBe(true);
+      expect(existsSync(path.join(staging, "plan.json"))).toBe(true);
     });
 
     it("waits for a live script to end, then removes", async () => {

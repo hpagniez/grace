@@ -54,7 +54,7 @@ function update(dataDir: string, change: (s: Record<string, unknown>) => void): 
 export const RECENT_LIMIT = 10;
 
 /** Two paths are the same folder when they resolve alike, ignoring case (Windows) and a trailing separator. */
-const sameFolder = (a: string, b: string) =>
+export const sameFolder = (a: string, b: string) =>
   path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
 /** The absolute paths of a saved list, newest first, one per folder, at most RECENT_LIMIT; anything else is dropped. */
