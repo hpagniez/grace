@@ -66,12 +66,12 @@ Success:
 The direction was chosen in the brainstorm from four mockups of the same running suite, after reading Bruno and three Dribbble shots the person picked, and the advice of two design tools (ui-ux-pro-max: true dark, "code dark + run green", JetBrains Mono or IBM Plex; taste-skill, from a study of real product screens: colour on data not chrome, flat surfaces, near-black primary buttons, no glass, glow or gradient).
 
 **Direction:**
-1. **A, Logbook:** Bruno sharpened. Panels a step darker than the window, brand green only on Run and on passed, figures in the mono, a selection marked by one thin line. **Chosen for the dark theme.**
+1. **A, Logbook:** Bruno sharpened. Panels a step darker than the window, brand green only on Run and on passed, figures in the mono, a selection marked by one thin line. **Chosen for the dark theme's colours.**
 2. B, Out of Dark: black with one soft green glow, floating rounded panels, pastel figure tiles. Most brand-forward, hard to carry into a light theme.
 3. C, Aurora: frosted glass over a violet gradient (OBS concept). Costs GPU in long runs, AA contrast on glass is hard to hold, and both tools flag it as a dated look.
-4. **D, Parchment sheet:** light first; a parchment frame holds the toolbar, the work sits on a white sheet with 16 px corners, a near-black primary with the green play mark. **Chosen for the light theme.**
+4. **D, Parchment sheet:** light first; a parchment frame holds the toolbar, the work sits on a white sheet with 16 px corners, a near-black primary with the green play mark. **Chosen for the light theme's colours, and for the structure of both themes** (see Design decisions already made).
 
-A and D take their colours from the logo (ADR 0013: green is a passing test, off-white is logbook paper): the logo is not recoloured. The [mockup](2026-10-29-premium-ui-mockup.png) shows the chosen pair on the same screen, with IBM Plex and Lucide; where it and the requirements below differ, the requirements win.
+A and D take their colours from the logo (ADR 0013: green is a passing test, off-white is logbook paper): the logo is not recoloured. The [mockup](2026-10-29-premium-ui-mockup.png) shows the chosen pair on the same screen, with IBM Plex and Lucide; where it and the requirements below differ, the requirements win. The mockup predates two decisions the person made after seeing the built app: the dark theme has the same structure as the light one (the inset, rounded sheet), and the primary buttons use the progress bar's passed green in both themes. Its dark half (flush panels) and its near-black Run all show neither.
 
 **How colours reach components:**
 1. **Semantic tokens whose values switch with the theme.** `@theme` defines `--color-surface`, `--color-ink`, `--color-failed` …; `:root` holds the light values and a `prefers-color-scheme: dark` block the dark ones. A component writes `bg-surface text-ink` once; no `dark:` class remains. The Appearance setting only sets `nativeTheme.themeSource`. **Chosen.**
@@ -89,8 +89,8 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 ### R1. Colour tokens
 
 1. `src/index.css` defines every colour as a semantic token in `@theme` and removes Tailwind's default palette (`--color-*: initial`), so a raw palette class compiles to nothing. `transparent`, `current`, `white` and `black` stay.
-2. Light values sit on `:root`; dark values in `@media (prefers-color-scheme: dark) { :root { … } }`. No component uses `dark:`.
-3. The tokens, with their values (light = direction D, dark = direction A):
+2. Light values sit on `:root`; dark values in `@media (prefers-color-scheme: dark) { :root { … } }`. No component uses `dark:`. The two themes differ only in colours: the dark block may set `color-scheme`, `--color-*` tokens, `--shadow-float` and `--backdrop`, and nothing else (no size, spacing, radius or layout token). A unit test lists every custom property of the block and fails on any other.
+3. The tokens, with their values (light = direction D's colours, dark = direction A's colours):
 
 | Token | Use | Light | Dark |
 |---|---|---|---|
@@ -104,10 +104,13 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 | `control` | borders of inputs, checkboxes, radios (3:1) | `#8a8478` | `#6a707e` |
 | `ink` | text | `#151821` | `#f1efe9` |
 | `muted` | secondary text, meta, placeholders | `#5b5e66` | `#9fa2ac` |
-| `accent` | the one primary action's fill, the active tab line, the selection bar | `#151821` | `#3fcf6e` |
+| `accent` | the active tab line, the selection bar, the included tag chip, the splitter on hover and drag | `#151821` | `#3fcf6e` |
 | `on-accent` | text and icons on `accent` | `#ffffff` | `#06210f` |
+| `primary` | the primary buttons' fill: `Run all`, `Open folder…`, a dialog's confirm button; the same green as the progress bar's passed segment, so equal to `passed` in each theme | `#1b7a4c` | `#3fcf6e` |
+| `on-primary` | text and icons on `primary` | `#ffffff` | `#151821` |
+| `primary-hover` | `primary` under the pointer (solid) | `#156640` | `#5fd98a` |
 | `on-danger` | text and icons on a `failed` fill (the `danger` button) | `#ffffff` | `#151821` |
-| `brand` | the logo's strike; the play mark on the light primary button | `#3fcf6e` | `#3fcf6e` |
+| `brand` | the logo's strike | `#3fcf6e` | `#3fcf6e` |
 | `focus` | the focus ring | `#151821` | `#3fcf6e` |
 | `passed` | passed; HTTP 2xx | `#1b7a4c` | `#3fcf6e` |
 | `failed` | failed, errors, destructive actions; HTTP 5xx and no response | `#c22a2f` | `#f2666f` |
@@ -125,7 +128,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 | `running-tint` | `#e5edf6` | `#1d2a3a` |
 | `cancelled-tint` | `#f2ebe0` | `#322a1e` |
 
-5. Contrast, checked by a unit test that reads the values from `src/index.css` (R1.3, R1.4): `ink` and `muted` at 4.5:1 or more on `ground`, `surface`, `sunken`, `hover`, `selected` and `raised`; each status token at 4.5:1 on `surface` and on its own tint, and 3:1 on `selected`; `on-accent` at 4.5:1 on `accent`; `on-danger` at 4.5:1 on `failed`; `control` and `focus` at 3:1 on `surface` and `ground`. All pass with the values above (light lowest: `passed` on its tint 4.53:1; dark lowest: `failed` on its tint 5.05:1; `on-danger` 5.73:1 light, 5.83:1 dark).
+5. Contrast, checked by a unit test that reads the values from `src/index.css` (R1.3, R1.4): `ink` and `muted` at 4.5:1 or more on `ground`, `surface`, `sunken`, `hover`, `selected` and `raised`; each status token at 4.5:1 on `surface` and on its own tint, and 3:1 on `selected`; `on-accent` at 4.5:1 on `accent`; `on-primary` at 4.5:1 on `primary` and on `primary-hover`; `primary` equal to `passed`; `on-danger` at 4.5:1 on `failed`; `control` and `focus` at 3:1 on `surface` and `ground`. All pass with the values above (`on-primary` 5.34:1 on `primary` and 6.98:1 on `primary-hover` in light, 8.75:1 and 9.94:1 in dark; light lowest: `passed` on its tint 4.53:1; dark lowest: `failed` on its tint 5.05:1; `on-danger` 5.73:1 light, 5.83:1 dark).
 6. No text is dimmed with `opacity` except disabled controls (R10.4).
 7. Scrollbars: thumb `control` at 60 %, track transparent.
 8. `src/shared/theme.ts` holds the two `ground` values for main's `backgroundColor` and `index.html`'s startup screen; a unit test checks they equal the CSS tokens.
@@ -152,7 +155,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 1. Spacing stays on Tailwind's 4 px scale. Density: toolbar and filter controls 28 px tall; tree rows, small buttons and chips 24 px; HTTP and history rows 28 px; bottom panel tab bar 32 px; panel padding 12 px; gaps 4, 8, 12, 16.
 2. Radius tokens: `rounded-sm` 4 px (rows, chips, tags), `rounded-md` 6 px (buttons, inputs), `rounded-lg` 8 px (boxes: error, code, flaky proof), `rounded-xl` 12 px (dialogs, menus, popovers), `rounded-full` (status badges, count pills).
-3. The sheet: in the light theme everything under the toolbar row (progress, filter bar, notice, tree, details, bottom panel) sits on a `surface` sheet inset 8 px from the window's left, right and bottom edges (above the status bar when there is one), with a 16 px radius and a 1 px `line` edge, on the `ground` frame. In the dark theme the inset and radius are 0: the panels fill the window, a step darker than the toolbar. Set by three tokens, `--sheet-inset`, `--sheet-radius` and `--sheet-side`.
+3. The sheet, the same in both themes: everything under the toolbar row (progress, filter bar, notice, tree, details, bottom panel) sits on a `surface` sheet inset 8 px from the window's left, right and bottom edges (above the status bar when there is one), with a 16 px radius and a 1 px `line` edge, on the `ground` frame. Set by three tokens, `--sheet-inset`, `--sheet-radius` and `--sheet-side`, which the dark block does not override (R1.3).
 4. Borders: 1 px `line` between areas and under rows; a border or a shadow at rest, never both; what floats (dialogs, menus, popovers, tooltips) has both.
 5. Elevation: only what floats casts a shadow (dialogs, menus, popovers, tooltips): `--shadow-float`, light `0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06)`, dark `0 16px 40px rgb(0 0 0 / 0.5)`. A dialog's backdrop is `ink` at 40 % (light) or black at 60 % (dark).
 
@@ -231,7 +234,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 ### R12. Home
 
-1. Layout as today (mascot, heading, sentence, Open button, recent list), left-aligned in a 540 px column, on `ground` in the light theme (no sheet: there is no project) and on `surface` in the dark one.
+1. Layout as today (mascot, heading, sentence, Open button, recent list), left-aligned in a 540 px column, on `ground` in both themes (no sheet: there is no project).
 2. First run (no recent folders): the heading "Open a Karate project", the sentence "Pick the folder that holds your .feature files. Grace brings its own Java and Karate.", and the primary button `Open folder…` with the `folder-open` icon.
 3. Recent folders: a titled list ("Recent folders") in one `surface` box with row rules. Each row: `folder` icon, folder name (500), its path in the mono `muted` below. A missing folder: name in `muted`, a `cancelled` badge with `triangle-alert` and "Not found", row disabled with the tooltip "Folder not found". The remove button is an icon button (`x`, "Remove from list"), shown on every row, 24 × 24.
 4. A notice (folder not found and the like) shows as a `Notice` above the column (R20).
@@ -239,7 +242,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 ### R13. Toolbar
 
 1. One 44 px row on `ground`, controls 28 px tall, in this order: the logo Home button · the project (folder name in 500, layout chip, full path in the mono `muted`, truncated from the start with the full path in the tooltip) · space · `Env` box · `Threads` box · `Properties…` · a 1 px divider · Refresh (icon only) · `Open…` · divider · `Report` · `Re-run failed` with its count in a pill once it is above 0 · `Cancel` · `Run all` (primary, rightmost).
-2. `Run all` is the only `primary` button on the screen: `accent` fill; in the light theme its `play` icon is `brand` green.
+2. `Run all` is the only `primary` button on the screen: `primary` fill (the progress bar's passed green) with `on-primary` text and an `on-primary` `play` icon, in both themes.
 3. Each button keeps its `data-testid`, its label and its disabled rules.
 
 ### R14. Progress
@@ -305,8 +308,10 @@ Once on `develop`: the status bar is 24 px on `ground` with `muted` 12 px text a
 - Native elements, no component library (the person).
 - Semantic tokens whose values switch with the theme, no `dark:` (the person).
 - Styled tooltips replacing the native `title` (the person, after the builder check).
+- The two themes differ only in colours: the dark theme has the light theme's structure, the inset rounded sheet included, and the dark block of `src/index.css` overrides colour tokens only (the person, after seeing the built app).
+- The primary buttons use the progress bar's passed green in each theme (`#1b7a4c` with white text in light, `#3fcf6e` with ink text in dark), not near-black and not the logo's green in light (the person, after seeing the built app).
 
-The spec author's calls: the token values and the contrast check (R1); the type scale with a 13 px body (R2); the light sheet and the flush dark panels as two tokens (R3.3); the icon names (R4); the logo as the Home button (R6.2); the console following the theme (R18.3), which replaces `e2e/console.spec.ts`'s check that it matches the dark background; "Not run yet" before the first run (R14.3); `buttons.ts` kept beside a new `ui.ts` (R9.1); the delivery order.
+The spec author's calls: the token values and the contrast check (R1); the type scale with a 13 px body (R2); the sheet's three tokens (R3.3); the icon names (R4); the logo as the Home button (R6.2); the console following the theme (R18.3), which replaces `e2e/console.spec.ts`'s check that it matches the dark background; "Not run yet" before the first run (R14.3); `buttons.ts` kept beside a new `ui.ts` (R9.1); the delivery order.
 
 Resolved by the builder check (2026-10-29), as the spec author's calls: solid tint tokens instead of opacity modifiers, so badges pass AA on every background (R1.4); `on-danger` for the dark Delete button, where white on `failed` is 3.0:1 (R1.3, R19.3); non-matching tree rows in `muted` instead of 40 % opacity, which dropped text to 1.9:1 (R1.6, R15.2); the build PR waiting for app-updates (Delivery).
 
@@ -340,7 +345,24 @@ Feature: Premium look and feel
     Then ink and muted reach 4.5:1 on ground, surface, sunken, selected and raised
     And each status colour reaches 4.5:1 on surface and on its own tint, and 3:1 on selected
     And on-accent reaches 4.5:1 on accent
+    And on-primary reaches 4.5:1 on primary and on primary-hover
     And control and focus reach 3:1 on surface and ground
+
+  Scenario: The dark theme changes colours only (unit)
+    Given the dark block of src/index.css
+    Then it declares no custom property except --color-* tokens, --shadow-float and --backdrop
+    And primary equals passed in each theme
+
+  Scenario Outline: The structure and the primary button do not change with the theme
+    Given Windows is in <mode> mode
+    When I open the http sample project
+    Then the sheet is inset 8 px, has 16 px corners and a 1 px edge
+    And "Run all" is filled with <fill>, the passed green, with <text> text
+
+    Examples:
+      | mode  | fill    | text    |
+      | light | #1b7a4c | #ffffff |
+      | dark  | #3fcf6e | #151821 |
 
   Scenario: No raw palette class or dark: variant is left (unit)
     When the test scans every .ts and .tsx file in src/renderer
