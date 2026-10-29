@@ -141,7 +141,7 @@ Spec: [docs/specs/2026-10-29-premium-ui.md](docs/specs/2026-10-29-premium-ui.md)
 - Colours only through the semantic tokens in `src/index.css`. Tailwind's default palette is removed: no raw palette class (`zinc-500`), no `dark:`, no `title=`. `src/renderer/palette.test.ts` enforces it.
 - Shared class strings live in `src/renderer/buttons.ts` and `src/renderer/ui.ts`. Reuse them.
 - Icons only through `Icon` with `lucide` icon data. Statuses only through `StatusMark`.
-- Tooltips only through `Tooltip`, or `Cut` for text that may be cut. In a row, set `side` so the tooltip stays on the row.
+- Tooltips only through `Tooltip`, or `Cut` for text that may be cut. In a row, set `side` so a one-line tooltip stays on its row; a click on any tooltip closes it.
 - A dialog keeps its content through its 100 ms exit (`--duration-fast`), then drops it.
 
 ## Karate integration rules

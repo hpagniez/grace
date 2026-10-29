@@ -211,7 +211,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 3. A unit test fails if any `.ts` or `.tsx` file in `src/renderer/` holds a raw palette class (`slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose` followed by `-` and a number), a `dark:` variant, or a `title` attribute (R9.4).
 4. Styled tooltips. One `Tooltip` replaces every native `title` in the renderer:
    - It shows 500 ms after the pointer rests on its target, and at once when the target gets keyboard focus (`:focus-visible`). It hides when the pointer leaves both the target and the tooltip, on blur, on a scroll that moves its target, on a press of its target or a click inside it, and on Escape, which closes only the tooltip, not a dialog under it (WCAG 2.2 "Content on hover or focus": dismissible, hoverable, persistent). After a press it does not reopen at the spot just pressed. One tooltip at a time.
-   - It is a `popover="manual"` element in the top layer, so it shows over dialogs. It sits 6 px below its target, flips above when there is no room, and stays 8 px inside the window. In a row it never lies on the next row: it sits 6 px beside its target (left or right, flipping when there is no room), or over its own cut text, where a click within the text reaches the text.
+   - It is a `popover="manual"` element in the top layer, so it shows over dialogs. It sits 6 px below its target, flips above when there is no room, and stays 8 px inside the window. In a row a one-line tooltip stays on its row: it sits 6 px beside its target (left or right, flipping when there is no room), or over its own cut text, where a click within the text reaches the text; an `over` tooltip that wraps onto a second line can reach the next row. A click on any tooltip closes it.
    - Style: `raised`, `ink` text at 12 px, `rounded-md`, 1 px `line`, `--shadow-float`, padding 4 × 8 px, at most 320 px wide, wrapping. It fades in over `--duration-fast`, with no motion under reduced motion.
    - `role="tooltip"`; the target points to it with `aria-describedby` when its text adds to the target's accessible name. An icon-only button's name stays its `aria-label`.
    - A disabled control still shows its tooltip on hover (the tooltip listens on a wrapper, since Chromium sends no pointer events to a disabled button).
@@ -451,7 +451,7 @@ Feature: Premium look and feel
     When I move the pointer onto the tooltip
     Then it stays open
 
-  Scenario: Escape in a dialog closes the tooltip first (unit)
+  Scenario: Escape in a dialog closes the tooltip first
     Given the Properties dialog is open and a tooltip shows inside it
     When I press Escape
     Then the tooltip closes and the dialog stays open
