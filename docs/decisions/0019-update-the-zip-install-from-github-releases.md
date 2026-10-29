@@ -43,7 +43,7 @@ Chosen: option 1. It is the only option that installs any version in both direct
 
 ### The updater is a contract between versions
 
-A version's updater installs the next one, and the next one reads what the previous one's script wrote. From the first version that ships the updater on, these do not change without a new record, pre-releases included: the tag `v<version>`, the asset name `Grace-win32-x64-<version>.zip`, the app at the zip's root, `resources\app-files.json`, `update-result.json` and its fields (a missing `reverted` reads as `false`), `<install>.update\plan.json` with its `to` and `installDir` fields, the `started` and `switching` files, the backup layout, and the `updates` key in `settings.json`.
+A version's updater installs the next one, and the next one reads what the previous one's script wrote. From the first version that ships the updater on, these do not change without a new record, pre-releases included: the tag `v<version>`, the asset name `Grace-win32-x64-<version>.zip`, the app at the zip's root, `resources\app-files.json`, `update-result.json` and its fields (a missing `reverted` reads as `false`), `<install>.update\plan.json` with its `to` and `installDir` fields, the names a switch leaves in `<install>.update` (including `old` and `failed`, where leftovers are moved before removal), `resources\app-files.json` as the mark of a Grace folder, the `started` and `switching` files, a carried `channel` of `null` or missing meaning "not picked", the backup layout, and the `updates` key in `settings.json`.
 
 ### Backward compatibility after 1.0.0
 
