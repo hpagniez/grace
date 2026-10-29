@@ -156,8 +156,10 @@ describe("results", () => {
       expect(takeResult(dir)?.updates).toEqual(defaultUpdateSettings());
       writeFileSync(file(), JSON.stringify({ ...r, updates: carried }));
       expect(takeResult(dir)?.updates).toEqual(carried);
-      writeFileSync(file(), JSON.stringify({ ...r, updates: null }));
-      expect(takeResult(dir)?.updates).toBeNull();
+      for (const updates of [null, [], ["stable"]]) {
+        writeFileSync(file(), JSON.stringify({ ...r, updates }));
+        expect(takeResult(dir)?.updates, JSON.stringify(updates)).toBeNull();
+      }
     });
   });
 });

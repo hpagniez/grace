@@ -6,7 +6,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Backup, UpdateSettings } from "../../shared/updates";
 import { parseVersion } from "../../shared/version";
-import { parseUpdateSettings, sameFolder } from "../settings";
+import { isObject, parseUpdateSettings, sameFolder } from "../settings";
 import { isGraceFolder, ownStaging } from "./preflight";
 
 /** `update-result.json`, as the script writes it (R10.5). */
@@ -27,9 +27,7 @@ function readObject(file: string): Record<string, unknown> | null {
   try {
     // TextDecoder drops a leading byte order mark
     const x: unknown = JSON.parse(new TextDecoder().decode(readFileSync(file)));
-    return typeof x === "object" && x !== null && !Array.isArray(x)
-      ? (x as Record<string, unknown>)
-      : null;
+    return isObject(x) ? x : null;
   } catch {
     return null;
   }
@@ -104,8 +102,7 @@ export function takeResult(dataDir: string): SwitchResult | null {
     return null;
   }
   if (error !== null && typeof error !== "string") return null;
-  const hasUpdates = typeof o.updates === "object" && o.updates !== null;
-  const updates = hasUpdates ? parseUpdateSettings(o.updates) : null;
+  const updates = isObject(o.updates) ? parseUpdateSettings(o.updates) : null;
   return { from, to, rollback, ok, reverted, error, updates };
 }
 

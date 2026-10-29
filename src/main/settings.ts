@@ -161,7 +161,8 @@ export function loadProjectFilter(dataDir: string, root: string): FilterState {
   return { ...NO_FILTER, include: [], exclude: [] };
 }
 
-const isObject = (x: unknown): x is Record<string, unknown> =>
+/** A plain JSON object: not null, not an array. */
+export const isObject = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x);
 
 /** Changes one project's entry and keeps its other fields; an entry that is not an object starts fresh. */
