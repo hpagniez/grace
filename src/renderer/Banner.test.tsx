@@ -37,7 +37,9 @@ describe("Banner", () => {
       `Grace ${pkg.version} · Karate ${vendor.karate.version} · Java ${vendor.jre.version}`,
     );
     const grace = screen.getByText("Grace").className;
-    expect(grace).toContain("font-semibold");
+    // 500: the console is in the mono, bundled at 400 and 500 only; 600 would be a faux bold (R2.1)
+    expect(grace).toContain("font-medium");
+    expect(grace).not.toContain("font-semibold");
     expect(grace).toContain("text-accent");
   });
 

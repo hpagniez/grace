@@ -12,7 +12,7 @@ export function Banner(props: { state: AppState }) {
   return (
     <div data-testid="console-banner">
       <div data-testid="banner-versions">
-        <span class="font-semibold text-accent">Grace</span>
+        <span class="font-medium text-accent">Grace</span>
         {` ${v.app} · Karate ${v.karate} · Java ${v.java}`}
       </div>
       <div data-testid="banner-project">

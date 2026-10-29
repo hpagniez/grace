@@ -246,7 +246,9 @@ describe("call details", () => {
     const title = within(id("call-details")).getByRole("heading", { level: 2 });
     expect(title.className).toContain("font-mono");
     expect(title.className).toContain("text-lg");
-    expect(title.className).toContain("font-semibold");
+    // 500: the mono is bundled at 400 and 500 only, so 600 would be a faux bold (R2.1)
+    expect(title.className).toContain("font-medium");
+    expect(title.className).not.toContain("font-semibold");
     expect(title.textContent).toBe("POSThttp://localhost/users");
     const status = id("call-status");
     expect(status.className).toContain(TINT[GROUP_TINT["2xx"]]);

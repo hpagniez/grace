@@ -73,7 +73,7 @@ export function CallDetails(props: { listed: ListedCall }) {
 
   return (
     <div data-testid="call-details" class="space-y-3">
-      <h2 class="flex gap-2 font-mono text-lg font-semibold break-all">
+      <h2 class="flex gap-2 font-mono text-lg font-medium break-all">
         <span data-testid="call-method" class="shrink-0">
           {call().method}
         </span>
