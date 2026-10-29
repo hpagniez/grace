@@ -406,6 +406,15 @@ describe("history list", () => {
     expect(rows()[0].className).not.toMatch(/\b(odd|even):/); // no zebra
   });
 
+  it("sets the table cells in 12 px (R2.2)", () => {
+    const { load } = setup();
+    load(entry("a"));
+    showHistory();
+    const table = screen.getByTestId("history").querySelector("table")!;
+    expect(table.className).toContain("text-xs");
+    expect(table.className).not.toContain("text-sm");
+  });
+
   it("uses no raw palette class, no dark: variant and no title", () => {
     const { load } = setup();
     load(entry("a", { filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false } }));

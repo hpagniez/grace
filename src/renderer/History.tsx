@@ -122,7 +122,7 @@ export function History(props: { state: AppState; api: Api }) {
           />
         }
       >
-        <table class="w-full text-left text-sm">
+        <table class="w-full text-left text-xs">
           <thead>
             <tr>
               <th class={th}>When</th>
