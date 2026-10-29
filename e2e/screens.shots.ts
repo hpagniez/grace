@@ -4,6 +4,9 @@
 import type { ElectronApplication, Page } from "@playwright/test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import pkg from "../package.json";
+import type { Release, UpdateView } from "../src/shared/updates";
+import { feedFile } from "./feed";
 import {
   emptyProject,
   expect,
@@ -25,15 +28,32 @@ const tmp = path.resolve("out", "shots-tmp");
 mkdirSync(tmp, { recursive: true });
 process.env.TEMP = process.env.TMP = tmp;
 
-/** Starts the app with `userData`'s window at 1280 × 800, under this colour scheme. */
-async function start(theme: "light" | "dark", userData?: string) {
-  const app = await launch(userData, {}, { colorScheme: theme });
+/** Starts the app with `userData`'s window at 1280 × 800, under this colour scheme, `env` added. */
+async function start(theme: "light" | "dark", userData?: string, env: Record<string, string> = {}) {
+  const app = await launch(userData, env, { colorScheme: theme });
   await app.app.evaluate(
     ({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h),
     [WIDTH, HEIGHT],
   );
   return app;
 }
+
+/** A release as main hands it to the renderer. */
+const release = (version: string, publishedAt: string): Release => ({
+  version,
+  prerelease: true,
+  publishedAt,
+  url: `https://github.com/hpagniez/grace/releases/download/v${version}/Grace-win32-x64-${version}.zip`,
+  size: 218_557_130,
+  sha256: "0".repeat(64),
+});
+
+/** Sends `event` from main to the window, as main would. */
+const send = (app: ElectronApplication, event: unknown) =>
+  app.evaluate(
+    ({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send("app:event", e),
+    event,
+  );
 
 /** Opens a sample project and waits for the node `key` of its tree. */
 async function open(app: ElectronApplication, win: Page, dir: string, key: string) {
@@ -82,6 +102,61 @@ for (const theme of ["light", "dark"] as const) {
       await win.getByTestId("recent-row").first().click();
       await expect(win.getByTestId("notice")).toContainText("Folder not found");
       await shoot(win, "notice");
+    });
+
+    await test.step("the update modal, settings and the switch and progress dialogs", async () => {
+      const { app, win } = await start(theme, undefined, {
+        GRACE_UPDATE_FEED: feedFile([{ version: "1.0.0-rc.99", prerelease: true }]),
+      });
+      const modal = win.getByTestId("update-modal");
+      await expect(modal).toBeVisible();
+      await shoot(win, "update-dialog");
+      await win.keyboard.press("Escape"); // closes it and saves nothing
+      await expect(modal).toBeHidden();
+
+      // A packaged app with a saved copy of an older version, which a test build cannot be: main's view of it
+      const view: UpdateView = {
+        running: pkg.version,
+        packaged: true,
+        settings: {
+          channel: null,
+          checkAtStartup: true,
+          autoUpdate: false,
+          skipped: null,
+          failed: null,
+          lastChecked: new Date().toISOString(),
+        },
+        releases: [
+          release("1.0.0-rc.99", "2026-10-29T10:00:00Z"),
+          release("1.0.0-rc.3", "2026-10-28T10:00:00Z"),
+        ],
+        checking: false,
+        error: null,
+        backups: [{ version: "1.0.0-rc.3", savedAt: "2026-10-28T16:00:00Z" }],
+      };
+      await send(app, { type: "updates", view });
+      await win.getByTestId("settings-button").click();
+      await expect(win.getByTestId("version-row")).toHaveCount(3);
+      await shoot(win, "settings");
+
+      await win.getByRole("button", { name: "Roll back" }).click();
+      await expect(win.getByTestId("switch-dialog")).toBeVisible();
+      await shoot(win, "switch-dialog");
+      await win.getByTestId("switch-cancel").click();
+      await expect(win.getByTestId("switch-dialog")).toBeHidden();
+
+      await send(app, {
+        type: "updateProgress",
+        progress: {
+          version: "1.0.0-rc.99",
+          rollback: false,
+          step: "download",
+          received: 82_000_000,
+          total: 218_557_130,
+        },
+      });
+      await expect(win.getByTestId("update-progress")).toBeVisible();
+      await shoot(win, "update-progress");
     });
 
     await test.step("project idle", async () => {
