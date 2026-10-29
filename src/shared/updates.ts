@@ -39,7 +39,8 @@ function toRelease(e: unknown): Release | null {
   const sha256 =
     typeof digest === "string" ? /^sha256:([0-9a-f]{64})$/.exec(digest)?.[1] : undefined;
   if (typeof size !== "number" || !Number.isInteger(size) || size <= 0 || !sha256) return null;
-  if (typeof url !== "string" || !url.startsWith(downloadPrefix(version))) return null;
+  // exactly: a prefix would let `/../` take the download elsewhere
+  if (url !== downloadPrefix(version) + zipName(version)) return null;
   const date = e.published_at;
   const publishedAt = typeof date === "string" && !Number.isNaN(Date.parse(date)) ? date : "";
   return { version, prerelease: e.prerelease, publishedAt, url, size, sha256 };

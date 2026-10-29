@@ -122,6 +122,11 @@ describe("parseReleases", () => {
       gh("v1.0.0-rc.5", {
         url: "http://github.com/hpagniez/grace/releases/download/v1.0.0-rc.5/x.zip",
       }),
+      // the right prefix, then out of it
+      gh("v1.0.0-rc.5", {
+        url: `${downloadPrefix("1.0.0-rc.5")}../../../../evil/grace/releases/download/v1.0.0-rc.5/${zipName("1.0.0-rc.5")}`,
+      }),
+      gh("v1.0.0-rc.5", { url: `${downloadPrefix("1.0.0-rc.5")}other.zip` }),
     ];
     for (const b of bad) expect(parseReleases([b])).toEqual([]);
   });
