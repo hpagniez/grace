@@ -36,7 +36,7 @@ export function FlakyProof(props: {
                 >
                   <span>{whenLabel(r.startedAt, Date.now())}</span>
                   <span class="inline-flex items-center gap-1">
-                    <StatusMark status={r.status} />
+                    <StatusMark status={r.status} decorative />
                     {STATUS_LABEL[r.status]}
                   </span>
                   <span>{threadsLabel(r.threads)}</span>

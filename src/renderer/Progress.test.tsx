@@ -124,7 +124,9 @@ describe("before any run (R14.3)", () => {
     expect(screen.queryByTestId("progress-passed")).toBeNull();
     expect(screen.queryByTestId("progress-failed")).toBeNull();
     expect(screen.queryByTestId("progress-elapsed")).toBeNull();
-    expect(screen.queryByRole("img", { name: "Passed" })).toBeNull();
+    expect(
+      screen.getByTestId("progress-text").closest("section")!.querySelector("[data-status]"),
+    ).toBeNull();
   });
 
   it("says test for one", () => {
@@ -178,16 +180,18 @@ describe("after a run (R14.2)", () => {
     expect(passed.className).toContain("font-mono");
     expect(passed.className).toContain("tabular-nums");
     expect(passed.parentElement!.textContent).toBe("1 passed");
-    expect(passed.parentElement!.querySelector("[role=img]")!.getAttribute("aria-label")).toBe(
-      "Passed",
-    );
+    // the word after the mark names the status, so the mark is hidden from the accessibility tree
+    const passedMark = passed.parentElement!.querySelector<HTMLElement>("[data-status]")!;
+    expect(passedMark.dataset.status).toBe("passed");
+    expect(passedMark.getAttribute("aria-hidden")).toBe("true");
+    expect(passedMark.hasAttribute("role")).toBe(false);
     const failed = screen.getByTestId("progress-failed");
     expect(failed.parentElement!.textContent).toBe("1 failed");
-    expect(failed.parentElement!.querySelector("[role=img]")!.getAttribute("aria-label")).toBe(
-      "Failed",
-    );
-    expect(screen.getByRole("img", { name: "Passed" }).dataset.status).toBe("passed");
-    expect(screen.getByRole("img", { name: "Failed" }).dataset.status).toBe("failed");
+    const failedMark = failed.parentElement!.querySelector<HTMLElement>("[data-status]")!;
+    expect(failedMark.dataset.status).toBe("failed");
+    expect(failedMark.getAttribute("aria-hidden")).toBe("true");
+    expect(failedMark.hasAttribute("role")).toBe(false);
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
   it("shows the elapsed time in the mono", () => {

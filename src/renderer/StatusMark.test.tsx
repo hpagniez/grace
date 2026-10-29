@@ -63,6 +63,18 @@ describe("StatusMark", () => {
       expect(drawn(k).querySelector(".animate-spin") !== null, k).toBe(k === "running");
   });
 
+  it.each(KEYS)("%s, when decorative, is hidden with no role and no name", (status) => {
+    const { container } = render(() => <StatusMark status={status} decorative />);
+    const mark = container.querySelector<HTMLElement>("[data-status]")!;
+    expect(mark.getAttribute("aria-hidden")).toBe("true");
+    expect(mark.hasAttribute("role")).toBe(false);
+    expect(mark.hasAttribute("aria-label")).toBe(false);
+    expect(mark.dataset.status).toBe(status);
+    expect(mark.className).toContain(MARK[status].text);
+    expect(mark.querySelector(".animate-spin") !== null).toBe(status === "running");
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
   it("is 14 px unless asked for 16", () => {
     const { container } = render(() => <StatusMark status="passed" size={16} />);
     expect(container.querySelector("svg")!.getAttribute("width")).toBe("16");

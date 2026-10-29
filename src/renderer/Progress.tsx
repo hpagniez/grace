@@ -101,14 +101,14 @@ export function Progress(props: { state: AppState }) {
         </span>
         <Show when={!idle()}>
           <span class="inline-flex items-center gap-1.5">
-            <StatusMark status="passed" />
+            <StatusMark status="passed" decorative />
             <span data-testid="progress-passed" class="font-mono font-medium tabular-nums">
               {run().passed}
             </span>{" "}
             passed
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <StatusMark status="failed" />
+            <StatusMark status="failed" decorative />
             <span data-testid="progress-failed" class="font-mono font-medium tabular-nums">
               {run().failed}
             </span>{" "}

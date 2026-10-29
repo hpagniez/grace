@@ -26,13 +26,17 @@ export const MARK: Record<MarkStatus, { icon: IconNode; text: string; label: str
   skipped: { icon: CircleMinus, text: "text-skipped", label: "Skipped" },
 };
 
-/** A status by shape, colour and accessible name (spec R7.1): never by colour alone. */
-export function StatusMark(props: { status: MarkStatus; size?: 14 | 16 }) {
+/**
+ * A status by shape, colour and accessible name (spec R7.1): never by colour alone. `decorative` hides
+ * it from assistive technology, for a mark that sits next to the word that names the status.
+ */
+export function StatusMark(props: { status: MarkStatus; size?: 14 | 16; decorative?: boolean }) {
   const mark = () => MARK[props.status];
   return (
     <span
-      role="img"
-      aria-label={mark().label}
+      role={props.decorative ? undefined : "img"}
+      aria-label={props.decorative ? undefined : mark().label}
+      aria-hidden={props.decorative ? "true" : undefined}
       data-status={props.status}
       class={`inline-flex shrink-0 ${mark().text}`}
     >

@@ -138,6 +138,10 @@ describe("details: a test", () => {
     expect(status.className).toContain("bg-passed-tint");
     expect(drawn(status.querySelector("svg"), CircleCheck)).toBe(true);
     expect(status.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    const badgeMark = status.querySelector<HTMLElement>("[data-status]")!; // the shared mark, hidden: the word names it
+    expect(badgeMark.dataset.status).toBe("passed");
+    expect(badgeMark.getAttribute("aria-hidden")).toBe("true");
+    expect(within(status).queryByRole("img")).toBeNull();
     expect(screen.getByTestId("details-location").textContent).toBe("tests/x.feature:3");
     expect(screen.getByTestId("details-location").className).toContain("font-mono");
     expect(screen.getByTestId("details-duration").textContent).toBe("1.50 s");
@@ -291,8 +295,13 @@ describe("details: a group", () => {
     expect(screen.getByTestId("details-location").textContent).toBe("tests/x.feature");
     const counts = screen.getByTestId("details-counts");
     expect(counts.textContent).toContain("3 scenarios");
-    const marks = within(counts).getAllByRole("img");
-    expect(marks.map((m) => m.getAttribute("aria-label"))).toEqual(["Passed", "Failed", "Pending"]);
+    // the word after each mark names it, so the marks are hidden from the accessibility tree
+    expect(within(counts).queryAllByRole("img")).toHaveLength(0);
+    const marks = [...counts.querySelectorAll<HTMLElement>("[data-status]")];
+    expect(marks.map((m) => m.dataset.status)).toEqual(["passed", "failed", "pending"]);
+    expect(
+      marks.every((m) => m.getAttribute("aria-hidden") === "true" && !m.hasAttribute("role")),
+    ).toBe(true);
     expect(drawn(marks[1].querySelector("svg"), CircleX)).toBe(true);
     // a mark, then the figure in tabular numbers, then the word
     const failed = marks[1].parentElement!;

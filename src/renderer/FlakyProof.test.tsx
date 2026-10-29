@@ -191,12 +191,19 @@ describe("flaky proof in the details pane", () => {
     expect(box.outerHTML).not.toMatch(/\b(zinc|red|green|sky|amber)-\d|dark:|title=/);
   });
 
-  it("marks each proof run by its status: a mark with its name, then the word", () => {
+  it("marks each proof run by its status: a hidden mark, then the word that names it", () => {
     const { flaky } = setup();
     flaky(env("qa", 1, 1, [run("b", { status: "failed" }), run("a", { status: "passed" })]));
     const rows = runs(boxes()[0]);
-    const marks = rows.map((r) => within(r).getByRole("img"));
-    expect(marks.map((m) => m.getAttribute("aria-label"))).toEqual(["Failed", "Passed"]);
+    expect(within(boxes()[0]).queryAllByRole("img")).toHaveLength(0);
+    const marks = rows.map((r) => r.querySelector<HTMLElement>("[data-status]")!);
+    expect(
+      marks.every((m) => m.getAttribute("aria-hidden") === "true" && !m.hasAttribute("role")),
+    ).toBe(true);
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining("Failed"),
+      expect.stringContaining("Passed"),
+    ]);
     expect(drawn(marks[0].querySelector("svg"), CircleX)).toBe(true);
     expect(drawn(marks[1].querySelector("svg"), CircleCheck)).toBe(true);
     expect(rows.map((r) => r.dataset.status)).toEqual(["failed", "passed"]); // tests read this

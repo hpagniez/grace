@@ -31,11 +31,7 @@ const BADGE: Record<Status, keyof typeof TINT> = {
 function StatusBadge(props: { status: Status }) {
   return (
     <span data-testid="details-status" class={`${badge} ${TINT[BADGE[props.status]]}`}>
-      <Icon
-        icon={MARK[props.status].icon}
-        size={14}
-        class={props.status === "running" ? "animate-spin" : undefined}
-      />
+      <StatusMark status={props.status} decorative />
       {STATUS_LABEL[props.status]}
     </span>
   );
@@ -210,7 +206,7 @@ function Group(props: { node: TestNode; state: AppState }) {
         <For each={counts()}>
           {([s, n]) => (
             <span class="inline-flex items-center gap-1.5">
-              <StatusMark status={s} />
+              <StatusMark status={s} decorative />
               <span class="tabular-nums">{n}</span> {STATUS_LABEL[s]}
             </span>
           )}
