@@ -347,6 +347,7 @@ describe("history list", () => {
     expect(within(screen.getByTestId("history")).queryAllByRole("img")).toHaveLength(0);
     // a block flex: inline-flex would sit on the baseline and lift the words above the rest of the row
     expect(cell(0, "history-result").firstElementChild!.className).toMatch(/(^| )flex /);
+    expect(cell(0, "history-result").className).toContain("tabular-nums"); // R2.4: it holds counts
     expect(text(0, "history-result")).toBe("41 passed, 2 failed of 43");
     expect(text(1, "history-result")).toBe("3 passed, 0 failed of 3");
     expect(text(2, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
@@ -500,7 +501,7 @@ describe("Clear history", () => {
     load(entry("a"), entry("b"), entry("c"));
     showHistory();
     expect(clear().textContent).toBe("Clear history");
-    expect(screen.queryByText(/Delete the/)).toBeNull();
+    expect(confirm().open).toBe(false);
     click(clear());
     expect(confirm().open).toBe(true);
     expect(
@@ -536,6 +537,9 @@ describe("Clear history", () => {
     expect(cancel.className).toContain(btn);
     expect(del.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(cancel.hasAttribute("autofocus")).toBe(true);
+    // R2.2: dialog buttons are 14 px. `!`, because the buttons' own text-sm is later in the stylesheet.
+    expect(del.className).toContain("text-base!");
+    expect(cancel.className).toContain("text-base!");
     expect(confirm().outerHTML).not.toMatch(RAW);
   });
 
@@ -549,18 +553,52 @@ describe("Clear history", () => {
     ).toBeTruthy();
   });
 
-  it("ignores a close event that arrives while the dialog is open again", () => {
-    const { load } = setup();
-    load(entry("a"), entry("b"));
-    showHistory();
-    click(clear());
-    confirm().dispatchEvent(new Event("close")); // late: the dialog was reopened meanwhile
-    flush();
-    expect(screen.queryByText(/Delete the/)).not.toBeNull();
-    confirm().removeAttribute("open"); // Escape
-    confirm().dispatchEvent(new Event("close"));
-    flush();
-    expect(screen.queryByText(/Delete the/)).toBeNull();
+  // The dialog fades out over 100 ms (R5.2): its title and buttons must stay until it is gone.
+  describe("while it closes", () => {
+    const whole = (runs: string) => {
+      expect(within(confirm()).getByText(runs)).toBeTruthy();
+      expect(within(confirm()).getByTestId("clear-history-confirm")).toBeTruthy();
+      expect(within(confirm()).getByTestId("clear-history-cancel")).toBeTruthy();
+    };
+    const THREE = "Delete the 3 runs of this project and their reports?";
+
+    it("keeps its title and buttons after Cancel and after Escape", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-cancel"));
+      expect(confirm().open).toBe(false);
+      whole(THREE);
+      click(clear());
+      confirm().removeAttribute("open"); // Escape: the browser closes the dialog itself
+      confirm().dispatchEvent(new Event("close"));
+      flush();
+      whole(THREE);
+    });
+
+    it("keeps the count it was opened with when main answers Delete with an empty list", () => {
+      const { api, load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-confirm"));
+      expect(api.clearHistory).toHaveBeenCalledOnce();
+      load(); // main's reply, while the dialog is still fading out
+      expect(rows()).toHaveLength(0);
+      whole(THREE); // not "Delete the 0 runs of this project and their reports?"
+    });
+
+    it("counts again each time it opens", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-cancel"));
+      load(entry("a"), entry("b"), entry("c"), entry("d"));
+      click(clear());
+      whole("Delete the 4 runs of this project and their reports?");
+    });
   });
 
   it("disables the toolbar Report and Re-run failed once the history is empty", () => {

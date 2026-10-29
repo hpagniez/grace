@@ -1,5 +1,5 @@
 import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
-import { createSignal, flush, For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import {
   resultLabel,
   whatRanLabel,
@@ -38,7 +38,8 @@ const resultStatus = (r: HistoryEntry): MarkStatus =>
       ? "cancelled"
       : "passed";
 
-// Headers stick to the top of the scroll (R18.4). Rows are 28 px; scroll-mt-7 keeps a focused row clear of the header (R10.2).
+// Headers stick to the top of the scroll (R18.4). Rows are 28 px. The row's scroll-mt-7 clears the header when the row itself
+// is scrolled into view; a focused button inside it is cleared by the scroller's scroll-pt-7 (R10.2).
 const th =
   "sticky top-0 h-7 whitespace-nowrap bg-surface px-3 text-xs font-medium text-muted shadow-[inset_0_-1px_0_var(--color-line)]";
 const td = "whitespace-nowrap px-3";
@@ -47,16 +48,12 @@ const num = "text-right tabular-nums";
 /** The "Clear history" button of the tab header and the dialog that confirms it. */
 export function ClearHistory(props: { state: AppState; api: Api }) {
   let dialog!: HTMLDialogElement;
-  const [open, setOpen] = createSignal(false);
+  // The count the dialog was opened with: main's empty list, arriving while it fades out, must not change its words.
+  const [count, setCount] = createSignal(0);
   const locked = () => props.state.run.active || props.state.busy;
   const show = () => {
-    setOpen(true);
-    flush(); // the dialog's content must exist for showModal to focus Cancel
+    setCount(props.state.history.length);
     dialog.showModal();
-  };
-  const close = () => {
-    dialog.close();
-    setOpen(false);
   };
   return (
     <>
@@ -74,37 +71,36 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
         data-testid="clear-history-dialog"
         aria-labelledby="clear-history-title"
         class={`${dialogStyle} w-[28rem] max-w-[95vw]`}
-        onClose={() => dialog.open || setOpen(false)} // Escape; not a late event after a reopen
       >
-        <Show when={open()}>
-          <p id="clear-history-title" class="text-lg font-semibold">
-            {props.state.history.length === 1
-              ? "Delete the 1 run of this project and its report?"
-              : `Delete the ${props.state.history.length} runs of this project and their reports?`}
-          </p>
-          <div class="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
-              data-testid="clear-history-confirm"
-              class={danger}
-              onClick={() => {
-                close();
-                void props.api.clearHistory();
-              }}
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              data-testid="clear-history-cancel"
-              class={btn}
-              autofocus
-              onClick={close}
-            >
-              Cancel
-            </button>
-          </div>
-        </Show>
+        {/* Always mounted: the title and buttons stay while the dialog fades out (R5.2). */}
+        <p id="clear-history-title" class="text-lg font-semibold">
+          {count() === 1
+            ? "Delete the 1 run of this project and its report?"
+            : `Delete the ${count()} runs of this project and their reports?`}
+        </p>
+        <div class="mt-5 flex justify-end gap-2">
+          {/* text-base! (R2.2): the buttons' own text-sm comes later in the stylesheet */}
+          <button
+            type="button"
+            data-testid="clear-history-confirm"
+            class={`${danger} text-base!`}
+            onClick={() => {
+              dialog.close();
+              void props.api.clearHistory();
+            }}
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            data-testid="clear-history-cancel"
+            class={`${btn} text-base!`}
+            autofocus
+            onClick={() => dialog.close()}
+          >
+            Cancel
+          </button>
+        </div>
       </dialog>
     </>
   );
@@ -114,6 +110,7 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
 export function History(props: { state: AppState; api: Api }) {
   const locked = () => props.state.run.active || props.state.busy;
   return (
+    // scroll-pt-7: a button focused under the 28 px sticky header scrolls clear of it (R10.2)
     <div data-testid="history" class="min-h-0 flex-1 scroll-pt-7 overflow-auto">
       <Show
         when={props.state.history.length > 0}
@@ -189,7 +186,7 @@ export function History(props: { state: AppState; api: Api }) {
                         </span>
                       </Tooltip>
                     </td>
-                    <td data-testid="history-result" class={td}>
+                    <td data-testid="history-result" class={`${td} tabular-nums`}>
                       {/* a block flex, not inline-flex: baseline alignment would lift the words above their row */}
                       <div class="flex items-center gap-1.5">
                         <StatusMark status={resultStatus(run)} decorative />
