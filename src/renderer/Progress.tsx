@@ -58,9 +58,11 @@ export function Progress(props: { state: AppState }) {
   const waiting = () => (props.state.busy && !run().active) || (run().active && run().done === 0);
   const value = (n: number) => (waiting() ? undefined : n);
   // No run in this view yet (the reducer starts a view with none on a new project or environment)
-  const neverRan = () => !run().active && run().runId === null && run().outcome === null;
-  // idle, the run view has no total: the line counts the tests of the tree
-  const tests = () => run().total || (props.state.tree ? leaves(props.state.tree).length : 0);
+  const idle = () => !run().active && run().runId === null && run().outcome === null;
+  // "Not run yet" only for a project that never ran: with runs in its history the line just counts
+  const neverRan = () => idle() && props.state.history.length === 0;
+  // the run view's total is 0 until a run starts: the line counts the tests of the tree
+  const tests = () => (props.state.tree ? leaves(props.state.tree).length : 0);
   const fill = "flex-none transition-[width] duration-300 ease-out motion-reduce:transition-none";
 
   return (
@@ -91,13 +93,13 @@ export function Progress(props: { state: AppState }) {
       <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span
           data-testid="progress-text"
-          class={neverRan() ? "text-muted tabular-nums" : "font-mono tabular-nums"}
+          class={idle() ? "text-muted tabular-nums" : "font-mono tabular-nums"}
         >
-          {neverRan()
-            ? `${tests()} ${tests() === 1 ? "test" : "tests"} · Not run yet`
+          {idle()
+            ? `${tests()} ${tests() === 1 ? "test" : "tests"}${neverRan() ? " · Not run yet" : ""}`
             : `${run().done} / ${run().total}`}
         </span>
-        <Show when={!neverRan()}>
+        <Show when={!idle()}>
           <span class="inline-flex items-center gap-1.5">
             <StatusMark status="passed" />
             <span data-testid="progress-passed" class="font-mono font-medium tabular-nums">

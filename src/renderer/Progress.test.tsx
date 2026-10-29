@@ -63,6 +63,27 @@ const result = (n: number, status: "passed" | "failed" | "interrupted"): AppEven
   type: "scenarios",
   updates: [{ key: leaf(n).key, status }],
 });
+const history = (): AppEvent => ({
+  type: "history",
+  runs: [
+    {
+      id: "20261028-100000-000",
+      startedAt: 1,
+      durationMillis: 2,
+      env: null,
+      threads: 1,
+      filter: { include: [], exclude: [], hideNonMatching: false },
+      selection: null,
+      failedOf: null,
+      outcome: "finished",
+      exitCode: 0,
+      passed: 1,
+      failed: 0,
+      total: 1,
+      reportAvailable: true,
+    },
+  ],
+});
 const finished = (outcome: "finished" | "cancelled" | "failed"): AppEvent => ({
   type: "runFinished",
   outcome,
@@ -78,7 +99,7 @@ function setup() {
     for (const e of events) set((draft) => reduce(draft, e));
     flush();
   };
-  return { send, set };
+  return { send };
 }
 
 const text = (id: string) => screen.getByTestId(id).textContent;
@@ -106,14 +127,20 @@ describe("before any run (R14.3)", () => {
     expect(screen.queryByRole("img", { name: "Passed" })).toBeNull();
   });
 
-  it("reads the total of the run view when it has one, and says test for one", () => {
-    const { send, set } = setup();
-    set((d) => void (d.run.total = 24));
-    flush();
-    expect(text("progress-text")).toBe("24 tests · Not run yet");
-    set((d) => void (d.run.total = 0));
+  it("says test for one", () => {
+    const { send } = setup();
     send(loaded(1));
     expect(text("progress-text")).toBe("1 test · Not run yet");
+  });
+
+  it("only counts the tests once the project has runs in its history, and still shows no zero counts", () => {
+    const { send } = setup();
+    send(loaded(24), history());
+    expect(text("progress-text")).toBe("24 tests");
+    expect(screen.queryByTestId("progress-passed")).toBeNull();
+    expect(screen.queryByTestId("progress-elapsed")).toBeNull();
+    send({ type: "history", runs: [] }); // Clear history
+    expect(text("progress-text")).toBe("24 tests · Not run yet");
   });
 
   it("keeps the progress bar and its values", () => {

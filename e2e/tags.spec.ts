@@ -166,7 +166,7 @@ test("A tag removed before a run does not widen it", async () => {
   await win.getByTestId("run-all-button").click();
   await expect(win.getByTestId("notice")).toHaveText("Nothing to run", { timeout: 30_000 });
   await expect(win.getByTestId("run-outcome")).toHaveText("");
-  await expect(win.getByTestId("progress-text")).toHaveText("0 / 0");
+  await expect(win.getByTestId("progress-text")).toHaveText(/^\d+ tests? · Not run yet$/);
   // the pre-run dry run sees the new tree but prunes nothing
   await expect(chip(win, "wip")).toHaveAttribute("data-state", "include");
 });

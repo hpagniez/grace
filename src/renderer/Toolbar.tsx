@@ -4,7 +4,7 @@ import type { AppState } from "./reduce";
 import { matchingLeaves } from "../shared/tags";
 // a file, never a data: URL, which the CSP (default-src 'self') would block
 import logo from "../../assets/icon-small.svg?no-inline";
-import { btn, btnIcon, primary } from "./buttons";
+import { btn, btnIcon, narrowIcon, narrowLabel, primary } from "./buttons";
 import { EnvPicker } from "./EnvPicker";
 import { Icon } from "./Icon";
 import { PropertiesDialog } from "./PropertiesDialog";
@@ -42,7 +42,8 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <img src={logo} alt="" width="20" height="20" />
         </button>
       </Tooltip>
-      <div class="flex min-w-0 flex-1 items-center gap-2 pr-2">
+      {/* a container: the layout chip goes when the name and the chip no longer fit side by side */}
+      <div class="@container flex min-w-0 flex-1 items-center gap-2 pr-2">
         <Tooltip text={path()} class="min-w-0">
           <span data-testid="project-name" class="truncate text-base font-medium">
             {folderName(path())}
@@ -50,7 +51,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         </Tooltip>
         <span
           data-testid="project-layout"
-          class="inline-flex h-5 shrink-0 items-center rounded-sm bg-selected px-1.5 text-2xs font-medium text-muted empty:hidden"
+          class="inline-flex h-5 shrink-0 items-center rounded-sm bg-selected px-1.5 text-2xs font-medium text-muted empty:hidden @max-[160px]:hidden"
         >
           {props.state.project ? LAYOUT_LABEL[props.state.project.layout] : ""}
         </span>
@@ -80,43 +81,52 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <Icon icon={RefreshCw} />
         </button>
       </Tooltip>
-      <button
-        data-testid="open-button"
-        class={btn}
-        disabled={busy()}
-        onClick={() => void props.api.openProject()}
-      >
-        <Icon icon={FolderOpen} />
-        Open…
-      </button>
+      <Tooltip text="Open…">
+        <button
+          data-testid="open-button"
+          class={`${btn} ${narrowIcon}`}
+          disabled={busy()}
+          onClick={() => void props.api.openProject()}
+        >
+          <Icon icon={FolderOpen} />
+          <span class={narrowLabel}>Open…</span>
+        </button>
+      </Tooltip>
       <Divider />
-      <button
-        data-testid="report-button"
-        class={btn}
-        disabled={busy() || !props.state.run.reportAvailable}
-        onClick={() => void props.api.openReport()}
-      >
-        <Icon icon={FileText} />
-        Report
-      </button>
-      <button
-        data-testid="rerun-failed-button"
-        class={btn}
-        disabled={busy() || failedCount() === 0}
-        onClick={() => void props.api.rerunFailed(newest()!.id)}
-      >
-        <Icon icon={RotateCcw} />
-        Re-run failed <span class={countPill}>{failedCount()}</span>
-      </button>
-      <button
-        data-testid="cancel-button"
-        class={btn}
-        disabled={!busy()}
-        onClick={() => void props.api.cancel()}
-      >
-        <Icon icon={Square} />
-        Cancel
-      </button>
+      <Tooltip text="Report">
+        <button
+          data-testid="report-button"
+          class={`${btn} ${narrowIcon}`}
+          disabled={busy() || !props.state.run.reportAvailable}
+          onClick={() => void props.api.openReport()}
+        >
+          <Icon icon={FileText} />
+          <span class={narrowLabel}>Report</span>
+        </button>
+      </Tooltip>
+      <Tooltip text="Re-run failed">
+        <button
+          data-testid="rerun-failed-button"
+          class={`${btn} max-[1100px]:px-2`}
+          disabled={busy() || failedCount() === 0}
+          onClick={() => void props.api.rerunFailed(newest()!.id)}
+        >
+          <Icon icon={RotateCcw} />
+          <span class={narrowLabel}>Re-run failed</span>{" "}
+          <span class={countPill}>{failedCount()}</span>
+        </button>
+      </Tooltip>
+      <Tooltip text="Cancel">
+        <button
+          data-testid="cancel-button"
+          class={`${btn} ${narrowIcon}`}
+          disabled={!busy()}
+          onClick={() => void props.api.cancel()}
+        >
+          <Icon icon={Square} />
+          <span class={narrowLabel}>Cancel</span>
+        </button>
+      </Tooltip>
       <button
         data-testid="run-all-button"
         class={primary}

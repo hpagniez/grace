@@ -3,7 +3,7 @@ import { createStore, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
-import { primary } from "./buttons";
+import { btn, btnIcon, ghost, narrowIcon, narrowLabel, primary } from "./buttons";
 import { initialState, reduce } from "./reduce";
 import { Toolbar } from "./Toolbar";
 import { countPill } from "./ui";
@@ -134,6 +134,65 @@ describe("order and shape (R13.1)", () => {
   });
 });
 
+describe("a narrow window", () => {
+  const LABELLED = [
+    ["properties-button", "Properties…"],
+    ["open-button", "Open…"],
+    ["report-button", "Report"],
+    ["rerun-failed-button", "Re-run failed"],
+    ["cancel-button", "Cancel"],
+  ] as const;
+
+  it("never wraps a button's label", () => {
+    for (const style of [btn, primary, ghost, btnIcon])
+      expect(style).toContain("whitespace-nowrap");
+  });
+
+  it("below 1100 px hides the label of five buttons from sight but not from their names", () => {
+    setup();
+    for (const [id, label] of LABELLED) {
+      const spoken = button(id).querySelector(`.${CSS.escape(narrowLabel)}`)!;
+      expect(spoken.textContent, id).toBe(label);
+      expect(spoken.tagName).toBe("SPAN");
+      expect(narrowLabel).toBe("max-[1100px]:sr-only");
+    }
+    // the names: a label and, for Re-run failed, its count
+    for (const name of ["Properties…", "Open…", "Report", "Cancel", "Re-run failed 0"])
+      expect(screen.getByRole("button", { name }), name).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Home" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeTruthy();
+  });
+
+  it("shrinks four of them to a 28 px icon and keeps the count pill of Re-run failed", () => {
+    setup();
+    for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
+      for (const c of narrowIcon.split(" ")) expect(button(id).className, id).toContain(c);
+    expect(button("rerun-failed-button").className).toContain("max-[1100px]:px-2");
+    const spans = [...button("rerun-failed-button").querySelectorAll("span")];
+    expect(spans.at(-1)!.textContent).toBe("0"); // the pill follows the spoken label
+  });
+
+  it("keeps Run all's label in sight", () => {
+    setup();
+    const run = button("run-all-button");
+    expect(run.textContent).toBe("Run all");
+    expect(run.querySelector("span")).toBeNull();
+    expect(run.className).not.toContain("max-[1100px]");
+  });
+
+  it("gives each of the five a tooltip with the label, also when disabled", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    setup();
+    for (const [id, label] of LABELLED) {
+      hover(button(id));
+      expect(tip().textContent, id).toBe(label);
+      fireEvent.pointerLeave(wrapperOf(button(id)));
+      flush();
+    }
+    expect(button("report-button").disabled).toBe(true);
+  });
+});
+
 describe("Home and Refresh, the icon-only buttons", () => {
   it("Home holds the logo, is named Home and shows that in a tooltip", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -209,6 +268,13 @@ describe("the project", () => {
     expect(tip().textContent).toBe(ROOT);
   });
 
+  it("hides the layout chip, by a container query, when the name and the chip would not fit", () => {
+    setup();
+    const chip = screen.getByTestId("project-layout");
+    expect(chip.className).toContain("@max-[160px]:hidden");
+    expect(chip.parentElement!.className).toContain("@container");
+  });
+
   it("the path's tooltip lets the row shrink", () => {
     setup();
     expect(wrapperOf(screen.getByTestId("project-path")).className).toContain("min-w-0");
@@ -260,7 +326,7 @@ describe("the actions", () => {
     });
     const rerun = button("rerun-failed-button");
     expect(rerun.textContent).toBe("Re-run failed 2");
-    const pill = rerun.querySelector("span")!;
+    const pill = [...rerun.querySelectorAll("span")].at(-1)!; // after the spoken label
     expect(pill.textContent).toBe("2");
     for (const c of countPill.split(" ")) expect(pill.className).toContain(c);
     expect(rerun.disabled).toBe(false);

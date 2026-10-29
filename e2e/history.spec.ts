@@ -273,7 +273,7 @@ test("Cancelling the environment switch of a re-run runs nothing", async () => {
   await expect(win.getByTestId("env-input")).toHaveValue("");
   await expect.poll(ourJavaPids).toEqual([]);
   await expect(win.getByTestId("run-outcome")).toHaveText("");
-  await expect(win.getByTestId("progress-text")).toHaveText(/^\d+ tests? · Not run yet$/);
+  await expect(win.getByTestId("progress-text")).toHaveText(/^\d+ tests?$/);
   await expect(tab(win)).toHaveText("History (1)");
   expect(readdirSync(path.join(projectDataDir(userData, dir), "runs"))).toHaveLength(1);
 });
@@ -307,7 +307,7 @@ test("A re-run of a test that no longer exists", async () => {
   });
   await expect.poll(ourJavaPids).toEqual([]);
   await expect(win.getByTestId("run-outcome")).toHaveText("");
-  await expect(win.getByTestId("progress-text")).toHaveText(/^\d+ tests? · Not run yet$/);
+  await expect(win.getByTestId("progress-text")).toHaveText(/^\d+ tests?$/);
   await expect(tab(win)).toHaveText("History (1)");
 });
 

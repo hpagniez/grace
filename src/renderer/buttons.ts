@@ -1,5 +1,5 @@
 const base =
-  "inline-flex items-center justify-center gap-1.5 rounded-md transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
 const md = "h-7 px-3 text-sm"; // 28 px (spec R3.1)
 const sm = "h-6 px-2 text-xs"; // 24 px
 const plain = "border border-control bg-surface text-ink enabled:hover:bg-hover";
@@ -14,3 +14,10 @@ export const ghost = `${base} ${md} ${quiet}`;
 export const ghostSmall = `${base} ${sm} ${quiet}`;
 /** Icon only: 28 × 28, borderless. Give it an aria-label. */
 export const btnIcon = `${base} size-7 ${quiet}`;
+
+/**
+ * The toolbar below 1100 px: a button's label is only spoken (put narrowLabel on a span around it)
+ * and the button shrinks to its icon, so the toolbar fits down to the window's 760 px minimum.
+ */
+export const narrowIcon = "max-[1100px]:w-7 max-[1100px]:px-0";
+export const narrowLabel = "max-[1100px]:sr-only";

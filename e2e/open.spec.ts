@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import {
@@ -72,6 +73,91 @@ test("The toolbar cuts a long path from its start and keeps its characters in or
   expect(seen).toEqual({ startCut: true, endShown: true, leftToRight: true });
   await box.hover();
   await expect(win.getByRole("tooltip")).toHaveText(full);
+});
+
+/** The layout chip is hidden, or ends before the Env label starts. */
+async function expectChipClear(win: Page) {
+  const chip = await win.getByTestId("project-layout").boundingBox();
+  const env = await win.locator("label", { has: win.getByTestId("env-input") }).boundingBox();
+  if (chip) expect(chip.x + chip.width).toBeLessThanOrEqual(env!.x);
+}
+
+test("A narrow window keeps every toolbar button on screen, with its name", async () => {
+  const dir = project("clean");
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  // the window cannot get narrower than the toolbar fits
+  expect(
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getMinimumSize()[0]),
+  ).toBe(760);
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(780, 700),
+  );
+  await expect.poll(() => win.evaluate(() => innerWidth)).toBe(780);
+  await expect(win.getByTestId("run-all-button")).toBeEnabled({ timeout: 15_000 });
+
+  const names = {
+    "home-button": "Home",
+    "properties-button": "Properties…",
+    "refresh-button": "Refresh",
+    "open-button": "Open…",
+    "report-button": "Report",
+    "rerun-failed-button": /^Re-run failed \d+$/,
+    "cancel-button": "Cancel",
+    "run-all-button": "Run all",
+  };
+  for (const [id, name] of Object.entries(names))
+    await expect(win.getByTestId(id), id).toHaveAccessibleName(name);
+
+  const seen = await win.locator("header button").evaluateAll((buttons) =>
+    buttons.map((b) => {
+      const r = b.getBoundingClientRect();
+      return {
+        id: (b as HTMLElement).dataset.testid,
+        left: r.left,
+        right: r.right,
+        width: r.width,
+      };
+    }),
+  );
+  expect(seen.map((b) => b.id)).toEqual(Object.keys(names));
+  for (const b of seen) {
+    expect(b.left, `${b.id} left`).toBeGreaterThanOrEqual(0);
+    expect(b.right, `${b.id} right`).toBeLessThanOrEqual(780);
+  }
+  // below 1100 px four labels are only spoken: those buttons are their icon
+  for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
+    expect(seen.find((b) => b.id === id)!.width, id).toBeLessThan(40);
+  expect(await win.locator("header").evaluate((h) => h.scrollWidth <= h.clientWidth)).toBe(true);
+  await expectChipClear(win);
+  expect((await win.getByTestId("project-name").boundingBox())!.width).toBeGreaterThan(30);
+  // just over 1100 px the labels show and the toolbar is at its tightest
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(1101, 700),
+  );
+  await expect.poll(() => win.evaluate(() => innerWidth)).toBe(1101);
+  await expect
+    .poll(() =>
+      win
+        .getByTestId("open-button")
+        .boundingBox()
+        .then((b) => b!.width),
+    )
+    .toBeGreaterThan(60);
+  await expectChipClear(win);
+  expect(await win.locator("header").evaluate((h) => h.scrollWidth <= h.clientWidth)).toBe(true);
+  // and back at 1200 px the labels show
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(1200, 700),
+  );
+  await expect
+    .poll(() =>
+      win
+        .getByTestId("open-button")
+        .boundingBox()
+        .then((b) => b!.width),
+    )
+    .toBeGreaterThan(60);
 });
 
 test("Maven layout with classpath resources", async () => {

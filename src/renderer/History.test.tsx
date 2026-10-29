@@ -414,8 +414,14 @@ describe("toolbar Re-run failed", () => {
 
   it("sits between Report and Cancel, before Run all (spec R13.1)", () => {
     setup();
-    expect(toolbarRerunFailed().previousElementSibling).toBe(report());
-    expect(toolbarRerunFailed().nextElementSibling).toBe(screen.getByTestId("cancel-button"));
+    const slot = (el: HTMLElement) => el.parentElement!; // each sits in its tooltip's wrapper
+    expect(slot(toolbarRerunFailed()).previousElementSibling).toBe(slot(report()));
+    expect(slot(toolbarRerunFailed()).nextElementSibling).toBe(
+      slot(screen.getByTestId("cancel-button")),
+    );
+    expect(slot(screen.getByTestId("cancel-button")).nextElementSibling).toBe(
+      screen.getByTestId("run-all-button"),
+    );
   });
 
   it("is disabled with no history, with no failure in the newest run, and while busy", () => {

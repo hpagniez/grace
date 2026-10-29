@@ -11,10 +11,11 @@ import {
   type RowView,
 } from "../shared/env";
 import type { Api } from "../shared/ipc";
-import { btn, primary } from "./buttons";
+import { btn, narrowIcon, narrowLabel, primary } from "./buttons";
 import { INVALID_ENV } from "./EnvPicker";
 import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
+import { Tooltip } from "./Tooltip";
 
 /** A property row being edited. Scope "" is "All environments". */
 interface Row {
@@ -213,16 +214,18 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="properties-button"
-        class={btn}
-        disabled={locked() || !view()}
-        onClick={show}
-      >
-        <Icon icon={SlidersHorizontal} />
-        Properties…
-      </button>
+      <Tooltip text="Properties…">
+        <button
+          type="button"
+          data-testid="properties-button"
+          class={`${btn} ${narrowIcon}`}
+          disabled={locked() || !view()}
+          onClick={show}
+        >
+          <Icon icon={SlidersHorizontal} />
+          <span class={narrowLabel}>Properties…</span>
+        </button>
+      </Tooltip>
       <dialog
         ref={(e) => (dialog = e)}
         data-testid="properties-dialog"
