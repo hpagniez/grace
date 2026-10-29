@@ -21,7 +21,7 @@ import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
 import { StatusMark } from "./StatusMark";
 import { Tooltip } from "./Tooltip";
-import { badge, chip, TINT } from "./ui";
+import { badge, tagChip, TINT } from "./ui";
 
 interface Ctx {
   state: AppState;
@@ -31,8 +31,7 @@ interface Ctx {
 
 // The tree scrolls, so a focus ring goes inside its row (spec R10.1).
 const INSET = "focus-visible:-outline-offset-2";
-// 20 px, not the chip's 24: rows are 24 px with no gap, so a 24 px tag would touch the rows above and below.
-const TAG = `${chip.replace("h-6", "h-5")} shrink-0`;
+const TAG = `${tagChip} shrink-0`;
 const FLAKY = `${badge} ${TINT.cancelled} shrink-0`;
 // 24 x 24 (R10.3). Muted until its row is hovered, focused or selected (the row sets `group`).
 const RUN = `inline-flex size-6 shrink-0 items-center justify-center rounded-sm transition-colors duration-(--duration-fast) ease-standard enabled:group-hover:text-passed enabled:group-focus-within:text-passed disabled:cursor-not-allowed disabled:opacity-40 ${INSET}`;
@@ -40,7 +39,7 @@ const RUN = `inline-flex size-6 shrink-0 items-center justify-center rounded-sm 
 function Node(props: { node: TestNode; ctx: Ctx }) {
   const [open, setOpen] = createSignal(true);
   const hasKids = () => props.node.children.length > 0;
-  const status = () => deriveStatus(props.node, props.ctx.state.statuses);
+  const status = createMemo(() => deriveStatus(props.node, props.ctx.state.statuses));
   const selected = () => props.ctx.state.selected === props.node.key;
   // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
   const isFeature = () => props.node.kind === "feature";
@@ -59,6 +58,10 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
   const kindIcon = () =>
     isFeature() ? FileText : props.node.kind === "folder" ? (open() ? FolderOpen : Folder) : null;
   const title = () => (isFeature() && props.node.name !== label() ? props.node.name : null);
+  // Cut: the label shows less than it holds. Measured when the tooltip would show, so it follows the window.
+  let labelEl!: HTMLButtonElement;
+  const cut = () => labelEl.scrollWidth > labelEl.clientWidth;
+  const full = () => (title() ? `${label()} · ${title()}` : label());
   return (
     <Show when={!hidden()}>
       <li
@@ -93,8 +96,9 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
           <Show when={kindIcon()}>
             <Icon icon={kindIcon()!} size={14} class="text-muted" />
           </Show>
-          <Tooltip text={title() ? `${label()} · ${title()}` : label()} class="min-w-0 flex-1">
+          <Tooltip text={cut() ? full() : undefined} class="min-w-0 flex-1">
             <button
+              ref={(e) => (labelEl = e)}
               type="button"
               class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
               onClick={() => props.ctx.select(props.node.key)}
@@ -111,7 +115,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
               when={isTest()}
               fallback={
                 <span data-testid="flaky-count" class={FLAKY}>
-                  <Icon icon={Shuffle} size={12} />
+                  <Icon icon={Shuffle} size={14} />
                   {`${flakyCount()} flaky`}
                 </span>
               }
@@ -123,7 +127,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
                   aria-label={FLAKY_TITLE}
                   class={FLAKY}
                 >
-                  <Icon icon={Shuffle} size={12} />
+                  <Icon icon={Shuffle} size={14} />
                   flaky
                 </span>
               </Tooltip>

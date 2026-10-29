@@ -5,10 +5,13 @@ export const input =
 
 // A tag chip is 24 px (R3.1). Its state shows by shape as well as colour (R7.3).
 const chipBase =
-  "inline-flex h-6 items-center gap-1 rounded-sm border px-1.5 text-2xs font-medium transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
-export const chip = `${chipBase} border-line bg-surface text-muted enabled:hover:bg-hover`;
-export const chipIncluded = `${chipBase} border-accent bg-accent text-on-accent`;
-export const chipExcluded = `${chipBase} border-control bg-surface text-ink line-through`;
+  "inline-flex items-center gap-1 rounded-sm border px-1.5 text-2xs font-medium transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
+const chipPlain = "border-line bg-surface text-muted enabled:hover:bg-hover";
+export const chip = `${chipBase} h-6 ${chipPlain}`;
+/** A tag in a 24 px list row, 20 px so it clears the rows above and below. */
+export const tagChip = `${chipBase} h-5 ${chipPlain}`;
+export const chipIncluded = `${chipBase} h-6 border-accent bg-accent text-on-accent`;
+export const chipExcluded = `${chipBase} h-6 border-control bg-surface text-ink line-through`;
 
 // A bottom panel tab is 32 px (R3.1); the active one has the 2 px accent line.
 const tabBase =

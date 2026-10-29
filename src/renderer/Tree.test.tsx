@@ -227,22 +227,58 @@ describe("main screen", () => {
     expect(run("s:tests/basic.feature#1").className).not.toMatch(green);
   });
 
-  it("truncates a label and shows it whole in a tooltip", () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    try {
-      const { load } = setup();
-      load();
-      const label = screen.getByText("failing match");
-      expect(label.className).toContain("truncate");
-      expect(label.hasAttribute("title")).toBe(false);
-      const wrapper = label.parentElement!;
-      expect(wrapper.className).toContain("min-w-0");
-      fireEvent.pointerEnter(wrapper);
+  describe("label tooltip", () => {
+    // jsdom has no layout: say how wide the label is and how much of it shows
+    const measure = (el: HTMLElement, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { value: scrollWidth, configurable: true });
+      Object.defineProperty(el, "clientWidth", { value: clientWidth, configurable: true });
+    };
+    const tip = () => document.querySelector("[role=tooltip]");
+    const rest = (el: HTMLElement) => {
+      fireEvent.pointerEnter(el.parentElement!);
       vi.advanceTimersByTime(500);
-      expect(document.querySelector("[role=tooltip]")!.textContent).toBe("failing match");
-    } finally {
-      vi.useRealTimers();
-    }
+    };
+
+    it("shows a cut label whole in a tooltip, not as a title", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { load } = setup();
+        load();
+        const label = screen.getByText("failing match");
+        expect(label.className).toContain("truncate");
+        expect(label.hasAttribute("title")).toBe(false);
+        expect(label.parentElement!.className).toContain("min-w-0");
+        // measured when the tooltip would show, not once at mount
+        measure(label, 200, 100);
+        rest(label);
+        expect(tip()!.textContent).toBe("failing match");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("shows nothing for a label that fits (R9.4: truncated text only)", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { load } = setup();
+        load();
+        const label = screen.getByText("failing match");
+        measure(label, 100, 100);
+        rest(label);
+        expect(tip()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it("gives tags the 20 px tag chip, so they clear the rows above and below", () => {
+    const { load } = setup();
+    load();
+    const tag = screen.getByText("smoke"); // the tree tag; the filter chip reads @smoke
+    expect(tag.className).toContain("h-5");
+    expect(tag.className).not.toContain("h-6");
+    expect(tag.className).toContain("rounded-sm");
   });
 
   it("gives every run button an accessible name", () => {
@@ -586,6 +622,7 @@ describe("flaky marks", () => {
       expect(mark.getAttribute("aria-label")).toBe(FLAKY_TITLE);
       expect(mark.className).toContain("bg-cancelled-tint");
       expect(drawn(mark.querySelector("svg"), Shuffle)).toBe(true);
+      expect(mark.querySelector("svg")!.getAttribute("width")).toBe("14"); // R4.2
       expect(countOf(key)).toBeNull();
     }
     expect(countOf("o:tests/x.feature#3")!.textContent).toBe("1 flaky");
