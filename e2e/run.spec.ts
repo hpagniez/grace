@@ -48,6 +48,9 @@ test("Run one outline row", async () => {
   await expect(row(1)).toHaveAttribute("data-status", "passed");
   await expect(row(2)).toHaveAttribute("data-status", "notRun");
 
+  // The pointer rested on row 1's button during the run, so its tooltip is up, and it covers row 2's
+  // button. A tooltip closes when the pointer leaves, or when something that moves its target scrolls.
+  await win.mouse.move(0, 0);
   await row(2).getByTestId("run-node").click();
   await expect(row(2)).toHaveAttribute("data-status", "passed", { timeout: 30_000 });
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 30_000 });
