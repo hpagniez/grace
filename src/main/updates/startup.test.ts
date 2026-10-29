@@ -291,6 +291,15 @@ describe("a switch on disk", () => {
       for (const d of [old(), aside(), staging]) expect(existsSync(d), d).toBe(false);
     });
 
+    it("removes a copy the script moved into staging but could not delete", async () => {
+      leftovers();
+      // an earlier .failed, moved in by the script, whose removal an antivirus cut short
+      graceFolder(path.join(staging, "failed"));
+      writeFileSync(path.join(staging, "failed", "left.txt"), "");
+      await removeLeftovers(install);
+      for (const d of [old(), aside(), staging]) expect(existsSync(d), d).toBe(false);
+    });
+
     it("removes a partial download left by a killed Grace", async () => {
       writeFileSync(path.join(staging, "Grace-win32-x64-1.0.0-rc.6.zip"), "partial");
       mkdirSync(path.join(staging, "app"));
@@ -336,12 +345,17 @@ describe("a switch on disk", () => {
 
     it("keeps the plan for the next start when a folder cannot be moved away", async () => {
       leftovers();
-      // a copy cut short at an earlier start stands where .old goes
-      mkdirSync(path.join(staging, "old"));
-      writeFileSync(path.join(staging, "old", "x"), "");
-      await removeLeftovers(install);
-      expect(existsSync(path.join(old(), "resources", "app-files.json"))).toBe(true);
-      expect(existsSync(path.join(staging, "plan.json"))).toBe(true);
+      // a process whose current folder is .old keeps Windows from moving it
+      const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 10000)"], { cwd: old() });
+      try {
+        await new Promise((r) => holder.once("spawn", r));
+        await removeLeftovers(install);
+        expect(existsSync(path.join(old(), "resources", "app-files.json"))).toBe(true);
+        expect(existsSync(path.join(staging, "plan.json"))).toBe(true);
+      } finally {
+        holder.kill();
+        await new Promise((r) => holder.once("exit", r));
+      }
     });
 
     it("waits for a live script to end, then removes", async () => {

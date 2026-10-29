@@ -151,8 +151,14 @@ export async function removeLeftovers(
   if (typeof planned === "string" && sameFolder(planned, installDir)) {
     for (const name of ["old", "failed"]) {
       const from = `${installDir}.${name}`;
-      // moved in whole first: a removal cut short never leaves half a Grace folder outside
-      if (isGraceFolder(from)) await rename(from, path.join(dir, name)).catch(() => (kept = true));
+      // moved in whole first: a removal cut short never leaves half a Grace folder outside; a copy
+      // the script moved in but could not delete would block the move, and is ours to remove
+      if (!isGraceFolder(from)) continue;
+      const into = path.join(dir, name);
+      await rm(into, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
+      await rename(from, into).catch(() => (kept = true));
     }
   }
   // the plan stays while a folder could not be moved, so the next start tries again; the script
