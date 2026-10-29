@@ -14,6 +14,7 @@ on:
 permissions:
   actions: read
   contents: write
+  issues: write # closes the issues a merged PR names with Closes #N
   pull-requests: write
 
 jobs:
@@ -80,3 +81,11 @@ jobs:
 
           # --match-head-commit refuses the merge if a push landed after these checks
           gh pr merge "$PR" --merge --delete-branch --match-head-commit "$sha"
+
+          # GitHub ignores closing keywords (Closes #N) in a merge made with the workflow token: close them here
+          issues=$(gh pr view "$PR" --json closingIssuesReferences \
+            --jq '.closingIssuesReferences[] | select("\(.repository.owner.login)/\(.repository.name)" == env.GH_REPO) | .number')
+          for n in $issues; do
+            [ "$(gh issue view "$n" --json state --jq .state)" = OPEN ] || continue
+            gh issue close "$n" --reason completed --comment "Done in #$PR."
+          done

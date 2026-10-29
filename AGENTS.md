@@ -82,7 +82,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 - Open PRs as drafts while working. Mark ready for review when done.
 - CI runs no e2e on PRs into `develop`. Before marking one ready, run `npm run e2e` locally if it changes more than `docs/**` and `*.md`, and paste the summary in the PR. PRs into `main` run e2e on CI once ready.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
-- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` and PRs from forks are merged by hand.
+- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit, deletes the branch, and closes the issues the PR names with `Closes #N` (GitHub ignores closing keywords in a merge made with the workflow token). PRs into `main` and PRs from forks are merged by hand.
 
 | Workflow | When | What it runs |
 |---|---|---|
