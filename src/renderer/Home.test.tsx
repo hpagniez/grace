@@ -1,10 +1,12 @@
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { Folder, FolderOpen, TriangleAlert, X, type IconNode } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent, RecentEntry } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { btnIconSmall, primary } from "./buttons";
 
 const tree: TestNode = {
   key: "d:",
@@ -48,8 +50,21 @@ const list: RecentEntry[] = [
   { path: "E:\\usb\\old", exists: false },
 ];
 
+/** Whether `svg` draws `icon`: every attribute of its shapes is in the markup. */
+const drawn = (svg: Element | null | undefined, icon: IconNode) =>
+  !!svg &&
+  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
+/** The wrapper a Tooltip puts around its target, and the tooltip it opens. */
+const wrapperOf = (el: HTMLElement) => el.closest("span.inline-flex") as HTMLElement;
+const tip = () => document.querySelector('[role="tooltip"]');
+const hover = (el: HTMLElement) => {
+  fireEvent.pointerEnter(wrapperOf(el));
+  vi.advanceTimersByTime(500);
+};
+
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   document.getElementById("startup")?.remove();
 });
 
@@ -72,8 +87,15 @@ describe("home screen", () => {
     send({ type: "project", project: null, tree: null, error: null });
     const check = () => {
       expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Open a Karate project");
-      expect(screen.getByText("Pick a folder, or reopen one you used before.")).toBeTruthy();
+      expect(
+        screen.getByText(
+          "Pick the folder that holds your .feature files. Grace brings its own Java and Karate.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText(/reopen one you used before/)).toBeNull();
       expect(button("open-button").textContent).toBe("Open folder…");
+      expect(button("open-button").className).toContain(primary);
+      expect(drawn(button("open-button").querySelector("svg"), FolderOpen)).toBe(true);
       expect(screen.queryByTestId("recent-list")).toBeNull();
       expect(screen.queryByText("Recent folders")).toBeNull();
       expect(screen.queryByTestId("project-path")).toBeNull();
@@ -110,6 +132,8 @@ describe("home screen", () => {
     const { api, send } = setup();
     send({ type: "opening", root: null }, recent(list));
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Recent folders");
+    // with a list to reopen, the sentence says so
+    expect(screen.getByText("Pick a folder, or reopen one you used before.")).toBeTruthy();
     const rows = screen.getAllByTestId("recent-row") as HTMLButtonElement[];
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toContain("api");
@@ -119,16 +143,79 @@ describe("home screen", () => {
     expect(rows[0].disabled).toBe(false);
     expect(rows[1].disabled).toBe(true);
     expect(screen.getAllByTestId("recent-missing").map((e) => e.textContent)).toEqual([
-      "not found",
+      "Not found",
     ]);
-    expect(rows[1].textContent).toContain("not found");
+    expect(rows[1].textContent).toContain("Not found");
     fireEvent.click(rows[0]);
     expect(api.openRecent).toHaveBeenCalledExactlyOnceWith("D:\\work\\api");
     const remove = screen.getAllByRole("button", { name: "Remove from list" });
     expect(remove).toHaveLength(2);
-    expect(remove[1].getAttribute("title")).toBe("Remove from list");
     fireEvent.click(remove[1]);
     expect(api.removeRecent).toHaveBeenCalledExactlyOnceWith("E:\\usb\\old");
+  });
+
+  it("shows the list in one surface box with a rule between rows (R12.3)", () => {
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const box = screen.getByTestId("recent-list");
+    for (const c of ["bg-surface", "rounded-lg", "border-line", "divide-line", "divide-y"])
+      expect(box.className).toContain(c);
+    const [ok, gone] = screen.getAllByTestId("recent-row");
+    // a folder icon, the name in 500, the path in the mono muted below
+    expect(drawn(ok.querySelector("svg"), Folder)).toBe(true);
+    expect(within(ok).getByTestId("recent-name").className).toContain("font-medium");
+    expect(within(ok).getByTestId("recent-name").className).not.toContain("text-muted");
+    const path = within(ok).getByText("D:\\work\\api");
+    for (const c of ["font-mono", "text-muted", "truncate"]) expect(path.className).toContain(c);
+    expect(ok.className).toContain("enabled:hover:bg-hover");
+    expect(ok.className).toContain("focus-visible:-outline-offset-2"); // inset, inside a clipped list
+    // the missing one: its name in muted, and nothing dimmed by opacity
+    expect(within(gone).getByTestId("recent-name").className).toContain("text-muted");
+    expect(gone.outerHTML).not.toMatch(/opacity/);
+    expect(box.outerHTML).not.toMatch(/\b(zinc|red|amber|sky)-\d|dark:| title=/);
+  });
+
+  it("says Not found in a cancelled badge with the warning icon, and the row is disabled", () => {
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const [ok, gone] = screen.getAllByTestId("recent-row") as HTMLButtonElement[];
+    expect(within(ok).queryByTestId("recent-missing")).toBeNull();
+    const badge = within(gone).getByTestId("recent-missing");
+    expect(badge.textContent).toBe("Not found");
+    expect(badge.className).toContain("bg-cancelled-tint");
+    expect(badge.className).toContain("text-cancelled");
+    expect(drawn(badge.querySelector("svg"), TriangleAlert)).toBe(true);
+    expect(badge.querySelector("svg")!.getAttribute("width")).toBe("12");
+    expect(gone.disabled).toBe(true);
+  });
+
+  it("explains a missing folder in a tooltip, though its row is disabled", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const [ok, gone] = screen.getAllByTestId("recent-row");
+    hover(ok);
+    expect(tip()).toBeNull();
+    hover(gone);
+    expect(tip()!.textContent).toBe("Folder not found");
+    expect(gone.hasAttribute("title")).toBe(false);
+  });
+
+  it("removes a row with a 24 px icon button that has a name and a tooltip (R10.3)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const [first, second] = screen.getAllByTestId("recent-remove");
+    for (const b of [first, second]) {
+      expect(b.getAttribute("aria-label")).toBe("Remove from list");
+      expect(b.hasAttribute("title")).toBe(false);
+      expect(b.className).toContain(btnIconSmall);
+      expect(b.className).toContain("size-6");
+      expect(drawn(b.querySelector("svg"), X)).toBe(true);
+      expect(b.textContent).toBe("");
+    }
+    hover(second);
+    expect(tip()!.textContent).toBe("Remove from list");
   });
 
   it("removing a row moves the focus to Open folder…", () => {
@@ -216,6 +303,24 @@ describe("home screen", () => {
     expect(box.getAttribute("role")).toBe("status");
     expect(box.className).toContain("bg-cancelled-tint");
     expect(box.querySelector("svg")).not.toBeNull();
+  });
+
+  it("a notice shows above the column, inside home", () => {
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list), { type: "notice", message: "Cancelled" });
+    const column = screen.getByRole("heading", { level: 1 }).parentElement!;
+    const notice = screen.getByTestId("notice");
+    expect(screen.getByTestId("home").contains(notice)).toBe(true);
+    expect(notice.compareDocumentPosition(column) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(column.contains(notice)).toBe(false);
+  });
+
+  it("home sits on the ground in light and on the surface in dark, with no sheet (R12.1)", () => {
+    setup().send({ type: "opening", root: null });
+    const cls = screen.getByTestId("home").className;
+    expect(cls).toContain("bg-(--home-bg)");
+    expect(cls).not.toMatch(/dark:|bg-surface|bg-ground|rounded|border/);
+    expect(screen.queryByTestId("sheet")).toBeNull();
   });
 
   it("the project view sits on the sheet under the toolbar; home has none", () => {

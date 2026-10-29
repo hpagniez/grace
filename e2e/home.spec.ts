@@ -37,8 +37,13 @@ test("A first start shows the home screen", async () => {
   const { win } = await launch();
   await expect(win.getByTestId("home")).toBeVisible();
   await expect(win.getByRole("heading", { level: 1 })).toHaveText("Open a Karate project");
-  await expect(win.getByText("Pick a folder, or reopen one you used before.")).toBeVisible();
+  await expect(
+    win.getByText(
+      "Pick the folder that holds your .feature files. Grace brings its own Java and Karate.",
+    ),
+  ).toBeVisible();
   await expect(win.getByTestId("open-button")).toHaveText("Open folder…");
+  await expect(win.getByTestId("open-button").locator("svg")).toBeVisible();
   const mascot = win.getByTestId("mascot");
   await expect(mascot).toBeVisible();
   // loaded, so the CSP let it through
@@ -87,7 +92,13 @@ test("A missing last project shows the home screen", async () => {
   await expect(row).toHaveCount(1);
   await expect(row).toBeDisabled();
   await expect(win.getByTestId("recent-name")).toHaveText(path.basename(gone));
-  await expect(win.getByTestId("recent-missing")).toBeVisible();
+  await expect(win.getByTestId("recent-missing")).toHaveText("Not found");
+  await expect(win.getByText("Pick a folder, or reopen one you used before.")).toBeVisible();
+
+  // a disabled row still explains itself: the tooltip listens on its wrapper
+  await row.hover({ force: true });
+  await expect(win.getByRole("tooltip")).toHaveText("Folder not found");
+  await win.mouse.move(0, 0);
 
   await row.click({ force: true }); // a disabled button takes no click
   await expect(win.getByTestId("home")).toBeVisible();
@@ -108,6 +119,20 @@ test("A dry-run error still opens the project", async () => {
   await win.getByTestId("home-button").click();
   await expect(win.getByTestId("home")).toBeVisible();
   await expect(rows(win).first()).toContainText(path.resolve(dir));
+});
+
+// R12: the home screen's ground
+
+const homeBackground = async (colorScheme: "light" | "dark") => {
+  const { app, win } = await launch(undefined, {}, { colorScheme });
+  const bg = await win.getByTestId("home").evaluate((e) => getComputedStyle(e).backgroundColor);
+  await app.close();
+  return bg;
+};
+
+test("The home screen is on the ground in light and on the surface in dark", async () => {
+  expect(await homeBackground("light")).toBe("rgb(243, 239, 230)"); // #f3efe6
+  expect(await homeBackground("dark")).toBe("rgb(16, 18, 23)"); // #101217
 });
 
 // R2: the home screen
@@ -161,6 +186,9 @@ test("Removing a row", async () => {
   });
   const remove = win.getByTestId("recent-remove");
   await expect(remove).toHaveAttribute("aria-label", "Remove from list");
+  const size = (await remove.boundingBox())!; // R10.3: a target of at least 24 × 24
+  expect(size.width).toBeGreaterThanOrEqual(24);
+  expect(size.height).toBeGreaterThanOrEqual(24);
 
   await remove.click();
   await expect(win.getByTestId("recent-list")).toHaveCount(0);

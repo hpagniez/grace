@@ -42,15 +42,7 @@ export function App(props: { api: Api }) {
         data-testid="app"
         class={`flex h-screen flex-col overflow-clip bg-ground text-ink ${dragging() ? "cursor-row-resize select-none" : state.busy || state.run.active ? "cursor-progress" : ""}`}
       >
-        <Show
-          when={!home()}
-          fallback={
-            <>
-              {noticeBox()}
-              <Home state={state} api={props.api} />
-            </>
-          }
-        >
+        <Show when={!home()} fallback={<Home state={state} api={props.api} notice={noticeBox()} />}>
           <Toolbar state={state} api={props.api} />
           {/* the sheet (spec R3.3): the project view on a surface, inset and rounded in the light theme, flat in the dark one; overflow-clip, like the root, so focus cannot scroll it */}
           <div

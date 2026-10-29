@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { readTokens } from "../../test/cssTokens";
+import { INDEX_CSS, readTokens } from "../../test/cssTokens";
 import { danger, dangerDialog, primary, primaryDialog } from "./buttons";
 
 /** WCAG 2 relative luminance of `#rrggbb`. */
@@ -107,4 +108,15 @@ describe("colour tokens (spec R1)", () => {
       });
     });
   }
+});
+
+describe("the home screen's ground (spec R12.1)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("is the ground in the light theme and the surface in the dark one", () => {
+    expect(css).toMatch(/:root\s*\{[^}]*--home-bg:\s*var\(--color-ground\)/);
+    expect(css).toMatch(
+      /prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{[^}]*--home-bg:\s*var\(--color-surface\)/,
+    );
+  });
 });

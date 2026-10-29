@@ -165,6 +165,7 @@
     --sheet-radius: 16px;
     --sheet-side: 1px; /* the sheet's side and bottom border width */
     --backdrop: color-mix(in srgb, var(--color-ink) 40%, transparent); /* the dialog backdrop */
+    --home-bg: var(--color-ground); /* the home screen has no sheet (R12.1) */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -200,6 +201,7 @@
       --sheet-radius: 0px;
       --sheet-side: 0px;
       --backdrop: rgb(0 0 0 / 0.6);
+      --home-bg: var(--color-surface);
     }
   }
 
