@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync }
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { holdFolder } from "../../../test/hold";
 import { defaultUpdateSettings, type UpdateSettings } from "../../shared/updates";
 import {
   listBackups,
@@ -346,15 +347,13 @@ describe("a switch on disk", () => {
     it("keeps the plan for the next start when a folder cannot be moved away", async () => {
       leftovers();
       // a process whose current folder is .old keeps Windows from moving it
-      const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 10000)"], { cwd: old() });
+      const release = await holdFolder(old());
       try {
-        await new Promise((r) => holder.once("spawn", r));
         await removeLeftovers(install);
         expect(existsSync(path.join(old(), "resources", "app-files.json"))).toBe(true);
         expect(existsSync(path.join(staging, "plan.json"))).toBe(true);
       } finally {
-        holder.kill();
-        await new Promise((r) => holder.once("exit", r));
+        await release();
       }
     });
 
