@@ -145,3 +145,15 @@ describe("the palette (spec R1.1)", () => {
       expect(css, name).toMatch(new RegExp(`--color-${name}:`));
   });
 });
+
+describe("the native controls' scheme (spec R1)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // without it a radio, a checkbox, a spinner or a select popup stays light in the dark theme
+  it("is light in the root and dark in the dark theme's root", () => {
+    expect(css).toMatch(/@layer base\s*\{\s*:root\s*\{\s*color-scheme:\s*light;/);
+    expect(css).toMatch(
+      /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{\s*color-scheme:\s*dark;/,
+    );
+  });
+});

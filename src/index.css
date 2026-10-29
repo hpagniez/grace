@@ -163,6 +163,7 @@
 
 @layer base {
   :root {
+    color-scheme: light; /* the native controls: radios, checkboxes, spinners, select popups */
     --shadow-float: 0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06);
     --duration-fast: 100ms; /* hover, press, colour */
     --duration-base: 160ms; /* chevron turn, tab line, dialog and popover enter */
@@ -175,6 +176,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :root {
+      color-scheme: dark;
       --color-ground: #151821;
       --color-surface: #101217;
       --color-raised: #1b1e26;
