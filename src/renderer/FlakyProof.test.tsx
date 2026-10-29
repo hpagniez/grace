@@ -1,5 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { CircleCheck, CircleX, Shuffle, type IconNode } from "lucide";
+import { CircleCheck, CircleX, Shuffle } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -7,6 +7,7 @@ import type { FlakyEnv, FlakyRun } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { drawn } from "../../test/drawn";
 
 // "now" is Sunday 2026-10-25 15:00 local time; only Date is faked so flush() keeps working
 beforeEach(() => {
@@ -104,10 +105,6 @@ function setup() {
   return { api, send, select, flaky };
 }
 
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 const boxes = () => screen.queryAllByTestId("flaky-proof");
 const runs = (box: HTMLElement) => within(box).queryAllByTestId("flaky-run");
 const reports = () => screen.queryAllByTestId("flaky-run-report") as HTMLButtonElement[];

@@ -30,7 +30,7 @@ function media(matches: boolean) {
     listeners,
     change: (now: boolean) => {
       query.matches = now;
-      for (const f of [...listeners]) f();
+      for (const f of listeners) f();
       flush();
     },
   };

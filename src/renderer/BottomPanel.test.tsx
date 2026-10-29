@@ -1,16 +1,12 @@
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
-import { Globe, History, SquareTerminal, type IconNode } from "lucide";
+import { Globe, History, SquareTerminal } from "lucide";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
 import { initialState, type AppState } from "./reduce";
+import { drawn } from "../../test/drawn";
 
 afterEach(cleanup);
-
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 
 function show(panel: AppState["panel"], runs = 0) {
   const state: AppState = {

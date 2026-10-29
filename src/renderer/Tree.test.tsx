@@ -1,13 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import {
-  ChevronRight,
-  FileSearch,
-  FileText,
-  Folder,
-  FolderOpen,
-  Shuffle,
-  type IconNode,
-} from "lucide";
+import { ChevronRight, FileSearch, FileText, Folder, FolderOpen, Shuffle } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -15,6 +7,7 @@ import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { drawn } from "../../test/drawn";
 
 const node = (
   kind: TestNode["kind"],
@@ -93,10 +86,6 @@ function setup() {
 }
 
 const button = (id: string) => screen.getByTestId(id) as HTMLButtonElement;
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 const rowByKey = (key: string) =>
   screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
 

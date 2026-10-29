@@ -1,13 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import {
-  Check,
-  FileText,
-  History as HistoryIcon,
-  Minus,
-  Play,
-  RotateCcw,
-  type IconNode,
-} from "lucide";
+import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -17,6 +9,7 @@ import { App } from "./App";
 import { btnDialog, dangerDialog, ghostSmall } from "./buttons";
 import { durationLabel } from "./History";
 import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
+import { drawn } from "../../test/drawn";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
@@ -90,10 +83,6 @@ function setup() {
   return { api, send, load };
 }
 
-/** Whether `svg` draws `icon`: every attribute of its shapes is in the markup. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 const cell = (i: number, id: string) => within(rows()[i]).getByTestId(id);
 const RAW = /\b(zinc|red|green|sky|amber|slate|gray)-\d|dark:| title=/; // R9.3
 

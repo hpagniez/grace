@@ -8,7 +8,6 @@ import {
   CircleX,
   LoaderCircle,
   MousePointerClick,
-  type IconNode,
 } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +15,7 @@ import type { AppEvent, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { drawn } from "../../test/drawn";
 
 const node = (
   kind: TestNode["kind"],
@@ -118,10 +118,6 @@ function setup() {
   return { send, select, finished };
 }
 
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 const details = () => screen.getByTestId("details");
 
 afterEach(cleanup);

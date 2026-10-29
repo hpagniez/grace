@@ -1,5 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { Check, CircleAlert, Copy, type IconNode } from "lucide";
+import { Check, CircleAlert, Copy } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -10,11 +10,7 @@ import { App } from "./App";
 import { btnSmall } from "./buttons";
 import { GROUP_TINT } from "./HttpCalls";
 import { TINT } from "./ui";
-
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
+import { drawn } from "../../test/drawn";
 
 afterEach(() => {
   cleanup();

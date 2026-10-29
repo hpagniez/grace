@@ -1,5 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { Check, Globe, type IconNode } from "lucide";
+import { Check, Globe } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -9,16 +9,12 @@ import type { TestNode } from "../shared/model";
 import { App } from "./App";
 import { GROUP_TINT } from "./HttpCalls";
 import { TINT } from "./ui";
+import { drawn } from "../../test/drawn";
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
 });
-
-/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 
 const call = (over: Partial<HttpCall>): HttpCall => ({
   method: "GET",
