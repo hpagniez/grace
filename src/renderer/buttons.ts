@@ -21,3 +21,5 @@ export const btnIcon = `${base} size-7 ${quiet}`;
  */
 export const narrowIcon = "max-[1100px]:w-7 max-[1100px]:px-0";
 export const narrowLabel = "max-[1100px]:sr-only";
+/** The width of the two strings above, for a script that must know (a tooltip only while the label is hidden). */
+export const NARROW_QUERY = "(width < 1100px)"; // what Tailwind's max-[1100px] means

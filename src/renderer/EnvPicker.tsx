@@ -71,7 +71,7 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
           type="text"
           data-testid="env-input"
           list="env-suggestions"
-          class={`${input} w-32`}
+          class={`${input} w-28`}
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}

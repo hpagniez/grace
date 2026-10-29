@@ -3,7 +3,7 @@ import { createStore, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
-import { btn, btnIcon, ghost, narrowIcon, narrowLabel, primary } from "./buttons";
+import { btn, btnIcon, ghost, NARROW_QUERY, narrowIcon, narrowLabel, primary } from "./buttons";
 import { initialState, reduce } from "./reduce";
 import { Toolbar } from "./Toolbar";
 import { countPill } from "./ui";
@@ -11,7 +11,30 @@ import { countPill } from "./ui";
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  delete (window as { matchMedia?: unknown }).matchMedia; // jsdom has none
 });
+
+/** A `matchMedia` that answers `matches` for the narrow query, and tells its listeners when it changes. */
+function media(matches: boolean) {
+  const listeners = new Set<() => void>();
+  const query = {
+    matches,
+    addEventListener: vi.fn((_: string, f: () => void) => listeners.add(f)),
+    removeEventListener: vi.fn((_: string, f: () => void) => listeners.delete(f)),
+  };
+  const ask = vi.fn(() => query);
+  window.matchMedia = ask as unknown as typeof window.matchMedia;
+  return {
+    query,
+    ask,
+    listeners,
+    change: (now: boolean) => {
+      query.matches = now;
+      for (const f of [...listeners]) f();
+      flush();
+    },
+  };
+}
 
 const ROOT = "D:\\work\\petstore-api";
 
@@ -180,9 +203,16 @@ describe("a narrow window", () => {
     expect(run.className).not.toContain("max-[1100px]");
   });
 
-  it("gives each of the five a tooltip with the label, also when disabled", () => {
+  it("asks for the width the classes use", () => {
+    expect(NARROW_QUERY).toBe("(width < 1100px)"); // Tailwind's max-[1100px] is below 1100 px
+    for (const c of [narrowIcon, narrowLabel]) expect(c).toContain("max-[1100px]:");
+  });
+
+  it("gives each of the five a tooltip with the label while the label is hidden, also when disabled", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const m = media(true);
     setup();
+    expect(m.ask).toHaveBeenCalledWith(NARROW_QUERY);
     for (const [id, label] of LABELLED) {
       hover(button(id));
       expect(tip().textContent, id).toBe(label);
@@ -190,6 +220,41 @@ describe("a narrow window", () => {
       flush();
     }
     expect(button("report-button").disabled).toBe(true);
+  });
+
+  it("gives them no tooltip while the label shows, which a tooltip would only repeat", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    media(false);
+    setup();
+    for (const [id] of LABELLED) {
+      hover(button(id));
+      expect(document.querySelector('[role="tooltip"]'), id).toBeNull();
+      fireEvent.pointerLeave(wrapperOf(button(id)));
+    }
+    // the icon-only Home and Refresh and the paths keep theirs at any width
+    hover(button("refresh-button"));
+    expect(tip().textContent).toBe("Refresh");
+  });
+
+  it("follows the window as it is resized, and stops listening with the toolbar", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const m = media(false);
+    setup();
+    hover(button("open-button"));
+    expect(document.querySelector('[role="tooltip"]')).toBeNull();
+    m.change(true);
+    hover(button("open-button"));
+    expect(tip().textContent).toBe("Open…");
+    fireEvent.pointerLeave(wrapperOf(button("open-button")));
+    flush();
+    m.change(false);
+    hover(button("open-button"));
+    expect(document.querySelector('[role="tooltip"]')).toBeNull();
+    // the toolbar and the Properties button each listen
+    expect(m.listeners.size).toBe(2);
+    cleanup();
+    expect(m.listeners.size).toBe(0);
+    expect(m.query.removeEventListener).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -268,11 +333,20 @@ describe("the project", () => {
     expect(tip().textContent).toBe(ROOT);
   });
 
-  it("hides the layout chip, by a container query, when the name and the chip would not fit", () => {
+  it("keeps the layout chip in sight above 1100 px: it truncates last, and only below 1100 px may it hide", () => {
     setup();
     const chip = screen.getByTestId("project-layout");
-    expect(chip.className).toContain("@max-[160px]:hidden");
+    expect(chip.className).toContain("max-[1100px]:@max-[160px]:hidden");
+    expect(chip.className).not.toMatch(/(^| )@max-\[160px\]:hidden/); // never by the container alone
     expect(chip.parentElement!.className).toContain("@container");
+    // squeezed, the path gives way first, then the name, then the chip
+    const shrink = (el: HTMLElement) =>
+      Number(/shrink-\[?([\d.]+)\]?/.exec(el.className)?.[1] ?? 1);
+    const path = wrapperOf(screen.getByTestId("project-path"));
+    const name = wrapperOf(screen.getByTestId("project-name"));
+    expect(shrink(path)).toBeGreaterThan(shrink(name));
+    expect(shrink(name)).toBeGreaterThan(shrink(chip));
+    for (const c of ["min-w-0", "truncate"]) expect(chip.className).toContain(c);
   });
 
   it("the path's tooltip lets the row shrink", () => {

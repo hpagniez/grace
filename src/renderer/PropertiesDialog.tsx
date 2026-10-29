@@ -14,6 +14,7 @@ import type { Api } from "../shared/ipc";
 import { btn, narrowIcon, narrowLabel, primary } from "./buttons";
 import { INVALID_ENV } from "./EnvPicker";
 import { Icon } from "./Icon";
+import { createNarrow } from "./narrow";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
 
@@ -53,6 +54,7 @@ const rowsOf = (scope: string, list: RowView[]): Row[] =>
  */
 export function PropertiesDialog(props: { state: AppState; api: Api }) {
   let dialog!: HTMLDialogElement;
+  const narrow = createNarrow(); // the button's label is hidden then: its tooltip says it
   let list!: HTMLUListElement;
   let session = 0; // each opening; an answer to an earlier one is ignored
   const [open, setOpen] = createSignal(false);
@@ -214,7 +216,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
 
   return (
     <>
-      <Tooltip text="Properties…">
+      <Tooltip text={narrow() ? "Properties…" : undefined}>
         <button
           type="button"
           data-testid="properties-button"

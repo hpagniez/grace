@@ -7,6 +7,7 @@ import logo from "../../assets/icon-small.svg?no-inline";
 import { btn, btnIcon, narrowIcon, narrowLabel, primary } from "./buttons";
 import { EnvPicker } from "./EnvPicker";
 import { Icon } from "./Icon";
+import { createNarrow } from "./narrow";
 import { PropertiesDialog } from "./PropertiesDialog";
 import { Threads } from "./Threads";
 import { Tooltip } from "./Tooltip";
@@ -29,6 +30,9 @@ export function Toolbar(props: { state: AppState; api: Api }) {
   const path = () => props.state.project?.root ?? props.state.opening ?? "No project";
   const newest = () => props.state.history[0]; // main sends the newest run first
   const failedCount = () => newest()?.failed ?? 0;
+  // a button whose label is hidden gets its label as a tooltip; a visible label needs none
+  const narrow = createNarrow();
+  const spoken = (label: string) => (narrow() ? label : undefined);
   return (
     <header class="flex min-h-11 items-center gap-2 bg-ground px-3">
       <Tooltip text="Home">
@@ -42,21 +46,21 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <img src={logo} alt="" width="20" height="20" />
         </button>
       </Tooltip>
-      {/* a container: the layout chip goes when the name and the chip no longer fit side by side */}
+      {/* a container: below 1100 px the layout chip goes when the name and the chip no longer fit side by side */}
       <div class="@container flex min-w-0 flex-1 items-center gap-2 pr-2">
-        <Tooltip text={path()} class="min-w-0">
+        <Tooltip text={path()} class="min-w-0 shrink-100000">
           <span data-testid="project-name" class="truncate text-base font-medium">
             {folderName(path())}
           </span>
         </Tooltip>
         <span
           data-testid="project-layout"
-          class="inline-flex h-5 shrink-0 items-center rounded-sm bg-selected px-1.5 text-2xs font-medium text-muted empty:hidden @max-[160px]:hidden"
+          class="h-5 min-w-0 truncate rounded-sm bg-selected px-1.5 text-2xs leading-5 font-medium text-muted empty:hidden max-[1100px]:@max-[160px]:hidden"
         >
           {props.state.project ? LAYOUT_LABEL[props.state.project.layout] : ""}
         </span>
-        <Tooltip text={path()} class="min-w-0 shrink-100">
-          {/* rtl cuts the start of a long path; the ltr span inside keeps its characters in order. shrink-100: the path gives way before the name does */}
+        <Tooltip text={path()} class="min-w-0 shrink-1000000">
+          {/* rtl cuts the start of a long path; the ltr span inside keeps its characters in order. squeezed, the path gives way first (shrink-1000000), then the name (shrink-100000), then the chip (shrink 1): the factors are far apart so a chip that fits loses no fraction of a pixel, which would already show an ellipsis */}
           <span
             data-testid="project-path"
             class="min-w-0 truncate font-mono text-xs text-muted"
@@ -81,7 +85,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <Icon icon={RefreshCw} />
         </button>
       </Tooltip>
-      <Tooltip text="Open…">
+      <Tooltip text={spoken("Open…")}>
         <button
           data-testid="open-button"
           class={`${btn} ${narrowIcon}`}
@@ -93,7 +97,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         </button>
       </Tooltip>
       <Divider />
-      <Tooltip text="Report">
+      <Tooltip text={spoken("Report")}>
         <button
           data-testid="report-button"
           class={`${btn} ${narrowIcon}`}
@@ -104,7 +108,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <span class={narrowLabel}>Report</span>
         </button>
       </Tooltip>
-      <Tooltip text="Re-run failed">
+      <Tooltip text={spoken("Re-run failed")}>
         <button
           data-testid="rerun-failed-button"
           class={`${btn} max-[1100px]:px-2`}
@@ -116,7 +120,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <span class={countPill}>{failedCount()}</span>
         </button>
       </Tooltip>
-      <Tooltip text="Cancel">
+      <Tooltip text={spoken("Cancel")}>
         <button
           data-testid="cancel-button"
           class={`${btn} ${narrowIcon}`}
