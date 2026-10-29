@@ -90,6 +90,8 @@
   --color-ink: #151821;
   --color-muted: #5b5e66;
   --color-accent: #151821;
+  /* A filled button on hover is solid: a translucent fill lets the background bleed and drops the text's ratio. */
+  --color-accent-hover: #2b2f3a;
   --color-on-accent: #ffffff;
   --color-on-danger: #ffffff;
   --color-brand: #3fcf6e;
@@ -98,6 +100,7 @@
   --color-focus: #151821;
   --color-passed: #1b7a4c;
   --color-failed: #c22a2f;
+  --color-failed-hover: #a3242a;
   --color-skipped: #64676f;
   --color-running: #2a68b0;
   --color-cancelled: #8f5a00;
@@ -176,12 +179,14 @@
       --color-ink: #f1efe9;
       --color-muted: #9fa2ac;
       --color-accent: #3fcf6e;
+      --color-accent-hover: #5fd98a;
       --color-on-accent: #06210f;
       --color-on-danger: #151821;
       --color-play: #06210f;
       --color-focus: #3fcf6e;
       --color-passed: #3fcf6e;
       --color-failed: #f2666f;
+      --color-failed-hover: #f5838a;
       --color-skipped: #9a9ea8;
       --color-running: #62a8f2;
       --color-cancelled: #e5aa45;

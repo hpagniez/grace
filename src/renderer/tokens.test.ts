@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readTokens } from "../../test/cssTokens";
+import { danger, primary } from "./buttons";
 
 /** WCAG 2 relative luminance of `#rrggbb`. */
 function luminance(hex: string) {
@@ -28,14 +29,24 @@ const TOKENS = [
   "ink",
   "muted",
   "accent",
+  "accent-hover",
   "on-accent",
   "on-danger",
   "brand",
   "focus",
   "play",
+  "failed-hover",
   ...STATUSES,
   ...STATUSES.map((s) => `${s}-tint`),
 ];
+
+describe("filled buttons on hover", () => {
+  it("fill with a solid token, not a translucent one", () => {
+    expect(primary).toContain("enabled:hover:bg-accent-hover");
+    expect(danger).toContain("enabled:hover:bg-failed-hover");
+    expect(`${primary} ${danger}`).not.toMatch(/hover:bg-\S+\//);
+  });
+});
 
 describe("colour tokens (spec R1)", () => {
   const { light, darkOverrides } = readTokens();
@@ -78,6 +89,15 @@ describe("colour tokens (spec R1)", () => {
         expect(contrast(t["on-danger"], t.failed), "on-danger on failed").toBeGreaterThanOrEqual(
           4.5,
         );
+        // the hover fills are solid, so the text keeps its ratio while the pointer is over the button
+        expect(
+          contrast(t["on-accent"], t["accent-hover"]),
+          "on-accent on accent-hover",
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrast(t["on-danger"], t["failed-hover"]),
+          "on-danger on failed-hover",
+        ).toBeGreaterThanOrEqual(4.5);
       });
 
       it("keeps control borders and the focus ring at 3:1", () => {

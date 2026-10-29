@@ -7,8 +7,8 @@ const quiet = "text-ink enabled:hover:bg-hover";
 
 export const btn = `${base} ${md} ${plain}`;
 export const btnSmall = `${base} ${sm} ${plain}`;
-export const primary = `${base} ${md} bg-accent font-semibold text-on-accent enabled:hover:bg-accent/85`;
-export const danger = `${base} ${md} bg-failed text-on-danger enabled:hover:bg-failed/85`;
+export const primary = `${base} ${md} bg-accent font-semibold text-on-accent enabled:hover:bg-accent-hover`;
+export const danger = `${base} ${md} bg-failed text-on-danger enabled:hover:bg-failed-hover`;
 /** No border, so a row of them stays quiet. */
 export const ghost = `${base} ${md} ${quiet}`;
 export const ghostSmall = `${base} ${sm} ${quiet}`;

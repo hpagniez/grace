@@ -225,6 +225,7 @@ describe("home screen", () => {
     send({ type: "notice", message: "Nothing to run" });
     const sheet = screen.getByTestId("sheet");
     for (const c of [
+      "relative", // so a positioned descendant (sr-only text) is clipped here, not scrolled with the page
       "mx-(--sheet-inset)",
       "rounded-(--sheet-radius)",
       "bg-surface",
