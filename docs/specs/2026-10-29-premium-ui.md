@@ -157,7 +157,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 2. Radius tokens: `rounded-sm` 4 px (rows, chips, tags), `rounded-md` 6 px (buttons, inputs), `rounded-lg` 8 px (boxes: error, code, flaky proof), `rounded-xl` 12 px (dialogs, menus, popovers), `rounded-full` (status badges, count pills).
 3. The sheet, the same in both themes: everything under the toolbar row (progress, filter bar, notice, tree, details, bottom panel) sits on a `surface` sheet inset 8 px from the window's left, right and bottom edges (above the status bar when there is one), with a 16 px radius and a 1 px `line` edge, on the `ground` frame. Set by three tokens, `--sheet-inset`, `--sheet-radius` and `--sheet-side`, which the dark block does not override (R1.3).
 4. Borders: 1 px `line` between areas and under rows; a border or a shadow at rest, never both; what floats (dialogs, menus, popovers, tooltips) has both.
-5. Elevation: only what floats casts a shadow (dialogs, menus, popovers, tooltips): `--shadow-float`, light `0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06)`, dark `0 16px 40px rgb(0 0 0 / 0.5)`. A dialog's backdrop is `ink` at 40 % (light) or black at 60 % (dark).
+5. Elevation: only what floats casts a shadow (dialogs, menus, popovers, tooltips): `--shadow-float`, with the same offsets and blur in both themes (`0 12px 32px` and `0 1px 2px`) and its own colours: light `rgb(21 24 33 / 0.14)` and `rgb(21 24 33 / 0.06)`, dark `rgb(0 0 0 / 0.5)` and `rgb(0 0 0 / 0.3)`. A dialog's backdrop is `ink` at 40 % (light) or black at 60 % (dark).
 
 ### R4. Icons
 
@@ -351,6 +351,7 @@ Feature: Premium look and feel
   Scenario: The dark theme changes colours only (unit)
     Given the dark block of src/index.css
     Then it declares no custom property except --color-* tokens, --shadow-float and --backdrop
+    And --shadow-float has the same offsets and blur in both themes
     And primary equals passed in each theme
 
   Scenario Outline: The structure and the primary button do not change with the theme

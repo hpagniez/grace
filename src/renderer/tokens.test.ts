@@ -136,6 +136,18 @@ describe("colour tokens (spec R1)", () => {
   }
 });
 
+describe("the floating shadow (spec R3.5)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("has one geometry in both themes: only its colours differ", () => {
+    const shadows = [...css.matchAll(/--shadow-float:\s*([^;]+);/g)].map((m) =>
+      m[1].replace(/rgb\([^)]*\)/g, "rgb"),
+    );
+    expect(shadows).toHaveLength(2); // light, then dark
+    expect(shadows[1]).toBe(shadows[0]);
+  });
+});
+
 describe("the sheet (spec R3.3)", () => {
   const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 

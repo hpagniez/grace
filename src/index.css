@@ -155,7 +155,7 @@
 
 /*
  * Only what floats casts a shadow (R3.5). Not a @theme token: Tailwind copies a theme shadow's value
- * into the utility, so the dark override of --shadow-float below would never reach it.
+ * into the utility, so the dark colours of --shadow-float below would never reach it. One geometry in both themes.
  */
 @utility shadow-float {
   box-shadow: var(--shadow-float);
@@ -204,7 +204,7 @@
       --color-skipped-tint: #26282e;
       --color-running-tint: #1d2a3a;
       --color-cancelled-tint: #322a1e;
-      --shadow-float: 0 16px 40px rgb(0 0 0 / 0.5);
+      --shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
       --backdrop: rgb(0 0 0 / 0.6);
     }
   }
