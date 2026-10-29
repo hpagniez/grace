@@ -219,7 +219,7 @@ for (const scheme of ["light", "dark"] as const) {
         if (!el || el === document.body) return null;
         const style = getComputedStyle(el);
         const area = el.closest(
-          "header, [data-testid=filter-bar], [data-testid=tree], [data-testid=details], [data-testid=bottom-panel]",
+          "header, [data-testid=filter-bar], [data-testid=tree], [data-testid=details], [data-testid=bottom-panel], [data-testid=status-bar]",
         );
         return {
           name: `${el.tagName.toLowerCase()} ${el.dataset.testid ?? el.getAttribute("aria-label") ?? el.textContent?.slice(0, 20)}`,
@@ -247,7 +247,7 @@ for (const scheme of ["light", "dark"] as const) {
     expect(stops.length).toBeGreaterThan(30); // 51 at the time of writing: the whole page, not the first few
     expect(stops.filter((s) => s.outline !== ring)).toEqual([]);
     expect(new Set(stops.map((s) => s.area))).toEqual(
-      new Set(["toolbar", "filter-bar", "tree", "details", "bottom-panel"]),
+      new Set(["toolbar", "filter-bar", "tree", "details", "bottom-panel", "status-bar"]),
     );
   });
 }
