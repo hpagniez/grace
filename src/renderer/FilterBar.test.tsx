@@ -1,5 +1,6 @@
 import path from "node:path";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { Check, Minus, type IconNode } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -58,6 +59,14 @@ const nodeByKey = (key: string) =>
   screen.queryAllByTestId("tree-node").find((n) => n.dataset.key === key);
 const runButtonOf = (key: string) => nodeByKey(key)!.querySelector('[data-testid="run-node"]');
 const checkbox = () => screen.getByTestId("hide-non-matching") as HTMLInputElement;
+/** Whether the element holds this icon: every shape of the Lucide icon is in its svg. */
+const drawn = (el: Element, icon: IconNode) => {
+  const svg = el.querySelector("svg");
+  return (
+    !!svg &&
+    icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))))
+  );
+};
 
 afterEach(cleanup);
 
@@ -105,22 +114,61 @@ describe("filter bar", () => {
     });
   });
 
-  it("shows include and exclude states, the counter and Clear", () => {
+  it("shows include and exclude states by shape and colour, the counter and Clear", () => {
     const { api, load } = setup(); // clean sample, @smoke included and @wip excluded
     load(smokeNotWip(true));
     expect(chip("slow").dataset.state).toBe("off");
     expect(chip("smoke").dataset.state).toBe("include");
     expect(chip("wip").dataset.state).toBe("exclude");
-    expect(chip("smoke").className).toContain("border-green-600");
-    expect(chip("wip").className).toContain("border-red-600");
+    // R7.3: included = check + accent fill; excluded = minus + outline + strike-through; off = plain
+    expect(drawn(chip("smoke"), Check)).toBe(true);
+    expect(chip("smoke").className).toContain("bg-accent");
+    expect(drawn(chip("wip"), Minus)).toBe(true);
     expect(chip("wip").className).toContain("line-through");
+    expect(chip("wip").className).not.toContain("bg-accent");
+    expect(chip("slow").querySelector("svg")).toBeNull();
+    expect(chip("slow").className).not.toContain("line-through");
+    for (const c of screen.getAllByTestId("tag-chip")) {
+      expect(c.className).toContain("h-6");
+      expect(c.className).toContain("rounded-sm");
+    }
     expect(screen.getByRole("button", { name: "@smoke, included" })).toBe(chip("smoke"));
     expect(screen.getByRole("button", { name: "@wip, excluded" })).toBe(chip("wip"));
     fireEvent.click(screen.getByTestId("tag-clear"));
     expect(api.setFilter).toHaveBeenCalledWith({ include: [], exclude: [], hideNonMatching: true });
   });
 
-  it("dims and hides non-matching tests", () => {
+  it("styles Clear, the counter and the checkbox with the tokens", () => {
+    const { load } = setup();
+    load(smokeNotWip());
+    expect(screen.getByTestId("tag-clear").className).toContain("hover:bg-hover");
+    expect(screen.getByTestId("tag-counter").parentElement!.className).toContain("text-muted");
+    expect(checkbox().className).toContain("accent-accent");
+    // a native checkbox in a 24 px label, so the whole line is the target
+    expect(checkbox().closest("label")!.className).toContain("h-6");
+  });
+
+  it("shows the next click in a tooltip, not in a title attribute", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { load } = setup();
+      load(smokeNotWip());
+      for (const c of screen.getAllByTestId("tag-chip"))
+        expect(c.hasAttribute("title")).toBe(false);
+      fireEvent.pointerEnter(chip("smoke").parentElement!);
+      vi.advanceTimersByTime(500);
+      expect(document.querySelector("[role=tooltip]")!.textContent).toBe(
+        "Included. Click to exclude.",
+      );
+      expect(chip("smoke").getAttribute("aria-describedby")).toBe(
+        document.querySelector("[role=tooltip]")!.id,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("mutes and hides non-matching tests", () => {
     const { send, load } = setup();
     load(smokeNotWip());
     expect(screen.getByTestId("tag-counter").textContent).toBe("2 of 9 tests match");
@@ -130,7 +178,9 @@ describe("filter bar", () => {
       const match = matching.includes(n.dataset.key!);
       if (n.dataset.kind === "scenario" || n.dataset.kind === "row") {
         expect(n.dataset.match).toBe(String(match));
-        expect(n.className.includes("opacity-40")).toBe(!match);
+        // R15.2: a non-matching row is muted, never faded
+        expect(n.className.includes("text-muted")).toBe(!match);
+        expect(n.className).not.toContain("opacity");
         expect(n.querySelector('[data-testid="run-node"]') !== null).toBe(match);
       }
     }
@@ -181,7 +231,7 @@ describe("filter bar", () => {
     const nodes = screen.getAllByTestId("tree-node");
     expect(nodes).toHaveLength(14);
     expect(nodes.every((n) => n.dataset.match === "true")).toBe(true);
-    expect(nodes.every((n) => !n.className.includes("opacity-40"))).toBe(true);
+    expect(nodes.every((n) => !n.className.includes("text-muted"))).toBe(true);
     expect(screen.getAllByTestId("run-node")).toHaveLength(14);
   });
 
