@@ -144,7 +144,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 | `text-lg` | 16 / 24 | details title, dialog and settings titles |
 | `text-xl` | 20 / 28 | the home screen heading |
 
-3. Weights: 400 body, 500 labels and active tabs, 600 titles and the primary button. No 700.
+3. Weights: 400 body, 500 labels and active tabs, 600 titles and the primary button (500 in the mono, which has no 600). No 700.
 4. Every count, duration, time and progress figure uses `tabular-nums`. Durations and elapsed time are in the mono.
 5. Sentence case everywhere; no uppercase tracked labels.
 
@@ -152,8 +152,8 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 1. Spacing stays on Tailwind's 4 px scale. Density: toolbar and filter controls 28 px tall; tree rows, small buttons and chips 24 px; HTTP and history rows 28 px; bottom panel tab bar 32 px; panel padding 12 px; gaps 4, 8, 12, 16.
 2. Radius tokens: `rounded-sm` 4 px (rows, chips, tags), `rounded-md` 6 px (buttons, inputs), `rounded-lg` 8 px (boxes: error, code, flaky proof), `rounded-xl` 12 px (dialogs, menus, popovers), `rounded-full` (status badges, count pills).
-3. The sheet: in the light theme everything under the toolbar row (progress, filter bar, notice, tree, details, bottom panel) sits on a `surface` sheet inset 8 px from the window's left, right and bottom edges (above the status bar when there is one), with a 16 px radius and a 1 px `line` edge, on the `ground` frame. In the dark theme the inset and radius are 0: the panels fill the window, a step darker than the toolbar. Set by two tokens, `--sheet-inset` and `--sheet-radius`.
-4. Borders: 1 px `line` between areas and under rows; a border or a shadow, never both on one element at rest.
+3. The sheet: in the light theme everything under the toolbar row (progress, filter bar, notice, tree, details, bottom panel) sits on a `surface` sheet inset 8 px from the window's left, right and bottom edges (above the status bar when there is one), with a 16 px radius and a 1 px `line` edge, on the `ground` frame. In the dark theme the inset and radius are 0: the panels fill the window, a step darker than the toolbar. Set by three tokens, `--sheet-inset`, `--sheet-radius` and `--sheet-side`.
+4. Borders: 1 px `line` between areas and under rows; a border or a shadow at rest, never both; what floats (dialogs, menus, popovers, tooltips) has both.
 5. Elevation: only what floats casts a shadow (dialogs, menus, popovers, tooltips): `--shadow-float`, light `0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06)`, dark `0 16px 40px rgb(0 0 0 / 0.5)`. A dialog's backdrop is `ink` at 40 % (light) or black at 60 % (dark).
 
 ### R4. Icons
@@ -206,12 +206,12 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 ### R9. Shared styles and components
 
-1. Shared class strings live in two files. `src/renderer/buttons.ts` keeps its name and exports (`btn`, `btnSmall`, `primary`, `danger`) with token values, and adds `btnIcon` and `ghost`. A new `src/renderer/ui.ts` holds the rest: `input`, `chip` (with its states), `tab`, `badge`, `box` (error, code), `dialog`, `menu`. Every component uses them for those jobs. Keeping `buttons.ts` spares the branches built in parallel a broken import.
+1. Shared class strings live in two files. `src/renderer/buttons.ts` keeps its name and exports (`btn`, `btnSmall`, `primary`, `danger`) with token values, and adds `btnIcon` and `ghost`. A new `src/renderer/ui.ts` holds the rest: `input`, `chip` (with its states), `tab`, `badge`, `box` (error, code), `dialog`. Every component uses them for those jobs. Keeping `buttons.ts` spares the branches built in parallel a broken import.
 2. Components: `Icon` (R4.1), `StatusMark` (R4.4), `EmptyState` (R6.5), `Notice` (R20), `Tooltip` (R9.4). `nodes.ts` drops `STATUS_DOT` and `FLAKY_TONE`; `STATUS_LABEL` stays.
 3. A unit test fails if any `.ts` or `.tsx` file in `src/renderer/` holds a raw palette class (`slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose` followed by `-` and a number), a `dark:` variant, or a `title` attribute (R9.4).
 4. Styled tooltips. One `Tooltip` replaces every native `title` in the renderer:
-   - It shows 500 ms after the pointer rests on its target, and at once when the target gets keyboard focus (`:focus-visible`). It hides when the pointer leaves both the target and the tooltip, on blur, on a scroll that moves its target, and on Escape, which closes only the tooltip, not a dialog under it (WCAG 2.2 "Content on hover or focus": dismissible, hoverable, persistent). One tooltip at a time.
-   - It is a `popover="manual"` element in the top layer, so it shows over dialogs. It sits 6 px below its target, flips above when there is no room, and stays 8 px inside the window.
+   - It shows 500 ms after the pointer rests on its target, and at once when the target gets keyboard focus (`:focus-visible`). It hides when the pointer leaves both the target and the tooltip, on blur, on a scroll that moves its target, on a press of its target or a click inside it, and on Escape, which closes only the tooltip, not a dialog under it (WCAG 2.2 "Content on hover or focus": dismissible, hoverable, persistent). After a press it does not reopen at the spot just pressed. One tooltip at a time.
+   - It is a `popover="manual"` element in the top layer, so it shows over dialogs. It sits 6 px below its target, flips above when there is no room, and stays 8 px inside the window. In a row it never lies on the next row: it sits 6 px beside its target (left or right, flipping when there is no room), or over its own cut text, where a click within the text reaches the text.
    - Style: `raised`, `ink` text at 12 px, `rounded-md`, 1 px `line`, `--shadow-float`, padding 4 × 8 px, at most 320 px wide, wrapping. It fades in over `--duration-fast`, with no motion under reduced motion.
    - `role="tooltip"`; the target points to it with `aria-describedby` when its text adds to the target's accessible name. An icon-only button's name stays its `aria-label`.
    - A disabled control still shows its tooltip on hover (the tooltip listens on a wrapper, since Chromium sends no pointer events to a disabled button).
@@ -238,7 +238,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 ### R13. Toolbar
 
-1. One 44 px row on `ground`, controls 28 px tall, in this order: the logo Home button · the project (folder name in 500, layout chip, full path in the mono `muted`, truncated from the start with the full path in the tooltip) · space · `Env` box · `Threads` box · `Properties…` · a 1 px divider · Refresh (icon only) · `Open…` · divider · `Report` · `Re-run failed` with its count in a pill · `Cancel` · `Run all` (primary, rightmost).
+1. One 44 px row on `ground`, controls 28 px tall, in this order: the logo Home button · the project (folder name in 500, layout chip, full path in the mono `muted`, truncated from the start with the full path in the tooltip) · space · `Env` box · `Threads` box · `Properties…` · a 1 px divider · Refresh (icon only) · `Open…` · divider · `Report` · `Re-run failed` with its count in a pill once it is above 0 · `Cancel` · `Run all` (primary, rightmost).
 2. `Run all` is the only `primary` button on the screen: `accent` fill; in the light theme its `play` icon is `brand` green.
 3. Each button keeps its `data-testid`, its label and its disabled rules.
 
@@ -273,7 +273,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 1. The splitter: a 1 px `line` with a 6 px hit area; on hover and drag the line becomes 2 px `accent`. Keyboard resizing stays as today.
 2. Tabs: 32 px, each with its icon (R4.5), label, and count in a pill; the active tab in `ink` 500 with a 2 px `accent` line under it; others in `muted`. `Clear history` stays at the right of the History tab.
-3. Console: `sunken` background in both themes (it now follows the theme), the mono at 12 px. The banner (F24): "Grace" in `accent` weight 600 (dark) or `ink` 600 (light), labels in `muted`, "Ready." in `passed`. Lines with ` ERROR ` in `failed`, ` WARN ` in `cancelled`.
+3. Console: `sunken` background in both themes (it now follows the theme), the mono at 12 px. The banner (F24): "Grace" in `accent` weight 500 (dark) or `ink` 500 (light; the mono has no 600, R2.1), labels in `muted`, "Ready." in `passed`. Lines with ` ERROR ` in `failed`, ` WARN ` in `cancelled`.
 4. History: a table with 12 px `muted` sentence-case headers on `surface` (sticky, no band), 28 px rows with `line` rules, no zebra; Threads and Duration right-aligned in `tabular-nums`; Result with a `StatusMark` and its words; tag cells as R7.3 chips (included and excluded); the row actions as small ghost buttons with icons (`file-text` Report, `play` Re-run, `rotate-ccw` Re-run failed). Empty: an `EmptyState` (`history`) with "No runs yet. Runs appear here when they finish."
 5. HTTP: the group filters as chips with counts (pressed: `selected` fill and `ink` text, plus the check icon); rows 28 px with the status badge (R7.2), the method in the mono 500, the URL in the mono, the test in `muted`, attempt and via in `muted`, the time right-aligned. Selected row: `selected` and the `accent` bar. Empty states as today's sentences in an `EmptyState` (`globe`).
 6. Call details: the method and URL as the title in the mono; the status badge, the time; the test and its location in `muted`; `Copy as cURL` as a `btnSmall` with `copy`, turning to `check` and "Copied" for 2 s; `Request` and `Response` as 12 px 500 section titles; headers and bodies in `sunken` boxes; the no-response error in a `failed` box.
