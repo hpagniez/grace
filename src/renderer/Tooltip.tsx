@@ -7,6 +7,14 @@ const DELAY = 500; // the pointer must rest this long on the target
 /** The hide of the tooltip that is open: only one at a time. */
 let openTip: (() => void) | null = null;
 
+/**
+ * Where a target was last pressed, until the pointer leaves a tooltip's wrapper. A press often redraws
+ * the row under a pointer that has not moved, and the new wrapper gets a pointerenter there: it must not
+ * start a pause, or a tooltip would come up over the row below, which the person is about to click.
+ */
+let pressedAt: { x: number; y: number } | null = null;
+const SAME_SPOT = 2; // px
+
 // A fade over --duration-fast; the global reduced-motion rule turns it off. `open:` is :popover-open.
 // The ::before bridges the 6 px gap to the target, so the pointer can cross onto the tooltip.
 // The tooltip sits inside rows that may truncate, centre or shout: it resets what text inherits.
@@ -121,11 +129,24 @@ export function Tooltip(props: {
     <span
       ref={(e) => (wrap = e)}
       class={props.class ? `inline-flex ${props.class}` : "inline-flex"}
-      onPointerEnter={() => {
+      onPointerEnter={(e) => {
+        if (pressedAt && Math.hypot(e.clientX - pressedAt.x, e.clientY - pressedAt.y) <= SAME_SPOT)
+          return;
+        pressedAt = null;
         clearTimeout(timer);
         timer = setTimeout(show, DELAY);
       }}
-      onPointerLeave={hide}
+      onPointerLeave={() => {
+        pressedAt = null;
+        hide();
+      }}
+      // A press of the target: the person acted on it. The tooltip is hoverable, so it would stay up over
+      // whatever lies below and take the next click. A press inside the tooltip leaves it open.
+      onPointerDown={(e) => {
+        if (tip?.contains(e.target as Node)) return;
+        pressedAt = { x: e.clientX, y: e.clientY };
+        hide();
+      }}
       onFocusIn={(e) => keyboardFocus(e.target) && show()}
       onFocusOut={hide}
     >

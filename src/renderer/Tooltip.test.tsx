@@ -239,6 +239,49 @@ describe("Tooltip", () => {
     expect(tips().map((x) => x.textContent)).toEqual(["Refresh"]);
   });
 
+  it("hides on a press of its target, not on one inside the tooltip", () => {
+    const { button, wrapper } = one();
+    hover(wrapper);
+    expect(tips()).toHaveLength(1);
+    fireEvent.pointerDown(tipOf()!);
+    flush();
+    expect(tips()).toHaveLength(1);
+    fireEvent.pointerDown(button);
+    flush();
+    expect(tips()).toHaveLength(0);
+    leave(wrapper);
+  });
+
+  it("does not come back under a pointer that has not moved since the press", () => {
+    const at = (x: number) => ({ clientX: x, clientY: 20 });
+    const { button, wrapper } = one();
+    fireEvent.pointerEnter(wrapper, at(10));
+    fireEvent.pointerDown(button, at(10));
+    flush();
+    vi.advanceTimersByTime(500); // a press ends the pause that was running
+    expect(tips()).toHaveLength(0);
+
+    // the row is redrawn under the pointer: its new wrapper gets a pointerenter where the press was
+    cleanup();
+    const again = one();
+    fireEvent.pointerEnter(again.wrapper, at(11));
+    vi.advanceTimersByTime(500);
+    expect(tips()).toHaveLength(0);
+
+    // the pointer moves on, and comes back somewhere else: a tooltip again
+    fireEvent.pointerEnter(again.wrapper, at(40));
+    vi.advanceTimersByTime(500);
+    expect(tips()).toHaveLength(1);
+    leave(again.wrapper);
+
+    // leaving ends it: the same spot shows a tooltip after the pointer was elsewhere
+    fireEvent.pointerDown(again.button, at(10));
+    leave(again.wrapper);
+    fireEvent.pointerEnter(again.wrapper, at(10));
+    vi.advanceTimersByTime(500);
+    expect(tips()).toHaveLength(1);
+  });
+
   it("calls showPopover once the tooltip exists, when the engine has it", () => {
     const show = vi.fn(function (this: HTMLElement) {
       expect(this.isConnected).toBe(true);
