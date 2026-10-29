@@ -82,7 +82,7 @@ const TOOLBAR_BUTTONS = {
   "refresh-button": "Refresh",
   "open-button": "Open…",
   "report-button": "Report",
-  "rerun-failed-button": /^Re-run failed \d+$/,
+  "rerun-failed-button": /^Re-run failed( [1-9]\d*)?$/, // the count only once there is one
   "cancel-button": "Cancel",
   "run-all-button": "Run all",
 };

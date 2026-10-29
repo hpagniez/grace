@@ -649,7 +649,7 @@ describe("toolbar Re-run failed", () => {
 
   it("is disabled with no history, with no failure in the newest run, and while busy", () => {
     const { send, load } = setup();
-    expect(toolbarRerunFailed().textContent).toBe("Re-run failed 0");
+    expect(toolbarRerunFailed().textContent).toBe("Re-run failed"); // no 0 pill
     expect(toolbarRerunFailed().disabled).toBe(true);
     load(entry("new", { failed: 0 }), entry("old", { failed: 5 }));
     expect(toolbarRerunFailed().disabled).toBe(true);

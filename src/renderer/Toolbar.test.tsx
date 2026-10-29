@@ -38,6 +38,24 @@ function media(matches: boolean) {
 
 const ROOT = "D:\\work\\petstore-api";
 
+/** A finished run of 5 tests, `failed` of which failed. */
+const failedRun = (failed: number) => ({
+  id: "r1",
+  startedAt: 1,
+  durationMillis: 2,
+  env: null,
+  threads: 1,
+  filter: { include: [], exclude: [], hideNonMatching: false },
+  selection: null,
+  failedOf: null,
+  outcome: "finished" as const,
+  exitCode: failed > 0 ? 1 : 0,
+  passed: 5 - failed,
+  failed,
+  total: 5,
+  reportAvailable: true,
+});
+
 function setup(root = ROOT) {
   const [state, set] = createStore(initialState());
   const api = {
@@ -179,20 +197,21 @@ describe("a narrow window", () => {
       expect(spoken.tagName).toBe("SPAN");
       expect(narrowLabel).toBe("max-[1280px]:sr-only");
     }
-    // the names: a label and, for Re-run failed, its count
-    for (const name of ["Properties…", "Open…", "Report", "Cancel", "Re-run failed 0"])
+    // the names: a label (Re-run failed adds its count once there is one)
+    for (const name of ["Properties…", "Open…", "Report", "Cancel", "Re-run failed"])
       expect(screen.getByRole("button", { name }), name).toBeTruthy();
     expect(screen.getByRole("button", { name: "Home" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeTruthy();
   });
 
   it("shrinks four of them to a 28 px icon and keeps the count pill of Re-run failed", () => {
-    setup();
+    const { send } = setup();
     for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
       for (const c of narrowIcon.split(" ")) expect(button(id).className, id).toContain(c);
     expect(button("rerun-failed-button").className).toContain("max-[1280px]:px-2");
+    send({ type: "history", runs: [failedRun(2)] });
     const spans = [...button("rerun-failed-button").querySelectorAll("span")];
-    expect(spans.at(-1)!.textContent).toBe("0"); // the pill follows the spoken label
+    expect(spans.at(-1)!.textContent).toBe("2"); // the pill follows the spoken label
   });
 
   it("keeps Run all's label in sight", () => {
@@ -377,27 +396,7 @@ describe("the actions", () => {
   it("shows the newest run's failed count in a pill on Re-run failed", () => {
     const { api, send } = setup();
     expect(button("rerun-failed-button").disabled).toBe(true);
-    send({
-      type: "history",
-      runs: [
-        {
-          id: "r1",
-          startedAt: 1,
-          durationMillis: 2,
-          env: null,
-          threads: 1,
-          filter: { include: [], exclude: [], hideNonMatching: false },
-          selection: null,
-          failedOf: null,
-          outcome: "finished",
-          exitCode: 1,
-          passed: 3,
-          failed: 2,
-          total: 5,
-          reportAvailable: true,
-        },
-      ],
-    });
+    send({ type: "history", runs: [failedRun(2)] });
     const rerun = button("rerun-failed-button");
     expect(rerun.textContent).toBe("Re-run failed 2");
     const pill = [...rerun.querySelectorAll("span")].at(-1)!; // after the spoken label
@@ -406,6 +405,18 @@ describe("the actions", () => {
     expect(rerun.disabled).toBe(false);
     fireEvent.click(rerun);
     expect(api.rerunFailed).toHaveBeenCalledExactlyOnceWith("r1");
+  });
+
+  it("shows no pill while there is nothing to re-run: a 0 on a disabled button says nothing", () => {
+    const { send } = setup();
+    for (const runs of [[], [failedRun(0)]]) {
+      send({ type: "history", runs });
+      const rerun = button("rerun-failed-button");
+      expect(rerun.disabled).toBe(true);
+      expect(rerun.textContent).toBe("Re-run failed");
+      expect(rerun.querySelector(`.${CSS.escape(countPill.split(" ")[0]!)}`)).toBeNull();
+      expect(screen.getByRole("button", { name: "Re-run failed" })).toBe(rerun);
+    }
   });
 
   it("keeps Run all, Cancel and Open as before", () => {

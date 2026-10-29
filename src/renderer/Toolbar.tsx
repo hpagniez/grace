@@ -1,4 +1,5 @@
 import { FileText, FolderOpen, Play, RefreshCw, RotateCcw, Square } from "lucide";
+import { Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import type { AppState } from "./reduce";
 import { matchingLeaves } from "../shared/tags";
@@ -116,8 +117,12 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           onClick={() => void props.api.rerunFailed(newest()!.id)}
         >
           <Icon icon={RotateCcw} />
-          <span class={narrowLabel}>Re-run failed</span>{" "}
-          <span class={countPill}>{failedCount()}</span>
+          <span class={narrowLabel}>Re-run failed</span>
+          {/* a 0 on a disabled button says nothing: the count shows once there is one */}
+          <Show when={failedCount() > 0}>
+            {" "}
+            <span class={countPill}>{failedCount()}</span>
+          </Show>
         </button>
       </Tooltip>
       <Tooltip text={spoken("Cancel")}>
