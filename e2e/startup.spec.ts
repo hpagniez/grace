@@ -35,7 +35,8 @@ test("the page starts with a static startup screen", () => {
   expect(html).toContain('<div id="startup" role="status" aria-label="Loading Grace">');
   const startup = html.slice(html.indexOf('<div id="startup"'), html.indexOf('<div id="root">'));
   expect(startup).toContain("<svg"); // the logo (assets/icon.svg, inlined)
-  expect(startup).toContain("Grace");
+  // the word on screen, after the logo and before the spinner: the aria-label holds it too
+  expect(startup).toMatch(/<\/svg>\s*Grace\s*<div class="spinner">/);
   expect(html).toMatch(/prefers-color-scheme:\s*dark/);
   expect(html).toMatch(/prefers-reduced-motion:\s*reduce/);
   expect(html).toContain('<div id="root"></div>');
