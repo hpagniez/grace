@@ -35,7 +35,6 @@ const TOKENS = [
   "on-primary",
   "primary-hover",
   "on-danger",
-  "brand",
   "focus",
   "failed-hover",
   ...STATUSES,
@@ -72,8 +71,8 @@ describe("colour tokens (spec R1)", () => {
   });
 
   // `readTokens().dark` falls back to light for a token the dark block lacks, so check the block itself.
-  it("overrides every token in the dark theme except brand, the one that is the same", () => {
-    expect(Object.keys(darkOverrides).sort()).toEqual(TOKENS.filter((n) => n !== "brand").sort());
+  it("overrides every token in the dark theme", () => {
+    expect(Object.keys(darkOverrides).sort()).toEqual([...TOKENS].sort());
   });
 
   // the person: "UX/UI and components must not change from one theme to the other; only colour must change"

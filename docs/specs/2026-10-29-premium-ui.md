@@ -110,7 +110,6 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 | `on-primary` | text and icons on `primary` | `#ffffff` | `#151821` |
 | `primary-hover` | `primary` under the pointer (solid) | `#156640` | `#5fd98a` |
 | `on-danger` | text and icons on a `failed` fill (the `danger` button) | `#ffffff` | `#151821` |
-| `brand` | the logo's strike | `#3fcf6e` | `#3fcf6e` |
 | `focus` | the focus ring | `#151821` | `#3fcf6e` |
 | `passed` | passed; HTTP 2xx | `#1b7a4c` | `#3fcf6e` |
 | `failed` | failed, errors, destructive actions; HTTP 5xx and no response | `#c22a2f` | `#f2666f` |
