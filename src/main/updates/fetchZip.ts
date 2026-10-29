@@ -63,7 +63,8 @@ export async function verify(file: string, size: number, sha256: string): Promis
 
 /**
  * R8.4: unpacks `zip` into `dir`. Rejects unless the app's two key files are there.
- * bsdtar refuses `..` and absolute entries (no `-P`), so nothing lands outside `dir`.
+ * Without `-P`, bsdtar refuses `..` entries and strips the drive or leading slash of an absolute
+ * one, which then lands inside `dir`: nothing lands outside it.
  */
 export async function unpack(zip: string, dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
