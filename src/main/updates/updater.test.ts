@@ -7,7 +7,7 @@ import { downloadPrefix, zipName, type Release } from "../../shared/updates";
 import { loadUpdateSettings, saveUpdateSettings } from "../settings";
 import type { fetchReleases as FetchReleases } from "./check";
 import type { download as Download, unpack as Unpack, verify as Verify } from "./fetchZip";
-import type { preflight as Preflight } from "./preflight";
+import { preflight as realPreflight, type preflight as Preflight } from "./preflight";
 import { takeResult, type SwitchResult } from "./startup";
 import type { startSwitch as StartSwitch } from "./switch";
 import { Updater, type UpdaterDeps } from "./updater";
@@ -423,6 +423,23 @@ describe("install", () => {
     const u = await checked();
     await u.install("1.0.0-rc.6", false);
     expect(u.progress()).toEqual({ version: "1.0.0-rc.6", rollback: false, error: DAMAGED });
+  });
+
+  it("never removes a staging folder or file Grace did not make when it refuses (R8.1)", async () => {
+    const roomy = async () => 1e12;
+    const u = await checked({ preflight: (dir, size) => realPreflight(dir, size, roomy) });
+    const refused = `Grace can't update itself while ${staging} exists: it is not a folder Grace made. Move or rename it, then try again.`;
+    mkdirSync(staging);
+    writeFileSync(path.join(staging, "notes.txt"), "mine");
+    await u.install("1.0.0-rc.6", false);
+    expect(u.progress()).toEqual({ version: "1.0.0-rc.6", rollback: false, error: refused });
+    expect(readFileSync(path.join(staging, "notes.txt"), "utf8")).toBe("mine");
+    rmSync(staging, { recursive: true });
+    writeFileSync(staging, "mine");
+    await u.install("1.0.0-rc.6", false);
+    expect(u.progress()).toEqual({ version: "1.0.0-rc.6", rollback: false, error: refused });
+    expect(readFileSync(staging, "utf8")).toBe("mine");
+    expect(download).not.toHaveBeenCalled();
   });
 
   it("removes a leftover staging folder before the download (R8.2)", async () => {

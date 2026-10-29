@@ -19,7 +19,7 @@ import { compareVersions, parseVersion } from "../../shared/version";
 import { loadUpdateSettings, saveUpdateSettings } from "../settings";
 import { fetchReleases } from "./check";
 import { download, unpack, verify } from "./fetchZip";
-import { preflight } from "./preflight";
+import { ownStaging, preflight } from "./preflight";
 import {
   listBackups,
   resultNotice,
@@ -273,7 +273,8 @@ export class Updater {
         named("The switch script")(e);
       }
     } catch (e) {
-      await removeStaging().catch(() => {});
+      // only what Grace put there: a refusal may name a folder or file of someone else's (R8.1)
+      if (ownStaging(stagingDir)) await removeStaging().catch(() => {});
       if (!job.signal.aborted) this.show({ version, rollback, error: (e as Error).message });
       return;
     } finally {
