@@ -159,7 +159,7 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     await expect(win.getByTestId(id), id).toHaveAccessibleName(name);
 
   const seen = await expectToolbarFits(win);
-  // below 1100 px four labels are only spoken: those buttons are their icon, and say it in a tooltip
+  // below 1150 px four labels are only spoken: those buttons are their icon, and say it in a tooltip
   for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
     expect(seen.find((b) => b.id === id)!.width, id).toBeLessThan(40);
   await chipClearOfEnv(win);
@@ -186,8 +186,13 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     expect(box.x + box.width, `${id} inside ${floor} px`).toBeLessThanOrEqual(floor);
   }
 
-  // just over 1100 px the labels show and the toolbar is at its tightest: the chip still shows
-  await contentWidth(app, win, 1101);
+  // the breakpoint: 1149 px is icon-only and 1151 px has the labels, the toolbar at its tightest. At both
+  // the folder name shows and the chip is whole, which is what the breakpoint is set for.
+  await contentWidth(app, win, 1149);
+  await expectToolbarFits(win);
+  expect((await win.getByTestId("open-button").boundingBox())!.width).toBeLessThan(40);
+  await expectChipShown(win);
+  await contentWidth(app, win, 1151);
   await expect
     .poll(() =>
       win
@@ -197,9 +202,9 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     )
     .toBeGreaterThan(60);
   await expectToolbarFits(win);
-  await expect(win.getByTestId("project-layout")).toBeVisible();
-  const tight = await chipClearOfEnv(win);
-  expect(tight!.width).toBeGreaterThan(15); // cut short, with its ellipsis, not collapsed
+  await expectChipShown(win);
+  await expect(win.getByTestId("project-name")).toBeVisible();
+  expect((await win.getByTestId("project-name").boundingBox())!.width).toBeGreaterThan(25); // a few letters
 
   // the common widths: labels, a whole chip, and no tooltip that only repeats a label
   for (const width of [1200, 1500]) {

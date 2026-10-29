@@ -171,13 +171,13 @@ describe("a narrow window", () => {
       expect(style).toContain("whitespace-nowrap");
   });
 
-  it("below 1100 px hides the label of five buttons from sight but not from their names", () => {
+  it("below 1150 px hides the label of five buttons from sight but not from their names", () => {
     setup();
     for (const [id, label] of LABELLED) {
       const spoken = button(id).querySelector(`.${CSS.escape(narrowLabel)}`)!;
       expect(spoken.textContent, id).toBe(label);
       expect(spoken.tagName).toBe("SPAN");
-      expect(narrowLabel).toBe("max-[1100px]:sr-only");
+      expect(narrowLabel).toBe("max-[1150px]:sr-only");
     }
     // the names: a label and, for Re-run failed, its count
     for (const name of ["Properties…", "Open…", "Report", "Cancel", "Re-run failed 0"])
@@ -190,7 +190,7 @@ describe("a narrow window", () => {
     setup();
     for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
       for (const c of narrowIcon.split(" ")) expect(button(id).className, id).toContain(c);
-    expect(button("rerun-failed-button").className).toContain("max-[1100px]:px-2");
+    expect(button("rerun-failed-button").className).toContain("max-[1150px]:px-2");
     const spans = [...button("rerun-failed-button").querySelectorAll("span")];
     expect(spans.at(-1)!.textContent).toBe("0"); // the pill follows the spoken label
   });
@@ -200,12 +200,12 @@ describe("a narrow window", () => {
     const run = button("run-all-button");
     expect(run.textContent).toBe("Run all");
     expect(run.querySelector("span")).toBeNull();
-    expect(run.className).not.toContain("max-[1100px]");
+    expect(run.className).not.toContain("max-[1150px]");
   });
 
   it("asks for the width the classes use", () => {
-    expect(NARROW_QUERY).toBe("(width < 1100px)"); // Tailwind's max-[1100px] is below 1100 px
-    for (const c of [narrowIcon, narrowLabel]) expect(c).toContain("max-[1100px]:");
+    expect(NARROW_QUERY).toBe("(width < 1150px)"); // Tailwind's max-[1150px] is below 1150 px
+    for (const c of [narrowIcon, narrowLabel]) expect(c).toContain("max-[1150px]:");
   });
 
   it("gives each of the five a tooltip with the label while the label is hidden, also when disabled", () => {
@@ -333,10 +333,10 @@ describe("the project", () => {
     expect(tip().textContent).toBe(ROOT);
   });
 
-  it("keeps the layout chip in sight above 1100 px: it truncates last, and only below 1100 px may it hide", () => {
+  it("keeps the layout chip in sight above 1150 px: it truncates last, and only below 1150 px may it hide", () => {
     setup();
     const chip = screen.getByTestId("project-layout");
-    expect(chip.className).toContain("max-[1100px]:@max-[160px]:hidden");
+    expect(chip.className).toContain("max-[1150px]:@max-[160px]:hidden");
     expect(chip.className).not.toMatch(/(^| )@max-\[160px\]:hidden/); // never by the container alone
     expect(chip.parentElement!.className).toContain("@container");
     // squeezed, the path gives way first, then the name, then the chip

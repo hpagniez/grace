@@ -65,13 +65,13 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
 
   return (
     <div class="flex flex-col">
-      <label class="flex items-center gap-2 text-sm text-muted">
+      <label class="flex items-center gap-1.5 text-sm text-muted">
         Env
         <input
           type="text"
           data-testid="env-input"
           list="env-suggestions"
-          class={`${input} w-28`}
+          class={`${input} w-24`}
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}

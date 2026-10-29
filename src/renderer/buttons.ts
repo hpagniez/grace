@@ -16,10 +16,10 @@ export const ghostSmall = `${base} ${sm} ${quiet}`;
 export const btnIcon = `${base} size-7 ${quiet}`;
 
 /**
- * The toolbar below 1100 px: a button's label is only spoken (put narrowLabel on a span around it)
+ * The toolbar below 1150 px: a button's label is only spoken (put narrowLabel on a span around it)
  * and the button shrinks to its icon, so the toolbar fits down to the window's 760 px minimum.
  */
-export const narrowIcon = "max-[1100px]:w-7 max-[1100px]:px-0";
-export const narrowLabel = "max-[1100px]:sr-only";
+export const narrowIcon = "max-[1150px]:w-7 max-[1150px]:px-0";
+export const narrowLabel = "max-[1150px]:sr-only";
 /** The width of the two strings above, for a script that must know (a tooltip only while the label is hidden). */
-export const NARROW_QUERY = "(width < 1100px)"; // what Tailwind's max-[1100px] means
+export const NARROW_QUERY = "(width < 1150px)"; // what Tailwind's max-[1150px] means
