@@ -520,7 +520,20 @@ setInterval(() => {}, 1 << 30);
   });
 
   it("writes a failure result when something unexpected fails before the swap", T, async () => {
-    await run({ exitTimeoutSec: "soon" as unknown as number });
+    const old = spawn(path.join(install, "Grace.exe"), [], { cwd: install, env, stdio: "ignore" });
+    children.push(old);
+    // the script fails at once, so it may be done before the launcher sees `switching`: then Grace
+    // is told it did not start and stays, which is what it should do either way
+    try {
+      startSwitch(plan({ pid: old.pid, exitTimeoutSec: "soon" as unknown as number }), env);
+    } catch (err) {
+      expect(String(err)).toMatch(/did not start/);
+    }
+    await until(
+      () =>
+        existsSync(path.join(data, "update-result.json")) &&
+        !existsSync(path.join(staging, "switching")),
+    );
     expect(result()).toMatchObject({ ok: false, reverted: false });
     expect(result().error).toEqual(expect.any(String));
     expect(read(install, "v.txt")).toBe("1.0.0-rc.5");
