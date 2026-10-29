@@ -109,6 +109,14 @@ describe("results", () => {
       expect(existsSync(file())).toBe(false);
     });
 
+    it("reads a result without reverted, which R10.5 does not list, as not reverted", () => {
+      writeFileSync(
+        file(),
+        JSON.stringify({ ...failed("1.0.0-rc.5", "1.0.0-rc.6", "x"), reverted: undefined }),
+      );
+      expect(takeResult(dir)).toEqual(failed("1.0.0-rc.5", "1.0.0-rc.6", "x"));
+    });
+
     it("is null without a file", () => {
       expect(takeResult(dir)).toBeNull();
     });
@@ -120,7 +128,11 @@ describe("results", () => {
       ["a string for a boolean", JSON.stringify({ ...ok("1.0.0-rc.5", "1.0.0-rc.6"), ok: "yes" })],
       [
         "a missing field",
-        JSON.stringify({ ...ok("1.0.0-rc.5", "1.0.0-rc.6"), reverted: undefined }),
+        JSON.stringify({ ...ok("1.0.0-rc.5", "1.0.0-rc.6"), rollback: undefined }),
+      ],
+      [
+        "a reverted that is not a boolean",
+        JSON.stringify({ ...ok("1.0.0-rc.5", "1.0.0-rc.6"), reverted: "no" }),
       ],
       [
         "an error that is not text",

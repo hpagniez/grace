@@ -96,7 +96,8 @@ export function takeResult(dataDir: string): SwitchResult | null {
     // held open for a moment: the notice then shows once more at the next start
   }
   if (!o) return null;
-  const { from, to, rollback, ok, reverted, error } = o;
+  // R10.5 does not list `reverted`: a script that omits it did not switch back
+  const { from, to, rollback, ok, reverted = false, error } = o;
   if (typeof from !== "string" || !parseVersion(from)) return null;
   if (typeof to !== "string" || !parseVersion(to)) return null;
   if (typeof rollback !== "boolean" || typeof ok !== "boolean" || typeof reverted !== "boolean") {
