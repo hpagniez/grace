@@ -120,3 +120,18 @@ describe("the home screen's ground (spec R12.1)", () => {
     );
   });
 });
+
+describe("the focus ring (spec R10.1)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("is 2 px in the focus colour, offset 2 px", () => {
+    expect(css).toMatch(
+      /:focus-visible\s*\{\s*outline:\s*2px solid var\(--color-focus\);\s*outline-offset:\s*2px;/,
+    );
+  });
+
+  // transition-colors also moves outline-color: without this the ring fades in from the text colour
+  it("has its colour before focus arrives", () => {
+    expect(css).toMatch(/\*\s*\{\s*outline-color:\s*var\(--color-focus\);\s*\}/);
+  });
+});

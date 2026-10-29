@@ -215,6 +215,10 @@
     font-size: var(--text-sm);
     line-height: var(--text-sm--line-height);
   }
+  /* The ring's colour is set before focus arrives: `transition-colors` also moves outline-color, and a ring fading in from the text colour is the wrong colour for 100 ms. */
+  * {
+    outline-color: var(--color-focus);
+  }
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
