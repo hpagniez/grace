@@ -103,7 +103,9 @@ describe("preflight", () => {
         writeFileSync(path.join(dir, "resources", APP_FILES), "[]");
       }
       const staging = `${install}.update`;
-      mkdirSync(path.join(staging, "app"), { recursive: true });
+      // old and failed: moved in by the startup cleanup or the script before they are removed
+      for (const d of ["app", "old", "failed"])
+        mkdirSync(path.join(staging, d), { recursive: true });
       for (const f of [
         "plan.json",
         "switch.ps1",
