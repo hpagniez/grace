@@ -56,8 +56,15 @@ describe("fetchReleases", () => {
     expect(await fetchReleases(file)).toEqual(fromUrl);
   });
 
-  it("gives no releases, and no error, for JSON that is not a releases list", async () => {
-    expect(await fetchReleases(`${base}/object`)).toEqual([]);
+  it("fails on JSON that is not a releases list", async () => {
+    await expect(fetchReleases(`${base}/object`)).rejects.toThrow(
+      "GitHub's answer could not be read",
+    );
+  });
+
+  it("gives no releases, and no error, for an empty list", async () => {
+    const f = vi.fn<typeof fetch>(async () => new Response("[]"));
+    expect(await fetchReleases("https://example.test/releases", 1000, f)).toEqual([]);
   });
 
   it("fails with the status on HTTP errors", async () => {

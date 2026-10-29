@@ -43,7 +43,9 @@ export async function fetchReleases(
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Error("GitHub's answer could not be read");
+    json = null;
   }
+  // an object is an error answer ({"message": …}), not "no releases" (R2.5)
+  if (!Array.isArray(json)) throw new Error("GitHub's answer could not be read");
   return parseReleases(json);
 }
