@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { loadUpdateSettings, saveUpdateSettings } from "../settings";
 import type { fetchReleases as FetchReleases } from "./check";
 import type { download as Download, unpack as Unpack, verify as Verify } from "./fetchZip";
 import type { preflight as Preflight } from "./preflight";
-import type { SwitchResult } from "./startup";
+import { takeResult, type SwitchResult } from "./startup";
 import type { startSwitch as StartSwitch } from "./switch";
 import { Updater, type UpdaterDeps } from "./updater";
 
@@ -99,7 +99,7 @@ const ofType = <T extends AppEvent["type"]>(t: T) =>
   events.filter((e): e is Extract<AppEvent, { type: T }> => e.type === t);
 const notices = () => ofType("notice").map((e) => e.message);
 const saveSettings = (patch: object) =>
-  saveUpdateSettings(dataDir, { ...loadUpdateSettings(dataDir, RUNNING), ...patch });
+  saveUpdateSettings(dataDir, { ...loadUpdateSettings(dataDir), ...patch });
 const backup = (version: string) => {
   const dir = path.join(dataDir, "backups", version);
   mkdirSync(dir, { recursive: true });
@@ -118,7 +118,7 @@ describe("startup", () => {
       ok: true,
       reverted: false,
       error: null,
-      updates: { ...loadUpdateSettings(dataDir, RUNNING), channel: "prerelease" },
+      updates: { ...loadUpdateSettings(dataDir), channel: "prerelease" },
     };
     const u = make();
     await u.startup(result);
@@ -220,10 +220,10 @@ describe("startup", () => {
       ok: true,
       reverted: false,
       error: null,
-      updates: loadUpdateSettings(dataDir, RUNNING),
+      updates: loadUpdateSettings(dataDir),
     };
     await make().startup(result);
-    expect(loadUpdateSettings(dataDir, RUNNING)).toMatchObject({
+    expect(loadUpdateSettings(dataDir)).toMatchObject({
       autoUpdate: false,
       skipped: "1.0.0-rc.6",
     });
@@ -246,7 +246,7 @@ describe("check", () => {
 
   it("saves the time of a successful check (R2.6)", async () => {
     await make().check();
-    expect(loadUpdateSettings(dataDir, RUNNING).lastChecked).not.toBeNull();
+    expect(loadUpdateSettings(dataDir).lastChecked).not.toBeNull();
   });
 
   it("a failure keeps lastChecked and sets the error (R2.5)", async () => {
@@ -256,7 +256,7 @@ describe("check", () => {
     await u.check();
     expect(u.view().error).toBe("Couldn't check for updates: GitHub answered 403");
     expect(u.view().settings.lastChecked).toBe("2026-10-27T10:00:00.000Z");
-    expect(loadUpdateSettings(dataDir, RUNNING).lastChecked).toBe("2026-10-27T10:00:00.000Z");
+    expect(loadUpdateSettings(dataDir).lastChecked).toBe("2026-10-27T10:00:00.000Z");
     expect(u.view().releases).toBeNull();
   });
 
@@ -271,7 +271,7 @@ describe("settings", () => {
   it("setSettings saves, then emits updates", () => {
     const u = make();
     u.setSettings({ channel: "stable", autoUpdate: true });
-    expect(loadUpdateSettings(dataDir, RUNNING)).toMatchObject({
+    expect(loadUpdateSettings(dataDir)).toMatchObject({
       channel: "stable",
       autoUpdate: true,
       checkAtStartup: true,
@@ -282,9 +282,9 @@ describe("settings", () => {
   it("skip saves a valid version only", () => {
     const u = make();
     u.skip("nonsense");
-    expect(loadUpdateSettings(dataDir, RUNNING).skipped).toBeNull();
+    expect(loadUpdateSettings(dataDir).skipped).toBeNull();
     u.skip("1.0.0-rc.6");
-    expect(loadUpdateSettings(dataDir, RUNNING).skipped).toBe("1.0.0-rc.6");
+    expect(loadUpdateSettings(dataDir).skipped).toBe("1.0.0-rc.6");
     expect(ofType("updates")).toHaveLength(1);
   });
 
@@ -293,6 +293,53 @@ describe("settings", () => {
     expect(make().view().backups).toEqual([
       { version: "1.0.0-rc.4", savedAt: "2026-10-27T10:00:00Z" },
     ]);
+  });
+});
+
+describe("the channel (R1.3)", () => {
+  /** The `updates` key as settings.json holds it. */
+  const stored = () =>
+    JSON.parse(readFileSync(path.join(dataDir, "settings.json"), "utf8")).updates;
+
+  it("is never saved until the person picks one", async () => {
+    const u = make();
+    await u.check();
+    u.skip("1.0.0-rc.6");
+    expect(stored()).not.toHaveProperty("channel");
+    expect(stored().skipped).toBe("1.0.0-rc.6");
+    expect(u.view().settings.channel).toBeNull();
+  });
+
+  it("is saved once picked, and kept by later saves", async () => {
+    const u = make();
+    u.setSettings({ channel: "stable" });
+    expect(stored().channel).toBe("stable");
+    await u.check();
+    u.setSettings({ autoUpdate: true });
+    expect(stored()).toMatchObject({ channel: "stable", autoUpdate: true });
+    expect(make().view().settings.channel).toBe("stable");
+  });
+
+  it("stays not picked through a switch", async () => {
+    await (await checked()).install("1.0.0-rc.6", false);
+    const { updates } = startSwitch.mock.lastCall![0];
+    expect(updates.channel).toBeNull();
+    // what the script writes back: the plan's updates, through JSON
+    writeFileSync(
+      path.join(dataDir, "update-result.json"),
+      JSON.stringify({
+        from: RUNNING,
+        to: "1.0.0-rc.6",
+        rollback: false,
+        ok: true,
+        error: null,
+        updates,
+      }),
+    );
+    const after = make({ running: "1.0.0-rc.6" });
+    await after.startup(takeResult(dataDir));
+    expect(stored()).not.toHaveProperty("channel");
+    expect(after.view().settings.channel).toBeNull();
   });
 });
 
@@ -479,7 +526,7 @@ describe("install", () => {
         installDir,
         stagingDir: staging,
         dataDir,
-        updates: loadUpdateSettings(dataDir, RUNNING),
+        updates: loadUpdateSettings(dataDir),
         exitTimeoutSec: 60,
         startTimeoutSec: 120,
         keepBackups: 3,

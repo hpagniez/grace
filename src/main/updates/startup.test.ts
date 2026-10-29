@@ -150,10 +150,10 @@ describe("results", () => {
         file(),
         JSON.stringify({ ...r, updates: { channel: "nightly", skipped: "soon" } }),
       );
-      expect(takeResult(dir)?.updates).toEqual({
-        ...defaultUpdateSettings("1.0.0-rc.5"), // the default channel follows `from`
-        channel: "prerelease",
-      });
+      // a channel that is not valid, or null as a plan carries one not picked, reads as not picked
+      expect(takeResult(dir)?.updates).toEqual(defaultUpdateSettings());
+      writeFileSync(file(), JSON.stringify({ ...r, updates: { channel: null } }));
+      expect(takeResult(dir)?.updates).toEqual(defaultUpdateSettings());
       writeFileSync(file(), JSON.stringify({ ...r, updates: carried }));
       expect(takeResult(dir)?.updates).toEqual(carried);
       writeFileSync(file(), JSON.stringify({ ...r, updates: null }));

@@ -80,7 +80,7 @@ describe.runIf(process.platform === "win32")("switch script", () => {
     installDir: install,
     stagingDir: staging,
     dataDir: data,
-    updates: { ...defaultUpdateSettings("1.0.0-rc.5"), skipped: "1.0.0-rc.4" },
+    updates: { ...defaultUpdateSettings(), skipped: "1.0.0-rc.4" },
     exitTimeoutSec: 10,
     startTimeoutSec: 20,
     keepBackups: 3,

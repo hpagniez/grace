@@ -65,7 +65,8 @@ export const latestOn = (rs: Release[], c: Channel): Release | null =>
   );
 
 export interface UpdateSettings {
-  channel: Channel;
+  /** Null until the person picks one, and never saved till then: see `channelOf` (R1.3). */
+  channel: Channel | null;
   checkAtStartup: boolean;
   autoUpdate: boolean;
   skipped: string | null;
@@ -73,9 +74,13 @@ export interface UpdateSettings {
   lastChecked: string | null;
 }
 
-/** Settings before the person changes any: the channel follows the running version (R1.3, R12). */
-export const defaultUpdateSettings = (running: string): UpdateSettings => ({
-  channel: isPrerelease(running) ? "prerelease" : "stable",
+/** R1.3: the channel picked, else pre-release while a pre-release runs and stable otherwise. */
+export const channelOf = (s: UpdateSettings, running: string): Channel =>
+  s.channel ?? (isPrerelease(running) ? "prerelease" : "stable");
+
+/** Settings before the person changes any (R12). */
+export const defaultUpdateSettings = (): UpdateSettings => ({
+  channel: null,
   checkAtStartup: true,
   autoUpdate: false,
   skipped: null,
@@ -85,14 +90,14 @@ export const defaultUpdateSettings = (running: string): UpdateSettings => ({
 
 /** The release the startup modal offers: out of date, auto-update off, above the skipped one (R4.1). */
 export function promptFor(rs: Release[], s: UpdateSettings, running: string): Release | null {
-  const latest = latestOn(rs, s.channel);
+  const latest = latestOn(rs, channelOf(s, running));
   if (!latest || s.autoUpdate || compareVersions(latest.version, running) <= 0) return null;
   return s.skipped !== null && compareVersions(latest.version, s.skipped) <= 0 ? null : latest;
 }
 
 /** The release auto-update installs at startup: skipped counts for nothing, failed is never retried (R5.2). */
 export function autoUpdateTo(rs: Release[], s: UpdateSettings, running: string): Release | null {
-  const latest = latestOn(rs, s.channel);
+  const latest = latestOn(rs, channelOf(s, running));
   if (!latest || !s.autoUpdate || compareVersions(latest.version, running) <= 0) return null;
   return latest.version === s.failed ? null : latest;
 }

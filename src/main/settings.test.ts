@@ -616,8 +616,8 @@ describe("settings", () => {
           lastChecked: 5,
         },
       });
-      expect(loadUpdateSettings(dir, "1.0.0-rc.5")).toEqual({
-        channel: "prerelease",
+      expect(loadUpdateSettings(dir)).toEqual({
+        channel: null,
         checkAtStartup: true,
         autoUpdate: true,
         skipped: null,
@@ -627,18 +627,14 @@ describe("settings", () => {
     });
 
     it("reads no file, a corrupt file or a non-object key as the defaults", () => {
-      expect(loadUpdateSettings(tmp(), "1.0.0")).toEqual(defaultUpdateSettings("1.0.0"));
+      expect(loadUpdateSettings(tmp())).toEqual(defaultUpdateSettings());
       const corrupt = tmp();
       writeFileSync(path.join(corrupt, "settings.json"), "{not json");
-      expect(loadUpdateSettings(corrupt, "1.0.0-rc.5")).toEqual(
-        defaultUpdateSettings("1.0.0-rc.5"),
-      );
+      expect(loadUpdateSettings(corrupt)).toEqual(defaultUpdateSettings());
       for (const updates of [null, "x", 7, ["stable"]]) {
         const dir = tmp();
         write(dir, { updates });
-        expect(loadUpdateSettings(dir, "1.0.0"), JSON.stringify(updates)).toEqual(
-          defaultUpdateSettings("1.0.0"),
-        );
+        expect(loadUpdateSettings(dir), JSON.stringify(updates)).toEqual(defaultUpdateSettings());
       }
     });
 
@@ -647,7 +643,7 @@ describe("settings", () => {
       write(dir, { updates: { autoUpdate: true } });
       readFails.code = "EBUSY";
       try {
-        expect(loadUpdateSettings(dir, "1.0.0")).toEqual(defaultUpdateSettings("1.0.0"));
+        expect(loadUpdateSettings(dir)).toEqual(defaultUpdateSettings());
       } finally {
         readFails.code = null;
       }
@@ -665,7 +661,7 @@ describe("settings", () => {
           lastChecked: "2026-10-28T10:00:00Z",
         },
       });
-      expect(loadUpdateSettings(dir, "1.0.0-rc.5")).toEqual({
+      expect(loadUpdateSettings(dir)).toEqual({
         channel: "stable",
         checkAtStartup: false,
         autoUpdate: false,
@@ -679,7 +675,7 @@ describe("settings", () => {
       for (const bad of ["v1.0.1", "1.0", "1.0.0-beta.1", "01.0.0", "", " 1.0.0"]) {
         const dir = tmp();
         write(dir, { updates: { skipped: bad, failed: bad } });
-        const s = loadUpdateSettings(dir, "1.0.0");
+        const s = loadUpdateSettings(dir);
         expect(s.skipped, bad).toBeNull();
         expect(s.failed, bad).toBeNull();
       }
@@ -688,29 +684,34 @@ describe("settings", () => {
     it("reads a lastChecked that is not a date as null", () => {
       const dir = tmp();
       write(dir, { updates: { lastChecked: "yesterday" } });
-      expect(loadUpdateSettings(dir, "1.0.0").lastChecked).toBeNull();
+      expect(loadUpdateSettings(dir).lastChecked).toBeNull();
     });
 
-    it("defaults the channel from the running version when none is saved", () => {
+    it("reads no saved channel as not picked, and saves one only once picked (R1.3)", () => {
       const dir = tmp();
-      expect(loadUpdateSettings(dir, "1.0.0-rc.5").channel).toBe("prerelease");
-      expect(loadUpdateSettings(dir, "1.0.0").channel).toBe("stable");
+      expect(loadUpdateSettings(dir).channel).toBeNull();
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), lastChecked: "2026-10-28T10:00:00Z" });
+      expect(readJson(dir).updates).not.toHaveProperty("channel");
+      expect(loadUpdateSettings(dir).channel).toBeNull();
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), channel: "stable" });
+      expect(readJson(dir).updates.channel).toBe("stable");
+      expect(loadUpdateSettings(dir).channel).toBe("stable");
     });
 
     it("saves update settings and keeps the other keys", () => {
       const dir = tmp();
       write(dir, { lastProject: "D:\\p" });
-      saveUpdateSettings(dir, { ...defaultUpdateSettings("1.0.0"), skipped: "1.0.1" });
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), skipped: "1.0.1" });
       expect(readJson(dir).lastProject).toBe("D:\\p");
-      expect(loadUpdateSettings(dir, "1.0.0").skipped).toBe("1.0.1");
+      expect(loadUpdateSettings(dir).skipped).toBe("1.0.1");
     });
 
     it("saving other settings keeps the update settings", () => {
       const dir = tmp();
-      const s = { ...defaultUpdateSettings("1.0.0"), autoUpdate: true, failed: "1.0.3" };
+      const s = { ...defaultUpdateSettings(), autoUpdate: true, failed: "1.0.3" };
       saveUpdateSettings(dir, s);
       saveWindowState(dir, { x: 0, y: 0, width: 700, height: 500, maximized: false });
-      expect(loadUpdateSettings(dir, "1.0.0")).toEqual(s);
+      expect(loadUpdateSettings(dir)).toEqual(s);
     });
   });
 });

@@ -90,7 +90,7 @@ export class Updater {
       idleWaitMs: 120_000,
       ...deps,
     };
-    this.settings = loadUpdateSettings(deps.dataDir, deps.running);
+    this.settings = loadUpdateSettings(deps.dataDir);
   }
 
   view(): UpdateView {

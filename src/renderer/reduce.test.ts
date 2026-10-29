@@ -516,7 +516,7 @@ describe("reduce", () => {
     const view: UpdateView = {
       running: "1.0.0-rc.5",
       packaged: false,
-      settings: defaultUpdateSettings("1.0.0-rc.5"),
+      settings: defaultUpdateSettings(),
       releases: [release],
       checking: false,
       error: null,

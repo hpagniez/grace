@@ -105,7 +105,7 @@ export function takeResult(dataDir: string): SwitchResult | null {
   }
   if (error !== null && typeof error !== "string") return null;
   const hasUpdates = typeof o.updates === "object" && o.updates !== null;
-  const updates = hasUpdates ? parseUpdateSettings(o.updates, from) : null;
+  const updates = hasUpdates ? parseUpdateSettings(o.updates) : null;
   return { from, to, rollback, ok, reverted, error, updates };
 }
 

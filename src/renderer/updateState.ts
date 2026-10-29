@@ -1,11 +1,11 @@
-import { latestOn } from "../shared/updates";
+import { channelOf, latestOn } from "../shared/updates";
 import type { UpdateView } from "../shared/updates";
 import { compareVersions } from "../shared/version";
 import type { AppState } from "./reduce";
 
 /** The latest version on the channel when it is above the running one (R3.2), or null. */
 export function latestAvailable(u: UpdateView | null): string | null {
-  const l = u && latestOn(u.releases ?? [], u.settings.channel);
+  const l = u && latestOn(u.releases ?? [], channelOf(u.settings, u.running));
   return l && compareVersions(l.version, u.running) > 0 ? l.version : null;
 }
 

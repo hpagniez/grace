@@ -28,7 +28,7 @@ const release = (version: string): Release => ({
 const view = (): UpdateView => ({
   running: "1.0.0-rc.5",
   packaged: true,
-  settings: defaultUpdateSettings("1.0.0-rc.5"),
+  settings: defaultUpdateSettings(),
   releases: [release("1.0.0-rc.6"), release("1.0.0-rc.5")],
   checking: false,
   error: null,

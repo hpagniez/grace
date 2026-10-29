@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
-import { onChannel, type Release, type UpdateView } from "../shared/updates";
+import { channelOf, onChannel, type Release, type UpdateView } from "../shared/updates";
 import { compareVersions, isPrerelease } from "../shared/version";
 import { btn, btnSmall, primary } from "./buttons";
 import { lastCheckedText } from "./lastChecked";
@@ -16,7 +16,7 @@ const legend = "text-sm font-medium";
 /** What the table lists (R6.3): the channel's releases plus the running version, newest first. */
 function rowsOf(u: UpdateView): Release[] {
   const all = u.releases ?? [];
-  const rows = [...onChannel(all, u.settings.channel)]; // a copy: the channel may hand back `all` itself
+  const rows = [...onChannel(all, channelOf(u.settings, u.running))]; // a copy: the channel may hand back `all` itself
   if (!rows.some((r) => r.version === u.running))
     rows.push(
       all.find((r) => r.version === u.running) ?? {
@@ -145,7 +145,7 @@ export function Settings(props: { state: AppState; api: Api; back(): void }) {
                       type="radio"
                       name="channel"
                       data-testid="channel-stable"
-                      checked={u().settings.channel === "stable"}
+                      checked={channelOf(u().settings, u().running) === "stable"}
                       onChange={() => void props.api.setUpdateSettings({ channel: "stable" })}
                     />
                     Stable releases only
@@ -155,7 +155,7 @@ export function Settings(props: { state: AppState; api: Api; back(): void }) {
                       type="radio"
                       name="channel"
                       data-testid="channel-prerelease"
-                      checked={u().settings.channel === "prerelease"}
+                      checked={channelOf(u().settings, u().running) === "prerelease"}
                       onChange={() => void props.api.setUpdateSettings({ channel: "prerelease" })}
                     />
                     Stable and pre-releases

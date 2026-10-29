@@ -26,7 +26,7 @@ const release = (version: string, prerelease = true): Release => ({
   sha256: "a".repeat(64),
 });
 const settings = (more: Partial<UpdateView["settings"]> = {}) => ({
-  ...defaultUpdateSettings("1.0.0-rc.5"),
+  ...defaultUpdateSettings(),
   ...more,
 });
 const view = (more: Partial<UpdateView> = {}): UpdateView => ({

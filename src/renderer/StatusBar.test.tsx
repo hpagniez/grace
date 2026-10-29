@@ -18,7 +18,7 @@ const release = (version: string, prerelease = true): Release => ({
 const view = (more: Partial<UpdateView> = {}): UpdateView => ({
   running: "1.0.0-rc.5",
   packaged: true,
-  settings: defaultUpdateSettings("1.0.0-rc.5"),
+  settings: defaultUpdateSettings(),
   releases: [release("1.0.0-rc.6"), release("1.0.0-rc.5"), release("1.0.0-rc.4")],
   checking: false,
   error: null,
@@ -55,12 +55,12 @@ describe("StatusBar", () => {
   });
 
   it("keeps the marker for a skipped version", () => {
-    show(view({ settings: { ...defaultUpdateSettings("1.0.0-rc.5"), skipped: "1.0.0-rc.6" } }));
+    show(view({ settings: { ...defaultUpdateSettings(), skipped: "1.0.0-rc.6" } }));
     expect(text("update-marker")).toBe("1.0.0-rc.6 available");
   });
 
   it("shows no marker when the channel has nothing newer", () => {
-    show(view({ settings: { ...defaultUpdateSettings("1.0.0-rc.5"), channel: "stable" } }));
+    show(view({ settings: { ...defaultUpdateSettings(), channel: "stable" } }));
     expect(screen.queryByTestId("update-marker")).toBeNull();
     expect(screen.queryByTestId("update-link")).toBeNull();
     cleanup();

@@ -321,12 +321,12 @@ export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): v
 }
 
 /**
- * Update settings from any JSON value (R12). Each malformed or missing field reads as its default;
- * `running` sets the default channel. A `skipped` or `failed` that is not a valid version reads as
+ * Update settings from any JSON value (R12). Each malformed or missing field reads as its default,
+ * the channel as not picked (R1.3). A `skipped` or `failed` that is not a valid version reads as
  * null, as `compareVersions` throws on one. Never throws.
  */
-export function parseUpdateSettings(updates: unknown, running: string): UpdateSettings {
-  const d = defaultUpdateSettings(running);
+export function parseUpdateSettings(updates: unknown): UpdateSettings {
+  const d = defaultUpdateSettings();
   const u = isObject(updates) ? updates : {};
   const bool = (x: unknown, dflt: boolean) => (typeof x === "boolean" ? x : dflt);
   const version = (x: unknown) => (typeof x === "string" && parseVersion(x) ? x : null);
@@ -344,21 +344,24 @@ export function parseUpdateSettings(updates: unknown, running: string): UpdateSe
 }
 
 /** The saved update settings (R12). An unreadable file reads as the defaults, so it never throws. */
-export function loadUpdateSettings(dataDir: string, running: string): UpdateSettings {
+export function loadUpdateSettings(dataDir: string): UpdateSettings {
   let updates: unknown;
   try {
     updates = read(dataDir).updates;
   } catch {
     // unreadable: the defaults
   }
-  return parseUpdateSettings(updates, running);
+  return parseUpdateSettings(updates);
 }
 
-/** Saves the update settings and keeps the other keys. Throws if the file cannot be saved. */
+/**
+ * Saves the update settings and keeps the other keys. A channel not picked is left out, so the
+ * default keeps following the running version (R1.3). Throws if the file cannot be saved.
+ */
 export function saveUpdateSettings(dataDir: string, s: UpdateSettings): void {
   update(dataDir, (all) => {
     all.updates = {
-      channel: s.channel,
+      ...(s.channel === null ? {} : { channel: s.channel }),
       checkAtStartup: s.checkAtStartup,
       autoUpdate: s.autoUpdate,
       skipped: s.skipped,

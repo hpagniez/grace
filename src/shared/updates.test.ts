@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   autoUpdateTo,
+  channelOf,
   defaultUpdateSettings,
   downloadPrefix,
   latestOn,
@@ -155,14 +156,22 @@ describe("channels", () => {
 });
 
 describe("defaultUpdateSettings", () => {
-  it("defaults the channel from the running version (R1.3)", () => {
-    expect(defaultUpdateSettings("1.0.0-rc.5").channel).toBe("prerelease");
-    expect(defaultUpdateSettings("1.0.0").channel).toBe("stable");
+  it("follows the running version's channel until the person picks one (R1.3)", () => {
+    expect(channelOf(defaultUpdateSettings(), "1.0.0-rc.5")).toBe("prerelease");
+    expect(channelOf(defaultUpdateSettings(), "1.0.0")).toBe("stable");
+    const picked = { ...defaultUpdateSettings(), channel: "stable" as const };
+    expect(channelOf(picked, "1.0.0-rc.5")).toBe("stable");
+  });
+
+  it("prompts on the running version's channel when none is picked", () => {
+    const s = defaultUpdateSettings();
+    expect(promptFor([r("1.0.1-rc.1")], s, "1.0.0-rc.5")?.version).toBe("1.0.1-rc.1");
+    expect(promptFor([r("1.0.1-rc.1")], s, "1.0.0")).toBeNull();
   });
 
   it("checks at startup, never updates by itself, remembers nothing (R12)", () => {
-    expect(defaultUpdateSettings("1.0.0")).toEqual({
-      channel: "stable",
+    expect(defaultUpdateSettings()).toEqual({
+      channel: null,
       checkAtStartup: true,
       autoUpdate: false,
       skipped: null,
@@ -174,7 +183,7 @@ describe("defaultUpdateSettings", () => {
 
 describe("promptFor", () => {
   it("prompts once per version above the skipped one (R4.1)", () => {
-    const s = { ...defaultUpdateSettings("1.0.0-rc.5"), skipped: "1.0.0-rc.6" };
+    const s = { ...defaultUpdateSettings(), skipped: "1.0.0-rc.6" };
     expect(promptFor([r("1.0.0-rc.6")], s, "1.0.0-rc.5")).toBeNull();
     expect(promptFor([r("1.0.0-rc.7"), r("1.0.0-rc.6")], s, "1.0.0-rc.5")?.version).toBe(
       "1.0.0-rc.7",
@@ -183,7 +192,7 @@ describe("promptFor", () => {
   });
 
   it("prompts for latest when nothing is skipped, and not when up to date", () => {
-    const s = defaultUpdateSettings("1.0.0-rc.5");
+    const s = defaultUpdateSettings();
     expect(promptFor([r("1.0.0-rc.6")], s, "1.0.0-rc.5")?.version).toBe("1.0.0-rc.6");
     expect(promptFor([r("1.0.0-rc.5")], s, "1.0.0-rc.5")).toBeNull();
     expect(promptFor([r("1.0.0-rc.4")], s, "1.0.0-rc.5")).toBeNull();
@@ -191,7 +200,7 @@ describe("promptFor", () => {
   });
 
   it("only looks at the chosen channel", () => {
-    const s = { ...defaultUpdateSettings("1.0.0"), channel: "stable" as const };
+    const s = { ...defaultUpdateSettings(), channel: "stable" as const };
     expect(promptFor([r("1.0.1-rc.1")], s, "1.0.0")).toBeNull();
   });
 });
@@ -199,7 +208,7 @@ describe("promptFor", () => {
 describe("autoUpdateTo", () => {
   it("ignores skipped but never installs failed (R5.2)", () => {
     const s = {
-      ...defaultUpdateSettings("1.0.0-rc.5"),
+      ...defaultUpdateSettings(),
       autoUpdate: true,
       skipped: "1.0.0-rc.6",
       failed: "1.0.0-rc.7",
@@ -209,7 +218,7 @@ describe("autoUpdateTo", () => {
   });
 
   it("does nothing when auto-update is off or Grace is up to date", () => {
-    const s = defaultUpdateSettings("1.0.0-rc.5");
+    const s = defaultUpdateSettings();
     expect(autoUpdateTo([r("1.0.0-rc.6")], s, "1.0.0-rc.5")).toBeNull();
     expect(autoUpdateTo([r("1.0.0-rc.5")], { ...s, autoUpdate: true }, "1.0.0-rc.5")).toBeNull();
   });
