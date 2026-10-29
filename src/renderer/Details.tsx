@@ -1,4 +1,3 @@
-import type { JSX } from "@solidjs/web";
 import { ChevronRight, CircleAlert, LoaderCircle, MousePointerClick } from "lucide";
 import { createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
@@ -7,6 +6,7 @@ import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
+import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
@@ -34,33 +34,6 @@ function StatusBadge(props: { status: Status }) {
       <StatusMark status={props.status} decorative />
       {STATUS_LABEL[props.status]}
     </span>
-  );
-}
-
-/**
- * One line of text that is cut with an ellipsis when it does not fit. `full` shows in a tooltip, and only
- * when the line is cut (R9.4): measured when the tooltip would show, so it follows the window.
- * `class` goes on the line; `wrap` on the tooltip's wrapper, which must be able to shrink.
- */
-function Cut(props: {
-  full: string;
-  class?: string;
-  wrap?: string;
-  testid?: string;
-  children: JSX.Element;
-}) {
-  let line!: HTMLSpanElement;
-  const cut = () => line.scrollWidth > line.clientWidth;
-  return (
-    <Tooltip text={cut() ? props.full : undefined} class={`min-w-0 ${props.wrap ?? ""}`}>
-      <span
-        ref={(e) => (line = e)}
-        data-testid={props.testid}
-        class={`min-w-0 truncate ${props.class ?? ""}`}
-      >
-        {props.children}
-      </span>
-    </Tooltip>
   );
 }
 

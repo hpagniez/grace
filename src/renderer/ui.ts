@@ -12,6 +12,8 @@ export const chip = `${chipBase} h-6 ${chipPlain}`;
 export const tagChip = `${chipBase} h-5 ${chipPlain}`;
 export const chipIncluded = `${chipBase} h-6 border-accent bg-accent text-on-accent`;
 export const chipExcluded = `${chipBase} h-6 border-control bg-surface text-ink line-through`;
+/** A pressed filter chip (the HTTP groups): the selected fill and ink text, beside a check (R18.5). */
+export const chipPressed = `${chipBase} h-6 border-line bg-selected text-ink`;
 
 // A bottom panel tab is 32 px (R3.1); the active one has the 2 px accent line.
 const tabBase =
