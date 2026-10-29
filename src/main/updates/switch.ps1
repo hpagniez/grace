@@ -122,7 +122,8 @@ function Remove-Leftover($dir, $name) {
   $inside = Join-Path $PSScriptRoot $name
   Remove-Tree $inside
   Move-Back $dir $inside  # retried: an antivirus may hold a file for a moment
-  Remove-Tree $inside
+  # Once inside the staging folder it is out of the way; Grace removes what is left later (R10.8).
+  try { Remove-Tree $inside } catch {}
 }
 
 # Each flag says what to undo (R9.6, R10.4, R10.6). Set before the try: the catch reads them all.
@@ -139,6 +140,7 @@ try {
     $app = Join-Path $PSScriptRoot 'app'
     $old = "$install.old"
     $aside = "$install.failed"
+    $dest = $aside  # where a new version that did not start goes; the staging folder if .failed is stuck
     $backups = Join-Path $data 'backups'
     $backup = Join-Path $backups $plan.from
     $robocopy = Join-Path $env:SystemRoot 'System32\Robocopy.exe'
@@ -207,8 +209,13 @@ try {
       # R10.6: stop the new version and everything it started, then keep it aside
       try {
         foreach ($p in Get-Grace) { try { & $taskkill /PID $p.Id /T /F | Out-Null } catch {} }
-        Remove-Leftover $aside 'failed'  # left by an earlier switch
-        Move-Back $install $aside
+        # A .failed left by an earlier switch that cannot be moved must not keep the new version in
+        # place: it goes back into the staging folder instead.
+        try { Remove-Leftover $aside 'failed' } catch {
+          $err += "; clearing $aside failed: $(Get-Message $_)"
+          $dest = $app
+        }
+        Move-Back $install $dest
       } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
     } elseif ($movedNew) {
       try { Move-Back $install $app } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
@@ -218,7 +225,7 @@ try {
         $err += "; putting $($plan.from) back failed: $(Get-Message $_)"
         # never no install folder: the new version goes back in rather than none
         try {
-          Move-Back $(if ($startedNew) { $aside } else { $app }) $install
+          Move-Back $(if ($startedNew) { $dest } else { $app }) $install
           $err += ", so $($plan.to) stays installed"
         } catch { $err += "; putting $($plan.to) back failed too: $(Get-Message $_)" }
       }

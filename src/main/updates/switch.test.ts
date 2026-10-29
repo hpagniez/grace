@@ -17,6 +17,8 @@ import { POWERSHELL, startSwitch, type SwitchPlan } from "./switch";
 import script from "./switch.ps1?raw";
 
 const T = { timeout: 60_000 };
+// copying node.exe and killing stand-ins take longer than the 10 s default on CI
+const HOOK = 60_000;
 const SETTINGS = '{"theme":"Zoë"}';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const alive = (pid: number) => {
@@ -162,7 +164,7 @@ setInterval(() => {}, 1 << 30);
     );
     // NODE_OPTIONS reads backslashes in quotes as escapes
     env = { ...process.env, NODE_OPTIONS: `--require "${stub.replaceAll("\\", "/")}"` };
-  });
+  }, HOOK);
 
   beforeEach(() => {
     // a space, a non-ASCII letter and a wildcard in every path (plan Review Focus 1)
@@ -178,7 +180,7 @@ setInterval(() => {}, 1 << 30);
     write(path.join(data, "projects", "p", "runs", "r", "run.json"), "{}");
     write(path.join(data, "Cache", "x"));
     write(path.join(data, "Local Storage", "y"));
-  });
+  }, HOOK);
 
   afterEach(() => {
     for (const c of children.splice(0)) {
@@ -205,9 +207,12 @@ setInterval(() => {}, 1 << 30);
       maxRetries: 20,
       retryDelay: 250,
     });
-  });
+  }, HOOK);
 
-  afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }));
+  afterAll(
+    () => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }),
+    HOOK,
+  );
 
   it("is ASCII: Windows PowerShell reads a script without a BOM in the ANSI code page", () => {
     expect(script).toMatch(/^[\t\n\r -~]*$/);
@@ -418,6 +423,25 @@ setInterval(() => {}, 1 << 30);
     expect(read(`${install}.failed`, "v.txt")).toBe("1.0.0-rc.6");
     expect(existsSync(path.join(`${install}.failed`, "left.txt"))).toBe(false);
   });
+
+  it(
+    "puts the new version back in staging when an earlier .failed cannot be moved",
+    T,
+    async () => {
+      write(path.join(`${install}.failed`, "resources", "app-files.json"), "[]");
+      write(path.join(staging, "app", "noStart.flag"));
+      // a process whose current folder is .failed keeps Windows from moving it
+      const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], {
+        cwd: `${install}.failed`,
+      });
+      children.push(holder);
+      await run({ startTimeoutSec: 3 }); // the move is retried for exitTimeoutSec (10 s) first
+      expect(result()).toMatchObject({ ok: false, reverted: true });
+      expect(result().error).toMatch(/clearing .*\.failed failed/);
+      expect(read(install, "v.txt")).toBe("1.0.0-rc.5");
+      expect(read(path.join(staging, "app"), "v.txt")).toBe("1.0.0-rc.6");
+    },
+  );
 
   it("writes update-result.json and backup.json without a byte order mark", T, async () => {
     await run();
