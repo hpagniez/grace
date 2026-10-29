@@ -38,10 +38,11 @@ export const box = "rounded-lg bg-sunken p-2 font-mono text-xs";
 /**
  * A modal <dialog> (R19.1). It enters over --duration-base with a fade and a scale from 0.98, and its
  * backdrop fades (R5.2). transition-discrete keeps both displayed while they fade out, over the
- * shorter --duration-fast. Checked in Chromium: the enter and the exit both animate.
+ * shorter --duration-fast. Checked in Chromium: the enter and the exit both animate. While it fades out
+ * the box takes no pointer events, so a click on it cannot press Save or Delete.
  */
 export const dialog = [
-  "m-auto rounded-xl border border-line bg-raised p-5 text-ink shadow-float ease-standard",
+  "pointer-events-none m-auto rounded-xl border border-line bg-raised p-5 text-ink shadow-float ease-standard open:pointer-events-auto",
   "scale-[0.98] opacity-0 transition-[opacity,scale,display,overlay] transition-discrete duration-(--duration-fast)",
   "open:scale-100 open:opacity-100 open:duration-(--duration-base)",
   "starting:open:scale-[0.98] starting:open:opacity-0",
