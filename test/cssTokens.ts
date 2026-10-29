@@ -28,15 +28,15 @@ const colors = (css: string): Record<string, string> =>
 
 /**
  * The `#rrggbb` colour tokens of src/index.css: the light ones from `@theme`, the dark overrides from the dark media block.
- * `darkProps` lists every custom property (`--name`) the dark block declares, colour or not.
+ * `darkDeclarations` lists the name of every declaration in the dark block (`color-scheme`, `--color-ink`, `padding`...).
  */
 export function readTokens() {
   const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const light = colors(block(css, /@theme\s*\{/));
   const darkBlock = block(css, /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{/);
   const darkOverrides = colors(darkBlock);
-  const darkProps = [...darkBlock.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((m) => m[1]);
-  return { light, darkOverrides, darkProps, dark: { ...light, ...darkOverrides } };
+  const darkDeclarations = [...darkBlock.matchAll(/(?:^|[{;])\s*([\w-]+)\s*:/g)].map((m) => m[1]);
+  return { light, darkOverrides, darkDeclarations, dark: { ...light, ...darkOverrides } };
 }
 
 /** A duration token of src/index.css (`--duration-fast: 100ms`) in milliseconds. */

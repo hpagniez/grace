@@ -59,7 +59,7 @@ describe("filled buttons", () => {
 });
 
 describe("colour tokens (spec R1)", () => {
-  const { light, darkOverrides, darkProps } = readTokens();
+  const { light, darkOverrides, darkDeclarations } = readTokens();
 
   it("defines every token in the light theme", () => {
     expect(
@@ -75,11 +75,18 @@ describe("colour tokens (spec R1)", () => {
   });
 
   // the person: "UX/UI and components must not change from one theme to the other; only colour must change"
-  it("lets the dark theme override colours, shadows and the backdrop only", () => {
+  it("has one dark block, so the guard below sees all of the dark theme", () => {
+    const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(css.match(/prefers-color-scheme/g)).toHaveLength(1);
+  });
+
+  it("lets the dark theme declare colours, the shadow's colour and the backdrop only", () => {
     const allowed = (n: string) =>
-      n.startsWith("--color-") || ["--shadow-float", "--backdrop"].includes(n);
-    expect(darkProps.filter((n) => !allowed(n))).toEqual([]);
-    expect(darkProps).toContain("--color-ground");
+      n === "color-scheme" ||
+      n.startsWith("--color-") ||
+      ["--shadow-float", "--backdrop"].includes(n);
+    expect(darkDeclarations.filter((n) => !allowed(n))).toEqual([]);
+    expect(darkDeclarations).toContain("--color-ground"); // the block was found and read
   });
 
   for (const theme of ["light", "dark"] as const) {

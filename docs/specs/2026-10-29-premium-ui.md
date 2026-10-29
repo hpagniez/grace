@@ -89,7 +89,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 ### R1. Colour tokens
 
 1. `src/index.css` defines every colour as a semantic token in `@theme` and removes Tailwind's default palette (`--color-*: initial`), so a raw palette class compiles to nothing. `transparent`, `current`, `white` and `black` stay.
-2. Light values sit on `:root`; dark values in `@media (prefers-color-scheme: dark) { :root { … } }`. No component uses `dark:`. The two themes differ only in colours: the dark block may set `color-scheme`, `--color-*` tokens, `--shadow-float` and `--backdrop`, and nothing else (no size, spacing, radius or layout token). A unit test lists every custom property of the block and fails on any other.
+2. Light values sit on `:root`; dark values in `@media (prefers-color-scheme: dark) { :root { … } }`. No component uses `dark:`. The two themes differ only in colours: the dark block may set `color-scheme`, `--color-*` tokens, `--shadow-float` and `--backdrop`, and nothing else (no size, spacing, radius or layout declaration; `--shadow-float` keeps its offsets and blur, R3.5). `prefers-color-scheme` appears once in the file, and a unit test lists the name of every declaration of that block and fails on any other.
 3. The tokens, with their values (light = direction D's colours, dark = direction A's colours):
 
 | Token | Use | Light | Dark |
@@ -350,7 +350,8 @@ Feature: Premium look and feel
 
   Scenario: The dark theme changes colours only (unit)
     Given the dark block of src/index.css
-    Then it declares no custom property except --color-* tokens, --shadow-float and --backdrop
+    Then prefers-color-scheme appears once in the file
+    And it declares nothing except color-scheme, --color-* tokens, --shadow-float and --backdrop
     And --shadow-float has the same offsets and blur in both themes
     And primary equals passed in each theme
 
