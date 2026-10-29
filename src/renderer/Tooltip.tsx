@@ -62,13 +62,19 @@ export function Tooltip(props: {
     hide();
   };
 
+  // Only a scroll that moves the target hides the tooltip: the page, or a box that holds it. A console
+  // following its tail leaves the tooltip of a disabled button alone, as a run goes on.
+  const onScroll = (e: Event) => {
+    if (e.target instanceof Node && e.target.contains(wrap)) hide();
+  };
+
   // Taking the element out of the DOM hides the popover.
   const hide = () => {
     clearTimeout(timer);
     if (!shown) return;
     shown = false;
     document.removeEventListener("keydown", onKey, true);
-    document.removeEventListener("scroll", hide, true);
+    document.removeEventListener("scroll", onScroll, true);
     if (openTip === hide) openTip = null;
     setOpen(false);
   };
@@ -89,7 +95,7 @@ export function Tooltip(props: {
     tip!.style.left = `${at.left}px`;
     tip!.toggleAttribute("data-above", at.above);
     document.addEventListener("keydown", onKey, true);
-    document.addEventListener("scroll", hide, true);
+    document.addEventListener("scroll", onScroll, true);
   };
 
   // Added to the target's ids, not set over them: an input may already point at its error message.

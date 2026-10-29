@@ -200,6 +200,45 @@ test("The logo is the Home button", async () => {
   await expect(win.getByTestId("home")).toBeVisible();
 });
 
+// R9.4: tooltips (the toolbar is icon-only below 1280 px, so Refresh's tooltip is its name)
+
+test("A tooltip shows on keyboard focus and closes with Escape", async () => {
+  const { win } = await openClean();
+  const refresh = win.getByTestId("refresh-button");
+  await win.getByTestId("properties-button").focus();
+  await win.keyboard.press("Tab");
+  await expect(refresh).toBeFocused();
+  // at once: well inside the 500 ms a pointer must rest
+  await expect(win.getByRole("tooltip")).toHaveText("Refresh", { timeout: 300 });
+
+  await win.keyboard.press("Escape");
+  await expect(win.getByRole("tooltip")).toHaveCount(0);
+  await expect(refresh).toBeFocused();
+});
+
+test("A tooltip shows after a pause on hover, also on a disabled button", async () => {
+  test.setTimeout(90_000);
+  const { win } = await openClean();
+  await startSlowRun(win);
+  await expect(win.getByTestId("refresh-button")).toBeDisabled();
+
+  const tip = win.getByRole("tooltip");
+  const before = Date.now();
+  await win.getByTestId("refresh-button").hover({ force: true });
+  await expect(tip).toHaveText("Refresh");
+  expect(Date.now() - before).toBeGreaterThanOrEqual(480); // never earlier than the pause
+
+  // onto the tooltip, across the gap to the button
+  const box = (await tip.boundingBox())!;
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+  await win.waitForTimeout(300);
+  await expect(tip).toHaveText("Refresh");
+
+  await win.mouse.move(0, 0);
+  await expect(tip).toHaveCount(0);
+  await cancelRun(win);
+});
+
 // R10: keyboard and accessibility
 
 for (const scheme of ["light", "dark"] as const) {

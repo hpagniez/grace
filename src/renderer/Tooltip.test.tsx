@@ -201,12 +201,42 @@ describe("Tooltip", () => {
     expect(tips().map((t) => t.textContent)).toEqual(["Second"]);
   });
 
-  it("hides on scroll anywhere", () => {
+  it("hides when a scroll moves its target: the page's, or that of a box that holds it", () => {
     const { wrapper } = one();
     hover(wrapper);
     fireEvent.scroll(document.body);
     flush();
     expect(tips()).toHaveLength(0);
+
+    cleanup();
+    render(() => (
+      <div data-testid="list">
+        <Tooltip text="In a list">
+          <button type="button">Row</button>
+        </Tooltip>
+      </div>
+    ));
+    hover(wrapperOf(screen.getByRole("button")));
+    fireEvent.scroll(screen.getByTestId("list"));
+    flush();
+    expect(tips()).toHaveLength(0);
+  });
+
+  it("stays open when a box that does not hold its target scrolls: a console following its tail", () => {
+    render(() => (
+      <>
+        <div data-testid="console" />
+        <Tooltip text="Refresh">
+          <button type="button" disabled>
+            Refresh
+          </button>
+        </Tooltip>
+      </>
+    ));
+    hover(wrapperOf(screen.getByRole("button")));
+    fireEvent.scroll(screen.getByTestId("console"));
+    flush();
+    expect(tips().map((x) => x.textContent)).toEqual(["Refresh"]);
   });
 
   it("calls showPopover once the tooltip exists, when the engine has it", () => {
