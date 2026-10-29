@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readTokens } from "../../test/cssTokens";
-import { danger, primary } from "./buttons";
+import { danger, dangerDialog, primary, primaryDialog } from "./buttons";
 
 /** WCAG 2 relative luminance of `#rrggbb`. */
 function luminance(hex: string) {
@@ -42,9 +42,9 @@ const TOKENS = [
 
 describe("filled buttons on hover", () => {
   it("fill with a solid token, not a translucent one", () => {
-    expect(primary).toContain("enabled:hover:bg-accent-hover");
-    expect(danger).toContain("enabled:hover:bg-failed-hover");
-    expect(`${primary} ${danger}`).not.toMatch(/hover:bg-\S+\//);
+    for (const b of [primary, primaryDialog]) expect(b).toContain("enabled:hover:bg-accent-hover");
+    for (const b of [danger, dangerDialog]) expect(b).toContain("enabled:hover:bg-failed-hover");
+    expect(`${primary} ${danger} ${primaryDialog} ${dangerDialog}`).not.toMatch(/hover:bg-\S+\//);
   });
 });
 

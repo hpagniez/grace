@@ -9,7 +9,7 @@ import {
 } from "../shared/history";
 import type { Api } from "../shared/ipc";
 import { filterOn } from "../shared/tags";
-import { btn, btnSmall, danger, ghostSmall } from "./buttons";
+import { btnDialog, btnSmall, dangerDialog, ghostSmall } from "./buttons";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
@@ -79,11 +79,10 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
             : `Delete the ${count()} runs of this project and their reports?`}
         </p>
         <div class="mt-5 flex justify-end gap-2">
-          {/* text-base! (R2.2): the buttons' own text-sm comes later in the stylesheet */}
           <button
             type="button"
             data-testid="clear-history-confirm"
-            class={`${danger} text-base!`}
+            class={dangerDialog}
             onClick={() => {
               dialog.close();
               void props.api.clearHistory();
@@ -94,7 +93,7 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
           <button
             type="button"
             data-testid="clear-history-cancel"
-            class={`${btn} text-base!`}
+            class={btnDialog}
             autofocus
             onClick={() => dialog.close()}
           >

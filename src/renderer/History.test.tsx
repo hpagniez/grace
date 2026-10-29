@@ -14,7 +14,7 @@ import type { AppEvent } from "../shared/events";
 import type { HistoryEntry } from "../shared/history";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
-import { btn, danger, ghostSmall } from "./buttons";
+import { btnDialog, dangerDialog, ghostSmall } from "./buttons";
 import { durationLabel } from "./History";
 import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
 
@@ -542,13 +542,15 @@ describe("Clear history", () => {
     expect(title.className).toContain("font-semibold");
     const del = screen.getByTestId("clear-history-confirm");
     const cancel = screen.getByTestId("clear-history-cancel");
-    expect(del.className).toContain(danger);
-    expect(cancel.className).toContain(btn);
+    expect(del.className).toContain(dangerDialog);
+    expect(cancel.className).toContain(btnDialog);
     expect(del.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(cancel.hasAttribute("autofocus")).toBe(true);
-    // R2.2: dialog buttons are 14 px. `!`, because the buttons' own text-sm is later in the stylesheet.
-    expect(del.className).toContain("text-base!");
-    expect(cancel.className).toContain("text-base!");
+    // R2.2: dialog buttons are 14 px: the dialog variants, not an override of the standard ones
+    for (const b of [del, cancel]) {
+      expect(b.className).toContain("text-base");
+      expect(b.className).not.toMatch(/text-sm|!/);
+    }
     expect(confirm().outerHTML).not.toMatch(RAW);
   });
 

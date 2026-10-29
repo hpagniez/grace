@@ -1,19 +1,29 @@
 const base =
   "inline-flex items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
 const md = "h-7 px-3 text-sm"; // 28 px (spec R3.1)
+const mdDialog = "h-7 px-3 text-base"; // a dialog's buttons are 14 px (R2.2)
 const sm = "h-6 px-2 text-xs"; // 24 px
 const plain = "border border-control bg-surface text-ink enabled:hover:bg-hover";
 const quiet = "text-ink enabled:hover:bg-hover";
 
+const solid = "bg-accent font-semibold text-on-accent enabled:hover:bg-accent-hover";
+const solidDanger = "bg-failed text-on-danger enabled:hover:bg-failed-hover";
+
 export const btn = `${base} ${md} ${plain}`;
 export const btnSmall = `${base} ${sm} ${plain}`;
-export const primary = `${base} ${md} bg-accent font-semibold text-on-accent enabled:hover:bg-accent-hover`;
-export const danger = `${base} ${md} bg-failed text-on-danger enabled:hover:bg-failed-hover`;
+export const primary = `${base} ${md} ${solid}`;
+export const danger = `${base} ${md} ${solidDanger}`;
+/** The same three in a dialog's footer: 14 px text (R2.2), with nothing to override. */
+export const btnDialog = `${base} ${mdDialog} ${plain}`;
+export const primaryDialog = `${base} ${mdDialog} ${solid}`;
+export const dangerDialog = `${base} ${mdDialog} ${solidDanger}`;
 /** No border, so a row of them stays quiet. */
 export const ghost = `${base} ${md} ${quiet}`;
 export const ghostSmall = `${base} ${sm} ${quiet}`;
 /** Icon only: 28 × 28, borderless. Give it an aria-label. */
 export const btnIcon = `${base} size-7 ${quiet}`;
+/** Icon only, 24 × 24 (R10.3): the remove and delete buttons of a list row. */
+export const btnIconSmall = `${base} size-6 ${quiet}`;
 
 /**
  * The toolbar below 1280 px: a button's label is only spoken (put narrowLabel on a span around it)
