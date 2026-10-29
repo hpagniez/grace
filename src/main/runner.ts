@@ -440,6 +440,11 @@ export class Runner {
     await this.proc?.kill();
   }
 
+  /** True while discovering or running: an update would kill it (R6.4). */
+  isBusy(): boolean {
+    return this.busy;
+  }
+
   reportPath(): string | null {
     return this.report && existsSync(this.report) ? this.report : null;
   }

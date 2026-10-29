@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in Grace does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Remove secret values, tokens and personal paths from everything you paste. A security problem goes to the private form instead (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Grace version
+      description: The version in the zip name, for example 1.0.0-rc.3
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Settings > System > About, for example Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: layout
+    attributes:
+      label: Project layout
+      options:
+        - Maven
+        - Gradle
+        - Standalone (feature files only)
+        - Not sure
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A small feature file that shows the problem helps most.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: From the Console tab at the bottom of the window.
+      render: text

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_FILTER, type FilterState } from "../shared/tags";
+import { defaultUpdateSettings } from "../shared/updates";
 import {
   emptyEnvSettings,
   forgetLastProject,
@@ -11,6 +12,7 @@ import {
   loadProjectFilter,
   loadProjectThreads,
   loadRecentProjects,
+  loadUpdateSettings,
   loadWindowState,
   RECENT_LIMIT,
   removeRecentProject,
@@ -18,6 +20,7 @@ import {
   saveProjectEnv,
   saveProjectFilter,
   saveProjectThreads,
+  saveUpdateSettings,
   saveWindowState,
   skippedProperties,
   type EnvSettings,
@@ -592,6 +595,123 @@ describe("settings", () => {
       saveWindowState(data, ok);
       expect(loadLastProject(data)).toBe(project);
       expect(loadWindowState(data)).toEqual(ok);
+    });
+  });
+
+  describe("update settings", () => {
+    const write = (data: string, settings: unknown) =>
+      writeFileSync(path.join(data, "settings.json"), JSON.stringify(settings));
+    const readJson = (data: string) =>
+      JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8"));
+
+    it("reads missing or malformed update settings as defaults (R12)", () => {
+      const dir = tmp();
+      write(dir, {
+        updates: {
+          channel: "beta",
+          checkAtStartup: "yes",
+          autoUpdate: true,
+          skipped: "v1",
+          failed: 3,
+          lastChecked: 5,
+        },
+      });
+      expect(loadUpdateSettings(dir)).toEqual({
+        channel: null,
+        checkAtStartup: true,
+        autoUpdate: true,
+        skipped: null,
+        failed: null,
+        lastChecked: null,
+      });
+    });
+
+    it("reads no file, a corrupt file or a non-object key as the defaults", () => {
+      expect(loadUpdateSettings(tmp())).toEqual(defaultUpdateSettings());
+      const corrupt = tmp();
+      writeFileSync(path.join(corrupt, "settings.json"), "{not json");
+      expect(loadUpdateSettings(corrupt)).toEqual(defaultUpdateSettings());
+      for (const updates of [null, "x", 7, ["stable"]]) {
+        const dir = tmp();
+        write(dir, { updates });
+        expect(loadUpdateSettings(dir), JSON.stringify(updates)).toEqual(defaultUpdateSettings());
+      }
+    });
+
+    it("reads an unreadable file as the defaults and never throws", () => {
+      const dir = tmp();
+      write(dir, { updates: { autoUpdate: true } });
+      readFails.code = "EBUSY";
+      try {
+        expect(loadUpdateSettings(dir)).toEqual(defaultUpdateSettings());
+      } finally {
+        readFails.code = null;
+      }
+    });
+
+    it("keeps valid fields and defaults only the bad ones", () => {
+      const dir = tmp();
+      write(dir, {
+        updates: {
+          channel: "stable",
+          checkAtStartup: false,
+          autoUpdate: "no",
+          skipped: "1.0.1",
+          failed: "1.0.2-rc.1",
+          lastChecked: "2026-10-28T10:00:00Z",
+        },
+      });
+      expect(loadUpdateSettings(dir)).toEqual({
+        channel: "stable",
+        checkAtStartup: false,
+        autoUpdate: false,
+        skipped: "1.0.1",
+        failed: "1.0.2-rc.1",
+        lastChecked: "2026-10-28T10:00:00Z",
+      });
+    });
+
+    it("reads a skipped or failed version that is not valid as null, so compareVersions never throws", () => {
+      for (const bad of ["v1.0.1", "1.0", "1.0.0-beta.1", "01.0.0", "", " 1.0.0"]) {
+        const dir = tmp();
+        write(dir, { updates: { skipped: bad, failed: bad } });
+        const s = loadUpdateSettings(dir);
+        expect(s.skipped, bad).toBeNull();
+        expect(s.failed, bad).toBeNull();
+      }
+    });
+
+    it("reads a lastChecked that is not a date as null", () => {
+      const dir = tmp();
+      write(dir, { updates: { lastChecked: "yesterday" } });
+      expect(loadUpdateSettings(dir).lastChecked).toBeNull();
+    });
+
+    it("reads no saved channel as not picked, and saves one only once picked (R1.3)", () => {
+      const dir = tmp();
+      expect(loadUpdateSettings(dir).channel).toBeNull();
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), lastChecked: "2026-10-28T10:00:00Z" });
+      expect(readJson(dir).updates).not.toHaveProperty("channel");
+      expect(loadUpdateSettings(dir).channel).toBeNull();
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), channel: "stable" });
+      expect(readJson(dir).updates.channel).toBe("stable");
+      expect(loadUpdateSettings(dir).channel).toBe("stable");
+    });
+
+    it("saves update settings and keeps the other keys", () => {
+      const dir = tmp();
+      write(dir, { lastProject: "D:\\p" });
+      saveUpdateSettings(dir, { ...defaultUpdateSettings(), skipped: "1.0.1" });
+      expect(readJson(dir).lastProject).toBe("D:\\p");
+      expect(loadUpdateSettings(dir).skipped).toBe("1.0.1");
+    });
+
+    it("saving other settings keeps the update settings", () => {
+      const dir = tmp();
+      const s = { ...defaultUpdateSettings(), autoUpdate: true, failed: "1.0.3" };
+      saveUpdateSettings(dir, s);
+      saveWindowState(dir, { x: 0, y: 0, width: 700, height: 500, maximized: false });
+      expect(loadUpdateSettings(dir)).toEqual(s);
     });
   });
 });

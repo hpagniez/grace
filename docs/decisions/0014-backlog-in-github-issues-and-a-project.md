@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-28
 decision-makers: Tusquito
 ---
@@ -8,9 +8,9 @@ decision-makers: Tusquito
 
 ## Context and Problem Statement
 
-The backlog is a table in `docs/features.md`: 45 rows (23 done, 22 idea), with notes for 7 of them. Every spec or feature PR edits it, so parallel branches collide on one file (the F44/F45 research PR and the rename PR both edited it). Agents move a row's status by hand, and forget. Once the repo is public, outside users will report bugs and ideas as GitHub issues (F35) anyway.
+The backlog is a table in `docs/features.md`: 45 rows (25 done, 20 idea), with notes for 7 of them. Every spec or feature PR edits it, so parallel branches collide on one file (the F44/F45 research PR and the rename PR both edited it). Agents move a row's status by hand, and forget. Once the repo is public, outside users will report bugs and ideas as GitHub issues (F35) anyway.
 
-The repo is `hpagniez/karate-kid`, on the maintainer's personal account on GitHub Free. The account was renamed from `Tusquito` to `hpagniez`; `gh` still labels its saved login `Tusquito`. What GitHub offers, checked on 2026-10-28:
+The repo is `hpagniez/grace`, on the maintainer's personal account on GitHub Free. The account was renamed from `Tusquito` to `hpagniez`; `gh` still labels its saved login `Tusquito`. What GitHub offers, checked on 2026-10-28:
 
 - A project (Projects v2) belongs to a user or an organisation, not to a repo. Its board columns must be a single-select or iteration field. Labels cannot be columns, and a table view cannot group by labels.
 - Built-in project workflows set the `Status` field when an item is added, when a PR is linked to an issue (added November 2025), and when an item is closed. They are set up in the web UI only. GitHub Free allows one auto-add workflow. It adds only items created or updated after it is turned on.
@@ -31,13 +31,13 @@ Chosen: option 3.
 - One issue per feature. Its body holds the feature, a `Karate surface:` line, a `Spec:` line (the file on `develop`, or "none") and any notes.
 - Priority: labels `must`, `should` and `could`.
 - One project, `Grace`, owned by `hpagniez`. Its `Status` field has the options `idea`, `building` and `done`:
-  - Auto-add to project: issues of `hpagniez/karate-kid` (filter `is:issue`).
+  - Auto-add to project: issues of `hpagniez/grace` (filter `is:issue is:open`).
   - Item added to project: `idea`.
   - Pull request linked to issue: `building`.
   - Item closed: `done`.
 - `specced` is no longer a status. The issue's `Spec:` line shows it.
 - A PR that builds a feature says `Closes #N`. A spec-only PR, or one of several PRs for a feature, says `Part of #N`.
-- Agents leave the status to the workflows. They move a card by hand only where no workflow fires: a feature built over several PRs goes to `building` when its first `Part of #N` PR opens. `AGENTS.md` holds the project, field and option IDs for that.
+- Agents leave the status to the workflows. They move a card by hand only where no workflow fires: a feature built over several PRs goes to `building` when its first `Part of #N` PR that builds it (not a spec-only PR) opens. `AGENTS.md` holds the project, field and option IDs for that.
 - `docs/features.md` becomes a frozen map from F01–F45 to their issues, because specs, plans, research notes, decision records and commits name features by those IDs. New features have only an issue number.
 - Specs, plans, decision records, research notes and check records stay Markdown in the repo.
 - This supersedes the `features.md` line of ADR 0002's layout and its mitigation ("update `docs/features.md` ... in the same change"). The rest of ADR 0002 stands.

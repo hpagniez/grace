@@ -85,6 +85,29 @@ describe("createAppStore", () => {
     expect(Object.keys(store.state.statuses)).toEqual(["s:a#1"]);
   });
 
+  it("dismissPrompt drops the startup modal's release", () => {
+    let cb: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: async () => {},
+      onEvent: (f: (e: AppEvent) => void) => ((cb = f), () => {}),
+    } as unknown as Api;
+    const store = createAppStore(api);
+    const release = {
+      version: "1.0.0-rc.6",
+      prerelease: true,
+      publishedAt: "",
+      url: "",
+      size: 1,
+      sha256: "a".repeat(64),
+    };
+    cb({ type: "updatePrompt", release });
+    flush();
+    expect(store.state.updatePrompt).toEqual(release);
+    store.dismissPrompt();
+    flush();
+    expect(store.state.updatePrompt).toBeNull();
+  });
+
   describe("tag filter", () => {
     const project = { root: "D:/p", layout: "standalone" } as const;
     const setup = () => {

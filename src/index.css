@@ -8,6 +8,16 @@
       opacity: 0;
     }
   }
+  /* The progress bar's stripe while Grace waits (#80): a 30%-wide stripe crosses the track. */
+  --animate-slide: slide 1.4s ease-in-out infinite;
+  @keyframes slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(340%);
+    }
+  }
 }
 
 @layer base {

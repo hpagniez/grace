@@ -1,4 +1,4 @@
-# Merges a labelled PR into develop once checks and test are green on its head (ADR 0011).
+# Merges a labelled PR into develop once checks and test are green on its head (ADR 0011, ADR 0017).
 # workflow_run and pull_request_target always run this file as it is on develop.
 name: merge-when-green
 
@@ -14,6 +14,7 @@ on:
 permissions:
   actions: read
   contents: write
+  issues: write # closes the issues a merged PR names with Closes #N
   pull-requests: write
 
 jobs:
@@ -39,16 +40,23 @@ jobs:
           skip() { echo "::notice::not merging #$PR: $1"; exit 0; }
           [ -n "$PR" ] || skip "no PR in this event"
           pr=$(gh api "repos/$GH_REPO/pulls/$PR" \
-            --jq '"\(.state) \(.draft) \(.base.ref) \(any(.labels[]; .name == "merge-when-green")) \(.head.sha)"')
-          read -r state draft base labelled sha <<<"$pr"
+            --jq '"\(.state) \(.draft) \(.base.ref) \(any(.labels[]; .name == "merge-when-green")) \(.head.repo.full_name != .base.repo.full_name) \(.head.sha) \(.head.ref)"')
+          read -r state draft base labelled fork sha head <<<"$pr"
           [ "$state" = open ] || skip "it is not open"
           [ "$draft" = false ] || skip "it is a draft"
           [ "$base" = develop ] || skip "it does not target develop"
           [ "$labelled" = true ] || skip "it has no merge-when-green label"
+          # the label stays when new commits come in, and a fork's author can push, then mark the PR ready (ADR 0018)
+          [ "$fork" = false ] || skip "it comes from a fork"
+
+          # a release/* or hotfix/* merge back into develop runs no CI of its own (its runs are skipped):
+          # the same head must have passed checks and test, e2e included, on its PR into main
+          back=false only=""
+          case $head in release/* | hotfix/*) back=true only="&status=success" ;; esac
 
           # newest pull_request run of a workflow on the PR head ("null null" if none); a re-run updates it in place
           latest() {
-            gh api "repos/$GH_REPO/actions/workflows/$1/runs?event=pull_request&head_sha=$sha&per_page=1" \
+            gh api "repos/$GH_REPO/actions/workflows/$1/runs?event=pull_request&head_sha=$sha&per_page=1$only" \
               --jq '.workflow_runs[0] | "\(.id) \(.conclusion)"'
           }
           run=$(latest checks.yml)
@@ -64,10 +72,20 @@ jobs:
             done <<<"$files"
           else
             [ "$conclusion" = success ] || skip "test is not green on $sha"
-            # every e2e shard must pass; a run started while the PR was a draft skipped them
-            e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e") | .conclusion] | length > 0 and all(. == "success")')
-            [ "$e2e" = true ] || skip "e2e has not passed on $sha"
+            if [ "$back" = true ]; then
+              # every e2e shard must pass; a run started while the PR into main was a draft skipped them
+              e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e") | .conclusion] | length > 0 and all(. == "success")')
+              [ "$e2e" = true ] || skip "e2e has not passed on $sha"
+            fi
           fi
 
           # --match-head-commit refuses the merge if a push landed after these checks
           gh pr merge "$PR" --merge --delete-branch --match-head-commit "$sha"
+
+          # GitHub ignores closing keywords (Closes #N) in a merge made with the workflow token: close them here
+          issues=$(gh pr view "$PR" --json closingIssuesReferences \
+            --jq '.closingIssuesReferences[] | select("\(.repository.owner.login)/\(.repository.name)" == env.GH_REPO) | .number')
+          for n in $issues; do
+            [ "$(gh issue view "$n" --json state --jq .state)" = OPEN ] || continue
+            gh issue close "$n" --reason completed --comment "Done in #$PR."
+          done

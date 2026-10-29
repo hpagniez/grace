@@ -140,20 +140,6 @@ export function holdSlow(root: string): () => void {
   return () => writeFileSync(gate, "");
 }
 
-export const ourJava = () =>
-  execFileSync(
-    "powershell",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      "(Get-CimInstance Win32_Process -Filter \"Name='java.exe'\").ExecutablePath",
-    ],
-    { encoding: "utf8" },
-  )
-    .toLowerCase()
-    .includes(path.resolve(vendor.jreDir).toLowerCase());
-
 /** The run folder names of the project, oldest first. */
 export const folders = (dataDir: string, root: string) => {
   try {

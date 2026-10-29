@@ -1,5 +1,6 @@
-# Windows unit and e2e tests (ADR 0007, ADR 0016). Each job runs on its own VM, so the suites' Java leak
-# checks never see each other's processes. Drafts run unit tests only; e2e runs once the PR is ready for review.
+# Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017). Each job runs on its own VM, so the suites' Java leak
+# checks never see each other's processes. Unit tests run on every PR; e2e only on PRs into main once ready for
+# review, and on manual runs. A release/* or hotfix/* merge back into develop runs nothing: its PR into main did.
 name: test
 
 on:
@@ -19,19 +20,21 @@ concurrency:
 
 jobs:
   unit:
+    if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
       matrix:
         half: [1, 2]
     env:
-      # half 2 runs these runner files (about 200 s on CI), half 1 every other test file (about 185 s).
-      # Not vitest --shard: it splits by file count. Move files between the halves to keep them even.
+      # half 2 runs these runner files, half 1 every other test file, each on 3 workers. On CI each half's
+      # npm test took 75 to 110 s. Not vitest --shard: it splits by file count. Move files between the halves to
+      # keep them even.
       SECOND_HALF: >-
         src/main/runner.discovery.test.ts
         src/main/runner.runs.test.ts
         src/main/runner.tags.test.ts
-        src/main/runner.env.test.ts
+        src/main/runner.rerun.test.ts
         src/main/runner.properties.test.ts
     defaults:
       run:
@@ -61,6 +64,7 @@ jobs:
           if [ ${{ matrix.half }} = 1 ]; then UNIT_EXCLUDE="$SECOND_HALF" npm test; else npm test -- $SECOND_HALF; fi
 
   e2e:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
@@ -96,7 +100,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-      # merge-when-green.yml merges only if every step with this name passed
+      # merge-when-green.yml merges a back-merge into develop only if every step with this name passed
       - name: e2e
         run: npm run e2e -- --shard=${{ matrix.shard }}/2
         if: ${{ steps.pr.outputs.draft != 'true' }}

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Grace is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents. The app was called karate-kid until [ADR 0013](docs/decisions/0013-rename-the-app-to-grace.md); the GitHub repository and its folder keep that name until the maintainer renames them.
+Grace is a free, open-source desktop test-suite runner for [Karate](https://docs.karatelabs.io/) v2. It wraps the open-source Karate CLI in an Electron GUI. Karate's own GUI runners are paid. This repo is built mostly by AI agents. The app was called karate-kid until [ADR 0013](docs/decisions/0013-rename-the-app-to-grace.md); dated specs, plans, checks and research notes keep that name. The repository is `hpagniez/grace`.
 
 ## Commands
 
@@ -15,13 +15,14 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run lint` | oxlint and oxfmt check |
 | `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
 
-Never run `npm test` and `npm run e2e` at the same time: their Java leak checks scan every `java.exe` under `vendor/jre` and see each other's processes.
+Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
 ## Docs map
 
 | Path | What it holds |
 |---|---|
-| [docs/features.md](docs/features.md) | Backlog: what the app does, priority, status, how it gets the data from Karate |
+| [Issues](https://github.com/hpagniez/grace/issues) and the [Grace project](https://github.com/users/hpagniez/projects/2) | Backlog: one issue per feature, priority as label must (first release), should or could; status idea → building → done on the board |
+| [docs/features.md](docs/features.md) | Frozen map of the old backlog IDs F01–F45 to their issues |
 | [docs/inventory/karate-core.md](docs/inventory/karate-core.md) | Every open-source Karate v2 feature, tagged by GUI use; §19 = how the app drives Karate |
 | [docs/inventory/commercial.md](docs/inventory/commercial.md) | What Karate Labs' paid tools offer, and the gaps |
 | [docs/research/](docs/research/) | Dated research notes with sources |
@@ -33,13 +34,15 @@ Never run `npm test` and `npm run e2e` at the same time: their Java leak checks 
 ## Doc rules
 
 - Design specs go in `docs/specs/YYYY-MM-DD-<topic>.md` (this overrides the superpowers default `docs/superpowers/specs/`). Write requirements, then acceptance criteria in Gherkin.
-- When a spec is written or a feature ships, update its row in `docs/features.md` in the same change.
+- Every feature has an issue with a priority label. Its body holds the feature, a `Karate surface:` line and a `Spec:` line. New features get only an issue number, never a new F-ID; cite them as `#N`. When a spec is written, point the issue's `Spec:` line at the file on `develop`. `gh issue edit <N> --body-file -` replaces the whole body, so start from the current one (`gh issue view <N> --json body --jq .body`), change only that line, and pipe the full body back. A PR that builds a feature says `Closes #N`; a spec-only PR, or one of several, says `Part of #N`. The project's workflows move the status. For a feature built over several PRs, move its card to `building` when its first building PR (not a spec-only PR) opens: `gh project item-add 2 --owner hpagniez --url <issue URL> --format json --jq .id` gives the item ID, then `gh project item-edit --id <item ID> --project-id PVT_kwHOAka2MM4BpJIV --field-id PVTSSF_lAHOAka2MM4BpJIVzhnmDmA --single-select-option-id 47fc9ee4`. Both calls need a token with the `project` scope (`gh auth refresh -h github.com -s project`) ([ADR 0014](docs/decisions/0014-backlog-in-github-issues-and-a-project.md)).
 - A choice that is hard to reverse (dependency, architecture, file format) gets a new `docs/decisions/NNNN-title.md`. Never edit an accepted record; supersede it.
 - Do not copy code, text or assets from Karate Labs' paid products. Learn the feature set only.
 
 ## No backward compatibility
 
 The app is still in development. Never write code that keeps older versions working: no migration of settings, run history or data folders, no fallback to an old name, key, environment variable or file format, no deprecated alias. Change the name or format, and update every place that uses it. Data from an older version may be lost: say so in the commit's `BREAKING CHANGE:` footer.
+
+This rule ends at the first stable release, `1.0.0`. From then on, people get new versions through the in-app updater, so every version must read the data of every earlier stable version. A rollback is not promised to read newer data. The updater's own contract (release tag, zip name and layout, `update-result.json`, backup layout, the `updates` settings key) never changes without a new decision record, pre-releases included ([ADR 0019](docs/decisions/0019-update-the-zip-install-from-github-releases.md)).
 
 ## Git workflow
 
@@ -53,7 +56,7 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 - Scope is optional: the area touched (`docs`, `runner`, `ui`, `ipc`, `deps`). Reuse an existing scope before inventing one.
 - Subject: imperative, lower case, no trailing period, 72 characters max.
 - Breaking change: `!` after the scope, plus a `BREAKING CHANGE:` footer.
-- One logical change per commit. A spec or feature commit includes its `docs/features.md` row update.
+- One logical change per commit.
 
 ### Branches (git flow)
 
@@ -73,20 +76,21 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 
 ### Pull requests and CI
 
-Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md). The repo is private on GitHub Free: about 1,000 Windows minutes a month, and no branch protection.
+Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-private-plan.md); merging on green in [ADR 0011](docs/decisions/0011-merge-labelled-prs-when-ci-is-green.md); e2e on CI only for PRs into `main` in [ADR 0017](docs/decisions/0017-e2e-on-ci-only-for-prs-into-main.md); the public repo in [ADR 0018](docs/decisions/0018-make-the-repository-public.md). The repo is public on GitHub Free: Actions minutes on standard runners are free. A ruleset on `main` and `develop` blocks force-pushes and deletion, and takes changes only through a PR merged with a merge commit. Workflows may use only GitHub-owned actions pinned to a full commit SHA. Releases are immutable: once published, their tag and zip never change.
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
-- Open PRs as drafts while working. Mark ready for review when done: that runs the e2e suite.
+- Open PRs as drafts while working. Mark ready for review when done.
+- CI runs no e2e on PRs into `develop`. Before marking one ready, run `npm run e2e` locally if it changes more than `docs/**` and `*.md`, and paste the summary in the PR. PRs into `main` run e2e on CI once ready.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
-- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit and deletes the branch. PRs into `main` are merged by hand.
+- To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit, deletes the branch, and closes the issues the PR names with `Closes #N` (GitHub ignores closing keywords in a merge made with the workflow token). PRs into `main` and PRs from forks are merged by hand.
 
 | Workflow | When | What it runs |
 |---|---|---|
-| `checks` | Every PR to `develop` or `main` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
-| `test` | PRs that change more than `docs/**` and `*.md` (Windows) | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the runner files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards unless the PR is a draft (the steps named `e2e`) |
-| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` that has the `merge-when-green` label and is not a draft, once `checks` passed and `test` passed with every `e2e` step on its head commit (no `test` run only for docs-only PRs) |
+| `checks` | Every PR to `develop` or `main`, except a `release/*` or `hotfix/*` merge back into `develop` (Linux) | lint, typecheck, `npm audit --audit-level=high`, `scripts/check-pr.mjs` (commit headers, branch target) |
+| `test` | PRs that change more than `docs/**` and `*.md`, except a `release/*` or `hotfix/*` merge back into `develop` (Windows); by hand | Jobs on their own VMs ([ADR 0016](docs/decisions/0016-windows-tests-in-parallel-jobs.md)): `unit` runs `npm test` in two halves (half 2: the files listed in `test.yml`, half 1: every other file); `e2e` runs `npm run e2e` as two Playwright shards only on PRs into `main` that are not drafts, and on runs by hand (`gh workflow run test.yml --ref <branch>`) |
+| `merge-when-green` | `checks` or `test` finishes; a PR into `develop` is labelled or marked ready (Linux) | Merges a PR into `develop` from a branch of this repo (never a fork) that has the `merge-when-green` label and is not a draft, once `checks` and `test` passed on its head commit (no `test` run only for docs-only PRs). A back-merge from `release/*` or `hotfix/*` needs those runs from its PR into `main`, with every `e2e` step passed |
 | `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing) | Tag must match `package.json`; `npm run make`; GitHub pre-release with the zip |
-| `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI |
+| `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI (unit tests, no e2e) |
 
 Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not see the JRE and Karate pins in `scripts/vendor.json`: `vendor-updates` bumps them (`npm run vendor:bump -- <jre|karate>` by hand).
 

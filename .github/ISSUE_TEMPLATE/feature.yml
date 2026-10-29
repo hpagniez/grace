@@ -1,0 +1,23 @@
+name: Feature request
+description: Something Grace should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: feature
+    attributes:
+      label: The feature
+      description: What should Grace do? One sentence first, then the detail.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What are you trying to do, and how do you do it today?
+    validations:
+      required: true
+  - type: textarea
+    id: karate
+    attributes:
+      label: Karate surface
+      description: The Karate command-line option, event or file this needs, if you know it.

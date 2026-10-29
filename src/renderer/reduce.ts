@@ -5,6 +5,7 @@ import type { HistoryEntry } from "../shared/history";
 import type { HttpCall, HttpGroup } from "../shared/http";
 import type { Status, TestNode } from "../shared/model";
 import { NO_FILTER, type FilterState } from "../shared/tags";
+import type { Release, UpdateProgress, UpdateView } from "../shared/updates";
 import type { CallRef } from "./http";
 
 export interface RunView {
@@ -62,6 +63,12 @@ export interface AppState {
   loaded: boolean;
   /** The saved recent folders, newest first; null until main sends them. */
   recent: RecentEntry[] | null;
+  /** What main holds about updates; null until main sends it. */
+  updates: UpdateView | null;
+  /** The release the startup modal offers, until it closes. */
+  updatePrompt: Release | null;
+  /** The install in progress or its failure. */
+  updateProgress: UpdateProgress | null;
 }
 
 export const CONSOLE_LIMIT = 10_000;
@@ -108,6 +115,9 @@ export function initialState(): AppState {
     opening: null,
     loaded: false,
     recent: null,
+    updates: null,
+    updatePrompt: null,
+    updateProgress: null,
   };
 }
 
@@ -210,7 +220,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.run.outcome = e.outcome;
       s.run.summary = e.summary;
       s.run.reportAvailable = e.reportAvailable;
-      s.busy = false; // nothing follows a run; avoids "Preparing…" until the busy event arrives
+      s.busy = false; // nothing follows a run; avoids "Finding tests…" until the busy event arrives
       break;
     case "filter":
       s.filter = e.filter;
@@ -256,6 +266,15 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "recent":
       s.recent = e.entries;
+      break;
+    case "updates":
+      s.updates = e.view;
+      break;
+    case "updatePrompt":
+      s.updatePrompt = e.release;
+      break;
+    case "updateProgress":
+      s.updateProgress = e.progress;
       break;
   }
 }

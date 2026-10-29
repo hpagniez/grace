@@ -148,7 +148,7 @@ describe("openBumpPr", () => {
         },
       ],
       [/^gh api repos\/karatelabs\/karate\/compare\//, '["README.md"]'],
-      [/^gh pr create/, "https://github.com/Tusquito/karate-kid/pull/42\n"],
+      [/^gh pr create/, "https://github.com/hpagniez/grace/pull/42\n"],
     ]);
     expect(openBumpPr({ ...karate, check: false }, f.run)).toBe(false);
     const commit = `git -c user.name=github-actions[bot] -c user.email=${BOT_EMAIL} commit -m`;
@@ -178,7 +178,7 @@ describe("openBumpPr", () => {
       [/^gh pr list --head/, "[]"],
       [/^git ls-remote/, "abc123\trefs/heads/feature/bump-jre-21.0.13_11\n"],
       [/^gh pr list --state open/, "[]"],
-      [/^gh pr create/, "https://github.com/Tusquito/karate-kid/pull/43\n"],
+      [/^gh pr create/, "https://github.com/hpagniez/grace/pull/43\n"],
     ]);
     expect(
       openBumpPr({ dep: "jre", from: "21.0.12.1+1", to: "21.0.13+11", check: true }, f.run),
@@ -201,6 +201,7 @@ describe("prBody", () => {
     });
     expect(body.startsWith("Mark this PR ready for review to run `checks` and `test`")).toBe(true);
     expect(body).toContain("To skip this version, close this PR.");
+    expect(body).toContain("`gh workflow run test.yml --ref feature/bump-karate-2.1.5`");
     expect(body).toContain("https://github.com/karatelabs/karate/releases/tag/v2.1.5");
     expect(body).toContain("https://github.com/karatelabs/karate/compare/v2.1.4...v2.1.5");
     expect(body).toContain("`RunCommand.java`: unchanged.");

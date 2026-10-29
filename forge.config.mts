@@ -3,6 +3,9 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import { readdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { APP_FILES } from "./src/main/updates/preflight";
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -11,6 +14,14 @@ const config: ForgeConfig = {
     extraResource: ["vendor/jre", "vendor/karate.jar", "vendor/licenses"],
   },
   rebuildConfig: {},
+  hooks: {
+    // The updater (R8.1) refuses a folder that holds anything not listed here.
+    postPackage: async (_config, { outputPaths }) => {
+      for (const out of outputPaths) {
+        writeFileSync(path.join(out, "resources", APP_FILES), JSON.stringify(readdirSync(out)));
+      }
+    },
+  },
   makers: [new MakerZIP({}, ["win32"])],
   plugins: [
     new VitePlugin({

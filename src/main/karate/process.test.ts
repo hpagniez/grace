@@ -37,7 +37,7 @@ function start(dryRun: boolean, onLines: (l: string[]) => void, feature?: string
   });
   const p = spawnKarate(java, args, root, onLines);
   procs.push(p);
-  return p;
+  return Object.assign(p, { root });
 }
 
 const alive = (pid: number) =>
@@ -77,18 +77,18 @@ describe("spawnKarate", () => {
     await p.kill();
     await p.exit;
     expect(alive(p.pid)).toBe(false);
-    // no java from our jre may survive (tests run serially in this file)
+    // no java of this project may survive; other test files run their own java meanwhile
     const left = execFileSync(
       "powershell",
       [
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        "(Get-CimInstance Win32_Process -Filter \"Name='java.exe'\").ExecutablePath",
+        "(Get-CimInstance Win32_Process -Filter \"Name='java.exe'\").CommandLine",
       ],
       { encoding: "utf8" },
     );
-    expect(left.toLowerCase()).not.toContain(path.resolve(jreDir).toLowerCase());
+    expect(left).not.toContain(p.root);
     await p.kill(); // already gone: must not throw
   });
 });

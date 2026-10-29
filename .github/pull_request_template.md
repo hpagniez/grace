@@ -20,10 +20,9 @@ Tick what applies. Strike out (~~text~~) or write "N/A: <reason>" for items that
 
 ## Links
 
-- Feature: <!-- F01 ... F19 from docs/features.md, or "none" -->
 - Spec: <!-- docs/specs/YYYY-MM-DD-<topic>.md, or "none" -->
 - Decision record: <!-- docs/decisions/NNNN-<title>.md, or "none" -->
-- Issue: <!-- Closes #N, or "none" -->
+- Issue: <!-- Closes #N (builds the feature), Part of #N (spec, or one of several PRs), or "none" -->
 
 ## Changes
 
@@ -37,10 +36,10 @@ Tick what applies. Strike out (~~text~~) or write "N/A: <reason>" for items that
 - [ ] End-to-end tests (Playwright `_electron`) added or updated for user-visible behavior
 - [ ] Each spec acceptance criterion (Gherkin) maps to at least one test
 - [ ] `npx vitest run` passes
-- [ ] `npm run package`, then `npx playwright test` passes
+- [ ] `npm run e2e` passes locally (CI runs e2e only on PRs into `main`)
 - [ ] `npm run typecheck` passes
 - [ ] `npm run lint` passes (oxlint + oxfmt)
-- [ ] CI green: `checks` and `test` (e2e ran after ready for review)
+- [ ] CI green: `checks` and `test` (into `main`: e2e ran after ready for review)
 - [ ] Ran the app and checked the change by hand (`npm start`)
 
 <!-- Paste the test summary lines. If a test was skipped or is flaky, say which and why. -->
@@ -57,7 +56,7 @@ Tested on: <!-- OS + version, Java version, Karate version (e.g. Windows 11, Jav
 
 ## Documentation
 
-- [ ] `docs/features.md` row updated (status, spec link) in this PR
+- [ ] Spec PR: the issue's `Spec:` line points at the new spec
 - [ ] Spec written or updated in `docs/specs/` (requirements, then Gherkin acceptance criteria)
 - [ ] Hard-to-reverse choice (dependency, architecture, file format) has a new `docs/decisions/NNNN-*.md`; no accepted record edited
 - [ ] `AGENTS.md` updated if a rule, command or stack fact changed

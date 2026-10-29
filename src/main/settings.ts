@@ -3,6 +3,8 @@ import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
 import { validThreads } from "../shared/threads";
+import { defaultUpdateSettings, type UpdateSettings } from "../shared/updates";
+import { parseVersion } from "../shared/version";
 
 const file = (dataDir: string) => path.join(dataDir, "settings.json");
 
@@ -52,7 +54,7 @@ function update(dataDir: string, change: (s: Record<string, unknown>) => void): 
 export const RECENT_LIMIT = 10;
 
 /** Two paths are the same folder when they resolve alike, ignoring case (Windows) and a trailing separator. */
-const sameFolder = (a: string, b: string) =>
+export const sameFolder = (a: string, b: string) =>
   path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
 /** The absolute paths of a saved list, newest first, one per folder, at most RECENT_LIMIT; anything else is dropped. */
@@ -159,7 +161,8 @@ export function loadProjectFilter(dataDir: string, root: string): FilterState {
   return { ...NO_FILTER, include: [], exclude: [] };
 }
 
-const isObject = (x: unknown): x is Record<string, unknown> =>
+/** A plain JSON object: not null, not an array. */
+export const isObject = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x);
 
 /** Changes one project's entry and keeps its other fields; an entry that is not an object starts fresh. */
@@ -314,6 +317,57 @@ export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): v
           [...rows, ...rejectedRows(Object.hasOwn(oldByEnv, env) ? oldByEnv[env] : null)],
         ]),
       ),
+    };
+  });
+}
+
+/**
+ * Update settings from any JSON value (R12). Each malformed or missing field reads as its default,
+ * the channel as not picked (R1.3). A `skipped` or `failed` that is not a valid version reads as
+ * null, as `compareVersions` throws on one. Never throws.
+ */
+export function parseUpdateSettings(updates: unknown): UpdateSettings {
+  const d = defaultUpdateSettings();
+  const u = isObject(updates) ? updates : {};
+  const bool = (x: unknown, dflt: boolean) => (typeof x === "boolean" ? x : dflt);
+  const version = (x: unknown) => (typeof x === "string" && parseVersion(x) ? x : null);
+  return {
+    channel: u.channel === "stable" || u.channel === "prerelease" ? u.channel : d.channel,
+    checkAtStartup: bool(u.checkAtStartup, d.checkAtStartup),
+    autoUpdate: bool(u.autoUpdate, d.autoUpdate),
+    skipped: version(u.skipped),
+    failed: version(u.failed),
+    lastChecked:
+      typeof u.lastChecked === "string" && !Number.isNaN(Date.parse(u.lastChecked))
+        ? u.lastChecked
+        : null,
+  };
+}
+
+/** The saved update settings (R12). An unreadable file reads as the defaults, so it never throws. */
+export function loadUpdateSettings(dataDir: string): UpdateSettings {
+  let updates: unknown;
+  try {
+    updates = read(dataDir).updates;
+  } catch {
+    // unreadable: the defaults
+  }
+  return parseUpdateSettings(updates);
+}
+
+/**
+ * Saves the update settings and keeps the other keys. A channel not picked is left out, so the
+ * default keeps following the running version (R1.3). Throws if the file cannot be saved.
+ */
+export function saveUpdateSettings(dataDir: string, s: UpdateSettings): void {
+  update(dataDir, (all) => {
+    all.updates = {
+      ...(s.channel === null ? {} : { channel: s.channel }),
+      checkAtStartup: s.checkAtStartup,
+      autoUpdate: s.autoUpdate,
+      skipped: s.skipped,
+      failed: s.failed,
+      lastChecked: s.lastChecked,
     };
   });
 }
