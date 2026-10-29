@@ -135,3 +135,13 @@ describe("the focus ring (spec R10.1)", () => {
     expect(css).toMatch(/\*\s*\{\s*outline-color:\s*var\(--color-focus\);\s*\}/);
   });
 });
+
+describe("the palette (spec R1.1)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("drops Tailwind's default colours and keeps white, black, transparent and current", () => {
+    expect(css).toMatch(/@theme\s*\{\s*--color-\*:\s*initial;/);
+    for (const name of ["white", "black", "transparent", "current"])
+      expect(css, name).toMatch(new RegExp(`--color-${name}:`));
+  });
+});

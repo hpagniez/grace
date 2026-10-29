@@ -77,8 +77,14 @@
 @theme {
   /*
    * Colour tokens (spec R1.3, R1.4), light values. The dark values override them below. Tailwind's
-   * default palette stays until the components move to these tokens.
+   * default palette is removed, so a raw class like zinc-500 compiles to nothing (R1.1).
    */
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
   --color-ground: #f3efe6;
   --color-surface: #ffffff;
   --color-raised: #ffffff;
