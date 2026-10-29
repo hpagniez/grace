@@ -134,6 +134,16 @@ Most training data is Solid 1. Do not write Solid 1 code:
 
 Source: https://v2.solidjs.com/migration/from-solid-1
 
+### UI conventions
+
+Spec: [docs/specs/2026-10-29-premium-ui.md](docs/specs/2026-10-29-premium-ui.md).
+
+- Colours only through the semantic tokens in `src/index.css`. Tailwind's default palette is removed: no raw palette class (`zinc-500`), no `dark:`, no `title=`. `src/renderer/palette.test.ts` enforces it.
+- Shared class strings live in `src/renderer/buttons.ts` and `src/renderer/ui.ts`. Reuse them.
+- Icons only through `Icon` with `lucide` icon data. Statuses only through `StatusMark`.
+- Tooltips only through `Tooltip`, or `Cut` for text that may be cut. In a row, set `side` so the tooltip stays on the row.
+- A dialog keeps its content through its 100 ms exit (`--duration-fast`), then drops it.
+
 ## Karate integration rules
 
 Full detail: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#19-integration-surface-for-a-gui). Where they disagree, the [CLI spike](docs/research/2026-10-24-karate-cli-spike/README.md) wins: it ran Karate 2.1.4 for real. Its `samples/` are real event-stream fixtures.
