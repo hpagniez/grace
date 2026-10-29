@@ -1,11 +1,22 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import {
+  Check,
+  FileText,
+  History as HistoryIcon,
+  Minus,
+  Play,
+  RotateCcw,
+  type IconNode,
+} from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { HistoryEntry } from "../shared/history";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
+import { btn, danger, ghostSmall } from "./buttons";
 import { durationLabel } from "./History";
+import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
@@ -78,6 +89,13 @@ function setup() {
   const load = (...runs: HistoryEntry[]) => send({ type: "history", runs });
   return { api, send, load };
 }
+
+/** Whether `svg` draws `icon`: every attribute of its shapes is in the markup. */
+const drawn = (svg: Element | null | undefined, icon: IconNode) =>
+  !!svg &&
+  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
+const cell = (i: number, id: string) => within(rows()[i]).getByTestId(id);
+const RAW = /\b(zinc|red|green|sky|amber|slate|gray)-\d|dark:| title=/; // R9.3
 
 const click = (el: HTMLElement) => {
   fireEvent.click(el);
@@ -212,9 +230,6 @@ describe("history list", () => {
     expect(text(1, "history-tags")).toBe("—");
     expect(within(rows()[1]).queryAllByTestId("history-tag")).toHaveLength(0);
     expect(text(1, "history-what")).toBe("create user");
-    expect(within(rows()[1]).getByTestId("history-what").title).toBe(
-      "tests/users.feature › create user",
-    );
     expect(text(1, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
     expect(text(1, "history-duration")).toBe("18s");
 
@@ -235,32 +250,172 @@ describe("history list", () => {
     expect(text(1, "history-threads")).toBe("—");
   });
 
-  it("puts the path of a feature or folder in the tooltip", () => {
-    const { load } = setup();
-    load(
-      entry("a", {
-        selection: {
-          kind: "feature",
-          file: "tests/users.feature",
-          name: "users",
-          line: null,
-          key: "f:",
-        },
-      }),
-      entry("b", {
-        selection: { kind: "folder", file: "tests/api", name: "api", line: null, key: "d:" },
-      }),
-    );
-    showHistory();
-    expect(within(rows()[0]).getByTestId("history-what").title).toBe("tests/users.feature");
-    expect(text(0, "history-what")).toBe("tests/users.feature");
-    expect(within(rows()[1]).getByTestId("history-what").title).toBe("tests/api");
+  describe("What ran", () => {
+    // Only the timers the tooltip needs, with Date still on the test's "now".
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(new Date(2026, 9, 25, 15, 0));
+    });
+    const tip = () => document.querySelector("[role=tooltip]");
+    const what = (i: number) => cell(i, "history-what");
+    const rest = (el: HTMLElement) => {
+      fireEvent.pointerEnter(el.parentElement!); // the tooltip's wrapper
+      vi.advanceTimersByTime(500);
+    };
+
+    it("puts where the node sits in a tooltip, not in a title", () => {
+      const { load } = setup();
+      load(
+        entry("a", {
+          selection: {
+            kind: "scenario",
+            file: "tests/users.feature",
+            name: "create user",
+            line: 6,
+            key: "s:tests/users.feature#1",
+          },
+        }),
+        entry("b", {
+          selection: {
+            kind: "feature",
+            file: "tests/users.feature",
+            name: "users",
+            line: null,
+            key: "f:",
+          },
+        }),
+        entry("c", {
+          selection: { kind: "folder", file: "tests/api", name: "api", line: null, key: "d:" },
+        }),
+      );
+      showHistory();
+      expect(text(0, "history-what")).toBe("create user");
+      expect(text(1, "history-what")).toBe("tests/users.feature");
+      for (const [i, path] of [
+        [0, "tests/users.feature › create user"],
+        [1, "tests/users.feature"],
+        [2, "tests/api"],
+      ] as const) {
+        expect(what(i).hasAttribute("title")).toBe(false);
+        rest(what(i));
+        expect(tip()!.textContent, `row ${i}`).toBe(path);
+        fireEvent.pointerLeave(what(i).parentElement!);
+        flush();
+      }
+      expect(screen.getByTestId("history").querySelectorAll("[title]")).toHaveLength(0);
+    });
+
+    it("says nothing for a run that has no path (All, Failed tests)", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b", { selection: null }));
+      showHistory();
+      for (const i of [0, 1]) {
+        rest(what(i));
+        expect(tip(), `row ${i}`).toBeNull();
+      }
+    });
+
+    it("cuts a long label at 14 rem, inside a wrapper that can shrink", () => {
+      const { load } = setup();
+      load(entry("a"));
+      showHistory();
+      expect(what(0).className).toContain("truncate");
+      expect(what(0).className).toContain("min-w-0");
+      expect(what(0).parentElement!.className).toContain("min-w-0");
+      expect(what(0).parentElement!.className).toContain("max-w-56");
+    });
   });
 
-  it("says No runs yet", () => {
+  it("shows a status mark before the words of the result, and the mark is hidden", () => {
+    const { load } = setup();
+    load(
+      entry("a"), // finished with 2 failed
+      entry("b", { failed: 0, passed: 3, total: 3 }),
+      entry("c", { outcome: "cancelled", exitCode: null, failed: 0, passed: 1, total: 5 }),
+      entry("d", { outcome: "failed", exitCode: 3 }),
+    );
+    showHistory();
+    const marks = [0, 1, 2, 3].map((i) =>
+      cell(i, "history-result").querySelector<HTMLElement>("[data-status]")!,
+    );
+    expect(marks.map((m) => m.dataset.status)).toEqual(["failed", "passed", "cancelled", "failed"]);
+    // the words name the status: the mark is aria-hidden, with no role and no name
+    for (const m of marks) {
+      expect(m.getAttribute("aria-hidden")).toBe("true");
+      expect(m.hasAttribute("role")).toBe(false);
+    }
+    expect(within(screen.getByTestId("history")).queryAllByRole("img")).toHaveLength(0);
+    expect(text(0, "history-result")).toBe("41 passed, 2 failed of 43");
+    expect(text(1, "history-result")).toBe("3 passed, 0 failed of 3");
+    expect(text(2, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
+    expect(text(3, "history-result")).toBe("Error (exit 3)");
+  });
+
+  it("draws a tag by its shape: included with a check, excluded with a minus and a strike", () => {
+    const { load } = setup();
+    load(entry("a", { filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false } }));
+    showHistory();
+    const [inc, exc] = within(rows()[0]).getAllByTestId("history-tag");
+    expect(inc.className).toContain(chipIncluded);
+    expect(drawn(inc.querySelector("svg"), Check)).toBe(true);
+    expect(exc.className).toContain(chipExcluded);
+    expect(exc.className).toContain("line-through");
+    expect(drawn(exc.querySelector("svg"), Minus)).toBe(true);
+    expect(inc.textContent).toBe("@smoke");
+    expect(exc.textContent).toBe("not @slow");
+  });
+
+  it("right-aligns Threads and Duration in tabular figures", () => {
+    const { load } = setup();
+    load(entry("a", { threads: 8 }));
+    showHistory();
+    const heads = [...screen.getByTestId("history").querySelectorAll("th")];
+    for (const name of ["Threads", "Duration"])
+      expect(heads.find((h) => h.textContent === name)!.className, name).toContain("text-right");
+    for (const id of ["history-threads", "history-duration"]) {
+      expect(cell(0, id).className, id).toContain("text-right");
+      expect(cell(0, id).className, id).toContain("tabular-nums");
+    }
+    expect(cell(0, "history-when").className).toContain("tabular-nums");
+    expect(cell(0, "history-duration").className).toContain("font-mono");
+  });
+
+  it("sticks muted sentence-case headers to the top, and gives rows room under them", () => {
+    const { load } = setup();
+    load(entry("a"));
+    showHistory();
+    for (const th of screen.getByTestId("history").querySelectorAll("th"))
+      for (const c of [
+        "sticky",
+        "top-0",
+        "bg-surface",
+        "text-xs",
+        "text-muted",
+        "font-medium",
+        "h-7",
+      ])
+        expect(th.className, `${th.textContent} ${c}`).toContain(c);
+    // 28 px rows; scroll-mt-7 keeps a focused row out from under the 28 px header (R10.2)
+    for (const c of ["h-7", "border-b", "border-line", "scroll-mt-7"])
+      expect(rows()[0].className).toContain(c);
+    expect(rows()[0].className).not.toMatch(/\b(odd|even):/); // no zebra
+  });
+
+  it("uses no raw palette class, no dark: variant and no title", () => {
+    const { load } = setup();
+    load(entry("a", { filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false } }));
+    showHistory();
+    expect(screen.getByTestId("history").outerHTML).not.toMatch(RAW);
+  });
+
+  it("says No runs yet in an empty state with the history icon", () => {
     const { load } = setup();
     showHistory();
-    expect(screen.getByTestId("history-empty").textContent).toBe("No runs yet");
+    const empty = screen.getByTestId("history-empty");
+    expect(empty.textContent).toBe("No runs yet. Runs appear here when they finish.");
+    const icon = empty.parentElement!.querySelector("svg")!;
+    expect(drawn(icon, HistoryIcon)).toBe(true);
+    expect(icon.getAttribute("width")).toBe("24");
     expect(screen.getByTestId("tab-history").textContent).toBe("History (0)");
     expect(rows()).toHaveLength(0);
     load(entry("a"));
@@ -297,6 +452,11 @@ describe("history actions", () => {
       "Re-run",
       "Re-run failed",
     ]);
+    // small ghost buttons, each with its icon
+    for (const id of rowButtons) expect(inRow(1, id).className, id).toContain(ghostSmall);
+    expect(drawn(inRow(1, "history-report").querySelector("svg"), FileText)).toBe(true);
+    expect(drawn(inRow(1, "history-rerun").querySelector("svg"), Play)).toBe(true);
+    expect(drawn(inRow(1, "history-rerun-failed").querySelector("svg"), RotateCcw)).toBe(true);
     click(inRow(1, "history-report"));
     expect(api.openRunReport).toHaveBeenCalledExactlyOnceWith("20261024-172000-000");
     click(inRow(0, "history-rerun"));
@@ -354,6 +514,25 @@ describe("Clear history", () => {
     click(screen.getByTestId("clear-history-confirm"));
     expect(api.clearHistory).toHaveBeenCalledOnce();
     expect(confirm().open).toBe(false);
+  });
+
+  it("is a dialog-style box: a 16 px title, Delete (danger) first, then Cancel (focused)", () => {
+    const { load } = setup();
+    load(entry("a"), entry("b"));
+    showHistory();
+    click(clear());
+    expect(confirm().className).toContain(dialogStyle);
+    expect(confirm().getAttribute("aria-labelledby")).toBe("clear-history-title");
+    const title = document.getElementById("clear-history-title")!;
+    expect(title.className).toContain("text-lg");
+    expect(title.className).toContain("font-semibold");
+    const del = screen.getByTestId("clear-history-confirm");
+    const cancel = screen.getByTestId("clear-history-cancel");
+    expect(del.className).toContain(danger);
+    expect(cancel.className).toContain(btn);
+    expect(del.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cancel.hasAttribute("autofocus")).toBe(true);
+    expect(confirm().outerHTML).not.toMatch(RAW);
   });
 
   it("words the confirmation for one run in the singular", () => {

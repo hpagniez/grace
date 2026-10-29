@@ -1,9 +1,21 @@
+import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
 import { createSignal, flush, For, Show } from "solid-js";
-import { resultLabel, whatRanLabel, whenLabel, type StoredSelection } from "../shared/history";
+import {
+  resultLabel,
+  whatRanLabel,
+  whenLabel,
+  type HistoryEntry,
+  type StoredSelection,
+} from "../shared/history";
 import type { Api } from "../shared/ipc";
 import { filterOn } from "../shared/tags";
-import { btn, btnSmall, danger } from "./buttons";
+import { btn, btnSmall, danger, ghostSmall } from "./buttons";
+import { EmptyState } from "./EmptyState";
+import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
+import { StatusMark, type MarkStatus } from "./StatusMark";
+import { Tooltip } from "./Tooltip";
+import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
 
 /** "18s", or "1m 12s" from a minute on; a run under one second is "0s". */
 export function durationLabel(millis: number): string {
@@ -18,11 +30,19 @@ const selectionPath = (s: StoredSelection | null): string | undefined => {
   return path === "" ? undefined : path;
 };
 
-const chip = "rounded border px-1.5 text-xs";
-const INCLUDE = `${chip} border-green-600 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300`;
-const EXCLUDE = `${chip} border-red-600 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300`;
-const th = "sticky top-0 whitespace-nowrap bg-zinc-100 px-3 py-1 font-medium dark:bg-zinc-800";
-const td = "whitespace-nowrap px-3 py-1";
+/** The mark of a run's result: a failure beats a cancel (R7.1); the words next to it say which. */
+const resultStatus = (r: HistoryEntry): MarkStatus =>
+  r.outcome === "failed" || r.failed > 0
+    ? "failed"
+    : r.outcome === "cancelled"
+      ? "cancelled"
+      : "passed";
+
+// Headers stick to the top of the scroll (R18.4). Rows are 28 px; scroll-mt-7 keeps a focused row clear of the header (R10.2).
+const th =
+  "sticky top-0 h-7 whitespace-nowrap bg-surface px-3 text-xs font-medium text-muted shadow-[inset_0_-1px_0_var(--color-line)]";
+const td = "whitespace-nowrap px-3";
+const num = "text-right tabular-nums";
 
 /** The "Clear history" button of the tab header and the dialog that confirms it. */
 export function ClearHistory(props: { state: AppState; api: Api }) {
@@ -53,16 +73,16 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
         ref={(e) => (dialog = e)}
         data-testid="clear-history-dialog"
         aria-labelledby="clear-history-title"
-        class="m-auto w-[28rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+        class={`${dialogStyle} w-[28rem] max-w-[95vw]`}
         onClose={() => dialog.open || setOpen(false)} // Escape; not a late event after a reopen
       >
         <Show when={open()}>
-          <p id="clear-history-title" class="text-sm">
+          <p id="clear-history-title" class="text-lg font-semibold">
             {props.state.history.length === 1
               ? "Delete the 1 run of this project and its report?"
               : `Delete the ${props.state.history.length} runs of this project and their reports?`}
           </p>
-          <div class="mt-4 flex justify-end gap-2">
+          <div class="mt-5 flex justify-end gap-2">
             <button
               type="button"
               data-testid="clear-history-confirm"
@@ -98,21 +118,23 @@ export function History(props: { state: AppState; api: Api }) {
       <Show
         when={props.state.history.length > 0}
         fallback={
-          <p data-testid="history-empty" class="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400">
-            No runs yet
-          </p>
+          <EmptyState
+            icon={HistoryIcon}
+            text="No runs yet. Runs appear here when they finish."
+            testid="history-empty"
+          />
         }
       >
-        <table class="w-full text-left text-xs">
+        <table class="w-full text-left text-sm">
           <thead>
             <tr>
               <th class={th}>When</th>
               <th class={th}>Env</th>
-              <th class={th}>Threads</th>
+              <th class={`${th} text-right`}>Threads</th>
               <th class={th}>Tags</th>
               <th class={th}>What ran</th>
               <th class={th}>Result</th>
-              <th class={th}>Duration</th>
+              <th class={`${th} text-right`}>Duration</th>
               <th class={th}>
                 <span class="sr-only">Actions</span>
               </th>
@@ -126,15 +148,15 @@ export function History(props: { state: AppState; api: Api }) {
                   <tr
                     data-testid="history-row"
                     data-id={run.id}
-                    class="border-b border-zinc-100 dark:border-zinc-800"
+                    class="h-7 scroll-mt-7 border-b border-line"
                   >
-                    <td data-testid="history-when" class={td}>
+                    <td data-testid="history-when" class={`${td} tabular-nums`}>
                       {whenLabel(run.startedAt, now)}
                     </td>
                     <td data-testid="history-env" class={td}>
                       {run.env ?? "—"}
                     </td>
-                    <td data-testid="history-threads" class={td}>
+                    <td data-testid="history-threads" class={`${td} ${num}`}>
                       {run.threads ?? "—"}
                     </td>
                     <td data-testid="history-tags" class={td}>
@@ -142,14 +164,16 @@ export function History(props: { state: AppState; api: Api }) {
                         <span class="flex gap-1">
                           <For each={run.filter.include}>
                             {(tag) => (
-                              <span data-testid="history-tag" class={INCLUDE}>
+                              <span data-testid="history-tag" class={chipIncluded}>
+                                <Icon icon={Check} size={14} />
                                 {`@${tag}`}
                               </span>
                             )}
                           </For>
                           <For each={run.filter.exclude}>
                             {(tag) => (
-                              <span data-testid="history-tag" class={EXCLUDE}>
+                              <span data-testid="history-tag" class={chipExcluded}>
+                                <Icon icon={Minus} size={14} />
                                 {`not @${tag}`}
                               </span>
                             )}
@@ -157,20 +181,21 @@ export function History(props: { state: AppState; api: Api }) {
                         </span>
                       </Show>
                     </td>
-                    <td
-                      data-testid="history-what"
-                      title={selectionPath(run.selection)}
-                      class={`${td} max-w-56 truncate`}
-                    >
-                      {whatRanLabel(run, now)}
+                    <td class={td}>
+                      {/* the path adds to the label for a scenario, and shows a cut one whole */}
+                      <Tooltip text={selectionPath(run.selection)} class="min-w-0 max-w-56">
+                        <span data-testid="history-what" class="min-w-0 truncate">
+                          {whatRanLabel(run, now)}
+                        </span>
+                      </Tooltip>
                     </td>
-                    <td
-                      data-testid="history-result"
-                      class={`${td} ${run.outcome === "failed" || run.failed > 0 ? "text-red-700 dark:text-red-400" : ""}`}
-                    >
-                      {resultLabel(run)}
+                    <td data-testid="history-result" class={td}>
+                      <span class="inline-flex items-center gap-1.5">
+                        <StatusMark status={resultStatus(run)} decorative />
+                        {resultLabel(run)}
+                      </span>
                     </td>
-                    <td data-testid="history-duration" class={`${td} font-mono`}>
+                    <td data-testid="history-duration" class={`${td} ${num} font-mono`}>
                       {durationLabel(run.durationMillis)}
                     </td>
                     <td class={td}>
@@ -178,28 +203,31 @@ export function History(props: { state: AppState; api: Api }) {
                         <button
                           type="button"
                           data-testid="history-report"
-                          class={btnSmall}
+                          class={ghostSmall}
                           disabled={locked() || !run.reportAvailable}
                           onClick={() => void props.api.openRunReport(run.id)}
                         >
+                          <Icon icon={FileText} size={14} />
                           Report
                         </button>
                         <button
                           type="button"
                           data-testid="history-rerun"
-                          class={btnSmall}
+                          class={ghostSmall}
                           disabled={locked()}
                           onClick={() => void props.api.rerun(run.id)}
                         >
+                          <Icon icon={Play} size={14} />
                           Re-run
                         </button>
                         <button
                           type="button"
                           data-testid="history-rerun-failed"
-                          class={btnSmall}
+                          class={ghostSmall}
                           disabled={locked() || run.failed === 0}
                           onClick={() => void props.api.rerunFailed(run.id)}
                         >
+                          <Icon icon={RotateCcw} size={14} />
                           Re-run failed
                         </button>
                       </span>

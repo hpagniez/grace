@@ -347,7 +347,9 @@ test("Clear history", async () => {
     "Delete the 3 runs of this project and their reports?",
   );
   await win.getByTestId("clear-history-confirm").click();
-  await expect(win.getByTestId("history-empty")).toHaveText("No runs yet");
+  await expect(win.getByTestId("history-empty")).toHaveText(
+    "No runs yet. Runs appear here when they finish.",
+  );
   await expect(tab(win)).toHaveText("History (0)");
   expect(readdirSync(path.join(projectDataDir(userData, dir), "runs"))).toEqual([]);
   await expect(win.getByTestId("report-button")).toBeDisabled();
