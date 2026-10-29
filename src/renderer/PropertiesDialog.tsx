@@ -394,7 +394,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                           </button>
                         </span>
                       </Show>
-                      <label class="flex items-center gap-1 text-sm">
+                      <label class="flex h-6 items-center gap-1 text-sm">
                         <input
                           type="checkbox"
                           data-testid="prop-secret"

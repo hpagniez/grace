@@ -164,6 +164,8 @@ describe("home screen", () => {
     expect(within(ok).getByTestId("recent-name").className).not.toContain("text-muted");
     const path = within(ok).getByText("D:\\work\\api");
     for (const c of ["font-mono", "text-muted", "truncate"]) expect(path.className).toContain(c);
+    // a flex column, so the tooltip's inline wrapper adds no line-box height under the name
+    expect(path.closest("span.flex-col")).not.toBeNull();
     expect(ok.className).toContain("enabled:hover:bg-hover");
     expect(ok.className).toContain("focus-visible:-outline-offset-2"); // inset, inside a clipped list
     // the missing one: its name in muted, and nothing dimmed by opacity
@@ -196,6 +198,38 @@ describe("home screen", () => {
     hover(gone);
     expect(tip()!.textContent).toBe("Folder not found");
     expect(gone.hasAttribute("title")).toBe(false);
+  });
+
+  it("shows a path that is cut in a tooltip, and only then (R9.4)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { send } = setup();
+    send({ type: "opening", root: null }, recent(list));
+    const [ok, gone] = screen.getAllByTestId("recent-row");
+    // taken before any tooltip opens: the tooltip repeats the text
+    const okLine = within(ok).getByText("D:\\work\\api");
+    const goneLine = within(gone).getByText("E:\\usb\\old");
+    const cut = (el: HTMLElement) => {
+      // jsdom has no layout: make the line look cut
+      Object.defineProperty(el, "scrollWidth", { value: 300 });
+      Object.defineProperty(el, "clientWidth", { value: 100 });
+    };
+    // it fits: nothing to say
+    hover(okLine);
+    expect(tip()).toBeNull();
+    fireEvent.pointerLeave(wrapperOf(okLine));
+    flush();
+    cut(okLine);
+    hover(okLine);
+    expect(tip()!.textContent).toBe("D:\\work\\api");
+    fireEvent.pointerLeave(wrapperOf(okLine));
+    flush();
+    // on a missing row the cut path wins over the row's own tooltip
+    cut(goneLine);
+    fireEvent.pointerEnter(wrapperOf(gone)); // the pointer enters the row, then its path
+    fireEvent.pointerEnter(wrapperOf(goneLine));
+    vi.advanceTimersByTime(500);
+    expect(document.querySelectorAll('[role="tooltip"]')).toHaveLength(1); // one at a time
+    expect(tip()!.textContent).toBe("E:\\usb\\old");
   });
 
   it("removes a row with a 24 px icon button that has a name and a tooltip (R10.3)", () => {

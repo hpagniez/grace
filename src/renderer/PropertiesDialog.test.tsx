@@ -887,6 +887,9 @@ describe("the look of the dialog (spec R19)", () => {
     expect(inRow(1, "prop-value").className).toContain(inputStyle); // a password field too
     for (const el of [inRow(0, "prop-name"), inRow(0, "prop-value")])
       expect(el.className).toContain("min-w-0");
+    // the Secret checkbox: the accent, and a 24 px target with its label (R10.3)
+    expect(inRow(0, "prop-secret").className).toContain("accent-accent");
+    expect(inRow(0, "prop-secret").closest("label")!.className).toContain("h-6");
   });
 
   it("shows an error in failed with the error icon, under its row and linked to its fields", () => {

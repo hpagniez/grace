@@ -5,6 +5,7 @@ import type { Api } from "../shared/ipc";
 // a file, never a data: URL, which the CSP (default-src 'self') would block
 import mascot from "../../assets/mascot.svg?no-inline";
 import { btnIconSmall, primary } from "./buttons";
+import { Cut } from "./Cut";
 import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
@@ -62,7 +63,7 @@ export function Home(props: { state: AppState; api: Api; notice?: JSX.Element })
                         onClick={() => void props.api.openRecent(entry.path)}
                       >
                         <Icon icon={Folder} class="text-muted" />
-                        <span class="min-w-0 flex-1">
+                        <span class="flex min-w-0 flex-1 flex-col">
                           <span class="flex items-center gap-2">
                             <span
                               data-testid="recent-name"
@@ -80,9 +81,9 @@ export function Home(props: { state: AppState; api: Api; notice?: JSX.Element })
                               </span>
                             </Show>
                           </span>
-                          <span class="block truncate font-mono text-xs text-muted">
+                          <Cut full={entry.path} wrap="w-full" class="font-mono text-xs text-muted">
                             {entry.path}
-                          </span>
+                          </Cut>
                         </span>
                       </button>
                     </Tooltip>
