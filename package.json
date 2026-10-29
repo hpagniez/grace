@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "npm run package && npx electron --version && playwright test",
+    "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",
     "fixtures": "node scripts/capture-fixtures.mjs",
