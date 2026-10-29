@@ -93,6 +93,7 @@ test("Grace draws its own typefaces without any network request", async () => {
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   await expect(win.getByTestId("console-banner")).toBeVisible();
 
+  await win.evaluate(async () => void (await document.fonts.ready)); // the faces in use have loaded
   // document.fonts.check() is true also for a family nobody declared: ask for the loaded faces too
   const loaded = (family: string) =>
     win.evaluate(
