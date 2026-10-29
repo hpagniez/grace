@@ -1,10 +1,14 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { CircleAlert, Lock, Plus, Trash2, TriangleAlert } from "lucide";
 import { flush } from "solid-js";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawn } from "../../test/drawn";
 import type { EnvView, PropertiesEdit } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
+import { btn, btnDialog, btnIconSmall, primaryDialog } from "./buttons";
+import { dialog as dialogStyle, input as inputStyle } from "./ui";
 
 // Every array store the app creates is the dialog's draft rows: this lets a test look inside it.
 const drafts = vi.hoisted(() => [] as unknown[][]);
@@ -120,11 +124,24 @@ const cancel = () => screen.getByTestId("cancel-properties") as HTMLButtonElemen
 const errorOf = (i: number) => within(rows()[i]).queryByTestId("row-error")?.textContent;
 /** Lets main's answer to Save arrive. */
 const settle = async () => {
-  await new Promise((r) => setTimeout(r, 0));
+  await vi.advanceTimersByTimeAsync(0);
   flush();
 };
+/** Lets the fade-out end (R5.2: 100 ms): the dialog drops its draft and its content then. */
+const afterExit = () => {
+  vi.advanceTimersByTime(150);
+  flush();
+};
+const RAW = /\b(zinc|red|green|sky|amber|slate|gray)-\d|dark:| title=/; // R9.3
 
-afterEach(cleanup);
+// the dialog drops its draft on a timer, once its exit has ended
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+});
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("properties dialog", () => {
   it("lists scopes and rows", () => {
@@ -277,6 +294,7 @@ describe("properties dialog", () => {
       typeSecret();
       close();
       await settle();
+      afterExit();
       expect(drafts.at(-1)).toHaveLength(0);
       expect(draft()).not.toContain("s3cret-token-123");
     }
@@ -340,6 +358,7 @@ describe("properties dialog", () => {
     answer(true);
     await settle();
     expect(dialog().open).toBe(false);
+    afterExit();
     expect(drafts.at(-1)).toHaveLength(0);
     expect(api.saveProperties).toHaveBeenCalledTimes(3);
   });
@@ -499,6 +518,7 @@ describe("properties dialog", () => {
       },
     });
     // nothing changes in the window until main says so
+    afterExit();
     expect(screen.queryAllByTestId("property-row")).toHaveLength(0);
     send({
       type: "environment",
@@ -645,6 +665,7 @@ describe("properties dialog", () => {
     fireEvent.click(screen.getByTestId("cancel-properties"));
     flush();
     expect(dialog().open).toBe(false);
+    afterExit();
     expect(screen.queryAllByTestId("property-row")).toHaveLength(0);
     openDialog();
     expect(rows()).toHaveLength(1);
@@ -653,6 +674,7 @@ describe("properties dialog", () => {
     dialog().removeAttribute("open"); // Escape: the browser closes it and fires `close`
     fireEvent(dialog(), new Event("close"));
     flush();
+    afterExit();
     expect(screen.queryAllByTestId("property-row")).toHaveLength(0);
     openDialog();
     expect(rows()).toHaveLength(1);
@@ -679,5 +701,300 @@ describe("properties dialog", () => {
       env: null,
     });
     expect(button().disabled).toBe(true);
+  });
+});
+
+// The dialog fades out over 100 ms (R5.2): its title, rows and buttons stay until it is gone, and only
+// then does the draft go, so an unsaved secret does not linger in the window's memory.
+describe("while it fades out", () => {
+  const SECRET = "s3cret-token-123";
+  /** The dialog with a typed secret in a new row, open. */
+  const typed = () => {
+    const ctx = setup();
+    ctx.load(saved);
+    openDialog();
+    choose("qa");
+    const i = addRow("fresh.token", SECRET);
+    fireEvent.click(inRow(i, "prop-secret"));
+    flush();
+    return ctx;
+  };
+  const draft = () => JSON.stringify(drafts.at(-1));
+  const whole = () => {
+    expect(within(dialog()).getByText("Run properties")).toBeTruthy();
+    expect(rows()).toHaveLength(3);
+    expect(scope("qa")).toBeTruthy();
+    expect(save().textContent).toMatch(/^Sav/); // "Saving…" while it fades after a Save
+    expect(cancel().textContent).toBe("Cancel");
+    expect(draft()).toContain(SECRET);
+  };
+  const gone = () => {
+    expect(within(dialog()).queryByText("Run properties")).toBeNull();
+    expect(rows()).toHaveLength(0);
+    expect(screen.queryByTestId("save-properties")).toBeNull();
+    expect(drafts.at(-1)).toHaveLength(0);
+    expect(draft()).not.toContain(SECRET);
+  };
+  /** The box is whole for the exit's 100 ms, and gone soon after. */
+  const fades = () => {
+    whole();
+    vi.advanceTimersByTime(100);
+    flush();
+    whole();
+    vi.advanceTimersByTime(50);
+    flush();
+    gone();
+  };
+
+  it("keeps its content after Cancel for the whole exit, then drops the draft", () => {
+    typed();
+    fireEvent.click(cancel());
+    flush();
+    expect(dialog().open).toBe(false);
+    fades();
+  });
+
+  it("does the same after Escape", () => {
+    typed();
+    dialog().removeAttribute("open"); // the browser closes it, then fires `close`
+    fireEvent(dialog(), new Event("close"));
+    flush();
+    fades();
+  });
+
+  it("does the same once main has applied Save", async () => {
+    const { api } = typed();
+    fireEvent.click(save());
+    await settle();
+    expect(api.saveProperties).toHaveBeenCalledOnce();
+    expect(dialog().open).toBe(false);
+    fades();
+  });
+
+  it("keeps the draft when main refused Save: no timer starts", async () => {
+    const { api } = typed();
+    api.saveProperties.mockResolvedValueOnce(false);
+    fireEvent.click(save());
+    await settle();
+    expect(dialog().open).toBe(true);
+    vi.advanceTimersByTime(1000);
+    flush();
+    whole();
+  });
+
+  it("reopened within the fade, it starts from main's view and keeps it", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    addRow("gone");
+    fireEvent.click(cancel());
+    flush();
+    vi.advanceTimersByTime(60); // mid-fade
+    flush();
+    openDialog();
+    expect(dialog().open).toBe(true);
+    expect(rows()).toHaveLength(1);
+    expect(inRow(0, "prop-name").value).toBe("timeout");
+    expect(draft()).not.toContain("gone");
+    // the first close's timer was cleared: it must not drop the new draft
+    vi.advanceTimersByTime(1000);
+    flush();
+    expect(rows()).toHaveLength(1);
+    expect(within(dialog()).getByText("Run properties")).toBeTruthy();
+    expect(draft()).toContain("timeout");
+    expect(dialog().open).toBe(true);
+  });
+
+  it("ignores a close event that arrives after a reopen", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    fireEvent.click(cancel());
+    flush();
+    openDialog();
+    addRow("kept");
+    fireEvent(dialog(), new Event("close")); // late: the dialog is open again
+    flush();
+    vi.advanceTimersByTime(1000);
+    flush();
+    expect(dialog().open).toBe(true);
+    expect(rows()).toHaveLength(2);
+  });
+});
+
+describe("the look of the dialog (spec R19)", () => {
+  it("is a dialog-style box with a 16 px title", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    expect(dialog().className).toContain(dialogStyle);
+    expect(dialog().className).toContain("w-[48rem]");
+    const title = document.getElementById("properties-title")!;
+    expect(dialog().getAttribute("aria-labelledby")).toBe("properties-title");
+    expect(title.textContent).toBe("Run properties");
+    expect(title.className).toContain("text-lg");
+    expect(title.className).toContain("font-semibold");
+    expect(dialog().outerHTML).not.toMatch(RAW);
+  });
+
+  it("keeps Save first and Cancel last, in the 14 px dialog buttons", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    expect(save().className).toContain(primaryDialog);
+    expect(cancel().className).toContain(btnDialog);
+    expect(
+      save().compareDocumentPosition(cancel()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    for (const b of [save(), cancel()]) expect(b.className).not.toMatch(/text-sm|!/);
+    expect(save().parentElement!.className).toContain("justify-end");
+  });
+
+  it("lists the environments as a selectable list: selected fill and the accent bar", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    choose("qa");
+    const bar = "shadow-[inset_2px_0_0_var(--color-accent)]";
+    expect(scope("qa").className).toContain("bg-selected");
+    expect(scope("qa").className).toContain(bar);
+    expect(scope("").className).not.toContain("bg-selected");
+    expect(scope("").className).not.toContain(bar);
+    expect(scope("").className).toContain("hover:bg-hover");
+  });
+
+  it("marks an environment with errors by an icon and the words, not by colour alone", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    addRow("karate.env");
+    expect(scope("").textContent).toBe("All environments has errors");
+    expect(drawn(scope("").querySelector("svg"), CircleAlert)).toBe(true);
+    expect(scope("").querySelector("svg")!.getAttribute("class")).toContain("text-failed");
+    expect(scope("qa").querySelector("svg")).toBeNull();
+  });
+
+  it("sets the fields in the shared input style", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    expect(screen.getByTestId("add-env-input").className).toContain(inputStyle);
+    expect(inRow(0, "prop-name").className).toContain(inputStyle);
+    expect(inRow(0, "prop-value").className).toContain(inputStyle);
+    addRow("t", "abcdef");
+    fireEvent.click(inRow(1, "prop-secret"));
+    flush();
+    expect(inRow(1, "prop-value").className).toContain(inputStyle); // a password field too
+    for (const el of [inRow(0, "prop-name"), inRow(0, "prop-value")])
+      expect(el.className).toContain("min-w-0");
+  });
+
+  it("shows an error in failed with the error icon, under its row and linked to its fields", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    const i = addRow("karate.options", "-t @x");
+    const error = within(rows()[i]).getByTestId("row-error");
+    expect(error.textContent).toBe("Reserved name");
+    expect(error.className).toContain("text-failed");
+    expect(error.className).toContain("text-xs");
+    expect(drawn(error.querySelector("svg"), CircleAlert)).toBe(true);
+    for (const id of ["prop-name", "prop-value"]) {
+      expect(inRow(i, id).getAttribute("aria-invalid")).toBe("true");
+      expect(inRow(i, id).getAttribute("aria-describedby")).toBe(error.id);
+    }
+    typeIn(inRow(i, "prop-name"), "my.own");
+    expect(inRow(i, "prop-name").hasAttribute("aria-describedby")).toBe(false);
+    expect(inRow(i, "prop-value").hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("shows the add-environment error with the error icon", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    typeIn(screen.getByTestId("add-env-input"), "not valid!");
+    fireEvent.click(screen.getByTestId("add-env"));
+    flush();
+    const error = screen.getByTestId("add-env-error");
+    expect(error.className).toContain("text-failed");
+    expect(drawn(error.querySelector("svg"), CircleAlert)).toBe(true);
+  });
+
+  it("shows the secrets note in muted with a lock, and a short secret's hint muted", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    const note = screen.getByTestId("secrets-note");
+    expect(note.className).toContain("text-muted");
+    expect(drawn(note.querySelector("svg"), Lock)).toBe(true);
+    const i = addRow("pin", "abc");
+    fireEvent.click(inRow(i, "prop-secret"));
+    flush();
+    expect(within(rows()[i]).getByTestId("row-hint").className).toContain("text-muted");
+  });
+
+  it("shows the two warnings in cancelled with the warning icon", () => {
+    const { load } = setup();
+    load({
+      ...saved,
+      secretsAvailable: false,
+      properties: {
+        shared: [],
+        byEnv: { qa: [{ name: "t", secret: true, state: "unreadable" }] },
+      },
+    });
+    openDialog();
+    choose("qa");
+    for (const el of [
+      screen.getByTestId("secrets-unavailable"),
+      within(rows()[0]).getByTestId("prop-unreadable"),
+    ]) {
+      expect(el.className).toContain("text-cancelled");
+      expect(drawn(el.querySelector("svg"), TriangleAlert)).toBe(true);
+    }
+  });
+
+  it("deletes a row with a 24 px icon button that has a name and a tooltip", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    const button = within(rows()[0]).getByTestId("prop-delete");
+    expect(button.getAttribute("aria-label")).toBe("Delete timeout");
+    expect(button.className).toContain(btnIconSmall);
+    expect(button.textContent).toBe("");
+    expect(drawn(button.querySelector("svg"), Trash2)).toBe(true);
+    fireEvent.pointerEnter(button.closest("span.inline-flex")!);
+    vi.advanceTimersByTime(500);
+    expect(document.querySelector('[role="tooltip"]')!.textContent).toBe("Delete timeout");
+  });
+
+  it("adds a property with a plus icon, and the other buttons are standard", () => {
+    const { load } = setup();
+    load(saved);
+    openDialog();
+    const add = screen.getByTestId("add-property");
+    expect(add.className).toContain(btn);
+    expect(add.textContent).toBe("Add property");
+    expect(drawn(add.querySelector("svg"), Plus)).toBe(true);
+    for (const id of ["add-env", "delete-env"])
+      expect(screen.getByTestId(id).className, id).toContain(btn);
+    choose("qa");
+    expect(within(rows()[1]).getByTestId("prop-replace").className).toContain(btn);
+  });
+
+  it("tells a cut environment name in a tooltip", () => {
+    const { load } = setup();
+    const name = `e${"x".repeat(60)}`;
+    load({ ...saved, properties: { shared: [], byEnv: { [name]: [] } } });
+    openDialog();
+    const long = scope(name);
+    const line = long.querySelector(".truncate") as HTMLElement;
+    expect(line.textContent).toBe(name);
+    // jsdom has no layout: make it look cut, then hover
+    Object.defineProperty(line, "scrollWidth", { value: 300 });
+    Object.defineProperty(line, "clientWidth", { value: 100 });
+    fireEvent.pointerEnter(line.closest("span.inline-flex")!);
+    vi.advanceTimersByTime(500);
+    expect(document.querySelector('[role="tooltip"]')!.textContent).toBe(name);
   });
 });

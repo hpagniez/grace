@@ -1,5 +1,5 @@
-import { SlidersHorizontal } from "lucide";
-import { createMemo, createSignal, createStore, flush, For, Show } from "solid-js";
+import { CircleAlert, Lock, Plus, SlidersHorizontal, Trash2 } from "lucide";
+import { createMemo, createSignal, createStore, flush, For, onCleanup, Show } from "solid-js";
 import {
   MAX_ENVS,
   MAX_ROWS,
@@ -11,12 +11,15 @@ import {
   type RowView,
 } from "../shared/env";
 import type { Api } from "../shared/ipc";
-import { btn, narrowIcon, narrowLabel, primary } from "./buttons";
+import { btn, btnDialog, btnIconSmall, narrowIcon, narrowLabel, primaryDialog } from "./buttons";
+import { Cut } from "./Cut";
 import { INVALID_ENV } from "./EnvPicker";
+import { FieldMessage } from "./FieldMessage";
 import { Icon } from "./Icon";
 import { createNarrow } from "./narrow";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
+import { dialog as dialogStyle, input } from "./ui";
 
 /** A property row being edited. Scope "" is "All environments". */
 interface Row {
@@ -32,8 +35,8 @@ interface Row {
   saved: "set" | "unreadable" | null;
 }
 
-const field =
-  "min-w-0 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800";
+/** The dialog fades out over 100 ms (R5.2): its content stays this long after it closes. */
+const EXIT_MS = 120;
 const SECRETS_NOTE =
   "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask. Run history keeps the reports of the last 20 runs; Clear history deletes them.";
 
@@ -57,6 +60,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
   const narrow = createNarrow(); // the button's label is hidden then: its tooltip says it
   let list!: HTMLUListElement;
   let session = 0; // each opening; an answer to an earlier one is ignored
+  let exit: ReturnType<typeof setTimeout> | undefined; // drops the draft once the dialog has faded out
   const [open, setOpen] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [rows, setRows] = createStore<Row[]>([]);
@@ -111,6 +115,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
   };
 
   const show = () => {
+    clearTimeout(exit); // reopened while it still fades out: this draft is the new one
     const { shared, byEnv } = view()!.properties;
     const draft = [
       ...rowsOf("", shared),
@@ -126,7 +131,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setOpen(true);
     dialog.showModal();
   };
-  // Closing drops the draft, so a typed secret does not linger in the window's memory.
+  // Closing drops the draft, so a typed secret does not linger in the window's memory. The content
+  // stays through the exit, or the box would fade out empty; the timer drops it once the dialog is gone.
   const drop = () => {
     setOpen(false);
     setRows((d) => void d.splice(0, d.length));
@@ -135,9 +141,14 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setNewEnv("");
     setEnvError(null);
   };
+  const dropLater = () => {
+    clearTimeout(exit);
+    exit = setTimeout(drop, EXIT_MS);
+  };
+  onCleanup(() => clearTimeout(exit));
   const close = () => {
     dialog.close();
-    drop();
+    dropLater();
   };
 
   /** Gives `name` a list in the draft; false, saying why, if main would refuse one more. */
@@ -232,11 +243,11 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
         ref={(e) => (dialog = e)}
         data-testid="properties-dialog"
         aria-labelledby="properties-title"
-        class="m-auto w-[48rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-        onClose={() => dialog.open || drop()} // Escape; not a late event after a reopen
+        class={`${dialogStyle} w-[48rem] max-w-[95vw]`}
+        onClose={() => dialog.open || dropLater()} // Escape; not a late event after a reopen
       >
         <Show when={open()}>
-          <h2 id="properties-title" class="mb-3 text-base font-semibold">
+          <h2 id="properties-title" class="mb-4 text-lg font-semibold">
             Run properties
           </h2>
           <div class="flex gap-4">
@@ -251,15 +262,15 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         data-scope={s}
                         data-invalid={invalidScopes().has(s) ? "true" : undefined}
                         aria-current={s === scope() ? "true" : undefined}
-                        class={`w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${s === scope() ? "bg-zinc-200 font-medium dark:bg-zinc-700" : ""}`}
+                        class={`flex w-full items-center gap-1 rounded-sm px-2 py-1 text-left text-sm transition-colors duration-(--duration-fast) ease-standard ${s === scope() ? "bg-selected font-medium shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"}`}
                         onClick={() => setScope(s)}
                       >
-                        {s === "" ? "All environments" : s}
+                        <Cut full={s === "" ? "All environments" : s} wrap="flex-1" class="flex-1">
+                          {s === "" ? "All environments" : s}
+                        </Cut>
                         <Show when={invalidScopes().has(s)}>
                           <span class="sr-only"> has errors</span>
-                          <span aria-hidden="true" class="text-red-600 dark:text-red-400">
-                            {" !"}
-                          </span>
+                          <Icon icon={CircleAlert} size={14} class="text-failed" />
                         </Show>
                       </button>
                     </li>
@@ -273,7 +284,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                   placeholder="+ environment"
                   autocomplete="off"
                   spellcheck={false}
-                  class={`${field} w-full`}
+                  class={`${input} min-w-0 flex-1`}
                   value={newEnv()}
                   onInput={(e) => {
                     setNewEnv(e.currentTarget.value);
@@ -288,9 +299,9 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                 </button>
               </div>
               <Show when={envError()}>
-                <span data-testid="add-env-error" class="text-xs text-red-700 dark:text-red-400">
+                <FieldMessage kind="error" testid="add-env-error">
                   {envError()}
-                </span>
+                </FieldMessage>
               </Show>
               <button
                 type="button"
@@ -303,7 +314,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
               </button>
             </div>
             <section class="flex min-w-0 flex-1 flex-col gap-2">
-              <ul ref={(e) => (list = e)} class="max-h-[50vh] overflow-y-auto">
+              {/* -mx-1 px-1: room for the focus ring of the first and last column, which the scroll would clip */}
+              <ul ref={(e) => (list = e)} class="-mx-1 max-h-[50vh] overflow-y-auto px-1">
                 <For each={visible()}>
                   {(row) => (
                     <li data-testid="property-row" class="flex flex-wrap items-center gap-2 py-1">
@@ -312,7 +324,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         aria-label="Property name"
                         autocomplete="off"
                         spellcheck={false}
-                        class={`${field} w-40`}
+                        class={`${input} w-40 min-w-0`}
                         value={row.name}
                         aria-invalid={errors().get(row.id) ? "true" : undefined}
                         aria-describedby={errors().get(row.id) ? `row-error-${row.id}` : undefined}
@@ -333,9 +345,12 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                             type={row.secret ? "password" : "text"}
                             autocomplete={row.secret ? "new-password" : "off"}
                             spellcheck={false}
-                            class={`${field} flex-1`}
+                            class={`${input} min-w-0 flex-1`}
                             value={row.value}
                             aria-invalid={errors().get(row.id) ? "true" : undefined}
+                            aria-describedby={
+                              errors().get(row.id) ? `row-error-${row.id}` : undefined
+                            }
                             onInput={(e) => {
                               const value = e.currentTarget.value;
                               patch(row.id, (r) => void (r.value = value));
@@ -347,12 +362,9 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                           <Show
                             when={row.saved === "set"}
                             fallback={
-                              <span
-                                data-testid="prop-unreadable"
-                                class="text-sm text-amber-700 dark:text-amber-400"
-                              >
+                              <FieldMessage kind="warning" testid="prop-unreadable">
                                 Can't be read, enter it again
-                              </span>
+                              </FieldMessage>
                             }
                           >
                             <span
@@ -386,6 +398,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         <input
                           type="checkbox"
                           data-testid="prop-secret"
+                          class="accent-accent"
                           checked={row.secret}
                           disabled={!available() && !row.secret}
                           onChange={(e) => {
@@ -398,39 +411,39 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         />
                         Secret
                       </label>
-                      <button
-                        type="button"
-                        data-testid="prop-delete"
-                        aria-label={`Delete ${row.name || "property"}`}
-                        class="rounded px-2 text-base text-red-700 hover:bg-zinc-100 dark:text-red-400 dark:hover:bg-zinc-800"
-                        onClick={() =>
-                          setRows(
-                            (d) =>
-                              void d.splice(
-                                d.findIndex((r) => r.id === row.id),
-                                1,
-                              ),
-                          )
-                        }
-                      >
-                        ×
-                      </button>
+                      <Tooltip text={`Delete ${row.name || "property"}`}>
+                        <button
+                          type="button"
+                          data-testid="prop-delete"
+                          aria-label={`Delete ${row.name || "property"}`}
+                          class={btnIconSmall}
+                          onClick={() =>
+                            setRows(
+                              (d) =>
+                                void d.splice(
+                                  d.findIndex((r) => r.id === row.id),
+                                  1,
+                                ),
+                            )
+                          }
+                        >
+                          <Icon icon={Trash2} />
+                        </button>
+                      </Tooltip>
                       <Show when={errors().get(row.id)}>
-                        <span
+                        <FieldMessage
+                          kind="error"
                           id={`row-error-${row.id}`}
-                          data-testid="row-error"
-                          class="w-full text-xs text-red-700 dark:text-red-400"
+                          testid="row-error"
+                          class="w-full"
                         >
                           {errors().get(row.id)}
-                        </span>
+                        </FieldMessage>
                       </Show>
                       <Show when={shortSecret(row)}>
-                        <span
-                          data-testid="row-hint"
-                          class="w-full text-xs text-zinc-600 dark:text-zinc-400"
-                        >
+                        <FieldMessage kind="hint" testid="row-hint" class="w-full">
                           Too short to hide in the console
-                        </span>
+                        </FieldMessage>
                       </Show>
                     </li>
                   )}
@@ -438,29 +451,27 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
               </ul>
               <div>
                 <button type="button" data-testid="add-property" class={btn} onClick={addRow}>
-                  + Add property
+                  <Icon icon={Plus} />
+                  Add property
                 </button>
               </div>
               <Show when={!available()}>
-                <p
-                  data-testid="secrets-unavailable"
-                  class="text-xs text-amber-700 dark:text-amber-400"
-                >
+                <FieldMessage kind="warning" testid="secrets-unavailable">
                   Secret storage is not available on this system
-                </p>
+                </FieldMessage>
               </Show>
               <Show when={rows.some((r) => r.secret)}>
-                <p data-testid="secrets-note" class="text-xs text-zinc-600 dark:text-zinc-400">
+                <FieldMessage kind="hint" icon={Lock} testid="secrets-note">
                   {SECRETS_NOTE}
-                </p>
+                </FieldMessage>
               </Show>
             </section>
           </div>
-          <div class="mt-4 flex justify-end gap-2">
+          <div class="mt-5 flex justify-end gap-2">
             <button
               type="button"
               data-testid="save-properties"
-              class={primary}
+              class={primaryDialog}
               disabled={saving() || [...errors().values()].some(Boolean)}
               onClick={() => void save()}
             >
@@ -469,7 +480,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
             <button
               type="button"
               data-testid="cancel-properties"
-              class={btn}
+              class={btnDialog}
               disabled={saving()}
               onClick={close}
             >

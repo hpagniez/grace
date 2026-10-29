@@ -1,7 +1,8 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { Folder, FolderOpen, TriangleAlert, X, type IconNode } from "lucide";
+import { Folder, FolderOpen, TriangleAlert, X } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { drawn } from "../../test/drawn";
 import type { AppEvent, RecentEntry } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
@@ -50,10 +51,6 @@ const list: RecentEntry[] = [
   { path: "E:\\usb\\old", exists: false },
 ];
 
-/** Whether `svg` draws `icon`: every attribute of its shapes is in the markup. */
-const drawn = (svg: Element | null | undefined, icon: IconNode) =>
-  !!svg &&
-  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 /** The wrapper a Tooltip puts around its target, and the tooltip it opens. */
 const wrapperOf = (el: HTMLElement) => el.closest("span.inline-flex") as HTMLElement;
 const tip = () => document.querySelector('[role="tooltip"]');

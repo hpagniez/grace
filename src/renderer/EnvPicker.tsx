@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { validEnvName } from "../shared/env";
 import type { Api } from "../shared/ipc";
+import { FieldMessage } from "./FieldMessage";
 import type { AppState } from "./reduce";
 import { input } from "./ui";
 
@@ -105,14 +106,14 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
         <For each={view()?.suggestions ?? []}>{(name) => <option value={name} />}</For>
       </datalist>
       <Show when={error()}>
-        <span id="env-error" data-testid="env-error" class="text-xs text-red-700 dark:text-red-400">
+        <FieldMessage kind="error" id="env-error" testid="env-error">
           {error()}
-        </span>
+        </FieldMessage>
       </Show>
       <Show when={hint()}>
-        <span id="env-hint" data-testid="env-hint" class="text-xs text-zinc-600 dark:text-zinc-400">
+        <FieldMessage kind="hint" id="env-hint" testid="env-hint">
           {hint()}
-        </span>
+        </FieldMessage>
       </Show>
     </div>
   );
