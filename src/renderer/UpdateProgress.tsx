@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { createEffect, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { btn } from "./buttons";
 import { showModalWhile } from "./modal";
@@ -26,6 +26,13 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
     () => dialog,
     () => progress() !== null,
     () => cancel,
+  );
+  // a failed hand-over brings the button back as Close, after the restart step had none (R4.6)
+  createEffect(
+    () => (running()?.step === "restart" ? "restart" : failure() !== null ? "failed" : "other"),
+    (now, before) => {
+      if (before === "restart" && now === "failed") cancel?.focus();
+    },
   );
 
   const percent = (p: { received: number; total: number }) =>

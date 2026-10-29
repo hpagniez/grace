@@ -99,6 +99,13 @@ describe("UpdateProgress", () => {
     expect(api.cancelUpdate).not.toHaveBeenCalled();
   });
 
+  it("focuses Close when the hand-over fails (R4.6)", () => {
+    const { set } = setup({ ...download(0), step: "restart" });
+    set({ version: "1.0.0-rc.6", rollback: false, error: "The switch script did not start" });
+    expect(cancel().textContent).toBe("Close");
+    expect(document.activeElement).toBe(cancel());
+  });
+
   it("Cancel stops the install", () => {
     const { api } = setup(download(1));
     expect(cancel().textContent).toBe("Cancel");
