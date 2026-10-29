@@ -36,7 +36,7 @@ interface Row {
 }
 
 /** The dialog fades out over 100 ms (R5.2): its content stays this long after it closes. */
-const EXIT_MS = 120;
+export const EXIT_MS = 120;
 const SECRETS_NOTE =
   "Secrets are hidden in this app, except inside encoded text such as a Basic auth header. Karate's HTML report and event file can still contain them unless the project sets configure logging mask. Run history keeps the reports of the last 20 runs; Clear history deletes them.";
 
@@ -358,7 +358,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                           />
                         }
                       >
-                        <span class="flex flex-1 items-center gap-2">
+                        <div class="flex flex-1 items-center gap-2">
                           <Show
                             when={row.saved === "set"}
                             fallback={
@@ -392,7 +392,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                           >
                             Replace
                           </button>
-                        </span>
+                        </div>
                       </Show>
                       <label class="flex h-6 items-center gap-1 text-sm">
                         <input

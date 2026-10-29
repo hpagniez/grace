@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
-export const INDEX_CSS = new URL("../src/index.css", import.meta.url);
+// A path, not a URL: jsdom replaces the URL class, which readFileSync then refuses.
+export const INDEX_CSS = path.resolve(import.meta.dirname, "../src/index.css");
 
 /** The text between the braces after the first match of `header` (nested braces balanced). */
 function block(css: string, header: RegExp): string {
@@ -30,4 +32,12 @@ export function readTokens() {
   const light = colors(block(css, /@theme\s*\{/));
   const darkOverrides = colors(block(css, /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{/));
   return { light, darkOverrides, dark: { ...light, ...darkOverrides } };
+}
+
+/** A duration token of src/index.css (`--duration-fast: 100ms`) in milliseconds. */
+export function readDuration(name: string): number {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const m = new RegExp(String.raw`--duration-${name}:\s*(\d+)ms\s*;`).exec(css);
+  if (!m) throw new Error(`no --duration-${name} in src/index.css`);
+  return Number(m[1]);
 }

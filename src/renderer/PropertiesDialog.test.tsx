@@ -2,12 +2,14 @@ import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-lib
 import { CircleAlert, Lock, Plus, Trash2, TriangleAlert } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { readDuration } from "../../test/cssTokens";
 import { drawn } from "../../test/drawn";
 import type { EnvView, PropertiesEdit } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
 import { btn, btnDialog, btnIconSmall, primaryDialog } from "./buttons";
+import { EXIT_MS } from "./PropertiesDialog";
 import { dialog as dialogStyle, input as inputStyle } from "./ui";
 
 // Every array store the app creates is the dialog's draft rows: this lets a test look inside it.
@@ -442,6 +444,8 @@ describe("properties dialog", () => {
       "Can't be read, enter it again",
     );
     expect(within(rows()[0]).queryByTestId("prop-dots")).toBeNull();
+    // a <p> is not valid inside a <span>
+    expect(within(rows()[0]).getByTestId("prop-unreadable").parentElement!.tagName).toBe("DIV");
     fireEvent.click(within(rows()[0]).getByTestId("prop-replace"));
     flush();
     expect(within(rows()[0]).queryByTestId("prop-unreadable")).toBeNull();
@@ -707,6 +711,10 @@ describe("properties dialog", () => {
 // The dialog fades out over 100 ms (R5.2): its title, rows and buttons stay until it is gone, and only
 // then does the draft go, so an unsaved secret does not linger in the window's memory.
 describe("while it fades out", () => {
+  it("keeps the content longer than the exit transition lasts", () => {
+    expect(EXIT_MS).toBeGreaterThan(readDuration("fast"));
+  });
+
   const SECRET = "s3cret-token-123";
   /** The dialog with a typed secret in a new row, open. */
   const typed = () => {
