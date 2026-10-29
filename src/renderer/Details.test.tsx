@@ -291,6 +291,7 @@ describe("details: a group", () => {
     expect(screen.getByTestId("details-location").textContent).toBe("tests/x.feature");
     const counts = screen.getByTestId("details-counts");
     expect(counts.textContent).toContain("3 scenarios");
+    expect(within(counts).getByText("3 scenarios").className).toContain("tabular-nums"); // R2.4
     // the word after each mark names it, so the marks are hidden from the accessibility tree
     expect(within(counts).queryAllByRole("img")).toHaveLength(0);
     const marks = [...counts.querySelectorAll<HTMLElement>("[data-status]")];

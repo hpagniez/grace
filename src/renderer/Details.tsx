@@ -175,7 +175,7 @@ function Group(props: { node: TestNode; state: AppState }) {
         </Cut>
       </div>
       <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-testid="details-counts">
-        <span>{`${leaves(props.node).length} scenarios`}</span>
+        <span class="tabular-nums">{`${leaves(props.node).length} scenarios`}</span>
         <For each={counts()}>
           {([s, n]) => (
             <span class="inline-flex items-center gap-1.5">
