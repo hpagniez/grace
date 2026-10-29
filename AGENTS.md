@@ -42,6 +42,8 @@ Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak check
 
 The app is still in development. Never write code that keeps older versions working: no migration of settings, run history or data folders, no fallback to an old name, key, environment variable or file format, no deprecated alias. Change the name or format, and update every place that uses it. Data from an older version may be lost: say so in the commit's `BREAKING CHANGE:` footer.
 
+This rule ends at the first stable release, `1.0.0`. From then on, people get new versions through the in-app updater, so every version must read the data of every earlier stable version. A rollback is not promised to read newer data. The updater's own contract (release tag, zip name and layout, `update-result.json`, backup layout, the `updates` settings key) never changes without a new decision record, pre-releases included ([ADR 0019](docs/decisions/0019-update-the-zip-install-from-github-releases.md)).
+
 ## Git workflow
 
 Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md); release and hotfix branch names in [ADR 0009](docs/decisions/0009-release-and-hotfix-branches-named-after-their-tag.md); release candidates only in [ADR 0015](docs/decisions/0015-release-candidates-until-a-stable-release-is-decided.md).
