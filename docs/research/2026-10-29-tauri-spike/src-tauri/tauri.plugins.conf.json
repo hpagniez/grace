@@ -1,0 +1,51 @@
+{
+  "app": {
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "shell-java",
+          "description": "Option 3: the page itself spawns the bundled Java with Karate's argument shape, and taskkill.",
+          "windows": ["main"],
+          "permissions": [
+            {
+              "identifier": "shell:allow-execute",
+              "allow": [
+                {
+                  "name": "karate",
+                  "cmd": "$RESOURCE/jre/bin/java.exe",
+                  "args": [
+                    "-Dstdout.encoding=UTF-8",
+                    "-Dstderr.encoding=UTF-8",
+                    "-cp",
+                    { "validator": "^[^;]+\\\\karate\\.jar(;[^;]+)*$" },
+                    "io.karatelabs.Main",
+                    "run",
+                    "--no-color",
+                    "-w",
+                    { "validator": "^[A-Za-z]:\\\\.+$" },
+                    "-o",
+                    { "validator": "^[A-Za-z]:\\\\.+$" },
+                    "-B",
+                    "false",
+                    "-f",
+                    "html,karate:jsonl",
+                    "-D",
+                    "-T",
+                    "1",
+                    { "validator": "^[A-Za-z]:\\\\.+$" }
+                  ]
+                },
+                {
+                  "name": "taskkill",
+                  "cmd": "C:\\Windows\\System32\\taskkill.exe",
+                  "args": ["/PID", { "validator": "^\\d+$" }, "/T", "/F"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

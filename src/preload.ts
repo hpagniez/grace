@@ -20,6 +20,13 @@ const api: Api = {
   openRecent: (root) => ipcRenderer.invoke(CH.openRecent, root),
   removeRecent: (root) => ipcRenderer.invoke(CH.removeRecent, root),
   closeProject: () => ipcRenderer.invoke(CH.close),
+  checkUpdates: () => ipcRenderer.invoke(CH.checkUpdates),
+  installVersion: (version, useSavedData) =>
+    ipcRenderer.invoke(CH.installVersion, version, useSavedData),
+  cancelUpdate: () => ipcRenderer.invoke(CH.cancelUpdate),
+  setUpdateSettings: (patch) => ipcRenderer.invoke(CH.updateSettings, patch),
+  skipVersion: (version) => ipcRenderer.invoke(CH.skipVersion, version),
+  openWhatsNew: (version) => ipcRenderer.invoke(CH.whatsNew, version),
   onEvent: (cb) => {
     const listener = (_: unknown, e: AppEvent) => cb(e);
     ipcRenderer.on(CH.event, listener);

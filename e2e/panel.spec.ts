@@ -34,6 +34,14 @@ const splitterY = async (win: Page) => {
 };
 const dragBy = async (win: Page, dy: number) => dragTo(win, (await splitterY(win)) - dy);
 
+/** The status bar sits whole inside the window. */
+async function expectStatusBarShown(win: Page) {
+  const bar = (await win.getByTestId("status-bar").boundingBox())!;
+  expect(bar.height).toBeGreaterThan(0);
+  expect(bar.y).toBeGreaterThanOrEqual(0);
+  expect(bar.y + bar.height).toBeLessThanOrEqual(await win.evaluate(() => window.innerHeight));
+}
+
 const setWindowHeight = (app: ElectronApplication, h: number) =>
   app.evaluate(({ BrowserWindow }, h) => BrowserWindow.getAllWindows()[0].setSize(1200, h), h);
 
@@ -116,6 +124,14 @@ test("the window cannot get too short for the layout", async () => {
       () => document.scrollingElement!.scrollHeight <= document.scrollingElement!.clientHeight,
     ),
   ).toBe(true);
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].webContents.send("app:event", {
+      type: "notice",
+      message: "Something to say",
+    }),
+  );
+  await expect(win.getByTestId("notice")).toBeVisible();
+  await expectStatusBarShown(win);
 });
 
 /** 600 px tall fits CI's small screen, so the restart (F41) restores the same height whatever the first start's. */
@@ -198,11 +214,12 @@ test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
     w.setSize(520, 480);
     w.webContents.send("app:event", { type: "notice", message: "a long notice ".repeat(300) });
   });
-  const root = win.getByTestId("app");
+  const root = win.getByTestId("view");
   const sheet = win.getByTestId("sheet");
   await expect
     .poll(() => sheet.evaluate((e) => e.scrollHeight > e.clientHeight)) // the sheet cuts the panel off
     .toBe(true);
+  await expectStatusBarShown(win); // the panel, not the status bar
 
   await win.getByTestId("tab-http").focus();
   expect(await root.evaluate((e) => e.scrollTop)).toBe(0);

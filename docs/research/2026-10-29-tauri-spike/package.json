@@ -1,0 +1,19 @@
+{
+  "name": "grace-tauri-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "sidecar": "node sidecar/build.mjs",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}
