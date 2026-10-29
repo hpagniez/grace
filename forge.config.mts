@@ -3,9 +3,16 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
-import { readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { APP_FILES } from "./src/main/updates/preflight";
+
+// The renderer bundles these packages; their licences ship beside the JRE's and Karate's (ADRs 0021, 0022).
+const NPM_LICENSES = {
+  "lucide-LICENSE.txt": "node_modules/lucide/LICENSE",
+  "ibm-plex-sans-LICENSE.txt": "node_modules/@fontsource-variable/ibm-plex-sans/LICENSE",
+  "ibm-plex-mono-LICENSE.txt": "node_modules/@fontsource/ibm-plex-mono/LICENSE",
+};
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -19,6 +26,8 @@ const config: ForgeConfig = {
     postPackage: async (_config, { outputPaths }) => {
       for (const out of outputPaths) {
         writeFileSync(path.join(out, "resources", APP_FILES), JSON.stringify(readdirSync(out)));
+        for (const [name, from] of Object.entries(NPM_LICENSES))
+          copyFileSync(from, path.join(out, "resources", "licenses", name));
       }
     },
   },
