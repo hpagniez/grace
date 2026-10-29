@@ -1,24 +1,24 @@
 # App check: premium look and feel (#107)
 
 Date: 2026-10-29
-Branch: `feature/premium-ui` at bba0935b (the code is the same as at ae2567fe; the commits since then only retake screenshots)
+Branch: `feature/premium-ui`. The code is as at ddb75a3b; the commits since then only edit docs and retake screenshots.
 Machine: Windows 11 Pro 10.0.26300 (x64), AMD Ryzen 7 5800X, 32 GB, NVIDIA GeForce RTX 4060 Ti, Windows in dark mode, Node 24.15.0, npm 11.16.0, Electron 45.0.0, bundled Temurin 21.0.12.1 and Karate 2.1.4.
 Spec: [Premium look and feel](../specs/2026-10-29-premium-ui.md), with the [mockup](../specs/2026-10-29-premium-ui-mockup.png) and the [plan](../plans/2026-10-29-premium-ui.md).
 
-The branch restyles every screen to design tokens (IBM Plex, Lucide, the light "parchment sheet" and the dark "logbook" themes), adds styled tooltips and Settings › Appearance (Follow Windows, Light, Dark), and restyles the app-updates screens that came from `develop` (#110). This record holds the before and after screenshots of R22, the automated results, and what was checked by hand on the packaged app.
+The branch restyles every screen to design tokens (IBM Plex, Lucide, one structure in both themes, the inset "parchment sheet", with the dark theme differing only in colours, and the primary buttons in the progress bar's passed green), adds styled tooltips and Settings › Appearance (Follow Windows, Light, Dark), and restyles the app-updates screens that came from `develop` (#110). This record holds the before and after screenshots of R22, the automated results, and what was checked by hand on the packaged app.
 
 ## Automated part (run by an agent)
 
 | Check | Result |
 |---|---|
-| `npm run screens` (`e2e/screens.shots.ts`, 1280 × 800, light and dark) | `2 passed (37.4s)`. Wrote the 34 PNGs of `2026-10-29-premium-ui/after/` (17 screens × 2 themes). |
-| `npm test` | First run: `Test Files  1 failed \| 87 passed (88)` and `Tests  2 failed \| 1266 passed (1268)`. The 2 failures are `src/main/updates/switch.test.ts`, EPERM on `rmSync` of its temp folder under the parallel run (the updater flake of `develop`). That file with `startup.test.ts` alone: `Test Files  2 passed (2)`, `Tests  63 passed (63)`. |
+| `npm run screens` (`e2e/screens.shots.ts`, 1280 × 800, light and dark) | `2 passed (37.9s)`. Wrote the 34 PNGs of `2026-10-29-premium-ui/after/` (17 screens × 2 themes). |
+| `npm test` | First run: `Test Files  1 failed \| 87 passed (88)` and `Tests  2 failed \| 1289 passed (1291)`. The 2 failures are `src/main/updates/switch.test.ts`, EPERM on `rmSync` of its temp folder under the parallel run (the updater flake of `develop`). That file with `startup.test.ts` alone: `Test Files  2 passed (2)`, `Tests  63 passed (63)`. |
 | `npm run typecheck` | `tsc --noEmit`, no output, passed. |
 | `npm run lint` | oxlint reported nothing; oxfmt: `All matched files use the correct format.` |
-| `npm run e2e` | `159 passed (8.0m)`. Nothing on stderr. |
-| `npm run make` | Passed. `Grace-win32-x64-1.0.0-rc.4.zip`, 218,717,090 bytes (208.6 MB). Unzipped: `Grace.exe` (product and file version `1.0.0-rc.4`), `resources/jre/bin/java.exe`, `resources/karate.jar`, `resources/app-files.json`, `resources/licenses/` (181 files). |
+| `npm run e2e` | `161 passed (8.3m)`, nothing on stderr. An earlier run, before the passed-green change, had `2 failed` and `159 passed (8.6m)`: `home.spec.ts` "A missing last project shows the home screen" and `look.spec.ts` "A tooltip shows after a pause on hover, also on a disabled button", both with no tooltip after a real pointer hover. Nothing they touch changed, and the rerun passed both. |
+| `npm run make` | Passed, before the one-structure and primary-colour changes (styles only); not rerun for them. `Grace-win32-x64-1.0.0-rc.4.zip`, 218,717,090 bytes (208.6 MB). Unzipped: `Grace.exe` (product and file version `1.0.0-rc.4`), `resources/jre/bin/java.exe`, `resources/karate.jar`, `resources/app-files.json`, `resources/licenses/` (181 files). |
 
-The after shots were looked at one by one, in both themes, against the spec and the mockup. Nothing was off: tokens, type, icons, the sheet (light) and flush panels (dark), the filter chips, the status marks, the dialogs and the update screens match R1 to R21. Differences a reader may notice are in the deviations below, not defects.
+The after shots were retaken after the person's two decisions on the built app (see the deviations) and looked at in both themes: project idle, finished with a failed test, home with recent folders, Settings and the Properties dialog, against the spec. The dark theme shows the same structure as the light one: the toolbar on the `ground` frame, the work on an inset sheet with 16 px corners and a 1 px edge, the status bar below, Home on `ground`. Only colours differ. `Run all`, `Open folder…`, `Update to …` and a dialog's `Save` are the passed green (`#1b7a4c` with white text in light, `#3fcf6e` with ink text in dark), the same green as the passed part of the progress bar. Differences a reader may notice are in the deviations below, not defects.
 
 How the shots were taken: `SHOTS_DIR=<dir> npm run screens` packages the app and drives it with Playwright, one window of 1280 × 800 per state, the pointer parked off every control. Paths in the shots are temp folders of the git-ignored `out/`, so they hold no user name. Their random suffixes, the clock times and the counts of the `running` shot differ between before and after.
 
@@ -55,6 +55,8 @@ Not in the table:
 
 ## By hand (done by an agent on the packaged app)
 
+These were done before the person's two decisions (one structure in both themes, the passed-green primary buttons), so the shots in `by-hand/` that show the project screen, a dialog or Settings in the dark theme (`ring-project-dark`, `ring-dialog-dark`, `appearance-dark`) still show the earlier flat dark panels, and `ring-home-light` and `ring-settings-light` the near-black primary button. The startup shots are unchanged. The walks were not repeated: the focus ring and the Appearance setting, which they check, did not change.
+
 Method: `npm run make`, the zip unzipped into a folder under `out/`, `Grace.exe` started with `GRACE_USER_DATA` on a fresh profile whose `settings.json` was written first (the saved appearance, the last project a copy of the `clean` fixture). Keys were sent with SendKeys only while Grace held the foreground (the script stops otherwise; it stopped once, nothing was sent elsewhere). The window, title bar included, was captured from the screen with `CopyFromScreen`. Frames taken before the window shows its ground colour were thrown away unsaved: while Windows plays its show animation it blends the desktop behind the window.
 
 1. Startup screen and title bar with a saved appearance that differs from Windows (spec: Dark over a light Windows; R6.3, R8.3).
@@ -80,6 +82,8 @@ Method: `npm run make`, the zip unzipped into a folder under `out/`, `Grace.exe`
 
 ## Deviations from the spec decided during the build
 
+- The two themes have one structure and differ only in colours (the person, after seeing the built app): the dark theme has the light theme's inset, rounded sheet with its side borders and Home on `ground`, instead of flush panels and Home on `surface`. The dark block of `src/index.css` may override only colour tokens, shadows and the backdrop, and `tokens.test.ts` fails on anything else (R1.2, R3.3, R12.1).
+- The primary buttons are the progress bar's passed green, not near-black (the person, after seeing the built app): `#1b7a4c` with white text in light, `#3fcf6e` with ink text in dark. New tokens `primary`, `on-primary` and `primary-hover` replace the `accent` fill, `accent-hover` and `play`; `accent` stays for the tab line, the selection bar, the included tag chip and the splitter (R1.3, R13.2).
 - Tags in tree rows are 20 px chips, not 24 px: 24 px bordered chips in 24 px rows with no gap touched the rows above and below (R15.1, R16.1).
 - The toolbar shows icons only below 1280 px (the buttons keep their accessible names and a tooltip), and the window's minimum width is 760 px so Run all and Cancel stay on screen. The default 1200 px window is therefore icon-only (R13).
 - "Not run yet" shows only when the project has no run history (R14.3).
