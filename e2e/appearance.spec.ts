@@ -46,11 +46,11 @@ test("Follow Windows is the default", async () => {
   expect(await themeSource(app)).toBe("system");
 });
 
-test("A saved Dark is in force before the first frame, whatever Windows is", async () => {
+test("A saved Dark is in force at start, whatever Windows is", async () => {
   const { app, win } = await launchWithSettings({ appearance: { theme: "dark" } }, {}, NATIVE);
   expect(await themeSource(app)).toBe("dark");
   await expect(win.getByTestId("app")).toHaveCSS("background-color", GROUND_RGB.dark);
-  // the window was created in the saved theme: its background was never light
+  // the window's own background is the dark ground too
   expect((await windowBackground(app)).toLowerCase()).toBe("#151821");
   await openAppearance(win);
   await expect(win.getByRole("radio", { name: "Dark" })).toBeChecked();
