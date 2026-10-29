@@ -74,7 +74,7 @@ test("the splitter works from the keyboard", async () => {
   const { win } = await started();
   for (
     let i = 0;
-    i < 40 && !(await splitter(win).evaluate((e) => e === document.activeElement));
+    i < 80 && !(await splitter(win).evaluate((e) => e === document.activeElement));
     i++
   )
     await win.keyboard.press("Tab");
@@ -200,7 +200,7 @@ test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
   });
   const root = win.getByTestId("app");
   await expect
-    .poll(() => root.evaluate((e) => e.scrollHeight > e.clientHeight)) // the panel is cut off
+    .poll(() => win.getByTestId("sheet").evaluate((e) => e.scrollHeight > e.clientHeight)) // the sheet cuts the panel off
     .toBe(true);
 
   await win.getByTestId("tab-http").focus();

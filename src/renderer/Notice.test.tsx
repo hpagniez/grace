@@ -25,6 +25,13 @@ describe("Notice", () => {
     expect(box.hasAttribute("data-testid")).toBe(false);
   });
 
+  it("lets a long path wrap instead of overflowing", () => {
+    render(() => <Notice kind="warning" text={"D:\\" + "folder\\".repeat(50)} />);
+    const text = screen.getByRole("status").querySelector("span")!;
+    expect(text.className).toContain("min-w-0");
+    expect(text.className).toContain("break-words");
+  });
+
   it("draws a different icon per kind", () => {
     const shape = (kind: "warning" | "error") => {
       const { container } = render(() => <Notice kind={kind} text="x" />);

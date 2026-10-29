@@ -33,6 +33,9 @@ test("the window opens painted in the app's theme", async () => {
 test("the page starts with a static startup screen", () => {
   const html = readFileSync(".vite/renderer/main_window/index.html", "utf8");
   expect(html).toContain('<div id="startup" role="status" aria-label="Loading Grace">');
+  const startup = html.slice(html.indexOf('<div id="startup"'), html.indexOf('<div id="root">'));
+  expect(startup).toContain("<svg"); // the logo (assets/icon.svg, inlined)
+  expect(startup).toContain("Grace");
   expect(html).toMatch(/prefers-color-scheme:\s*dark/);
   expect(html).toMatch(/prefers-reduced-motion:\s*reduce/);
   expect(html).toContain('<div id="root"></div>');

@@ -16,7 +16,7 @@ export function Notice(props: { kind: "warning" | "error"; text: string; testid?
       class={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${kind().tone}`}
     >
       <Icon icon={kind().icon} class="mt-0.5" />
-      <span class="text-ink">{props.text}</span>
+      <span class="min-w-0 break-words text-ink">{props.text}</span>
     </div>
   );
 }

@@ -209,6 +209,38 @@ describe("home screen", () => {
     expect(screen.getByTestId("notice").textContent).toBe("Folder not found: D:\\x");
   });
 
+  it("the notice is a warning Notice: a status with the cancelled tint and its icon", () => {
+    const { send } = setup();
+    send({ type: "opening", root: null }, { type: "notice", message: "Cancelled" });
+    const box = screen.getByTestId("notice");
+    expect(box.getAttribute("role")).toBe("status");
+    expect(box.className).toContain("bg-cancelled-tint");
+    expect(box.querySelector("svg")).not.toBeNull();
+  });
+
+  it("the project view sits on the sheet under the toolbar; home has none", () => {
+    const { send, open } = setup();
+    expect(screen.queryByTestId("sheet")).toBeNull();
+    open();
+    send({ type: "notice", message: "Nothing to run" });
+    const sheet = screen.getByTestId("sheet");
+    for (const c of ["mx-(--sheet-inset)", "rounded-(--sheet-radius)", "bg-surface"])
+      expect(sheet.className).toContain(c);
+    for (const id of ["notice", "bottom-panel"])
+      expect(sheet.contains(screen.getByTestId(id))).toBe(true);
+    expect(sheet.querySelector("main")).not.toBeNull();
+    expect(sheet.querySelector("section")).not.toBeNull(); // progress
+    expect(sheet.contains(document.querySelector("header"))).toBe(false); // the toolbar stays on the ground
+  });
+
+  it("the app root is ground and ink, with no dark: classes", () => {
+    setup().send({ type: "opening", root: null });
+    const cls = screen.getByTestId("app").className;
+    expect(cls).toContain("bg-ground");
+    expect(cls).toContain("text-ink");
+    expect(cls).not.toContain("dark:");
+  });
+
   it("a dry-run error shows in the project view, not as a notice", () => {
     const { send } = setup();
     send({
