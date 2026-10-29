@@ -114,7 +114,7 @@ export function ClearHistory(props: { state: AppState; api: Api }) {
 export function History(props: { state: AppState; api: Api }) {
   const locked = () => props.state.run.active || props.state.busy;
   return (
-    <div data-testid="history" class="min-h-0 flex-1 overflow-auto">
+    <div data-testid="history" class="min-h-0 flex-1 scroll-pt-7 overflow-auto">
       <Show
         when={props.state.history.length > 0}
         fallback={
@@ -190,10 +190,11 @@ export function History(props: { state: AppState; api: Api }) {
                       </Tooltip>
                     </td>
                     <td data-testid="history-result" class={td}>
-                      <span class="inline-flex items-center gap-1.5">
+                      {/* a block flex, not inline-flex: baseline alignment would lift the words above their row */}
+                      <div class="flex items-center gap-1.5">
                         <StatusMark status={resultStatus(run)} decorative />
                         {resultLabel(run)}
-                      </span>
+                      </div>
                     </td>
                     <td data-testid="history-duration" class={`${td} ${num} font-mono`}>
                       {durationLabel(run.durationMillis)}

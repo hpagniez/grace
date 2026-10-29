@@ -345,6 +345,8 @@ describe("history list", () => {
       expect(m.hasAttribute("role")).toBe(false);
     }
     expect(within(screen.getByTestId("history")).queryAllByRole("img")).toHaveLength(0);
+    // a block flex: inline-flex would sit on the baseline and lift the words above the rest of the row
+    expect(cell(0, "history-result").firstElementChild!.className).toMatch(/(^| )flex /);
     expect(text(0, "history-result")).toBe("41 passed, 2 failed of 43");
     expect(text(1, "history-result")).toBe("3 passed, 0 failed of 3");
     expect(text(2, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
@@ -395,9 +397,11 @@ describe("history list", () => {
         "h-7",
       ])
         expect(th.className, `${th.textContent} ${c}`).toContain(c);
-    // 28 px rows; scroll-mt-7 keeps a focused row out from under the 28 px header (R10.2)
+    // 28 px rows (R18.4). A focused button is scrolled clear of the 28 px header by the scroller's
+    // scroll-padding, which a row's scroll-margin alone does not do (R10.2; checked in Chromium).
     for (const c of ["h-7", "border-b", "border-line", "scroll-mt-7"])
       expect(rows()[0].className).toContain(c);
+    expect(screen.getByTestId("history").className).toContain("scroll-pt-7");
     expect(rows()[0].className).not.toMatch(/\b(odd|even):/); // no zebra
   });
 
