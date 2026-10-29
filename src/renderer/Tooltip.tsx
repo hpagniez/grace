@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, flush, onCleanup, Show } from "solid-js";
-import { placeTip } from "./placeTip";
+import { placeTip, type Side } from "./placeTip";
 
 const DELAY = 500; // the pointer must rest this long on the target
 
@@ -16,15 +16,19 @@ let pressedAt: { x: number; y: number } | null = null;
 const SAME_SPOT = 2; // px
 
 // A fade over --duration-fast; the global reduced-motion rule turns it off. `open:` is :popover-open.
-// The ::before bridges the 6 px gap to the target, so the pointer can cross onto the tooltip.
+// The ::before bridges the 6 px gap to the target on the side the tooltip went (`data-side`), so the
+// pointer can cross onto it; one `over` its target has no gap.
 // The tooltip sits inside rows that may truncate, centre or shout: it resets what text inherits.
 const tipClass = [
   "m-0 inset-auto w-max max-w-80 overflow-visible rounded-md border border-line bg-raised px-2 py-1",
   "font-sans text-xs font-normal break-words whitespace-normal normal-case not-italic tracking-normal text-left text-ink shadow-float",
   "opacity-0 transition-[opacity,display,overlay] transition-discrete duration-(--duration-fast) ease-standard",
   "open:opacity-100 starting:open:opacity-0",
-  "before:absolute before:inset-x-0 before:-top-2 before:h-2",
-  "data-above:before:top-auto data-above:before:-bottom-2",
+  "before:absolute",
+  "data-[side=below]:before:inset-x-0 data-[side=below]:before:-top-2 data-[side=below]:before:h-2",
+  "data-[side=above]:before:inset-x-0 data-[side=above]:before:-bottom-2 data-[side=above]:before:h-2",
+  "data-[side=left]:before:inset-y-0 data-[side=left]:before:-right-2 data-[side=left]:before:w-2",
+  "data-[side=right]:before:inset-y-0 data-[side=right]:before:-left-2 data-[side=right]:before:w-2",
 ].join(" ");
 
 /** Whether the focus that just arrived came from the keyboard. An engine that cannot say shows it. */
@@ -39,6 +43,9 @@ function keyboardFocus(el: EventTarget | null) {
 /** The tooltip is a child of the target's wrapper in the DOM: a click on it must not reach a row or a toolbar. */
 const keepHere = (e: Event) => e.stopPropagation();
 
+const within = (r: DOMRect, e: MouseEvent) =>
+  e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+
 /**
  * A styled tooltip for the first element of `children` (spec R9.4); it replaces a native `title`.
  * The wrapper, not the target, listens: a disabled button gets no pointer events. The tooltip is in the
@@ -46,13 +53,14 @@ const keepHere = (e: Event) => e.stopPropagation();
  * leaves the wrapper. No `text` (a disabled control with no reason) means no tooltip.
  * `class` goes on the wrapper, after `inline-flex`: a row that truncates needs `min-w-0` there.
  * `describe` adds the tooltip to the target's `aria-describedby`: leave it off when the text is the
- * target's name.
+ * target's name. `side` is where it goes (`placeTip`): in a row, beside its target or over its cut text.
  */
 export function Tooltip(props: {
   text: string | undefined;
   children: JSX.Element;
   describe?: boolean;
   class?: string;
+  side?: Side;
 }) {
   const id = createUniqueId();
   const [open, setOpen] = createSignal(false);
@@ -74,6 +82,19 @@ export function Tooltip(props: {
   // following its tail leaves the tooltip of a disabled button alone, as a run goes on.
   const onScroll = (e: Event) => {
     if (e.target instanceof Node && e.target.contains(wrap)) hide();
+  };
+
+  // A click inside closes it, rather than being lost on it. One `over` its target lies on it: a click
+  // within the target's box is meant for the target.
+  const onTipClick = (e: MouseEvent) => {
+    hide();
+    const target = wrap.firstElementChild;
+    if (
+      props.side === "over" &&
+      target instanceof HTMLElement &&
+      within(target.getBoundingClientRect(), e)
+    )
+      target.click();
   };
 
   // Taking the element out of the DOM hides the popover.
@@ -98,10 +119,11 @@ export function Tooltip(props: {
     tip!.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
     const target = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
     const { width, height } = tip!.getBoundingClientRect();
-    const at = placeTip(target, { width, height }, { width: innerWidth, height: innerHeight });
+    const view = { width: innerWidth, height: innerHeight };
+    const at = placeTip(target, { width, height }, view, props.side);
     tip!.style.top = `${at.top}px`;
     tip!.style.left = `${at.left}px`;
-    tip!.toggleAttribute("data-above", at.above);
+    tip!.dataset.side = at.side;
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("scroll", onScroll, true);
   };
@@ -141,7 +163,8 @@ export function Tooltip(props: {
         hide();
       }}
       // A press of the target: the person acted on it. The tooltip is hoverable, so it would stay up over
-      // whatever lies below and take the next click. A press inside the tooltip leaves it open.
+      // whatever lies below and take the next click. A press inside the tooltip leaves it open: its click
+      // closes it.
       onPointerDown={(e) => {
         if (tip?.contains(e.target as Node)) return;
         pressedAt = { x: e.clientX, y: e.clientY };
@@ -158,6 +181,7 @@ export function Tooltip(props: {
             // Native listeners: Solid's own run at the document, after a row's native ones.
             for (const type of ["click", "dblclick", "contextmenu"])
               e.addEventListener(type, keepHere);
+            e.addEventListener("click", onTipClick);
           }}
           popover="manual"
           role="tooltip"

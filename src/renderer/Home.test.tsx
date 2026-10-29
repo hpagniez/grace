@@ -197,6 +197,8 @@ describe("home screen", () => {
     expect(tip()).toBeNull();
     hover(gone);
     expect(tip()!.textContent).toBe("Folder not found");
+    // over its row: below, it would take the click meant for the next row
+    expect((tip() as HTMLElement).dataset.side).toBe("over");
     expect(gone.hasAttribute("title")).toBe(false);
   });
 
@@ -221,6 +223,7 @@ describe("home screen", () => {
     cut(okLine);
     hover(okLine);
     expect(tip()!.textContent).toBe("D:\\work\\api");
+    expect((tip() as HTMLElement).dataset.side).toBe("over");
     fireEvent.pointerLeave(wrapperOf(okLine));
     flush();
     // on a missing row the cut path wins over the row's own tooltip

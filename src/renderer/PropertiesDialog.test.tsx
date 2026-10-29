@@ -1006,6 +1006,9 @@ describe("the look of the dialog (spec R19)", () => {
     Object.defineProperty(line, "clientWidth", { value: 100 });
     fireEvent.pointerEnter(line.closest("span.inline-flex")!);
     vi.advanceTimersByTime(500);
-    expect(document.querySelector('[role="tooltip"]')!.textContent).toBe(name);
+    const tip = document.querySelector<HTMLElement>('[role="tooltip"]')!;
+    expect(tip.textContent).toBe(name);
+    // over its row: below, it would take the click meant for the next row
+    expect(tip.dataset.side).toBe("over");
   });
 });

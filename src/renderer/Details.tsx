@@ -53,7 +53,7 @@ function StepRow(props: { step: Step }) {
         <Show when={props.step.background}>
           <span class={`${tagChip} shrink-0`}>Background</span>
         </Show>
-        <Cut full={`${props.step.keyword} ${props.step.text}`} wrap="flex-1">
+        <Cut full={`${props.step.keyword} ${props.step.text}`} wrap="flex-1" side="over">
           <span class="font-medium">{props.step.keyword}</span>{" "}
           <span class="font-mono text-xs">{props.step.text}</span>
         </Cut>

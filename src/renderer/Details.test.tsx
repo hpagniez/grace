@@ -367,6 +367,8 @@ describe("details: long text", () => {
       measure(cell, 300, 100);
       rest(cell);
       expect(tip()!.textContent).toBe("Given match response == { a: 1 }");
+      // over its row: below, it would take the click meant for the next row
+      expect((tip() as HTMLElement).dataset.side).toBe("over");
     });
   });
 });

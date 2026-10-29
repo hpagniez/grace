@@ -29,7 +29,8 @@ interface Ctx {
   api: Api;
 }
 
-// The tree scrolls, so a focus ring goes inside its row (spec R10.1).
+// The tree scrolls, so a focus ring goes inside its row (spec R10.1). A row's tooltips stay on the row
+// (beside their target, or over the cut label): one below would take the click meant for the next row.
 const INSET = "focus-visible:-outline-offset-2";
 const TAG = `${tagChip} shrink-0`;
 const FLAKY = `${badge} ${TINT.cancelled} shrink-0`;
@@ -90,13 +91,13 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
               class={`transition-transform duration-(--duration-base) ease-standard ${open() ? "rotate-90" : ""}`}
             />
           </button>
-          <Tooltip text={STATUS_LABEL[status()]}>
+          <Tooltip text={STATUS_LABEL[status()]} side="right">
             <StatusMark status={status()} />
           </Tooltip>
           <Show when={kindIcon()}>
             <Icon icon={kindIcon()!} size={14} class="text-muted" />
           </Show>
-          <Tooltip text={cut() ? full() : undefined} class="min-w-0 flex-1">
+          <Tooltip text={cut() ? full() : undefined} class="min-w-0 flex-1" side="over">
             <button
               ref={(e) => (labelEl = e)}
               type="button"
@@ -120,7 +121,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
                 </span>
               }
             >
-              <Tooltip text={FLAKY_TITLE} class="shrink-0">
+              <Tooltip text={FLAKY_TITLE} class="shrink-0" side="left">
                 <span
                   data-testid="flaky-mark"
                   role="img" // aria-label names only an element with a role
@@ -134,7 +135,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
             </Show>
           </Show>
           <Show when={match()}>
-            <Tooltip text={`Run ${label()}`} class="shrink-0">
+            <Tooltip text={`Run ${label()}`} class="shrink-0" side="left">
               <button
                 type="button"
                 data-testid="run-node"

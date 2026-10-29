@@ -259,6 +259,34 @@ describe("main screen", () => {
         vi.useRealTimers();
       }
     });
+
+    it("keeps a row's tooltips on its row: the mark's right, the label's over it, the run's left", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      // every box 24 x 24 in the middle of the window, so no side runs out of room
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+        DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }),
+      );
+      try {
+        const { load } = setup();
+        load();
+        const row = rowByKey("s:tests/basic.feature#2");
+        const label = screen.getByText("failing match");
+        measure(label, 200, 100);
+        const sideOf = (el: HTMLElement) => {
+          rest(el);
+          const side = (tip() as HTMLElement).dataset.side;
+          fireEvent.pointerLeave(el.parentElement!);
+          flush();
+          return side;
+        };
+        expect(sideOf(within(row).getByRole("img"))).toBe("right");
+        expect(sideOf(label)).toBe("over");
+        expect(sideOf(within(row).getByTestId("run-node"))).toBe("left");
+      } finally {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+    });
   });
 
   it("gives tags the 20 px tag chip, so they clear the rows above and below", () => {
@@ -634,8 +662,11 @@ describe("flaky marks", () => {
     expect(run).toBeGreaterThan(flaky);
   });
 
-  it("shows the flaky explanation in a tooltip", () => {
+  it("shows the flaky explanation in a tooltip, left of the mark: below, it would cover the next row", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }),
+    );
     try {
       const { send } = setup();
       send({
@@ -647,9 +678,12 @@ describe("flaky marks", () => {
       send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
       fireEvent.pointerEnter(markOf(SCENARIO)!.parentElement!);
       vi.advanceTimersByTime(500);
-      expect(document.querySelector("[role=tooltip]")!.textContent).toBe(FLAKY_TITLE);
+      const tip = document.querySelector<HTMLElement>("[role=tooltip]")!;
+      expect(tip.textContent).toBe(FLAKY_TITLE);
+      expect(tip.dataset.side).toBe("left");
     } finally {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     }
   });
 

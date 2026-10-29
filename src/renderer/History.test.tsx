@@ -288,6 +288,8 @@ describe("history list", () => {
         expect(what(i).hasAttribute("title")).toBe(false);
         rest(what(i));
         expect(tip()!.textContent, `row ${i}`).toBe(path);
+        // over its row: below, it would take the click meant for the next row
+        expect((tip() as HTMLElement).dataset.side).toBe("over");
         fireEvent.pointerLeave(what(i).parentElement!);
         flush();
       }

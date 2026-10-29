@@ -239,6 +239,32 @@ test("A tooltip shows after a pause on hover, also on a disabled button", async 
   await cancelRun(win);
 });
 
+test("A row's tooltip leaves the next row's run button to the pointer", async () => {
+  test.setTimeout(90_000);
+  const { win } = await openClean();
+  const first = node(win, "passing hello");
+  const second = node(win, "failing match");
+  const centre = async (row: Locator) => {
+    const b = (await row.getByTestId("run-node").boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  const from = await centre(first);
+  const to = await centre(second);
+  expect(to.x).toBe(from.x); // one column: straight down
+  expect(to.y).toBeGreaterThan(from.y);
+
+  await win.mouse.move(from.x, from.y);
+  await win.waitForTimeout(600);
+  await expect(win.getByRole("tooltip")).toHaveText("Run passing hello");
+  await win.mouse.move(to.x, to.y, { steps: 5 });
+  await win.mouse.down();
+  await win.mouse.up();
+
+  await expect(second).toHaveAttribute("data-status", "failed", { timeout: 60_000 });
+  await expect(first).toHaveAttribute("data-status", "notRun");
+  await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 30_000 });
+});
+
 // R10: keyboard and accessibility
 
 for (const scheme of ["light", "dark"] as const) {

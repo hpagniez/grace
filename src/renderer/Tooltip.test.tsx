@@ -239,17 +239,25 @@ describe("Tooltip", () => {
     expect(tips().map((x) => x.textContent)).toEqual(["Refresh"]);
   });
 
-  it("hides on a press of its target, not on one inside the tooltip", () => {
+  it("hides on a press of its target", () => {
     const { button, wrapper } = one();
     hover(wrapper);
-    expect(tips()).toHaveLength(1);
-    fireEvent.pointerDown(tipOf()!);
-    flush();
     expect(tips()).toHaveLength(1);
     fireEvent.pointerDown(button);
     flush();
     expect(tips()).toHaveLength(0);
     leave(wrapper);
+  });
+
+  it("hides on a click inside it, not on the press that starts one", () => {
+    const { wrapper } = one();
+    hover(wrapper);
+    fireEvent.pointerDown(tipOf()!); // a press may start a text selection
+    flush();
+    expect(tips()).toHaveLength(1);
+    fireEvent.click(tipOf()!);
+    flush();
+    expect(tips()).toHaveLength(0);
   });
 
   it("does not come back under a pointer that has not moved since the press", () => {
@@ -310,13 +318,97 @@ describe("Tooltip", () => {
       ));
       hover(wrapperOf(screen.getByRole("button")));
       const tip = tipOf()!;
-      for (const type of ["click", "dblclick", "contextmenu"])
+      for (const type of ["dblclick", "contextmenu", "click"])
         tip.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
       expect(delegated).not.toHaveBeenCalled();
       expect(native).not.toHaveBeenCalled();
+      flush();
+      expect(tips()).toHaveLength(0); // the click closed it
 
       fireEvent.click(screen.getByRole("button")); // the target itself still reaches the row
       expect(delegated).toHaveBeenCalledTimes(1);
+    });
+
+    /** A tooltip with `side` whose target is a 200 x 24 label at (100, 300); a click on the tooltip at x. */
+    function clickAt(side: "over" | "left", x: number) {
+      const rect = (e: Element) =>
+        e.getAttribute("role") === "tooltip"
+          ? DOMRect.fromRect({ x: 100, y: 300, width: 320, height: 26 })
+          : DOMRect.fromRect({ x: 100, y: 300, width: 200, height: 24 });
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: Element,
+      ) {
+        return rect(this);
+      });
+      const onTarget = vi.fn();
+      render(() => (
+        <div onClick={onTarget}>
+          <Tooltip text="A long label, whole" side={side}>
+            <button type="button">A long la…</button>
+          </Tooltip>
+        </div>
+      ));
+      hover(wrapperOf(screen.getByRole("button")));
+      fireEvent.click(tipOf()!, { clientX: x, clientY: 310 });
+      flush();
+      expect(tips()).toHaveLength(0);
+      return onTarget;
+    }
+
+    it("on an `over` tooltip, inside its target's box, reach the target: the tooltip lies on it", () => {
+      expect(clickAt("over", 150)).toHaveBeenCalledTimes(1);
+    });
+
+    it("on an `over` tooltip, beyond its target's box, only close it", () => {
+      expect(clickAt("over", 350)).not.toHaveBeenCalled();
+    });
+
+    it("on a tooltip beside its target only close it: what lies under is not the target", () => {
+      expect(clickAt("left", 150)).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("side", () => {
+    // every box 24 x 24 in the middle of the window, so no side runs out of room
+    beforeEach(() => {
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+        DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }),
+      );
+    });
+
+    const at = (side?: "below" | "left" | "right" | "over") => {
+      render(() => (
+        <Tooltip text="Hint" side={side}>
+          <button type="button">x</button>
+        </Tooltip>
+      ));
+      hover(wrapperOf(screen.getByRole("button")));
+      const tip = tipOf()!;
+      return { side: tip.dataset.side, top: tip.style.top, left: tip.style.left };
+    };
+
+    it("is below by default", () => {
+      expect(at()).toEqual({ side: "below", top: "330px", left: "500px" });
+    });
+
+    it("goes where it is asked and says where it went", () => {
+      expect(at("left")).toEqual({ side: "left", top: "300px", left: "470px" });
+      cleanup();
+      expect(at("right")).toEqual({ side: "right", top: "300px", left: "530px" });
+      cleanup();
+      expect(at("over")).toEqual({ side: "over", top: "300px", left: "500px" });
+    });
+
+    it("bridges the gap to its target on the side it went, so the pointer can cross onto it", () => {
+      at("left");
+      const classes = tipOf()!.className.split(" ");
+      for (const c of [
+        "data-[side=below]:before:-top-2",
+        "data-[side=above]:before:-bottom-2",
+        "data-[side=left]:before:-right-2",
+        "data-[side=right]:before:-left-2",
+      ])
+        expect(classes).toContain(c);
     });
   });
 

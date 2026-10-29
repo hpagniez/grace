@@ -265,7 +265,12 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                         class={`flex w-full items-center gap-1 rounded-sm px-2 py-1 text-left text-sm transition-colors duration-(--duration-fast) ease-standard ${s === scope() ? "bg-selected font-medium shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"}`}
                         onClick={() => setScope(s)}
                       >
-                        <Cut full={s === "" ? "All environments" : s} wrap="flex-1" class="flex-1">
+                        <Cut
+                          full={s === "" ? "All environments" : s}
+                          wrap="flex-1"
+                          class="flex-1"
+                          side="over"
+                        >
                           {s === "" ? "All environments" : s}
                         </Cut>
                         <Show when={invalidScopes().has(s)}>

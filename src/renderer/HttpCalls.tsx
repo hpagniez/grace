@@ -47,7 +47,8 @@ export const groupLabel = (status: number | null): string => {
 // A badge is the code in tabular mono on its group's solid tint, never white on a fill. A fixed width keeps the
 // methods in line down the list.
 const BADGE = `${badge} w-11 shrink-0 justify-center font-mono tabular-nums`;
-// The rows scroll, so a focus ring goes inside them (R10.1).
+// The rows scroll, so a focus ring goes inside them (R10.1). A row's tooltips stay on the row: beside the
+// badge, over the cut text.
 const ROW =
   "flex h-7 w-full items-center gap-3 border-b border-line px-3 text-left text-xs transition-colors duration-(--duration-fast) ease-standard focus-visible:-outline-offset-2";
 const SELECTED = "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]";
@@ -64,7 +65,7 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
       class={`${ROW} ${props.selected ? SELECTED : "hover:bg-hover"}`}
       onClick={props.onSelect}
     >
-      <Tooltip text={groupLabel(call().status)} describe class="shrink-0">
+      <Tooltip text={groupLabel(call().status)} describe class="shrink-0" side="right">
         <span data-testid="http-call-status" class={`${BADGE} ${TINT[statusTint(call().status)]}`}>
           {call().status ?? "—"}
         </span>
@@ -77,6 +78,7 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
         testid="http-call-url"
         class="font-mono"
         wrap="flex-1"
+        side="over"
       >
         {call().url ?? call().error?.split("\n")[0]}
       </Cut>
@@ -85,6 +87,7 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
         testid="http-call-test"
         class="max-w-40 text-muted"
         wrap="shrink-0"
+        side="over"
       >
         {nodeName(props.item.test)}
       </Cut>
@@ -102,6 +105,7 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
             testid="http-call-via"
             class="max-w-56 text-muted"
             wrap="shrink-0"
+            side="over"
           >
             {`via ${via()}`}
           </Cut>

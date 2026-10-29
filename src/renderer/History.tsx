@@ -179,7 +179,11 @@ export function History(props: { state: AppState; api: Api }) {
                     </td>
                     <td class={td}>
                       {/* the path adds to the label for a scenario, and shows a cut one whole */}
-                      <Tooltip text={selectionPath(run.selection)} class="min-w-0 max-w-56">
+                      <Tooltip
+                        text={selectionPath(run.selection)}
+                        class="min-w-0 max-w-56"
+                        side="over"
+                      >
                         <span data-testid="history-what" class="min-w-0 truncate">
                           {whatRanLabel(run, now)}
                         </span>

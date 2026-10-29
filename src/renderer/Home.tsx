@@ -54,6 +54,7 @@ export function Home(props: { state: AppState; api: Api; notice?: JSX.Element })
                     <Tooltip
                       text={entry.exists ? undefined : "Folder not found"}
                       class="min-w-0 flex-1"
+                      side="over"
                     >
                       <button
                         type="button"
@@ -81,7 +82,12 @@ export function Home(props: { state: AppState; api: Api; notice?: JSX.Element })
                               </span>
                             </Show>
                           </span>
-                          <Cut full={entry.path} wrap="w-full" class="font-mono text-xs text-muted">
+                          <Cut
+                            full={entry.path}
+                            wrap="w-full"
+                            class="font-mono text-xs text-muted"
+                            side="over"
+                          >
                             {entry.path}
                           </Cut>
                         </span>

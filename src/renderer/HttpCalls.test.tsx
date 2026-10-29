@@ -219,10 +219,12 @@ describe("HTTP tab", () => {
     const tipOf = (el: HTMLElement) => {
       fireEvent.pointerEnter(el.parentElement!);
       vi.advanceTimersByTime(500);
-      const tip = document.querySelector("[role=tooltip]")?.textContent ?? null;
+      const tip = document.querySelector<HTMLElement>("[role=tooltip]");
+      // right of the badge, on its own row: below, it would take the click meant for the next row
+      expect(tip?.dataset.side).toBe("right");
       fireEvent.pointerLeave(el.parentElement!);
       flush();
-      return tip;
+      return tip?.textContent ?? null;
     };
 
     it("shows the code tinted by its group, with the group in a tooltip", () => {
@@ -497,6 +499,8 @@ describe("HTTP tab", () => {
         measure(el, 200, 100);
         rest(el);
         expect(tip()!.textContent, id).toBe(whole);
+        // over its own text: below, it would take the click meant for the next row
+        expect((tip() as HTMLElement).dataset.side, id).toBe("over");
         fireEvent.pointerLeave(el.parentElement!);
         flush();
       }
