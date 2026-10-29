@@ -52,10 +52,10 @@ export function App(props: { api: Api }) {
           }
         >
           <Toolbar state={state} api={props.api} />
-          {/* the sheet (spec R3.3): the project view on a surface, inset and rounded in the light theme, flat in the dark one */}
+          {/* the sheet (spec R3.3): the project view on a surface, inset and rounded in the light theme, flat in the dark one; overflow-clip, like the root, so focus cannot scroll it */}
           <div
             data-testid="sheet"
-            class="mx-(--sheet-inset) mb-(--sheet-inset) flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--sheet-radius) border-x-(length:--sheet-side) border-t border-b-(length:--sheet-side) border-line bg-surface"
+            class="mx-(--sheet-inset) mb-(--sheet-inset) flex min-h-0 flex-1 flex-col overflow-clip rounded-(--sheet-radius) border-x-(length:--sheet-side) border-t border-b-(length:--sheet-side) border-line bg-surface"
           >
             <Progress state={state} />
             <FilterBar state={state} api={props.api} />

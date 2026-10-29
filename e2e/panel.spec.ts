@@ -199,12 +199,14 @@ test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
     w.webContents.send("app:event", { type: "notice", message: "a long notice ".repeat(300) });
   });
   const root = win.getByTestId("app");
+  const sheet = win.getByTestId("sheet");
   await expect
-    .poll(() => win.getByTestId("sheet").evaluate((e) => e.scrollHeight > e.clientHeight)) // the sheet cuts the panel off
+    .poll(() => sheet.evaluate((e) => e.scrollHeight > e.clientHeight)) // the sheet cuts the panel off
     .toBe(true);
 
   await win.getByTestId("tab-http").focus();
   expect(await root.evaluate((e) => e.scrollTop)).toBe(0);
+  expect(await sheet.evaluate((e) => e.scrollTop)).toBe(0); // the sheet clips; focus must not scroll it
   expect((await win.locator("header").boundingBox())!.y).toBeGreaterThanOrEqual(0);
 });
 

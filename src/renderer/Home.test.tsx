@@ -224,8 +224,14 @@ describe("home screen", () => {
     open();
     send({ type: "notice", message: "Nothing to run" });
     const sheet = screen.getByTestId("sheet");
-    for (const c of ["mx-(--sheet-inset)", "rounded-(--sheet-radius)", "bg-surface"])
+    for (const c of [
+      "mx-(--sheet-inset)",
+      "rounded-(--sheet-radius)",
+      "bg-surface",
+      "overflow-clip",
+    ])
       expect(sheet.className).toContain(c);
+    expect(sheet.className).not.toContain("overflow-hidden"); // hidden scrolls on focus; clip does not
     for (const id of ["notice", "bottom-panel"])
       expect(sheet.contains(screen.getByTestId(id))).toBe(true);
     expect(sheet.querySelector("main")).not.toBeNull();
