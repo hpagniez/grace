@@ -1,4 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { CircleCheck, CircleX, Shuffle, type IconNode } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -103,6 +104,10 @@ function setup() {
   return { api, send, select, flaky };
 }
 
+/** Whether the svg holds this icon: every shape of the Lucide icon is in it. */
+const drawn = (svg: Element | null | undefined, icon: IconNode) =>
+  !!svg &&
+  icon.every(([, attrs]) => Object.values(attrs).every((v) => svg.innerHTML.includes(String(v))));
 const boxes = () => screen.queryAllByTestId("flaky-proof");
 const runs = (box: HTMLElement) => within(box).queryAllByTestId("flaky-run");
 const reports = () => screen.queryAllByTestId("flaky-run-report") as HTMLButtonElement[];
@@ -170,10 +175,31 @@ describe("flaky proof in the details pane", () => {
         .map((c) => c.textContent),
     );
     expect(cells).toEqual([
-      ["Today 14:32", "failed", "1 thread", "Report"],
-      ["Yesterday 17:20", "passed", "8 threads", "Report"],
-      ["2026-10-21 09:05", "failed", "—", "Report"],
+      ["Today 14:32", "Failed", "1 thread", "Report"],
+      ["Yesterday 17:20", "Passed", "8 threads", "Report"],
+      ["2026-10-21 09:05", "Failed", "—", "Report"],
     ]);
+  });
+
+  it("boxes the proof in the cancelled tint, headed by the shuffle icon", () => {
+    const { flaky } = setup();
+    flaky(env("qa", 1, 1));
+    const box = boxes()[0];
+    expect(box.className).toContain("rounded-lg");
+    expect(box.className).toContain("bg-cancelled-tint");
+    expect(drawn(within(box).getByRole("heading").querySelector("svg"), Shuffle)).toBe(true);
+    expect(box.outerHTML).not.toMatch(/\b(zinc|red|green|sky|amber)-\d|dark:|title=/);
+  });
+
+  it("marks each proof run by its status: a mark with its name, then the word", () => {
+    const { flaky } = setup();
+    flaky(env("qa", 1, 1, [run("b", { status: "failed" }), run("a", { status: "passed" })]));
+    const rows = runs(boxes()[0]);
+    const marks = rows.map((r) => within(r).getByRole("img"));
+    expect(marks.map((m) => m.getAttribute("aria-label"))).toEqual(["Failed", "Passed"]);
+    expect(drawn(marks[0].querySelector("svg"), CircleX)).toBe(true);
+    expect(drawn(marks[1].querySelector("svg"), CircleCheck)).toBe(true);
+    expect(rows.map((r) => r.dataset.status)).toEqual(["failed", "passed"]); // tests read this
   });
 
   it("opens a run's report, only when it has one and the runner is idle", () => {
