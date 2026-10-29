@@ -103,6 +103,17 @@ describe("download", () => {
     expect(existsSync(dest)).toBe(false);
   });
 
+  it("stops, and leaves no file, once the download grows past the size it is given", async () => {
+    const dest = path.join(root, "too big.zip");
+    const signal = new AbortController().signal;
+    await expect(download(`${base}/file`, dest, () => {}, signal, fetch, size - 1)).rejects.toThrow(
+      "The download is bigger than the release says",
+    );
+    expect(existsSync(dest)).toBe(false);
+    await download(`${base}/file`, dest, () => {}, signal, fetch, size);
+    expect(readFileSync(dest)).toEqual(readFileSync(zip));
+  });
+
   it("uses the fetch it is given", async () => {
     const dest = path.join(root, "custom.zip");
     const custom = vi.fn(fetch);

@@ -422,6 +422,7 @@ describe("install", () => {
       expect.any(Function),
       expect.any(AbortSignal),
       undefined,
+      SIZE, // never more than the asset's size
     );
     expect(unpack).toHaveBeenCalledWith(
       path.join(staging, zipName("1.0.0-rc.6")),

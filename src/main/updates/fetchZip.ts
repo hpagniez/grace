@@ -14,7 +14,8 @@ const run = promisify(execFile);
 export const TAR = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
 
 /**
- * R8.2: streams `url` (redirects followed) to `dest`. Size and hash are `verify`'s job.
+ * R8.2: streams `url` (redirects followed) to `dest`, and stops past `maxBytes` so a wrong answer
+ * cannot fill the disk. The exact size and the hash are `verify`'s job.
  * `fetchFn` is Electron's `net.fetch` in the app, which honours the system proxy.
  */
 export async function download(
@@ -23,6 +24,7 @@ export async function download(
   onProgress: (received: number) => void,
   signal: AbortSignal,
   fetchFn: typeof fetch = fetch,
+  maxBytes = Infinity,
 ): Promise<void> {
   await mkdir(path.dirname(dest), { recursive: true });
   try {
@@ -34,6 +36,7 @@ export async function download(
       async function* (chunks: AsyncIterable<Buffer>) {
         for await (const chunk of chunks) {
           received += chunk.length;
+          if (received > maxBytes) throw new Error("The download is bigger than the release says");
           onProgress(received);
           yield chunk;
         }

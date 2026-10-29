@@ -234,7 +234,7 @@ export class Updater {
         step("download", received);
       };
       await this.d
-        .download(release.url, zip, onProgress, job.signal, this.d.fetch)
+        .download(release.url, zip, onProgress, job.signal, this.d.fetch, release.size)
         .catch(named("The download"));
       job.signal.throwIfAborted();
       step("check");
