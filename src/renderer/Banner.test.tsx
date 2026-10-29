@@ -36,7 +36,9 @@ describe("Banner", () => {
     expect(text("banner-versions")).toBe(
       `Grace ${pkg.version} · Karate ${vendor.karate.version} · Java ${vendor.jre.version}`,
     );
-    expect(screen.getByText("Grace").className).toContain("text-sky-400");
+    const grace = screen.getByText("Grace").className;
+    expect(grace).toContain("font-semibold");
+    expect(grace).toContain("text-accent");
   });
 
   it("asks for a project with none open", () => {
@@ -51,7 +53,7 @@ describe("Banner", () => {
     expect(text("banner-project")).toBe("project  D:\\work\\orders-api");
     expect(text("banner-tests")).toBe("tests    3 scenarios in 2 features");
     expect(text("console-state")).toBe("Ready. Press Run all, or ▶ on a test.");
-    expect(screen.getByText("Ready.").className).toContain("text-emerald-400");
+    expect(screen.getByText("Ready.").className).toContain("text-passed");
   });
 
   it("says when it is finding tests or starting Karate", () => {
