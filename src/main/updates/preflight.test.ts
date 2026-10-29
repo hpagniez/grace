@@ -124,8 +124,17 @@ describe("preflight", () => {
     const icacls = (...args: string[]) => execFileSync("icacls", args, { stdio: "ignore" });
     afterEach(() => icacls(parent, "/remove:d", user));
 
-    it("refuses a parent it cannot write to", async () => {
+    it("refuses a parent it cannot write to", async (ctx) => {
       icacls(parent, "/deny", `${user}:(W,AD)`);
+      // an elevated user (GitHub's Windows runner) still writes past the deny entry
+      const probe = path.join(parent, "probe");
+      try {
+        mkdirSync(probe);
+        rmSync(probe, { recursive: true });
+        ctx.skip("this user writes past a deny entry, so the parent cannot be made read-only");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EPERM") throw err;
+      }
       const message = await preflight(install, 100, roomy);
       expect(message).toBe(
         `Grace can't update itself in ${parent}. Move the Grace folder somewhere you can write to, such as your user folder, or download the new version from the release page.`,
