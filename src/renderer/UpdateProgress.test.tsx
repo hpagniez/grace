@@ -90,6 +90,15 @@ describe("UpdateProgress", () => {
     expect(screen.getByRole("progressbar").hasAttribute("aria-valuenow")).toBe(false);
   });
 
+  it("shows the hand-over without Cancel: it cannot be stopped (R8.5)", () => {
+    const { api } = setup({ ...download(0), step: "restart" });
+    expect(step()).toBe("Restarting Grace…");
+    expect(screen.queryByTestId("update-cancel")).toBeNull();
+    expect(escape()).toBe(true); // prevented
+    expect(dialog().open).toBe(true);
+    expect(api.cancelUpdate).not.toHaveBeenCalled();
+  });
+
   it("Cancel stops the install", () => {
     const { api } = setup(download(1));
     expect(cancel().textContent).toBe("Cancel");

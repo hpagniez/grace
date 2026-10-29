@@ -7,8 +7,8 @@ import type { AppState } from "./reduce";
 const mb = (bytes: number) => Math.round(bytes / 1e6);
 
 /**
- * The install's progress dialog (R8): the step under way and Cancel, or, once a step failed, the message
- * and Close. Escape does nothing while a step runs.
+ * The install's progress dialog (R8): the step under way and Cancel (none at the hand-over), or,
+ * once a step failed, the message and Close. Escape does nothing while a step runs.
  */
 export function UpdateProgress(props: { state: AppState; api: Api }) {
   let dialog!: HTMLDialogElement;
@@ -96,23 +96,28 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
                       ? `Downloading… ${mb(r().received)} of ${mb(r().total)} MB`
                       : r().step === "check"
                         ? "Checking…"
-                        : "Unpacking…"}
+                        : r().step === "unpack"
+                          ? "Unpacking…"
+                          : "Restarting Grace…"}
                   </p>
                 </>
               )}
             </Show>
-            <div class="mt-4 flex justify-end">
-              {/* one button, so focus stays on it when a step fails: both call cancelUpdate */}
-              <button
-                type="button"
-                data-testid="update-cancel"
-                ref={(e) => (cancel = e)}
-                class={btn}
-                onClick={() => void props.api.cancelUpdate()}
-              >
-                {running() ? "Cancel" : "Close"}
-              </button>
-            </div>
+            {/* none while Grace hands over to the switch script: that cannot be cancelled (R8.5) */}
+            <Show when={running()?.step !== "restart"}>
+              <div class="mt-4 flex justify-end">
+                {/* one button, so focus stays on it when a step fails: both call cancelUpdate */}
+                <button
+                  type="button"
+                  data-testid="update-cancel"
+                  ref={(e) => (cancel = e)}
+                  class={btn}
+                  onClick={() => void props.api.cancelUpdate()}
+                >
+                  {running() ? "Cancel" : "Close"}
+                </button>
+              </div>
+            </Show>
           </>
         )}
       </Show>

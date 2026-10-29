@@ -125,7 +125,8 @@ export type UpdateProgress =
   | {
       version: string;
       rollback: boolean;
-      step: "download" | "check" | "unpack";
+      /** `restart`: the hand-over to the switch script, which cannot be cancelled (R8.5). */
+      step: "download" | "check" | "unpack" | "restart";
       received: number;
       total: number;
     }

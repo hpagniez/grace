@@ -442,7 +442,7 @@ describe("install", () => {
     expect(downloads.at(-1)).toMatchObject({ received: SIZE, total: SIZE });
     expect(
       steps.map((p) => p && "step" in p && p.step).filter((s, i, a) => s !== a[i - 1]),
-    ).toEqual(["download", "check", "unpack"]);
+    ).toEqual(["download", "check", "unpack", "restart"]);
   });
 
   it("each failing step ends in an error, never a throw, and removes the staging folder (R8.6)", async () => {
@@ -516,6 +516,8 @@ describe("install", () => {
 
   it("hands over with the right plan, then quits (R8.5)", async () => {
     const u = await checked();
+    // no Cancel from here: the hand-over cannot be stopped
+    startSwitch.mockImplementation(() => expect(u.progress()).toMatchObject({ step: "restart" }));
     await u.install("1.0.0-rc.6", false);
     expect(startSwitch).toHaveBeenCalledWith(
       expect.objectContaining({

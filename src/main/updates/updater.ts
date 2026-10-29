@@ -217,7 +217,7 @@ export class Updater {
     const rollback = compareVersions(version, running) < 0;
     const stagingDir = `${installDir}.update`;
     const zip = path.join(stagingDir, zipName(version));
-    const step = (s: "download" | "check" | "unpack", received = 0) =>
+    const step = (s: "download" | "check" | "unpack" | "restart", received = 0) =>
       this.show({ version, rollback, step: s, received, total: release.size });
     const removeStaging = () =>
       rm(stagingDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
@@ -246,6 +246,7 @@ export class Updater {
       job.signal.throwIfAborted();
       // quitting would kill a run started during the download
       if (this.d.isBusy()) throw new Error(BUSY);
+      step("restart");
       const saved = listBackups(dataDir).some((b) => b.version === version);
       try {
         this.d.startSwitch({
