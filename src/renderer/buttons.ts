@@ -6,7 +6,7 @@ const sm = "h-6 px-2 text-xs"; // 24 px
 const plain = "border border-control bg-surface text-ink enabled:hover:bg-hover";
 const quiet = "text-ink enabled:hover:bg-hover";
 
-const solid = "bg-accent font-semibold text-on-accent enabled:hover:bg-accent-hover";
+const solid = "bg-primary font-semibold text-on-primary enabled:hover:bg-primary-hover";
 const solidDanger = "bg-failed text-on-danger enabled:hover:bg-failed-hover";
 
 export const btn = `${base} ${md} ${plain}`;

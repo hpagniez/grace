@@ -51,16 +51,16 @@ async function cancelRun(win: Page) {
   await expect.poll(ourJavaPids, { timeout: 15_000 }).toEqual([]);
 }
 
-/** The test ids of the buttons filled with the accent colour: the primary buttons (R13.2). */
+/** The test ids of the buttons filled with the primary colour: the primary buttons (R13.2). */
 const primaryButtons = (win: Page) =>
   win.evaluate(() => {
     const probe = document.createElement("i");
-    probe.style.backgroundColor = "var(--color-accent)";
+    probe.style.backgroundColor = "var(--color-primary)";
     document.body.append(probe);
-    const accent = getComputedStyle(probe).backgroundColor;
+    const primary = getComputedStyle(probe).backgroundColor;
     probe.remove();
     return [...document.querySelectorAll("button")]
-      .filter((b) => getComputedStyle(b).backgroundColor === accent)
+      .filter((b) => getComputedStyle(b).backgroundColor === primary)
       .map((b) => b.dataset.testid ?? b.textContent);
   });
 
@@ -81,6 +81,20 @@ for (const scheme of ["light", "dark"] as const) {
     expect(await colour("html", "backgroundColor")).toBe(want.ground);
     expect(await colour("[data-testid=app]", "backgroundColor")).toBe(want.ground);
     expect(await colour("header", "color")).toBe(want.ink);
+
+    // only the colours change between the themes (the person): the same inset, rounded sheet, the same green Run all
+    expect(
+      await win.getByTestId("sheet").evaluate((e) => {
+        const s = getComputedStyle(e);
+        return [s.marginLeft, s.borderTopLeftRadius, s.borderLeftWidth];
+      }),
+    ).toEqual(["8px", "16px", "1px"]);
+    expect(
+      await win.getByTestId("run-all-button").evaluate((e) => {
+        const s = getComputedStyle(e);
+        return [s.backgroundColor, s.color];
+      }),
+    ).toEqual(["rgb(63, 207, 110)", "rgb(21, 24, 33)"]); // brand green with ink text
   });
 }
 

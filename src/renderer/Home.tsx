@@ -14,14 +14,14 @@ import { badge, TINT } from "./ui";
 const name = (path: string) => path.split(/[\\/]/).pop() || path;
 
 /**
- * The start screen (spec R12), on the ground in the light theme and on the surface in the dark one:
- * no project is open, so there is no sheet. `notice` shows above the column.
+ * The start screen (spec R12), on the ground in both themes: no project is open, so there is no sheet.
+ * `notice` shows above the column.
  */
 export function Home(props: { state: AppState; api: Api; notice?: JSX.Element }) {
   const entries = () => props.state.recent ?? [];
   let openButton: HTMLButtonElement | undefined;
   return (
-    <div data-testid="home" class="flex min-h-0 flex-1 flex-col bg-(--home-bg)">
+    <div data-testid="home" class="flex min-h-0 flex-1 flex-col bg-ground">
       {props.notice}
       <div class="min-h-0 flex-1 overflow-auto px-4 py-12">
         <div class="mx-auto flex max-w-[540px] flex-col items-start">

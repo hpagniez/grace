@@ -142,7 +142,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
         disabled={!canRunAll()}
         onClick={() => void props.api.run(props.state.tree!.key)}
       >
-        <Icon icon={Play} class="text-play" />
+        <Icon icon={Play} class="text-on-primary" />
         Run all
       </button>
     </header>

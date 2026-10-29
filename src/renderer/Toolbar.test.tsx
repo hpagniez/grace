@@ -380,16 +380,16 @@ describe("the project", () => {
 });
 
 describe("the actions", () => {
-  it("Run all is the only primary button, with its play icon in the play colour", () => {
+  it("Run all is the only primary button, with its play icon in the on-primary ink", () => {
     setup();
     const run = button("run-all-button");
-    for (const c of primary.split(" ").filter((c) => c.startsWith("bg-accent")))
+    for (const c of primary.split(" ").filter((c) => c.startsWith("bg-primary")))
       expect(run.className).toContain(c);
     const filled = [...header().querySelectorAll("button")].filter((b) =>
-      b.className.includes("bg-accent"),
+      b.className.includes("bg-primary"),
     );
     expect(filled).toEqual([run]);
-    expect(run.querySelector("svg")!.getAttribute("class")).toContain("text-play");
+    expect(run.querySelector("svg")!.getAttribute("class")).toContain("text-on-primary");
     expect(run.disabled).toBe(false);
   });
 

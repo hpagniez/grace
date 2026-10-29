@@ -30,27 +30,38 @@ const TOKENS = [
   "ink",
   "muted",
   "accent",
-  "accent-hover",
   "on-accent",
+  "primary",
+  "on-primary",
+  "primary-hover",
   "on-danger",
   "brand",
   "focus",
-  "play",
   "failed-hover",
   ...STATUSES,
   ...STATUSES.map((s) => `${s}-tint`),
 ];
+/** One value in both themes: the logo's green and the primary button (the person's call, R1.3). */
+const SAME_IN_BOTH = ["brand", "primary", "on-primary", "primary-hover"];
 
-describe("filled buttons on hover", () => {
-  it("fill with a solid token, not a translucent one", () => {
-    for (const b of [primary, primaryDialog]) expect(b).toContain("enabled:hover:bg-accent-hover");
+describe("filled buttons", () => {
+  it("fill with a solid token on hover, not a translucent one", () => {
+    for (const b of [primary, primaryDialog]) expect(b).toContain("enabled:hover:bg-primary-hover");
     for (const b of [danger, dangerDialog]) expect(b).toContain("enabled:hover:bg-failed-hover");
     expect(`${primary} ${danger} ${primaryDialog} ${dangerDialog}`).not.toMatch(/hover:bg-\S+\//);
+  });
+
+  it("make the primary buttons brand green, whatever the theme", () => {
+    for (const b of [primary, primaryDialog]) {
+      expect(b).toContain("bg-primary");
+      expect(b).toContain("text-on-primary");
+      expect(b).not.toMatch(/accent/);
+    }
   });
 });
 
 describe("colour tokens (spec R1)", () => {
-  const { light, darkOverrides } = readTokens();
+  const { light, darkOverrides, darkProps } = readTokens();
 
   it("defines every token in the light theme", () => {
     expect(
@@ -61,8 +72,29 @@ describe("colour tokens (spec R1)", () => {
   });
 
   // `readTokens().dark` falls back to light for a token the dark block lacks, so check the block itself.
-  it("overrides every token in the dark theme except brand, the one that is the same", () => {
-    expect(Object.keys(darkOverrides).sort()).toEqual(TOKENS.filter((n) => n !== "brand").sort());
+  it("overrides every token in the dark theme except the ones that are the same", () => {
+    expect(Object.keys(darkOverrides).sort()).toEqual(
+      TOKENS.filter((n) => !SAME_IN_BOTH.includes(n)).sort(),
+    );
+  });
+
+  it("gives the primary button one definition, with no dark override", () => {
+    const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const n of ["primary", "on-primary", "primary-hover"])
+      expect(css.match(new RegExp(`--color-${n}:`, "g")), `--color-${n}`).toHaveLength(1);
+    expect([light.primary, light["on-primary"], light["primary-hover"]]).toEqual([
+      "#3fcf6e",
+      "#151821",
+      "#5fd98a",
+    ]);
+  });
+
+  // the person: "UX/UI and components must not change from one theme to the other; only colour must change"
+  it("lets the dark theme override colours, shadows and the backdrop only", () => {
+    const allowed = (n: string) =>
+      n.startsWith("--color-") || ["--shadow-float", "--backdrop"].includes(n);
+    expect(darkProps.filter((n) => !allowed(n))).toEqual([]);
+    expect(darkProps).toContain("--color-ground");
   });
 
   for (const theme of ["light", "dark"] as const) {
@@ -87,13 +119,17 @@ describe("colour tokens (spec R1)", () => {
         expect(contrast(t["on-accent"], t.accent), "on-accent on accent").toBeGreaterThanOrEqual(
           4.5,
         );
+        expect(
+          contrast(t["on-primary"], t.primary),
+          "on-primary on primary",
+        ).toBeGreaterThanOrEqual(4.5);
         expect(contrast(t["on-danger"], t.failed), "on-danger on failed").toBeGreaterThanOrEqual(
           4.5,
         );
         // the hover fills are solid, so the text keeps its ratio while the pointer is over the button
         expect(
-          contrast(t["on-accent"], t["accent-hover"]),
-          "on-accent on accent-hover",
+          contrast(t["on-primary"], t["primary-hover"]),
+          "on-primary on primary-hover",
         ).toBeGreaterThanOrEqual(4.5);
         expect(
           contrast(t["on-danger"], t["failed-hover"]),
@@ -110,14 +146,18 @@ describe("colour tokens (spec R1)", () => {
   }
 });
 
-describe("the home screen's ground (spec R12.1)", () => {
+describe("the sheet (spec R3.3)", () => {
   const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
-  it("is the ground in the light theme and the surface in the dark one", () => {
-    expect(css).toMatch(/:root\s*\{[^}]*--home-bg:\s*var\(--color-ground\)/);
-    expect(css).toMatch(
-      /prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{[^}]*--home-bg:\s*var\(--color-surface\)/,
-    );
+  it("is inset 8 px, rounded 16 px and edged 1 px, once for both themes", () => {
+    for (const [name, value] of [
+      ["inset", "8px"],
+      ["radius", "16px"],
+      ["side", "1px"],
+    ])
+      expect(css.match(new RegExp(`--sheet-${name}:\\s*([^;]+);`, "g"))).toEqual([
+        `--sheet-${name}: ${value};`,
+      ]);
   });
 });
 

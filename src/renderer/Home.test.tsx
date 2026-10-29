@@ -349,11 +349,11 @@ describe("home screen", () => {
     expect(column.contains(notice)).toBe(false);
   });
 
-  it("home sits on the ground in light and on the surface in dark, with no sheet (R12.1)", () => {
+  it("home sits on the ground in both themes, with no sheet (R12.1)", () => {
     setup().send({ type: "opening", root: null });
     const cls = screen.getByTestId("home").className;
-    expect(cls).toContain("bg-(--home-bg)");
-    expect(cls).not.toMatch(/dark:|bg-surface|bg-ground|rounded|border/);
+    expect(cls).toContain("bg-ground");
+    expect(cls).not.toMatch(/dark:|bg-surface|home-bg|rounded|border/);
     expect(screen.queryByTestId("sheet")).toBeNull();
   });
 

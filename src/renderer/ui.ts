@@ -36,8 +36,8 @@ export const TINT: Record<"passed" | "failed" | "skipped" | "running" | "cancell
 export const box = "rounded-lg bg-sunken p-2 font-mono text-xs";
 
 /**
- * The sheet under a row on the ground (spec R3.3): inset and rounded in the light theme, flat in the dark
- * one. overflow-clip, like the root, so focus cannot scroll it.
+ * The sheet under a row on the ground (spec R3.3): inset and rounded, in both themes. overflow-clip,
+ * like the root, so focus cannot scroll it.
  */
 export const sheet =
   "relative mx-(--sheet-inset) mb-(--sheet-inset) flex min-h-0 flex-1 flex-col overflow-clip rounded-(--sheet-radius) border-x-(length:--sheet-side) border-t border-b-(length:--sheet-side) border-line bg-surface";

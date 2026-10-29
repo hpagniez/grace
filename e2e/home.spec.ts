@@ -130,9 +130,9 @@ const homeBackground = async (colorScheme: "light" | "dark") => {
   return bg;
 };
 
-test("The home screen is on the ground in light and on the surface in dark", async () => {
+test("The home screen is on the ground in light and in dark", async () => {
   expect(await homeBackground("light")).toBe("rgb(243, 239, 230)"); // #f3efe6
-  expect(await homeBackground("dark")).toBe("rgb(16, 18, 23)"); // #101217
+  expect(await homeBackground("dark")).toBe("rgb(21, 24, 33)"); // #151821
 });
 
 // R2: the home screen

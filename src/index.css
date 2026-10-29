@@ -96,13 +96,13 @@
   --color-ink: #151821;
   --color-muted: #5b5e66;
   --color-accent: #151821;
-  /* A filled button on hover is solid: a translucent fill lets the background bleed and drops the text's ratio. */
-  --color-accent-hover: #2b2f3a;
   --color-on-accent: #ffffff;
+  /* The primary button (R13.2): brand green with ink text in both themes. On hover it is solid: a translucent fill lets the background bleed and drops the text's ratio. */
+  --color-primary: #3fcf6e;
+  --color-on-primary: #151821;
+  --color-primary-hover: #5fd98a;
   --color-on-danger: #ffffff;
   --color-brand: #3fcf6e;
-  /* The Run button's play glyph (R13.2): brand green on the near-black fill, on-accent on the green one. */
-  --color-play: #3fcf6e;
   --color-focus: #151821;
   --color-passed: #1b7a4c;
   --color-failed: #c22a2f;
@@ -167,12 +167,11 @@
     --shadow-float: 0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06);
     --duration-fast: 100ms; /* hover, press, colour */
     --duration-base: 160ms; /* chevron turn, tab line, dialog and popover enter */
-    /* The sheet under the toolbar (R3.3): inset from the window, rounded, edged. Flat in the dark theme. */
+    /* The sheet under the toolbar (R3.3): inset from the window, rounded, edged, in both themes. */
     --sheet-inset: 8px;
     --sheet-radius: 16px;
     --sheet-side: 1px; /* the sheet's side and bottom border width */
     --backdrop: color-mix(in srgb, var(--color-ink) 40%, transparent); /* the dialog backdrop */
-    --home-bg: var(--color-ground); /* the home screen has no sheet (R12.1) */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -188,10 +187,8 @@
       --color-ink: #f1efe9;
       --color-muted: #9fa2ac;
       --color-accent: #3fcf6e;
-      --color-accent-hover: #5fd98a;
       --color-on-accent: #06210f;
       --color-on-danger: #151821;
-      --color-play: #06210f;
       --color-focus: #3fcf6e;
       --color-passed: #3fcf6e;
       --color-failed: #f2666f;
@@ -205,11 +202,7 @@
       --color-running-tint: #1d2a3a;
       --color-cancelled-tint: #322a1e;
       --shadow-float: 0 16px 40px rgb(0 0 0 / 0.5);
-      --sheet-inset: 0px;
-      --sheet-radius: 0px;
-      --sheet-side: 0px;
       --backdrop: rgb(0 0 0 / 0.6);
-      --home-bg: var(--color-surface);
     }
   }
 
