@@ -97,10 +97,10 @@
   --color-muted: #5b5e66;
   --color-accent: #151821;
   --color-on-accent: #ffffff;
-  /* The primary button (R13.2): brand green with ink text in both themes. On hover it is solid: a translucent fill lets the background bleed and drops the text's ratio. */
-  --color-primary: #3fcf6e;
-  --color-on-primary: #151821;
-  --color-primary-hover: #5fd98a;
+  /* The primary button (R13.2): the progress bar's passed green. On hover it is solid: a translucent fill lets the background bleed and drops the text's ratio. */
+  --color-primary: #1b7a4c;
+  --color-on-primary: #ffffff;
+  --color-primary-hover: #156640;
   --color-on-danger: #ffffff;
   --color-brand: #3fcf6e;
   --color-focus: #151821;
@@ -188,6 +188,9 @@
       --color-muted: #9fa2ac;
       --color-accent: #3fcf6e;
       --color-on-accent: #06210f;
+      --color-primary: #3fcf6e;
+      --color-on-primary: #151821;
+      --color-primary-hover: #5fd98a;
       --color-on-danger: #151821;
       --color-focus: #3fcf6e;
       --color-passed: #3fcf6e;

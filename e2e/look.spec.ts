@@ -21,10 +21,25 @@ import {
 
 type Scheme = "light" | "dark";
 
-/** The ground and ink tokens (R1.3) and the focus colour, as the browser reports them. */
-const THEME: Record<Scheme, { ground: string; ink: string; focus: string }> = {
-  light: { ground: "rgb(243, 239, 230)", ink: "rgb(21, 24, 33)", focus: "rgb(21, 24, 33)" },
-  dark: { ground: "rgb(21, 24, 33)", ink: "rgb(241, 239, 233)", focus: "rgb(63, 207, 110)" },
+/** The ground and ink tokens (R1.3), the focus colour and the primary button's fill and text, as the browser reports them. */
+const THEME: Record<
+  Scheme,
+  { ground: string; ink: string; focus: string; primary: string; onPrimary: string }
+> = {
+  light: {
+    ground: "rgb(243, 239, 230)",
+    ink: "rgb(21, 24, 33)",
+    focus: "rgb(21, 24, 33)",
+    primary: "rgb(27, 122, 76)", // #1b7a4c, the passed green
+    onPrimary: "rgb(255, 255, 255)",
+  },
+  dark: {
+    ground: "rgb(21, 24, 33)",
+    ink: "rgb(241, 239, 233)",
+    focus: "rgb(63, 207, 110)",
+    primary: "rgb(63, 207, 110)", // #3fcf6e, the passed green
+    onPrimary: "rgb(21, 24, 33)",
+  },
 };
 
 /** Opens the clean sample project and waits for its tree. */
@@ -82,7 +97,7 @@ for (const scheme of ["light", "dark"] as const) {
     expect(await colour("[data-testid=app]", "backgroundColor")).toBe(want.ground);
     expect(await colour("header", "color")).toBe(want.ink);
 
-    // only the colours change between the themes (the person): the same inset, rounded sheet, the same green Run all
+    // only the colours change between the themes (the person): the same inset, rounded sheet, Run all in the passed green
     expect(
       await win.getByTestId("sheet").evaluate((e) => {
         const s = getComputedStyle(e);
@@ -94,7 +109,7 @@ for (const scheme of ["light", "dark"] as const) {
         const s = getComputedStyle(e);
         return [s.backgroundColor, s.color];
       }),
-    ).toEqual(["rgb(63, 207, 110)", "rgb(21, 24, 33)"]); // brand green with ink text
+    ).toEqual([want.primary, want.onPrimary]);
   });
 }
 

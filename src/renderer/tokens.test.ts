@@ -41,8 +41,6 @@ const TOKENS = [
   ...STATUSES,
   ...STATUSES.map((s) => `${s}-tint`),
 ];
-/** One value in both themes: the logo's green and the primary button (the person's call, R1.3). */
-const SAME_IN_BOTH = ["brand", "primary", "on-primary", "primary-hover"];
 
 describe("filled buttons", () => {
   it("fill with a solid token on hover, not a translucent one", () => {
@@ -51,7 +49,7 @@ describe("filled buttons", () => {
     expect(`${primary} ${danger} ${primaryDialog} ${dangerDialog}`).not.toMatch(/hover:bg-\S+\//);
   });
 
-  it("make the primary buttons brand green, whatever the theme", () => {
+  it("use the primary tokens, not the accent ones", () => {
     for (const b of [primary, primaryDialog]) {
       expect(b).toContain("bg-primary");
       expect(b).toContain("text-on-primary");
@@ -72,21 +70,8 @@ describe("colour tokens (spec R1)", () => {
   });
 
   // `readTokens().dark` falls back to light for a token the dark block lacks, so check the block itself.
-  it("overrides every token in the dark theme except the ones that are the same", () => {
-    expect(Object.keys(darkOverrides).sort()).toEqual(
-      TOKENS.filter((n) => !SAME_IN_BOTH.includes(n)).sort(),
-    );
-  });
-
-  it("gives the primary button one definition, with no dark override", () => {
-    const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-    for (const n of ["primary", "on-primary", "primary-hover"])
-      expect(css.match(new RegExp(`--color-${n}:`, "g")), `--color-${n}`).toHaveLength(1);
-    expect([light.primary, light["on-primary"], light["primary-hover"]]).toEqual([
-      "#3fcf6e",
-      "#151821",
-      "#5fd98a",
-    ]);
+  it("overrides every token in the dark theme except brand, the one that is the same", () => {
+    expect(Object.keys(darkOverrides).sort()).toEqual(TOKENS.filter((n) => n !== "brand").sort());
   });
 
   // the person: "UX/UI and components must not change from one theme to the other; only colour must change"
@@ -113,6 +98,11 @@ describe("colour tokens (spec R1)", () => {
           expect(contrast(t[s], t[`${s}-tint`]), `${s} on its tint`).toBeGreaterThanOrEqual(4.5);
           expect(contrast(t[s], t.selected), `${s} on selected`).toBeGreaterThanOrEqual(3);
         }
+      });
+
+      // the person: the primary buttons use the same green as the progress bar's passed segment
+      it("fills the primary button with the passed green", () => {
+        expect(t.primary).toBe(t.passed);
       });
 
       it("keeps the filled buttons' text readable", () => {
