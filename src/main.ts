@@ -15,6 +15,7 @@ import type { AppEvent } from "./shared/events";
 import { RUN_ID } from "./shared/history";
 import { CH } from "./shared/ipc";
 import { parseFilterState } from "./shared/tags";
+import { GROUND } from "./shared/theme";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
@@ -75,7 +76,7 @@ const createWindow = (dataDir: string) => {
     ...(placed ?? { width: 1200, height: 800 }),
     minHeight: 480, // room for the bars, 120 px of tests and 96 px of bottom panel
     show: false, // shown once painted, so it never flashes white
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#18181b" : "#ffffff", // the app root's two backgrounds
+    backgroundColor: GROUND[nativeTheme.shouldUseDarkColors ? "dark" : "light"],
     // packaged, the window takes Grace.exe's icon; from source it would get electron.exe's
     ...(app.isPackaged ? {} : { icon: path.join(app.getAppPath(), "assets", "icon.ico") }),
     webPreferences: {

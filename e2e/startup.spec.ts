@@ -1,5 +1,6 @@
 import type { ElectronApplication, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { GROUND } from "../src/shared/theme";
 import { expect, launch, test } from "./helpers";
 
 /** Once the toolbar shows, the startup screen is gone and the page holds the app alone. */
@@ -24,7 +25,7 @@ test("the window opens painted in the app's theme", async () => {
   const { app, win } = await launch();
   await expect.poll(async () => (await windowState(app)).visible).toBe(true);
   const { background, dark } = await windowState(app);
-  expect(background).toBe(dark ? "#18181b" : "#ffffff");
+  expect(background).toBe(dark ? GROUND.dark : GROUND.light);
   await expectAppOnly(win);
 });
 

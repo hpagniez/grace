@@ -8,7 +8,7 @@
     />
     <title>Grace</title>
     <style>
-      /* Shown until the app is drawn; App removes it. Colours match the app root's backgrounds. */
+      /* Shown until the app is drawn; App removes it. Colours are the ground and ink tokens of src/index.css (GROUND in src/shared/theme.ts). */
       #startup {
         position: fixed;
         inset: 0;
@@ -17,8 +17,8 @@
         align-items: center;
         justify-content: center;
         gap: 12px;
-        background: #ffffff;
-        color: #18181b;
+        background: #f3efe6;
+        color: #151821;
         font:
           14px system-ui,
           sans-serif;
@@ -38,8 +38,8 @@
       }
       @media (prefers-color-scheme: dark) {
         #startup {
-          background: #18181b;
-          color: #f4f4f5;
+          background: #151821;
+          color: #f1efe9;
         }
       }
       @media (prefers-reduced-motion: reduce) {
