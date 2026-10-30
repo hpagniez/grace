@@ -165,7 +165,7 @@
     color-scheme: light; /* the native controls: radios, checkboxes, spinners, select popups */
     --shadow-float: 0 12px 32px rgb(21 24 33 / 0.14), 0 1px 2px rgb(21 24 33 / 0.06);
     --duration-fast: 100ms; /* hover, press, colour */
-    --duration-base: 160ms; /* chevron turn, tab line, dialog and popover enter */
+    --duration-base: 160ms; /* log chevron turn, tab line, dialog and popover enter */
     /* The sheet under the toolbar (R3.3): inset from the window, rounded, edged, in both themes. */
     --sheet-inset: 8px;
     --sheet-radius: 16px;

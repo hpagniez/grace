@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   ChevronRight,
   FileSearch,
   FileText,
@@ -77,7 +78,8 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
           data-kind={props.node.kind}
           data-match={match() ? "true" : "false"}
           // A non-matching row is muted, not faded (R15.2): its status mark too, which sets its own colour.
-          class={`group flex h-6 items-center gap-1 rounded-sm pr-1 ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
+          // content-visibility: off-screen rows skip paint, so a hover transition or a status change repaints only what shows.
+          class={`group flex h-6 items-center gap-1 rounded-sm pr-1 [content-visibility:auto] [contain-intrinsic-size:auto_1.5rem] ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
         >
           <button
             type="button"
@@ -85,11 +87,8 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
             aria-label={`${open() ? "Collapse" : "Expand"} ${label()}`}
             onClick={() => setOpen(!open())}
           >
-            <Icon
-              icon={ChevronRight}
-              size={14}
-              class={`transition-transform duration-(--duration-base) ease-standard ${open() ? "rotate-90" : ""}`}
-            />
+            {/* A swap, not a rotate: a transform on every open row makes each hit test undo it. */}
+            <Icon icon={open() ? ChevronDown : ChevronRight} size={14} />
           </button>
           <Tooltip text={STATUS_LABEL[status()]} side="right">
             <StatusMark status={status()} />

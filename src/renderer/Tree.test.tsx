@@ -1,5 +1,13 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { ChevronRight, FileSearch, FileText, Folder, FolderOpen, Shuffle } from "lucide";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileSearch,
+  FileText,
+  Folder,
+  FolderOpen,
+  Shuffle,
+} from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -154,14 +162,15 @@ describe("main screen", () => {
     expect(mark("f:tests/outline.feature").getAttribute("aria-label")).toBe("Not run");
   });
 
-  it("turns the chevron when a folder opens and closes, and icons folders and features", () => {
+  it("swaps the chevron when a folder opens and closes, and icons folders and features", () => {
     const { load } = setup();
     load();
     const row = rowByKey("d:tests");
     const toggle = within(row).getByRole("button", { name: "Collapse tests" });
     const chevron = toggle.querySelector("svg");
-    expect(drawn(chevron, ChevronRight)).toBe(true);
-    expect(chevron!.getAttribute("class")).toContain("rotate-90");
+    expect(drawn(chevron, ChevronDown)).toBe(true);
+    // no transform: one on every open row slows every hit test of a large tree
+    expect(chevron!.getAttribute("class") ?? "").not.toContain("rotate");
     // svgs in a row: chevron, status mark, then the folder or file icon
     expect(drawn(row.querySelectorAll("svg")[2], FolderOpen)).toBe(true);
     expect(drawn(rowByKey("f:tests/basic.feature").querySelectorAll("svg")[2], FileText)).toBe(
@@ -174,7 +183,7 @@ describe("main screen", () => {
     fireEvent.click(toggle);
     flush();
     const closed = within(row).getByRole("button", { name: "Expand tests" });
-    expect(closed.querySelector("svg")!.getAttribute("class")).not.toContain("rotate-90");
+    expect(drawn(closed.querySelector("svg"), ChevronRight)).toBe(true);
     expect(drawn(row.querySelectorAll("svg")[2], Folder)).toBe(true);
     expect(row.parentElement!.getAttribute("aria-expanded")).toBe("false");
   });

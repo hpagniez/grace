@@ -175,13 +175,13 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 | interrupted, cancelled | `circle-slash` | `cancelled` |
 | skipped (a step) | `circle-minus` | `skipped` |
 
-5. Action icons: Home (the logo mark, R6.2), Open `folder-open`, Refresh `refresh-cw`, Properties `sliders-horizontal`, Report `file-text`, Re-run failed `rotate-ccw`, Cancel `square`, Run and Run all `play`, expand `chevron-right` (turns 90° when open), folder `folder`/`folder-open`, feature `file-text`, Console `square-terminal`, History `history`, HTTP `globe`, Settings `settings`, Copy `copy` (then `check` once copied), Remove `x`, flaky `shuffle`, warning `triangle-alert`, error `circle-alert`.
+5. Action icons: Home (the logo mark, R6.2), Open `folder-open`, Refresh `refresh-cw`, Properties `sliders-horizontal`, Report `file-text`, Re-run failed `rotate-ccw`, Cancel `square`, Run and Run all `play`, expand `chevron-right` (`chevron-down` when open; a swap, not a turn, so a large tree scrolls smoothly), folder `folder`/`folder-open`, feature `file-text`, Console `square-terminal`, History `history`, HTTP `globe`, Settings `settings`, Copy `copy` (then `check` once copied), Remove `x`, flaky `shuffle`, warning `triangle-alert`, error `circle-alert`.
 6. The builder checks every name exists in the pinned Lucide version and may swap a missing one for the closest shape, recorded in the plan.
 
 ### R5. Motion
 
-1. Tokens: `--ease-standard: cubic-bezier(0.2, 0, 0, 1)`; `--duration-fast: 100ms` (hover, press, colour); `--duration-base: 160ms` (chevron turn, tab line, dialog and popover enter); exits 100 ms. The progress fill keeps its 300 ms ease-out; the spinner turns once a second; the waiting stripe and the console cursor keep their timings.
-2. Only `transform`, `opacity` and colours move. A dialog enters with a fade and a scale from 0.98; its backdrop fades. Tree children appear without a height animation; only the chevron turns.
+1. Tokens: `--ease-standard: cubic-bezier(0.2, 0, 0, 1)`; `--duration-fast: 100ms` (hover, press, colour); `--duration-base: 160ms` (log chevron turn, tab line, dialog and popover enter); exits 100 ms. The progress fill keeps its 300 ms ease-out; the spinner turns once a second; the waiting stripe and the console cursor keep their timings.
+2. Only `transform`, `opacity` and colours move. A dialog enters with a fade and a scale from 0.98; its backdrop fades. Tree children appear without a height animation, and the tree's chevron swaps without turning: a transform on every open row slows each hit test of a large tree. Tree rows set `content-visibility: auto`, so rows out of view are not painted.
 3. Under `prefers-reduced-motion: reduce`, one rule in `src/index.css` turns every transition and animation off. The spinner then shows still, the stripe stays still, the cursor stays solid (as today).
 
 ### R6. Logo and mascot
