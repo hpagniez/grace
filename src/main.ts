@@ -19,6 +19,7 @@ import { parseFilterState } from "./shared/tags";
 import { GROUND, THEMES } from "./shared/theme";
 import type { Channel } from "./shared/updates";
 import { parseVersion } from "./shared/version";
+import { batched } from "./main/batch";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { killOrphan } from "./main/karate/process";
@@ -84,11 +85,11 @@ app.on("second-instance", () => {
   win.focus();
 });
 
-const emit = (e: AppEvent) => {
+const emit = batched<AppEvent>((events) => {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
-    win.webContents.send(CH.event, e);
+    win.webContents.send(CH.event, events);
   }
-};
+});
 
 const createWindow = (dataDir: string) => {
   const saved = loadWindowState(dataDir);

@@ -30,7 +30,10 @@ const api: Api = {
   getAppearance: () => ipcRenderer.invoke(CH.getAppearance),
   setAppearance: (theme) => ipcRenderer.invoke(CH.setAppearance, theme),
   onEvent: (cb) => {
-    const listener = (_: unknown, e: AppEvent) => cb(e);
+    // main sends one tick's events as one message; Solid applies the writes of one task together
+    const listener = (_: unknown, events: AppEvent[]) => {
+      for (const e of events) cb(e);
+    };
     ipcRenderer.on(CH.event, listener);
     return () => ipcRenderer.removeListener(CH.event, listener);
   },
