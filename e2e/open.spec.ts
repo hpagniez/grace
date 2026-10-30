@@ -245,9 +245,13 @@ test("The Env and Threads boxes show their longest likely values whole", async (
   await threads.press("Enter");
   await expect.poll(() => saved(userData, dir)?.threads).toBe(32);
   await expect(threads).toHaveValue("32");
-  expect(
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds().width),
-  ).toBe(1200);
+  // the default window is 1200 px wide, but Windows fits it to a narrower screen (1024 px on CI)
+  const inner = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(1200, 800);
+    return w.getContentSize()[0];
+  });
+  await expect.poll(() => win.evaluate(() => innerWidth)).toBe(inner);
 
   for (const width of [1200, 1500]) {
     if (width !== 1200) await contentWidth(app, win, width);
