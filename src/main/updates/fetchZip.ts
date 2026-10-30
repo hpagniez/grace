@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream, type WriteStream } from "node:fs";
-import { access, mkdir, rm } from "node:fs/promises";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { createReadStream, createWriteStream, promises, type WriteStream } from "original-fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
+const { access, mkdir, rm } = promises;
 
 const run = promisify(execFile);
 

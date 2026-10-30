@@ -1,13 +1,14 @@
 // What switch.ps1 leaves behind and what Grace does with it at the next start
 // (docs/specs/2026-10-28-app-updates.md R9.5, R10.6 to R10.9, R12).
-import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { rename, rm } from "node:fs/promises";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { promises, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "original-fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Backup, UpdateSettings } from "../../shared/updates";
 import { parseVersion } from "../../shared/version";
 import { isObject, parseUpdateSettings, sameFolder } from "../settings";
 import { isGraceFolder, ownStaging } from "./preflight";
+const { rename, rm } = promises;
 
 /** `update-result.json`, as the script writes it (R10.5). */
 export interface SwitchResult {

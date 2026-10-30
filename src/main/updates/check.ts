@@ -1,6 +1,8 @@
-import { readFile } from "node:fs/promises";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { promises } from "original-fs";
 import { isAbsolute } from "node:path";
 import { parseReleases, RELEASES_API, type Release } from "../../shared/updates";
+const { readFile } = promises;
 
 /** Where releases come from: GRACE_UPDATE_FEED in an unpackaged build (R13.2), else the GitHub API. */
 export function updateFeed(env: NodeJS.ProcessEnv, packaged: boolean): string {

@@ -9,6 +9,9 @@ export const FIRST_UPDATER = "1.0.0-rc.4";
 
 export const RELEASES_API = "https://api.github.com/repos/hpagniez/grace/releases?per_page=100";
 
+/** Written into `resources` by the Forge hook: the packaged folder's top-level names. */
+export const APP_FILES = "app-files.json";
+
 export const releasePage = (v: string) => `https://github.com/hpagniez/grace/releases/tag/v${v}`;
 export const zipName = (v: string) => `Grace-win32-x64-${v}.zip`;
 export const downloadPrefix = (v: string) =>

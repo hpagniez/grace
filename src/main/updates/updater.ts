@@ -1,6 +1,7 @@
 // Checks, the startup modal, auto-update and installs, run in main
 // (docs/specs/2026-10-28-app-updates.md R2, R4, R5, R8, R9.3).
-import { rm } from "node:fs/promises";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { promises } from "original-fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AppEvent } from "../../shared/events";
@@ -28,6 +29,7 @@ import {
   type SwitchResult,
 } from "./startup";
 import { startSwitch } from "./switch";
+const { rm } = promises;
 
 export interface UpdaterDeps {
   dataDir: string;

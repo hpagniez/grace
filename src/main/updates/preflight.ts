@@ -1,9 +1,8 @@
-import { existsSync, readdirSync } from "node:fs";
-import { mkdir, readdir, readFile, rmdir, statfs } from "node:fs/promises";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { existsSync, promises, readdirSync } from "original-fs";
 import path from "node:path";
-
-/** Written into `resources` by the Forge hook: the packaged folder's top-level names. */
-export const APP_FILES = "app-files.json";
+import { APP_FILES } from "../../shared/updates";
+const { mkdir, readdir, readFile, rmdir, statfs } = promises;
 
 /** A folder holding a Grace install: the build's file list is inside. */
 export const isGraceFolder = (dir: string): boolean =>
