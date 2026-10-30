@@ -1,14 +1,7 @@
 import { Check, Globe } from "lucide";
 import { createMemo, For, Show } from "solid-js";
 import { HTTP_GROUPS, httpGroup, type HttpGroup } from "../shared/http";
-import {
-  groupCounts,
-  narrowedCalls,
-  shownCalls,
-  totalCalls,
-  type CallRef,
-  type ListedCall,
-} from "./http";
+import { groupCounts, shownCalls, totalCalls, type CallRef, type ListedCall } from "./http";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
@@ -121,10 +114,12 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
 /** The HTTP tab: status-group chips over one row per call of the tests under the tree selection. */
 export function HttpCalls(props: {
   state: AppState;
+  /** The calls of the tests under the tree selection, from the panel, which counts them too. */
+  narrowed: ListedCall[];
   selectCall(ref: CallRef): void;
   toggleGroup(g: HttpGroup | "all"): void;
 }) {
-  const narrowed = createMemo(() => narrowedCalls(props.state));
+  const narrowed = () => props.narrowed;
   const counts = createMemo(() => groupCounts(narrowed()));
   const shown = createMemo(() => shownCalls(narrowed(), props.state.httpGroups));
   const pressed = (g: HttpGroup | "all") =>

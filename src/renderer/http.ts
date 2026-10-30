@@ -15,20 +15,34 @@ export interface ListedCall {
   test: TestNode;
 }
 
-/** The calls of the tests under the tree selection (all of them with none), in run order. */
-export function narrowedCalls(s: Pick<AppState, "tree" | "selected" | "calls">): ListedCall[] {
+/** The tests under the tree selection (all of them with none). */
+export function scopeTests(s: Pick<AppState, "tree" | "selected">): TestNode[] {
   if (!s.tree) return [];
-  const scope = (s.selected && findNode(s.tree, s.selected)) || s.tree;
-  return leaves(scope)
-    .flatMap((test) =>
-      (s.calls[test.key] ?? []).map((call, index) => ({
-        ref: { key: test.key, index },
-        call,
-        test,
-      })),
-    )
+  return leaves((s.selected && findNode(s.tree, s.selected)) || s.tree);
+}
+
+// One list per calls array: a test whose calls did not change keeps its rows, which are not drawn again.
+const listed = new WeakMap<HttpCall[], ListedCall[]>();
+
+/** The calls of these tests, in run order. */
+export function callsOf(tests: TestNode[], calls: AppState["calls"]): ListedCall[] {
+  return tests
+    .flatMap((test) => {
+      const list = calls[test.key] ?? [];
+      let rows = listed.get(list);
+      // a refresh keeps the calls of an unchanged test but gives it a new node
+      if (!rows || rows[0]?.test !== test) {
+        rows = list.map((call, index) => ({ ref: { key: test.key, index }, call, test }));
+        listed.set(list, rows);
+      }
+      return rows;
+    })
     .sort((a, b) => a.call.startTime - b.call.startTime); // stable: log order breaks ties
 }
+
+/** The calls of the tests under the tree selection (all of them with none), in run order. */
+export const narrowedCalls = (s: Pick<AppState, "tree" | "selected" | "calls">): ListedCall[] =>
+  callsOf(scopeTests(s), s.calls);
 
 export function groupCounts(list: ListedCall[]): Record<HttpGroup | "all", number> {
   const counts = { all: list.length, "1xx": 0, "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, none: 0 };
