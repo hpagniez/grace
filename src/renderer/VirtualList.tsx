@@ -22,7 +22,7 @@ export interface VirtualListHandle {
  * through every row, drawn or not, and select as they go (R3, R4). The focus row is the last focused one if
  * it is there, else the selected one, else the first. It alone has tabindex 0 and is always drawn.
  */
-export function VirtualList<T>(props: {
+export function VirtualList<T, S = undefined>(props: {
   items: readonly T[];
   keyOf(item: T): string;
   rowHeight: number;
@@ -38,8 +38,13 @@ export function VirtualList<T>(props: {
   scrollerTestid?: string;
   /** On every row element. */
   itemClass?: string;
+  /**
+   * Made once per drawn row, in the row's scope, and handed to `attrs` and `children`: memos both read are
+   * worked out once, and `attrs`, which runs again on every move of the focus or the selection, stays cheap.
+   */
+  shared?(item: () => T): S;
   /** Spread on the row element. */
-  attrs(item: T, index: number): Record<string, string | number | undefined>;
+  attrs(item: T, index: number, shared: S): Record<string, string | number | undefined>;
   selectedKey: string | null;
   /** When this value changes, the selected row scrolls into view once the rows in view are kept still (R4.7). */
   revealSelectedOn?: unknown;
@@ -47,7 +52,7 @@ export function VirtualList<T>(props: {
   /** The list's own keys; true when handled. */
   onKey?(e: KeyboardEvent, item: T, index: number): boolean;
   ref?(handle: VirtualListHandle): void;
-  children(item: T, index: number, keyboardFocused: () => boolean): JSX.Element;
+  children(item: T, index: number, keyboardFocused: () => boolean, shared: S): JSX.Element;
 }) {
   let scroller!: HTMLDivElement;
   let list!: HTMLDivElement;
@@ -230,6 +235,7 @@ export function VirtualList<T>(props: {
             // Only a new item or place redraws the row's content, not every scroll.
             const index = createMemo(() => r().index);
             const item = createMemo(() => r().item);
+            const shared = props.shared?.(item) as S;
             return (
               <div
                 ref={(e) => (el = e)}
@@ -254,9 +260,9 @@ export function VirtualList<T>(props: {
                   // A script focus would match :focus-visible: a click is not keyboard focus.
                   el.focus({ preventScroll: true, focusVisible: false });
                 }}
-                {...props.attrs(item(), index())}
+                {...props.attrs(item(), index(), shared)}
               >
-                {props.children(item(), index(), () => keyboard() === key)}
+                {props.children(item(), index(), () => keyboard() === key, shared)}
               </div>
             );
           }}

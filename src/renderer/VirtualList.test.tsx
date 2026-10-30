@@ -337,3 +337,42 @@ describe("VirtualList", () => {
     expect(r20?.getAttribute("aria-selected")).toBe("true");
   });
 });
+
+describe("shared", () => {
+  it("is made once per drawn row for its attributes and content, not again as the focus moves", () => {
+    const shared = vi.fn((item: () => string) => ({ upper: () => item().toUpperCase() }));
+    const onSelect = vi.fn();
+    render(() => (
+      <VirtualList
+        items={keys(3)}
+        keyOf={(k) => k}
+        rowHeight={24}
+        role="listbox"
+        itemRole="option"
+        label="Rows"
+        testid="list"
+        shared={shared}
+        attrs={(_k, _i, s) => ({ "aria-label": s.upper() })}
+        selectedKey={null}
+        onSelect={onSelect}
+      >
+        {(_k, _i, _keyboard, s) => <span>{s.upper()}</span>}
+      </VirtualList>
+    ));
+    const rows = () => [
+      ...screen.getByTestId("list").querySelectorAll<HTMLElement>("[role=option]"),
+    ];
+    expect(rows().map((r) => [r.getAttribute("aria-label"), r.textContent])).toEqual([
+      ["R0", "R0"],
+      ["R1", "R1"],
+      ["R2", "R2"],
+    ]);
+    expect(shared).toHaveBeenCalledTimes(3);
+    rows()[0].focus();
+    flush();
+    rows()[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    flush();
+    expect(onSelect).toHaveBeenLastCalledWith("r1");
+    expect(shared).toHaveBeenCalledTimes(3);
+  });
+});

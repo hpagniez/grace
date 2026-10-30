@@ -14,10 +14,22 @@ import type { AppEvent } from "../shared/events";
 import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
+import { deriveStatus } from "../shared/status";
 import { NO_FILTER } from "../shared/tags";
 import { App } from "./App";
+import { leaves } from "./nodes";
 import { treeRows } from "./treeRows";
 import { drawn } from "../../test/drawn";
+
+// The real functions, counted: their own recursion is not, so each call is one walk of a subtree.
+vi.mock("../shared/status", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/status")>();
+  return { ...actual, deriveStatus: vi.fn(actual.deriveStatus) };
+});
+vi.mock("./nodes", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./nodes")>();
+  return { ...actual, leaves: vi.fn(actual.leaves) };
+});
 
 const node = (
   kind: TestNode["kind"],
@@ -1258,6 +1270,50 @@ describe("virtual tree", () => {
       expect(screen.getByRole("treeitem", { name: "login works, failed, flaky" })).toBe(
         item("s:tests/login.feature#1"),
       );
+    });
+  });
+
+  // At 10,000 tests a walk of the top folder is 12,049 rows: a run sends a status update every 100 ms.
+  describe("the walks behind a row", () => {
+    const walked = () =>
+      vi
+        .mocked(deriveStatus)
+        .mock.calls.map(([n]) => n.key)
+        .sort();
+
+    it("works out a changed row's status once per update, and does not count its flaky tests again", () => {
+      const { send, load } = setup();
+      load();
+      startRun(send);
+      vi.mocked(deriveStatus).mockClear();
+      vi.mocked(leaves).mockClear();
+      send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "passed" }] });
+      expect(item("f:tests/basic.feature")!.getAttribute("aria-label")).toBe(
+        "basic.feature, not run",
+      );
+      expect(item("s:tests/basic.feature#1")!.getAttribute("aria-label")).toBe(
+        "passing hello, passed, smoke",
+      );
+      expect(walked()).toEqual(["d:tests", "f:tests/basic.feature", "s:tests/basic.feature#1"]);
+      expect(vi.mocked(leaves).mock.calls.map(([n]) => n.key)).toEqual([]);
+    });
+
+    it("works out no status when the selection or the focus moves", () => {
+      const { load } = setup();
+      load();
+      click(screen.getByText("passing hello"));
+      vi.mocked(deriveStatus).mockClear();
+      vi.mocked(leaves).mockClear();
+      click(screen.getByText("failing match"));
+      press("ArrowUp");
+      expect(focused()).toBe("s:tests/basic.feature#1");
+      expect(selected().map((r) => r.dataset.key)).toEqual(["s:tests/basic.feature#1"]);
+      expect(walked()).toEqual([]);
+      // only the HTTP tab, for the tests under each new selection
+      expect(vi.mocked(leaves).mock.calls.map(([n]) => n.key)).toEqual([
+        "s:tests/basic.feature#2",
+        "s:tests/basic.feature#1",
+      ]);
     });
   });
 });

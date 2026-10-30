@@ -12,7 +12,7 @@ import {
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { FLAKY_TITLE } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
-import type { TestNode } from "../shared/model";
+import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { EmptyState } from "./EmptyState";
@@ -54,21 +54,23 @@ const flakyChip = (n: TestNode, flaky: AppState["flaky"]) => {
   return count === 0 ? null : isTest(n) ? "flaky" : `${count} flaky`;
 };
 
-/** What a tree row draws; the list around it makes it a treeitem. */
+/** What a tree row draws; the list around it makes it a treeitem, named from the same status and flaky chip. */
 function Row(props: {
   node: TestNode;
   level: number;
   open: boolean;
   toggle(): void;
   keyboardFocused: boolean;
+  status: Status;
+  flaky: string | null;
   ctx: Ctx;
 }) {
   const hasKids = () => props.node.children.length > 0;
-  const status = createMemo(() => deriveStatus(props.node, props.ctx.state.statuses));
+  const status = () => props.status;
   const selected = () => props.ctx.state.selected === props.node.key;
   const isFeature = () => props.node.kind === "feature";
   const match = createMemo(() => matches(props.node, props.ctx.state.filter));
-  const flaky = createMemo(() => flakyChip(props.node, props.ctx.state.flaky));
+  const flaky = () => props.flaky;
   const label = () => labelOf(props.node);
   const kindIcon = () =>
     isFeature()
@@ -228,9 +230,13 @@ export function Tree(props: Ctx) {
           label="Tests"
           testid="tree"
           itemClass={ITEM}
-          attrs={(r) => {
+          // Each walks the row's subtree: once per change for the row and its name, not on every attrs run.
+          shared={(r) => ({
+            status: createMemo(() => deriveStatus(r().node, props.state.statuses)),
+            flaky: createMemo(() => flakyChip(r().node, props.state.flaky)),
+          })}
+          attrs={(r, _index, row) => {
             const n = r.node;
-            const status = deriveStatus(n, props.state.statuses);
             return {
               "aria-level": r.level,
               "aria-setsize": r.setSize,
@@ -238,7 +244,7 @@ export function Tree(props: Ctx) {
               "aria-expanded":
                 n.children.length > 0 ? (closed().has(n.key) ? "false" : "true") : undefined,
               "aria-selected": props.state.selected === n.key ? "true" : "false",
-              "aria-label": rowName(labelOf(n), status, flakyChip(n, props.state.flaky), n.tags),
+              "aria-label": rowName(labelOf(n), row.status(), row.flaky(), n.tags),
               "aria-keyshortcuts": "Control+Enter",
             };
           }}
@@ -249,13 +255,15 @@ export function Tree(props: Ctx) {
           revealSelectedOn={JSON.stringify(props.state.filter)}
           ref={(h) => (list = h)}
         >
-          {(r, _index, keyboardFocused) => (
+          {(r, _index, keyboardFocused, row) => (
             <Row
               node={r.node}
               level={r.level}
               open={!closed().has(r.node.key)}
               toggle={() => toggle(r.node.key)}
               keyboardFocused={keyboardFocused()}
+              status={row.status()}
+              flaky={row.flaky()}
               ctx={props}
             />
           )}
