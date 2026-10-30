@@ -90,6 +90,12 @@ export async function launch(
   });
   apps.push(app);
   const win = await app.firstWindow();
+  // The real mouse of someone using the machine would reach the window between Playwright's moves and
+  // end a hover (a tooltip test then fails). Windows passes it through to what lies below; Playwright's
+  // input goes to the page directly and still arrives.
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) w.setIgnoreMouseEvents(true);
+  });
   return { app, win, userData };
 }
 
