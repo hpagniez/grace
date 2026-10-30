@@ -1,4 +1,13 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileSearch,
+  FileText,
+  Folder,
+  FolderOpen,
+  Shuffle,
+} from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -6,6 +15,7 @@ import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { drawn } from "../../test/drawn";
 
 const node = (
   kind: TestNode["kind"],
@@ -84,6 +94,8 @@ function setup() {
 }
 
 const button = (id: string) => screen.getByTestId(id) as HTMLButtonElement;
+const rowByKey = (key: string) =>
+  screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
 
 afterEach(cleanup);
 
@@ -120,6 +132,179 @@ describe("main screen", () => {
     load();
     fireEvent.click(screen.getByRole("button", { name: "Run add 2 and 3" }));
     expect(api.run).toHaveBeenCalledWith("s:tests/outline.feature#1.2");
+  });
+
+  it("shows each row's status by shape, named for a screen reader (R4.4)", () => {
+    const { send, load } = setup();
+    load();
+    const mark = (key: string) => within(rowByKey(key)).getByRole("img");
+    for (const n of screen.getAllByTestId("tree-node"))
+      expect(within(n).getByRole("img").getAttribute("aria-label")).toBe("Not run");
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261025-120000-000",
+      keys: ["s:tests/basic.feature#1", "s:tests/basic.feature#2"],
+      total: 2,
+      startedAt: Date.now(),
+      env: null,
+    });
+    send({
+      type: "scenarios",
+      updates: [
+        { key: "s:tests/basic.feature#1", status: "passed" },
+        { key: "s:tests/basic.feature#2", status: "failed", error: "boom" },
+      ],
+    });
+    expect(mark("s:tests/basic.feature#1").getAttribute("aria-label")).toBe("Passed");
+    expect(mark("s:tests/basic.feature#2").getAttribute("aria-label")).toBe("Failed");
+    expect(mark("f:tests/basic.feature").getAttribute("aria-label")).toBe("Failed");
+    expect(mark("f:tests/outline.feature").getAttribute("aria-label")).toBe("Not run");
+  });
+
+  it("swaps the chevron when a folder opens and closes, and icons folders and features", () => {
+    const { load } = setup();
+    load();
+    const row = rowByKey("d:tests");
+    const toggle = within(row).getByRole("button", { name: "Collapse tests" });
+    const chevron = toggle.querySelector("svg");
+    expect(drawn(chevron, ChevronDown)).toBe(true);
+    // no transform: one on every open row slows every hit test of a large tree
+    expect(chevron!.getAttribute("class") ?? "").not.toContain("rotate");
+    // svgs in a row: chevron, status mark, then the folder or file icon
+    expect(drawn(row.querySelectorAll("svg")[2], FolderOpen)).toBe(true);
+    expect(drawn(rowByKey("f:tests/basic.feature").querySelectorAll("svg")[2], FileText)).toBe(
+      true,
+    );
+    // a leaf keeps the place of its chevron but hides it
+    expect(rowByKey("s:tests/basic.feature#1").querySelector("button")!.className).toContain(
+      "invisible",
+    );
+    fireEvent.click(toggle);
+    flush();
+    const closed = within(row).getByRole("button", { name: "Expand tests" });
+    expect(drawn(closed.querySelector("svg"), ChevronRight)).toBe(true);
+    expect(drawn(row.querySelectorAll("svg")[2], Folder)).toBe(true);
+    expect(row.parentElement!.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("marks the selected row with its background and the accent bar, rings focus inside the row", () => {
+    const { load } = setup();
+    load();
+    const row = rowByKey("s:tests/basic.feature#2");
+    expect(row.className).toContain("h-6");
+    expect(row.className).toContain("rounded-sm");
+    expect(row.className).toContain("hover:bg-hover");
+    expect(row.className).not.toContain("bg-selected");
+    fireEvent.click(screen.getByText("failing match"));
+    flush();
+    expect(row.className).toContain("bg-selected");
+    expect(row.className).toContain("shadow-[inset_2px_0_0_var(--color-accent)]");
+    expect(rowByKey("s:tests/basic.feature#1").className).not.toContain("bg-selected");
+    // the tree scrolls: the ring goes inside the row (R10.1)
+    for (const b of row.querySelectorAll("button"))
+      expect(b.className).toContain("focus-visible:-outline-offset-2");
+  });
+
+  it("shows the run button muted, green when its row is hovered, focused or selected", () => {
+    const { load } = setup();
+    load();
+    const key = "s:tests/basic.feature#2";
+    const run = (k: string) => within(rowByKey(k)).getByTestId("run-node");
+    const green = /(^| )text-passed( |$)/;
+    expect(rowByKey(key).className).toContain("group");
+    expect(run(key).className).toContain("text-muted");
+    expect(run(key).className).toContain("group-hover:text-passed");
+    expect(run(key).className).toContain("group-focus-within:text-passed");
+    expect(run(key).className).toContain("size-6"); // 24 x 24 (R10.3)
+    expect(run(key).className).not.toMatch(green);
+    expect(run(key).getAttribute("aria-label")).toBe("Run failing match");
+    fireEvent.click(screen.getByText("failing match"));
+    flush();
+    expect(run(key).className).toMatch(green);
+    expect(run("s:tests/basic.feature#1").className).not.toMatch(green);
+  });
+
+  describe("label tooltip", () => {
+    // jsdom has no layout: say how wide the label is and how much of it shows
+    const measure = (el: HTMLElement, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { value: scrollWidth, configurable: true });
+      Object.defineProperty(el, "clientWidth", { value: clientWidth, configurable: true });
+    };
+    const tip = () => document.querySelector("[role=tooltip]");
+    const rest = (el: HTMLElement) => {
+      fireEvent.pointerEnter(el.parentElement!);
+      vi.advanceTimersByTime(500);
+    };
+
+    it("shows a cut label whole in a tooltip, not as a title", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { load } = setup();
+        load();
+        const label = screen.getByText("failing match");
+        expect(label.className).toContain("truncate");
+        expect(label.hasAttribute("title")).toBe(false);
+        expect(label.parentElement!.className).toContain("min-w-0");
+        // measured when the tooltip would show, not once at mount
+        measure(label, 200, 100);
+        rest(label);
+        expect(tip()!.textContent).toBe("failing match");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("shows nothing for a label that fits (R9.4: truncated text only)", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { load } = setup();
+        load();
+        const label = screen.getByText("failing match");
+        measure(label, 100, 100);
+        rest(label);
+        expect(tip()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps a row's tooltips on its row: the mark's right, the label's over it, the run's left", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      // every box 24 x 24 in the middle of the window, so no side runs out of room
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+        DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }),
+      );
+      try {
+        const { load } = setup();
+        load();
+        const row = rowByKey("s:tests/basic.feature#2");
+        const label = screen.getByText("failing match");
+        measure(label, 200, 100);
+        const sideOf = (el: HTMLElement) => {
+          rest(el);
+          const side = (tip() as HTMLElement).dataset.side;
+          fireEvent.pointerLeave(el.parentElement!);
+          flush();
+          return side;
+        };
+        expect(sideOf(within(row).getByRole("img"))).toBe("right");
+        expect(sideOf(label)).toBe("over");
+        expect(sideOf(within(row).getByTestId("run-node"))).toBe("left");
+      } finally {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+    });
+  });
+
+  it("gives tags the 20 px tag chip, so they clear the rows above and below", () => {
+    const { load } = setup();
+    load();
+    const tag = screen.getByText("smoke"); // the tree tag; the filter chip reads @smoke
+    expect(tag.className).toContain("h-5");
+    expect(tag.className).not.toContain("h-6");
+    expect(tag.className).toContain("rounded-sm");
   });
 
   it("gives every run button an accessible name", () => {
@@ -251,7 +436,7 @@ describe("main screen", () => {
     expect(stripe.className).toContain("animate-slide");
     expect(stripe.className).toContain("motion-reduce:animate-none");
     const segments = [...screen.getByTestId("progress-bar").children].filter((c) => c !== stripe);
-    expect(segments).toHaveLength(2);
+    expect(segments).toHaveLength(3); // passed, failed, cancelled
     for (const s of segments) {
       expect(s.className).toContain("transition-[width]");
       expect(s.className).toContain("motion-reduce:transition-none");
@@ -299,7 +484,11 @@ describe("main screen", () => {
     const { send } = setup();
     send({ type: "opening", root: "D:/p" });
     expect(button("run-all-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("Finding tests…");
+    const loading = screen.getByTestId("tree-message");
+    expect(loading.textContent).toBe("Finding tests…");
+    expect(loading.parentElement!.querySelector("svg")!.getAttribute("class")).toContain(
+      "animate-spin",
+    );
     send({
       type: "project",
       project: { root: "D:/p", layout: "maven" },
@@ -307,7 +496,12 @@ describe("main screen", () => {
       error: null,
     });
     expect(button("run-all-button").disabled).toBe(true);
-    expect(screen.getByTestId("tree-message").textContent).toBe("No feature files found");
+    const empty = screen.getByTestId("tree-message");
+    expect(empty.textContent).toBe("No feature files found");
+    expect(drawn(empty.parentElement!.querySelector("svg"), FileSearch)).toBe(true);
+    expect(empty.parentElement!.textContent).toContain(
+      "Grace looks for .feature files under the project folder.",
+    );
     expect(screen.getByTestId("project-layout").textContent).toBe("Maven");
     send({
       type: "project",
@@ -315,7 +509,10 @@ describe("main screen", () => {
       tree: null,
       error: "bad syntax",
     });
-    expect(screen.getByTestId("tree-message").textContent).toBe("bad syntax");
+    const failed = screen.getByTestId("tree-message");
+    expect(failed.textContent).toBe("bad syntax");
+    expect(failed.getAttribute("role")).toBe("alert"); // a Notice of kind error
+    expect(failed.className).toContain("bg-failed-tint");
   });
 
   it("shows steps once they arrive, with their log on demand", () => {
@@ -447,11 +644,15 @@ describe("flaky marks", () => {
     for (const key of [SCENARIO, ROW]) {
       const mark = markOf(key)!;
       expect(mark.textContent).toBe("flaky");
-      expect(mark.title).toBe(FLAKY_TITLE);
+      expect(mark.hasAttribute("title")).toBe(false);
       expect(mark.getAttribute("aria-label")).toBe(FLAKY_TITLE);
+      expect(mark.className).toContain("bg-cancelled-tint");
+      expect(drawn(mark.querySelector("svg"), Shuffle)).toBe(true);
+      expect(mark.querySelector("svg")!.getAttribute("width")).toBe("14"); // R4.2
       expect(countOf(key)).toBeNull();
     }
     expect(countOf("o:tests/x.feature#3")!.textContent).toBe("1 flaky");
+    expect(countOf("o:tests/x.feature#3")!.className).toContain("bg-cancelled-tint");
     expect(markOf("o:tests/x.feature#3")).toBeNull();
     expect(countOf("f:tests/x.feature")!.textContent).toBe("2 flaky");
     expect(countOf("d:tests")!.textContent).toBe("2 flaky");
@@ -460,11 +661,39 @@ describe("flaky marks", () => {
       expect(countOf(key)).toBeNull();
     }
     // the mark sits right after the tags and right before the run button
-    const cells = [...rowOf(SCENARIO).children] as HTMLElement[];
-    const tag = cells.findIndex((c) => c.textContent === "slow");
+    const cells = [...rowOf(SCENARIO).querySelectorAll<HTMLElement>("span, button")];
+    const at = (pred: (c: HTMLElement) => boolean) => cells.findIndex(pred);
+    const tag = at((c) => c.textContent === "slow");
+    const flaky = at((c) => c.dataset.testid === "flaky-mark");
+    const run = at((c) => c.dataset.testid === "run-node");
     expect(tag).toBeGreaterThan(-1);
-    expect(cells[tag + 1].dataset.testid).toBe("flaky-mark");
-    expect(cells[tag + 2].dataset.testid).toBe("run-node");
+    expect(flaky).toBeGreaterThan(tag);
+    expect(run).toBeGreaterThan(flaky);
+  });
+
+  it("shows the flaky explanation in a tooltip, left of the mark: below, it would cover the next row", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 }),
+    );
+    try {
+      const { send } = setup();
+      send({
+        type: "project",
+        project: { root: "D:/p", layout: "standalone" },
+        tree: flakyTree(),
+        error: null,
+      });
+      send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
+      fireEvent.pointerEnter(markOf(SCENARIO)!.parentElement!);
+      vi.advanceTimersByTime(500);
+      const tip = document.querySelector<HTMLElement>("[role=tooltip]")!;
+      expect(tip.textContent).toBe(FLAKY_TITLE);
+      expect(tip.dataset.side).toBe("left");
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 
   it("names the mark for a screen reader", () => {

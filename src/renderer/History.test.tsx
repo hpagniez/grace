@@ -1,11 +1,15 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { HistoryEntry } from "../shared/history";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
+import { btnDialog, dangerDialog, ghostSmall } from "./buttons";
 import { durationLabel } from "./History";
+import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
+import { drawn } from "../../test/drawn";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
 beforeAll(() => {
@@ -78,6 +82,9 @@ function setup() {
   const load = (...runs: HistoryEntry[]) => send({ type: "history", runs });
   return { api, send, load };
 }
+
+const cell = (i: number, id: string) => within(rows()[i]).getByTestId(id);
+const RAW = /\b(zinc|red|green|sky|amber|slate|gray)-\d|dark:| title=/; // R9.3
 
 const click = (el: HTMLElement) => {
   fireEvent.click(el);
@@ -212,9 +219,6 @@ describe("history list", () => {
     expect(text(1, "history-tags")).toBe("—");
     expect(within(rows()[1]).queryAllByTestId("history-tag")).toHaveLength(0);
     expect(text(1, "history-what")).toBe("create user");
-    expect(within(rows()[1]).getByTestId("history-what").title).toBe(
-      "tests/users.feature › create user",
-    );
     expect(text(1, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
     expect(text(1, "history-duration")).toBe("18s");
 
@@ -235,32 +239,188 @@ describe("history list", () => {
     expect(text(1, "history-threads")).toBe("—");
   });
 
-  it("puts the path of a feature or folder in the tooltip", () => {
-    const { load } = setup();
-    load(
-      entry("a", {
-        selection: {
-          kind: "feature",
-          file: "tests/users.feature",
-          name: "users",
-          line: null,
-          key: "f:",
-        },
-      }),
-      entry("b", {
-        selection: { kind: "folder", file: "tests/api", name: "api", line: null, key: "d:" },
-      }),
-    );
-    showHistory();
-    expect(within(rows()[0]).getByTestId("history-what").title).toBe("tests/users.feature");
-    expect(text(0, "history-what")).toBe("tests/users.feature");
-    expect(within(rows()[1]).getByTestId("history-what").title).toBe("tests/api");
+  describe("What ran", () => {
+    // Only the timers the tooltip needs, with Date still on the test's "now".
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(new Date(2026, 9, 25, 15, 0));
+    });
+    const tip = () => document.querySelector("[role=tooltip]");
+    const what = (i: number) => cell(i, "history-what");
+    const rest = (el: HTMLElement) => {
+      fireEvent.pointerEnter(el.parentElement!); // the tooltip's wrapper
+      vi.advanceTimersByTime(500);
+    };
+
+    it("puts where the node sits in a tooltip, not in a title", () => {
+      const { load } = setup();
+      load(
+        entry("a", {
+          selection: {
+            kind: "scenario",
+            file: "tests/users.feature",
+            name: "create user",
+            line: 6,
+            key: "s:tests/users.feature#1",
+          },
+        }),
+        entry("b", {
+          selection: {
+            kind: "feature",
+            file: "tests/users.feature",
+            name: "users",
+            line: null,
+            key: "f:",
+          },
+        }),
+        entry("c", {
+          selection: { kind: "folder", file: "tests/api", name: "api", line: null, key: "d:" },
+        }),
+      );
+      showHistory();
+      expect(text(0, "history-what")).toBe("create user");
+      expect(text(1, "history-what")).toBe("tests/users.feature");
+      for (const [i, path] of [
+        [0, "tests/users.feature › create user"],
+        [1, "tests/users.feature"],
+        [2, "tests/api"],
+      ] as const) {
+        expect(what(i).hasAttribute("title")).toBe(false);
+        rest(what(i));
+        expect(tip()!.textContent, `row ${i}`).toBe(path);
+        // over its row: below, it would take the click meant for the next row
+        expect((tip() as HTMLElement).dataset.side).toBe("over");
+        fireEvent.pointerLeave(what(i).parentElement!);
+        flush();
+      }
+      expect(screen.getByTestId("history").querySelectorAll("[title]")).toHaveLength(0);
+    });
+
+    it("says nothing for a run that has no path (All, Failed tests)", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b", { selection: null }));
+      showHistory();
+      for (const i of [0, 1]) {
+        rest(what(i));
+        expect(tip(), `row ${i}`).toBeNull();
+      }
+    });
+
+    it("cuts a long label at 14 rem, inside a wrapper that can shrink", () => {
+      const { load } = setup();
+      load(entry("a"));
+      showHistory();
+      expect(what(0).className).toContain("truncate");
+      expect(what(0).className).toContain("min-w-0");
+      expect(what(0).parentElement!.className).toContain("min-w-0");
+      expect(what(0).parentElement!.className).toContain("max-w-56");
+    });
   });
 
-  it("says No runs yet", () => {
+  it("shows a status mark before the words of the result, and the mark is hidden", () => {
+    const { load } = setup();
+    load(
+      entry("a"), // finished with 2 failed
+      entry("b", { failed: 0, passed: 3, total: 3 }),
+      entry("c", { outcome: "cancelled", exitCode: null, failed: 0, passed: 1, total: 5 }),
+      entry("d", { outcome: "failed", exitCode: 3 }),
+    );
+    showHistory();
+    const marks = [0, 1, 2, 3].map((i) =>
+      cell(i, "history-result").querySelector<HTMLElement>("[data-status]")!,
+    );
+    expect(marks.map((m) => m.dataset.status)).toEqual(["failed", "passed", "cancelled", "failed"]);
+    // the words name the status: the mark is aria-hidden, with no role and no name
+    for (const m of marks) {
+      expect(m.getAttribute("aria-hidden")).toBe("true");
+      expect(m.hasAttribute("role")).toBe(false);
+    }
+    expect(within(screen.getByTestId("history")).queryAllByRole("img")).toHaveLength(0);
+    // a block flex: inline-flex would sit on the baseline and lift the words above the rest of the row
+    expect(cell(0, "history-result").firstElementChild!.className).toMatch(/(^| )flex /);
+    expect(cell(0, "history-result").className).toContain("tabular-nums"); // R2.4: it holds counts
+    expect(text(0, "history-result")).toBe("41 passed, 2 failed of 43");
+    expect(text(1, "history-result")).toBe("3 passed, 0 failed of 3");
+    expect(text(2, "history-result")).toBe("Cancelled, 1 passed, 0 failed of 5");
+    expect(text(3, "history-result")).toBe("Error (exit 3)");
+  });
+
+  it("draws a tag by its shape: included with a check, excluded with a minus and a strike", () => {
+    const { load } = setup();
+    load(entry("a", { filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false } }));
+    showHistory();
+    const [inc, exc] = within(rows()[0]).getAllByTestId("history-tag");
+    expect(inc.className).toContain(chipIncluded);
+    expect(drawn(inc.querySelector("svg"), Check)).toBe(true);
+    expect(exc.className).toContain(chipExcluded);
+    expect(exc.className).toContain("line-through");
+    expect(drawn(exc.querySelector("svg"), Minus)).toBe(true);
+    expect(inc.textContent).toBe("@smoke");
+    expect(exc.textContent).toBe("not @slow");
+  });
+
+  it("right-aligns Threads and Duration in tabular figures", () => {
+    const { load } = setup();
+    load(entry("a", { threads: 8 }));
+    showHistory();
+    const heads = [...screen.getByTestId("history").querySelectorAll("th")];
+    for (const name of ["Threads", "Duration"])
+      expect(heads.find((h) => h.textContent === name)!.className, name).toContain("text-right");
+    for (const id of ["history-threads", "history-duration"]) {
+      expect(cell(0, id).className, id).toContain("text-right");
+      expect(cell(0, id).className, id).toContain("tabular-nums");
+    }
+    expect(cell(0, "history-when").className).toContain("tabular-nums");
+    expect(cell(0, "history-duration").className).toContain("font-mono");
+  });
+
+  it("sticks muted sentence-case headers to the top, and gives rows room under them", () => {
+    const { load } = setup();
+    load(entry("a"));
+    showHistory();
+    for (const th of screen.getByTestId("history").querySelectorAll("th"))
+      for (const c of [
+        "sticky",
+        "top-0",
+        "bg-surface",
+        "text-xs",
+        "text-muted",
+        "font-medium",
+        "h-7",
+      ])
+        expect(th.className, `${th.textContent} ${c}`).toContain(c);
+    // 28 px rows (R18.4). A focused button is scrolled clear of the 28 px header by the scroller's
+    // scroll-padding, which a row's scroll-margin alone does not do (R10.2; checked in Chromium).
+    for (const c of ["h-7", "border-b", "border-line", "scroll-mt-7"])
+      expect(rows()[0].className).toContain(c);
+    expect(screen.getByTestId("history").className).toContain("scroll-pt-7");
+    expect(rows()[0].className).not.toMatch(/\b(odd|even):/); // no zebra
+  });
+
+  it("sets the table cells in 12 px (R2.2)", () => {
+    const { load } = setup();
+    load(entry("a"));
+    showHistory();
+    const table = screen.getByTestId("history").querySelector("table")!;
+    expect(table.className).toContain("text-xs");
+    expect(table.className).not.toContain("text-sm");
+  });
+
+  it("uses no raw palette class, no dark: variant and no title", () => {
+    const { load } = setup();
+    load(entry("a", { filter: { include: ["smoke"], exclude: ["slow"], hideNonMatching: false } }));
+    showHistory();
+    expect(screen.getByTestId("history").outerHTML).not.toMatch(RAW);
+  });
+
+  it("says No runs yet in an empty state with the history icon", () => {
     const { load } = setup();
     showHistory();
-    expect(screen.getByTestId("history-empty").textContent).toBe("No runs yet");
+    const empty = screen.getByTestId("history-empty");
+    expect(empty.textContent).toBe("No runs yet. Runs appear here when they finish.");
+    const icon = empty.parentElement!.querySelector("svg")!;
+    expect(drawn(icon, HistoryIcon)).toBe(true);
+    expect(icon.getAttribute("width")).toBe("24");
     expect(screen.getByTestId("tab-history").textContent).toBe("History (0)");
     expect(rows()).toHaveLength(0);
     load(entry("a"));
@@ -297,6 +457,11 @@ describe("history actions", () => {
       "Re-run",
       "Re-run failed",
     ]);
+    // small ghost buttons, each with its icon
+    for (const id of rowButtons) expect(inRow(1, id).className, id).toContain(ghostSmall);
+    expect(drawn(inRow(1, "history-report").querySelector("svg"), FileText)).toBe(true);
+    expect(drawn(inRow(1, "history-rerun").querySelector("svg"), Play)).toBe(true);
+    expect(drawn(inRow(1, "history-rerun-failed").querySelector("svg"), RotateCcw)).toBe(true);
     click(inRow(1, "history-report"));
     expect(api.openRunReport).toHaveBeenCalledExactlyOnceWith("20261024-172000-000");
     click(inRow(0, "history-rerun"));
@@ -336,7 +501,7 @@ describe("Clear history", () => {
     load(entry("a"), entry("b"), entry("c"));
     showHistory();
     expect(clear().textContent).toBe("Clear history");
-    expect(screen.queryByText(/Delete the/)).toBeNull();
+    expect(confirm().open).toBe(false);
     click(clear());
     expect(confirm().open).toBe(true);
     expect(
@@ -356,6 +521,30 @@ describe("Clear history", () => {
     expect(confirm().open).toBe(false);
   });
 
+  it("is a dialog-style box: a 16 px title, Delete (danger) first, then Cancel (focused)", () => {
+    const { load } = setup();
+    load(entry("a"), entry("b"));
+    showHistory();
+    click(clear());
+    expect(confirm().className).toContain(dialogStyle);
+    expect(confirm().getAttribute("aria-labelledby")).toBe("clear-history-title");
+    const title = document.getElementById("clear-history-title")!;
+    expect(title.className).toContain("text-lg");
+    expect(title.className).toContain("font-semibold");
+    const del = screen.getByTestId("clear-history-confirm");
+    const cancel = screen.getByTestId("clear-history-cancel");
+    expect(del.className).toContain(dangerDialog);
+    expect(cancel.className).toContain(btnDialog);
+    expect(del.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cancel.hasAttribute("autofocus")).toBe(true);
+    // R2.2: dialog buttons are 14 px: the dialog variants, not an override of the standard ones
+    for (const b of [del, cancel]) {
+      expect(b.className).toContain("text-base");
+      expect(b.className).not.toMatch(/text-sm|!/);
+    }
+    expect(confirm().outerHTML).not.toMatch(RAW);
+  });
+
   it("words the confirmation for one run in the singular", () => {
     const { load } = setup();
     load(entry("a"));
@@ -366,18 +555,52 @@ describe("Clear history", () => {
     ).toBeTruthy();
   });
 
-  it("ignores a close event that arrives while the dialog is open again", () => {
-    const { load } = setup();
-    load(entry("a"), entry("b"));
-    showHistory();
-    click(clear());
-    confirm().dispatchEvent(new Event("close")); // late: the dialog was reopened meanwhile
-    flush();
-    expect(screen.queryByText(/Delete the/)).not.toBeNull();
-    confirm().removeAttribute("open"); // Escape
-    confirm().dispatchEvent(new Event("close"));
-    flush();
-    expect(screen.queryByText(/Delete the/)).toBeNull();
+  // The dialog fades out over 100 ms (R5.2): its title and buttons must stay until it is gone.
+  describe("while it closes", () => {
+    const whole = (runs: string) => {
+      expect(within(confirm()).getByText(runs)).toBeTruthy();
+      expect(within(confirm()).getByTestId("clear-history-confirm")).toBeTruthy();
+      expect(within(confirm()).getByTestId("clear-history-cancel")).toBeTruthy();
+    };
+    const THREE = "Delete the 3 runs of this project and their reports?";
+
+    it("keeps its title and buttons after Cancel and after Escape", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-cancel"));
+      expect(confirm().open).toBe(false);
+      whole(THREE);
+      click(clear());
+      confirm().removeAttribute("open"); // Escape: the browser closes the dialog itself
+      confirm().dispatchEvent(new Event("close"));
+      flush();
+      whole(THREE);
+    });
+
+    it("keeps the count it was opened with when main answers Delete with an empty list", () => {
+      const { api, load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-confirm"));
+      expect(api.clearHistory).toHaveBeenCalledOnce();
+      load(); // main's reply, while the dialog is still fading out
+      expect(rows()).toHaveLength(0);
+      whole(THREE); // not "Delete the 0 runs of this project and their reports?"
+    });
+
+    it("counts again each time it opens", () => {
+      const { load } = setup();
+      load(entry("a"), entry("b"), entry("c"));
+      showHistory();
+      click(clear());
+      click(screen.getByTestId("clear-history-cancel"));
+      load(entry("a"), entry("b"), entry("c"), entry("d"));
+      click(clear());
+      whole("Delete the 4 runs of this project and their reports?");
+    });
   });
 
   it("disables the toolbar Report and Re-run failed once the history is empty", () => {
@@ -406,20 +629,27 @@ describe("toolbar Re-run failed", () => {
   it("shows the newest run's failed count and calls rerunFailed with its id", () => {
     const { api, load } = setup();
     load(entry("new", { failed: 2 }), entry("old", { failed: 5 }));
-    expect(toolbarRerunFailed().textContent).toBe("Re-run failed (2)");
+    expect(toolbarRerunFailed().textContent).toBe("Re-run failed 2");
     expect(toolbarRerunFailed().disabled).toBe(false);
     click(toolbarRerunFailed());
     expect(api.rerunFailed).toHaveBeenCalledExactlyOnceWith("new");
   });
 
-  it("sits right after Run all", () => {
+  it("sits between Report and Cancel, before Run all (spec R13.1)", () => {
     setup();
-    expect(screen.getByTestId("run-all-button").nextElementSibling).toBe(toolbarRerunFailed());
+    const slot = (el: HTMLElement) => el.parentElement!; // each sits in its tooltip's wrapper
+    expect(slot(toolbarRerunFailed()).previousElementSibling).toBe(slot(report()));
+    expect(slot(toolbarRerunFailed()).nextElementSibling).toBe(
+      slot(screen.getByTestId("cancel-button")),
+    );
+    expect(slot(screen.getByTestId("cancel-button")).nextElementSibling).toBe(
+      screen.getByTestId("run-all-button"),
+    );
   });
 
   it("is disabled with no history, with no failure in the newest run, and while busy", () => {
     const { send, load } = setup();
-    expect(toolbarRerunFailed().textContent).toBe("Re-run failed (0)");
+    expect(toolbarRerunFailed().textContent).toBe("Re-run failed"); // no 0 pill
     expect(toolbarRerunFailed().disabled).toBe(true);
     load(entry("new", { failed: 0 }), entry("old", { failed: 5 }));
     expect(toolbarRerunFailed().disabled).toBe(true);

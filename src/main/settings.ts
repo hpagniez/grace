@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "no
 import path from "node:path";
 import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
+import { parseTheme, type Theme } from "../shared/theme";
 import { validThreads } from "../shared/threads";
 import { defaultUpdateSettings, type UpdateSettings } from "../shared/updates";
 import { parseVersion } from "../shared/version";
@@ -369,5 +370,22 @@ export function saveUpdateSettings(dataDir: string, s: UpdateSettings): void {
       failed: s.failed,
       lastChecked: s.lastChecked,
     };
+  });
+}
+
+/** The saved theme (spec R8.2). A missing or malformed key or value, or an unreadable file, reads as Follow Windows, so it never throws. */
+export function loadAppearance(dataDir: string): Theme {
+  try {
+    const { appearance } = read(dataDir);
+    return parseTheme(isObject(appearance) ? appearance.theme : null);
+  } catch {
+    return "system";
+  }
+}
+
+/** Saves the theme and keeps the other keys. Throws if the file cannot be saved. */
+export function saveAppearance(dataDir: string, theme: Theme): void {
+  update(dataDir, (s) => {
+    s.appearance = { theme };
   });
 }

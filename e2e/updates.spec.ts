@@ -39,7 +39,7 @@ test("the status bar shows the version on every view (R3.1)", async () => {
   const { app, win } = await launch();
   await expect(win.getByTestId("home")).toBeVisible();
   await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
-  await expect(win.getByTestId("settings-button")).toHaveText("⚙ Settings");
+  await expect(win.getByTestId("settings-button")).toHaveText("Settings");
   await openProject(app, project("clean"));
   await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 15_000 });
   await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
@@ -52,10 +52,13 @@ test("out of date on the pre-release channel shows the marker (R3.2)", async () 
   await expect(win.getByTestId("update-link")).toHaveText("Update");
   // e2e runs a build that is not packaged (R13.1)
   await expect(win.getByTestId("update-link")).toBeDisabled();
-  await expect(win.getByTestId("update-link")).toHaveAttribute(
-    "title",
-    "Updates install only in the packaged app",
-  );
+  // a disabled button still explains itself: the tooltip listens on its wrapper. The startup modal
+  // makes the page inert: close it first (Escape saves nothing)
+  await win.keyboard.press("Escape");
+  await expect(win.getByTestId("update-modal")).toBeHidden();
+  await win.getByTestId("update-link").hover({ force: true });
+  await expect(win.getByRole("tooltip")).toHaveText("Updates install only in the packaged app");
+  await win.mouse.move(0, 0);
   await expect(
     win.getByRole("button", { name: `Grace ${pkg.version}, 1.0.0-rc.99 available` }),
   ).toBeVisible();
@@ -219,7 +222,9 @@ test("version list and dev-build install button (R6.3, R6.4)", async () => {
   // e2e runs a build that is not packaged (R13.1)
   const install = rows.first().getByRole("button", { name: "Install" });
   await expect(install).toBeDisabled();
-  await expect(install).toHaveAttribute("title", "Updates install only in the packaged app");
+  await install.hover({ force: true });
+  await expect(win.getByRole("tooltip")).toHaveText("Updates install only in the packaged app");
+  await win.mouse.move(0, 0);
   await expect(win.getByTestId("settings-update")).toBeDisabled();
   await expect(rows.last()).toContainText(pkg.version);
   await expect(rows.last()).toContainText("installed");
@@ -264,7 +269,7 @@ test("Back returns to the open project unchanged (R6.1)", async () => {
     ).toBe(false);
   }
   await expect(win.getByTestId("status-bar")).toContainText(`Grace ${pkg.version}`);
-  await win.getByRole("button", { name: "← Back" }).click();
+  await win.getByRole("button", { name: "Back", exact: true }).click();
   await expect(win.getByTestId("settings")).toHaveCount(0);
   await expect(folder).toBeVisible();
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));

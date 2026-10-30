@@ -1,27 +1,28 @@
-import { createEffect, Show } from "solid-js";
+import { createEffect, createMemo, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
-import { btn } from "./buttons";
+import type { UpdateProgress as Progress } from "../shared/updates";
+import { btnDialog } from "./buttons";
 import { showModalWhile } from "./modal";
+import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
+import { dialog as dialogStyle, link } from "./ui";
 
 const mb = (bytes: number) => Math.round(bytes / 1e6);
+const runningOf = (p: Progress | null) => (p && !("error" in p) ? p : null);
+const errorOf = (p: Progress | null) => (p && "error" in p ? p.error : null);
 
 /**
- * The install's progress dialog (R8): the step under way and Cancel (none at the hand-over), or,
- * once a step failed, the message and Close. Escape does nothing while a step runs.
+ * The install's progress dialog (app-updates R8): the step under way and Cancel (none at the hand-over),
+ * or, once a step failed, the message and Close. Escape does nothing while a step runs.
  */
 export function UpdateProgress(props: { state: AppState; api: Api }) {
   let dialog!: HTMLDialogElement;
   let cancel: HTMLButtonElement | undefined;
   const progress = () => props.state.updateProgress;
-  const running = () => {
-    const p = progress();
-    return p && !("error" in p) ? p : null;
-  };
-  const failure = () => {
-    const p = progress();
-    return p && "error" in p ? p.error : null;
-  };
+  const running = () => runningOf(progress());
+  const failure = () => errorOf(progress());
+  // the last progress: its words stay while the dialog fades out (R5.2)
+  const shown = createMemo<Progress | null>((last) => progress() ?? last ?? null);
   showModalWhile(
     () => dialog,
     () => progress() !== null,
@@ -43,7 +44,7 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
       ref={(e) => (dialog = e)}
       data-testid="update-progress"
       aria-labelledby="update-progress-title"
-      class="m-auto w-[28rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+      class={`${dialogStyle} w-[28rem] max-w-[95vw]`}
       onCancel={(e) => running() && e.preventDefault()}
       onClose={() => {
         // Chrome closes a dialog on a repeated Escape even when `cancel` was prevented
@@ -52,25 +53,25 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
         else if (failure() !== null) void props.api.cancelUpdate(); // Escape closes a failure's message
       }}
     >
-      <Show when={progress()}>
+      <Show when={shown()}>
         {(p) => (
           <>
-            <h2 id="update-progress-title" class="text-base font-semibold">
+            <h2 id="update-progress-title" class="text-lg font-semibold">
               {`${p().rollback ? "Rolling back to" : "Updating to"} ${p().version}`}
             </h2>
             <Show
-              when={running()}
+              when={runningOf(p())}
               fallback={
                 <>
-                  <p data-testid="update-error" class="mt-2 text-sm text-red-700 dark:text-red-400">
-                    {failure()}
-                  </p>
-                  <p class="mt-1 text-sm">
+                  <div class="mt-3">
+                    <Notice kind="error" text={errorOf(p()) ?? ""} testid="update-error" />
+                  </div>
+                  <p class="mt-3 text-sm">
                     {"See the "}
                     <button
                       type="button"
                       data-testid="update-release-page"
-                      class="rounded text-sky-700 underline hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-300"
+                      class={link}
                       onClick={() => void props.api.openWhatsNew(p().version)}
                     >
                       release page
@@ -82,23 +83,28 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
             >
               {(r) => (
                 <>
+                  {/* the run's bar (spec R14.1): the download fills it, the other steps cross it with the waiting stripe */}
                   <div
                     role="progressbar"
                     aria-labelledby="update-progress-title"
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={r().step === "download" ? percent(r()) : undefined}
-                    class="mt-3 h-2 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-700"
+                    class="relative mt-4 h-1.5 overflow-hidden rounded-full bg-line"
                   >
-                    <div
-                      class={`h-full bg-green-600 ${r().step === "download" ? "" : "animate-pulse"}`}
-                      style={{ width: r().step === "download" ? `${percent(r())}%` : "100%" }}
-                    />
+                    <Show
+                      when={r().step === "download"}
+                      fallback={
+                        <div class="absolute inset-y-0 left-0 w-[30%] animate-slide rounded-full bg-running motion-reduce:animate-none" />
+                      }
+                    >
+                      <div
+                        class="h-full rounded-full bg-running"
+                        style={{ width: `${percent(r())}%` }}
+                      />
+                    </Show>
                   </div>
-                  <p
-                    data-testid="update-step"
-                    class="mt-2 text-sm text-zinc-600 dark:text-zinc-400"
-                  >
+                  <p data-testid="update-step" class="mt-2 text-sm text-muted tabular-nums">
                     {r().step === "download"
                       ? `Downloading… ${mb(r().received)} of ${mb(r().total)} MB`
                       : r().step === "check"
@@ -111,17 +117,17 @@ export function UpdateProgress(props: { state: AppState; api: Api }) {
               )}
             </Show>
             {/* none while Grace hands over to the switch script: that cannot be cancelled (R8.5) */}
-            <Show when={running()?.step !== "restart"}>
-              <div class="mt-4 flex justify-end">
+            <Show when={runningOf(p())?.step !== "restart"}>
+              <div class="mt-5 flex justify-end">
                 {/* one button, so focus stays on it when a step fails: both call cancelUpdate */}
                 <button
                   type="button"
                   data-testid="update-cancel"
                   ref={(e) => (cancel = e)}
-                  class={btn}
+                  class={btnDialog}
                   onClick={() => void props.api.cancelUpdate()}
                 >
-                  {running() ? "Cancel" : "Close"}
+                  {runningOf(p()) ? "Cancel" : "Close"}
                 </button>
               </div>
             </Show>

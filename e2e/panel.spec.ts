@@ -82,7 +82,7 @@ test("the splitter works from the keyboard", async () => {
   const { win } = await started();
   for (
     let i = 0;
-    i < 40 && !(await splitter(win).evaluate((e) => e === document.activeElement));
+    i < 80 && !(await splitter(win).evaluate((e) => e === document.activeElement));
     i++
   )
     await win.keyboard.press("Tab");
@@ -215,13 +215,15 @@ test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
     w.webContents.send("app:event", { type: "notice", message: "a long notice ".repeat(300) });
   });
   const root = win.getByTestId("view");
+  const sheet = win.getByTestId("sheet");
   await expect
-    .poll(() => root.evaluate((e) => e.scrollHeight > e.clientHeight)) // the panel is cut off
+    .poll(() => sheet.evaluate((e) => e.scrollHeight > e.clientHeight)) // the sheet cuts the panel off
     .toBe(true);
   await expectStatusBarShown(win); // the panel, not the status bar
 
   await win.getByTestId("tab-http").focus();
   expect(await root.evaluate((e) => e.scrollTop)).toBe(0);
+  expect(await sheet.evaluate((e) => e.scrollTop)).toBe(0); // the sheet clips; focus must not scroll it
   expect((await win.locator("header").boundingBox())!.y).toBeGreaterThanOrEqual(0);
 });
 

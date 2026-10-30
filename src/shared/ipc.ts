@@ -2,6 +2,7 @@
 import type { PropertiesEdit } from "./env";
 import type { AppEvent } from "./events";
 import type { FilterState } from "./tags";
+import type { Theme } from "./theme";
 import type { Channel } from "./updates";
 
 export const CH = {
@@ -28,6 +29,8 @@ export const CH = {
   updateSettings: "updates:settings",
   skipVersion: "updates:skip",
   whatsNew: "updates:whatsNew",
+  getAppearance: "appearance:get",
+  setAppearance: "appearance:set",
   event: "app:event",
 } as const;
 
@@ -66,5 +69,9 @@ export interface Api {
   skipVersion(version: string): Promise<void>;
   /** Opens the version's release page in the default browser. */
   openWhatsNew(version: string): Promise<void>;
+  /** The saved theme (spec R8); main applies it to the window. */
+  getAppearance(): Promise<Theme>;
+  /** Main refuses anything but a theme, and saves and applies one. */
+  setAppearance(theme: Theme): Promise<void>;
   onEvent(cb: (e: AppEvent) => void): () => void;
 }

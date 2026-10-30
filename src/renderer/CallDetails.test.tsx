@@ -1,4 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { Check, CircleAlert, Copy } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -6,6 +7,10 @@ import { curlCommand, type HttpCall } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { btnSmall } from "./buttons";
+import { GROUP_TINT } from "./HttpCalls";
+import { TINT } from "./ui";
+import { drawn } from "../../test/drawn";
 
 afterEach(() => {
   cleanup();
@@ -203,12 +208,14 @@ describe("call details", () => {
       "curl -X POST 'http://localhost/users' -H 'Content-Type: application/json' -H 'Accept: application/json' --data-raw '{\"name\":\"bob\",\"tags\":[1,2]}'",
     );
     expect(textOf("copy-curl")).toBe("Copied");
+    expect(drawn(id("copy-curl").querySelector("svg"), Check)).toBe(true);
     vi.advanceTimersByTime(1999);
     flush();
     expect(textOf("copy-curl")).toBe("Copied");
     vi.advanceTimersByTime(1);
     flush();
     expect(textOf("copy-curl")).toBe("Copy as cURL");
+    expect(drawn(id("copy-curl").querySelector("svg"), Copy)).toBe(true);
   });
 
   it("says when the copy failed", async () => {
@@ -218,6 +225,98 @@ describe("call details", () => {
     click(id("copy-curl"));
     await settle();
     expect(textOf("copy-curl")).toBe("Copy failed");
+    expect(drawn(id("copy-curl").querySelector("svg"), Check)).toBe(false); // it was not copied
+  });
+
+  it("styles Copy as cURL as a small button with the copy icon, announced as it changes", () => {
+    setup();
+    selectCall(0);
+    const button = id("copy-curl");
+    expect(button.className).toBe(btnSmall);
+    expect(button.getAttribute("aria-live")).toBe("polite");
+    const svg = button.querySelector("svg")!;
+    expect(drawn(svg, Copy)).toBe(true);
+    expect(svg.getAttribute("width")).toBe("14");
+    expect(svg.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("heads the call with its method and URL in the mono, then a tinted badge and the time", () => {
+    setup();
+    selectCall(0);
+    const title = within(id("call-details")).getByRole("heading", { level: 2 });
+    expect(title.className).toContain("font-mono");
+    expect(title.className).toContain("text-lg");
+    // 500: the mono is bundled at 400 and 500 only, so 600 would be a faux bold (R2.1)
+    expect(title.className).toContain("font-medium");
+    expect(title.className).not.toContain("font-semibold");
+    expect(title.textContent).toBe("POSThttp://localhost/users");
+    const status = id("call-status");
+    expect(status.className).toContain(TINT[GROUP_TINT["2xx"]]);
+    expect(status.className).toContain("rounded-full");
+    expect(status.querySelector(".font-mono.tabular-nums")!.textContent).toBe("201");
+    expect(id("call-time").className).toContain("font-mono");
+    expect(id("call-time").className).toContain("tabular-nums");
+    expect(id("call-location").className).toContain("text-muted");
+    expect(id("call-via").className).toContain("text-muted");
+  });
+
+  it("tints the badge by group, with a code outside 100-599 neutral", () => {
+    const { send } = setup();
+    send({
+      type: "calls",
+      key: "s:a.feature#2",
+      calls: [
+        call({ status: 404, startTime: 10 }),
+        call({ status: 503, startTime: 11 }),
+        call({ status: 999, startTime: 12 }),
+        call({ status: null, error: "x", startTime: 13 }),
+      ],
+    });
+    selectCall(2);
+    const check = (text: string, tint: keyof typeof TINT) => {
+      expect(textOf("call-status")).toBe(text);
+      expect(id("call-status").className).toContain(TINT[tint]);
+    };
+    check("404 · 4xx Client error", GROUP_TINT["4xx"]);
+    click(screen.getAllByTestId("http-call")[3]);
+    check("503 · 5xx Server error", GROUP_TINT["5xx"]);
+    click(screen.getAllByTestId("http-call")[4]);
+    check("999", "skipped");
+    click(screen.getAllByTestId("http-call")[5]);
+    check("No response", GROUP_TINT.none);
+  });
+
+  it("sets Request and Response as 12 px section titles over sunken boxes", () => {
+    setup();
+    selectCall(0);
+    for (const name of ["Request", "Response"]) {
+      const h = heading(name)!;
+      expect(h.className).toContain("text-xs");
+      expect(h.className).toContain("font-medium");
+    }
+    for (const testid of [
+      "call-request-headers",
+      "call-request-body",
+      "call-response-headers",
+      "call-response-body",
+    ]) {
+      const box = id(testid).className;
+      for (const c of ["bg-sunken", "rounded-lg", "font-mono", "text-xs", "overflow-auto"])
+        expect(box, `${testid} ${c}`).toContain(c);
+    }
+  });
+
+  it("shows the no-response error in a failed box titled with the alert icon", () => {
+    setup();
+    selectCall(2);
+    const error = id("call-error");
+    const box = error.parentElement!;
+    expect(box.className).toContain(TINT.failed);
+    expect(box.className).toContain("rounded-lg");
+    expect(box.textContent).toContain("Error");
+    expect(drawn(box.querySelector("svg"), CircleAlert)).toBe(true);
+    expect(error.className).toContain("text-ink");
+    expect(error.className).toContain("whitespace-pre-wrap");
   });
 
   it("says the copy failed when the window has no clipboard", async () => {

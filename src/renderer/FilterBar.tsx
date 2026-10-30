@@ -1,16 +1,15 @@
+import { Check, Minus } from "lucide";
 import { createMemo, For, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { chipTags, cycleTag, filterOn, matchingLeaves, type FilterState } from "../shared/tags";
+import { ghostSmall } from "./buttons";
+import { Icon } from "./Icon";
 import { leaves } from "./nodes";
 import type { AppState } from "./reduce";
+import { Tooltip } from "./Tooltip";
+import { chip, chipExcluded, chipIncluded } from "./ui";
 
-const chipBase =
-  "rounded border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-40";
-const CHIP = {
-  off: `${chipBase} border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700`,
-  include: `${chipBase} border-green-600 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300`,
-  exclude: `${chipBase} border-red-600 bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300`,
-} as const;
+const CHIP = { off: chip, include: chipIncluded, exclude: chipExcluded } as const;
 const HINT = {
   off: "Not filtered. Click to include.",
   include: "Included. Click to exclude.",
@@ -40,30 +39,35 @@ export function FilterBar(props: { state: AppState; api: Api }) {
     <Show when={tags().length > 0}>
       <div
         data-testid="filter-bar"
-        class="flex flex-wrap items-center gap-1.5 border-b border-zinc-200 px-3 py-1.5 dark:border-zinc-700"
+        class="flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-1.5"
       >
         <For each={tags()}>
           {(tag) => (
-            <button
-              type="button"
-              data-testid="tag-chip"
-              data-tag={tag}
-              data-state={stateOf(tag)}
-              class={CHIP[stateOf(tag)]}
-              title={HINT[stateOf(tag)]}
-              aria-label={`@${tag}, ${SPOKEN[stateOf(tag)]}`}
-              disabled={locked()}
-              onClick={() => void props.api.setFilter(cycleTag(plain(), tag))}
-            >
-              {`@${tag}`}
-            </button>
+            <Tooltip text={HINT[stateOf(tag)]} describe>
+              <button
+                type="button"
+                data-testid="tag-chip"
+                data-tag={tag}
+                data-state={stateOf(tag)}
+                class={CHIP[stateOf(tag)]}
+                aria-label={`@${tag}, ${SPOKEN[stateOf(tag)]}`}
+                disabled={locked()}
+                onClick={() => void props.api.setFilter(cycleTag(plain(), tag))}
+              >
+                {/* A state shows by shape as well as colour (spec R7.3): an unfiltered tag has no icon. */}
+                <Show when={stateOf(tag) !== "off"}>
+                  <Icon icon={stateOf(tag) === "include" ? Check : Minus} size={14} />
+                </Show>
+                {`@${tag}`}
+              </button>
+            </Tooltip>
           )}
         </For>
         <Show when={filterOn(filter())}>
           <button
             type="button"
             data-testid="tag-clear"
-            class="rounded px-1.5 py-0.5 text-xs text-sky-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-400"
+            class={ghostSmall}
             disabled={locked()}
             onClick={() =>
               void props.api.setFilter({
@@ -77,15 +81,16 @@ export function FilterBar(props: { state: AppState; api: Api }) {
           </button>
         </Show>
         {/* Always mounted: a live region added together with its text is often not announced. */}
-        <span role="status" class="text-xs text-zinc-600 dark:text-zinc-400">
+        <span role="status" class="text-xs text-muted">
           <Show when={filterOn(filter())}>
             <span data-testid="tag-counter">{counter()}</span>
           </Show>
         </span>
-        <label class="ml-auto flex items-center gap-1 text-xs">
+        <label class="ml-auto flex h-6 items-center gap-1.5 text-xs">
           <input
             type="checkbox"
             data-testid="hide-non-matching"
+            class="accent-accent"
             checked={filter().hideNonMatching}
             disabled={locked()}
             onChange={(e) =>

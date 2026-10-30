@@ -78,9 +78,9 @@ describe("Console", () => {
   it("styles ERROR and WARN lines", () => {
     const { add } = setup();
     add("plain", "12:00 [main] ERROR boom", "12:00 [main] WARN careful");
-    expect(screen.getByText("plain").className).not.toMatch(/red|amber/);
-    expect(screen.getByText(/ERROR boom/).className).toContain("text-red-400");
-    expect(screen.getByText(/WARN careful/).className).toContain("text-amber-400");
+    expect(screen.getByText("plain").className).not.toMatch(/failed|cancelled/);
+    expect(screen.getByText(/ERROR boom/).className).toContain("text-failed");
+    expect(screen.getByText(/WARN careful/).className).toContain("text-cancelled");
   });
 
   it("follows new lines unless the user scrolled up", () => {

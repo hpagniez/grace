@@ -1,4 +1,5 @@
-import { rmSync } from "node:fs";
+import type { ElectronApplication, Locator, Page } from "@playwright/test";
+import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import {
   emptyProject,
@@ -9,6 +10,7 @@ import {
   openProject,
   project,
   recordOpenDialog,
+  saved,
   test,
 } from "./helpers";
 
@@ -39,6 +41,227 @@ test("Open a project and see its tests", async () => {
   );
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
   await expect(win.getByTestId("project-layout")).toHaveText("Standalone");
+});
+
+test("The toolbar cuts a long path from its start and keeps its characters in order", async () => {
+  // a folder name that ends in a neutral character: right-to-left text would move it to the front
+  const dir = path.join(emptyProject(), "final copy!");
+  mkdirSync(dir);
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const full = path.resolve(dir);
+  const box = win.getByTestId("project-path");
+  await expect(box).toHaveText(full);
+  // pin its width, so that the path is longer than the box on every machine
+  await box.evaluate((el) => void ((el.parentElement as HTMLElement).style.flex = "0 0 160px"));
+  const seen = await box.evaluate((el) => {
+    const text = el.firstElementChild!.firstChild as Text;
+    const at = (i: number) => {
+      const r = document.createRange();
+      r.setStart(text, i);
+      r.setEnd(text, i + 1);
+      return r.getBoundingClientRect();
+    };
+    const view = el.getBoundingClientRect();
+    const last = text.length - 1;
+    const probes = [0, 1, 2, last - 2, last - 1, last];
+    return {
+      startCut: at(0).right <= view.left + 0.5,
+      endShown: at(last).left >= view.left && at(last).right <= view.right + 0.5,
+      leftToRight: probes.every((i, k) => k === 0 || at(i).left > at(probes[k - 1]).left),
+    };
+  });
+  expect(seen).toEqual({ startCut: true, endShown: true, leftToRight: true });
+  await box.hover();
+  await expect(win.getByRole("tooltip")).toHaveText(full);
+});
+
+const TOOLBAR_BUTTONS = {
+  "home-button": "Home",
+  "properties-button": "Properties…",
+  "refresh-button": "Refresh",
+  "open-button": "Open…",
+  "report-button": "Report",
+  "rerun-failed-button": /^Re-run failed( [1-9]\d*)?$/, // the count only once there is one
+  "cancel-button": "Cancel",
+  "run-all-button": "Run all",
+};
+
+/** Sets the window's content width, and waits until the page has it. */
+async function contentWidth(app: ElectronApplication, win: Page, width: number) {
+  await app.evaluate(
+    ({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setContentSize(w, 700),
+    width,
+  );
+  await expect.poll(() => win.evaluate(() => innerWidth)).toBe(width);
+}
+
+/** Every toolbar button is whole inside the window, and the toolbar does not overflow. */
+async function expectToolbarFits(win: Page) {
+  const width = await win.evaluate(() => innerWidth);
+  const seen = await win.locator("header button").evaluateAll((buttons) =>
+    buttons.map((b) => {
+      const r = b.getBoundingClientRect();
+      return {
+        id: (b as HTMLElement).dataset.testid,
+        left: r.left,
+        right: r.right,
+        width: r.width,
+      };
+    }),
+  );
+  expect(seen.map((b) => b.id)).toEqual(Object.keys(TOOLBAR_BUTTONS));
+  for (const b of seen) {
+    expect(b.left, `${b.id} left at ${width}`).toBeGreaterThanOrEqual(0);
+    expect(b.right, `${b.id} right at ${width}`).toBeLessThanOrEqual(width);
+  }
+  expect(await win.locator("header").evaluate((h) => h.scrollWidth <= h.clientWidth)).toBe(true);
+  return seen;
+}
+
+/** The layout chip, when it shows, ends before the Env label starts. */
+async function chipClearOfEnv(win: Page) {
+  const chip = await win.getByTestId("project-layout").boundingBox();
+  const env = await win.locator("label", { has: win.getByTestId("env-input") }).boundingBox();
+  if (chip) expect(chip.x + chip.width).toBeLessThanOrEqual(env!.x);
+  return chip;
+}
+
+/** The chip is in sight, whole, and clear of the Env label: its text is not cut. */
+async function expectChipShown(win: Page) {
+  const chip = win.getByTestId("project-layout");
+  await expect(chip).toBeVisible();
+  expect(await chipClearOfEnv(win)).not.toBeNull();
+  // the whole word: its text fits the chip's content box, to a hundredth of a pixel
+  const room = await chip.evaluate((el) => {
+    const text = document.createRange();
+    text.selectNodeContents(el);
+    const css = getComputedStyle(el);
+    const box = el.getBoundingClientRect().width;
+    const padding = parseFloat(css.paddingLeft) + parseFloat(css.paddingRight);
+    return box - padding - text.getBoundingClientRect().width;
+  });
+  expect(room).toBeGreaterThanOrEqual(-0.01);
+}
+
+/** The folder name is in sight and wide enough to read a few letters of. */
+async function expectNameShown(win: Page) {
+  const name = win.getByTestId("project-name");
+  await expect(name).toBeVisible();
+  expect((await name.boundingBox())!.width).toBeGreaterThan(25);
+}
+
+const hasTooltip = (win: Page) => win.locator('[role="tooltip"]');
+
+test("A narrow window keeps every toolbar button on screen, with its name", async () => {
+  const dir = project("clean");
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const minimum = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].getMinimumSize(),
+  );
+  expect(minimum[0]).toBe(760);
+  await contentWidth(app, win, 780);
+  await expect(win.getByTestId("run-all-button")).toBeEnabled({ timeout: 15_000 });
+  for (const [id, name] of Object.entries(TOOLBAR_BUTTONS))
+    await expect(win.getByTestId(id), id).toHaveAccessibleName(name);
+
+  const seen = await expectToolbarFits(win);
+  // below 1280 px four labels are only spoken: those buttons are their icon, and say it in a tooltip
+  for (const id of ["properties-button", "open-button", "report-button", "cancel-button"])
+    expect(seen.find((b) => b.id === id)!.width, id).toBeLessThan(40);
+  await chipClearOfEnv(win);
+  expect((await win.getByTestId("project-name").boundingBox())!.width).toBeGreaterThan(30);
+  await win.getByTestId("open-button").hover();
+  await expect(win.getByRole("tooltip")).toHaveText("Open…");
+  await win.mouse.move(5, 400);
+
+  // the floor: the minimum is an outer width, so the content is narrower than 780 px
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(1, 700),
+  );
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds().width),
+    )
+    .toBe(760);
+  const floor = await win.evaluate(() => innerWidth);
+  expect(floor).toBeLessThan(780);
+  await expectToolbarFits(win);
+  await chipClearOfEnv(win);
+  for (const id of ["run-all-button", "cancel-button"]) {
+    const box = (await win.getByTestId(id).boundingBox())!;
+    expect(box.x + box.width, `${id} inside ${floor} px`).toBeLessThanOrEqual(floor);
+  }
+
+  // the default 1200 px window and 1279 px are icon-only; 1281 px has the labels. At every one of them
+  // the folder name shows and the chip is whole.
+  for (const width of [1200, 1279]) {
+    await contentWidth(app, win, width);
+    await expectToolbarFits(win);
+    expect(
+      (await win.getByTestId("open-button").boundingBox())!.width,
+      `open at ${width}`,
+    ).toBeLessThan(40);
+    await expectChipShown(win);
+    await expectNameShown(win);
+  }
+  await win.getByTestId("open-button").hover();
+  await expect(win.getByRole("tooltip")).toHaveText("Open…");
+  await win.mouse.move(5, 400);
+
+  // the labels, and no tooltip that only repeats one
+  for (const width of [1281, 1500]) {
+    await contentWidth(app, win, width);
+    await expect
+      .poll(() =>
+        win
+          .getByTestId("open-button")
+          .boundingBox()
+          .then((b) => b!.width),
+      )
+      .toBeGreaterThan(60);
+    await expectToolbarFits(win);
+    await expectChipShown(win);
+    await expectNameShown(win);
+    await win.getByTestId("open-button").hover();
+    await win.waitForTimeout(800);
+    await expect(hasTooltip(win)).toHaveCount(0);
+    await win.mouse.move(5, 400);
+  }
+});
+
+/** The box shows its whole value: no text scrolls out of sight. */
+const showsWhole = (box: Locator) => box.evaluate((el) => el.scrollWidth <= el.clientWidth);
+
+test("The Env and Threads boxes show their longest likely values whole", async () => {
+  const dir = project("clean");
+  const { app, win, userData } = await launch();
+  await openProject(app, dir);
+  const env = win.getByTestId("env-input");
+  const threads = win.getByTestId("threads-input");
+  await expect(threads).toBeEnabled({ timeout: 15_000 });
+  await threads.fill("32");
+  await threads.press("Enter");
+  await expect.poll(() => saved(userData, dir)?.threads).toBe(32);
+  await expect(threads).toHaveValue("32");
+  expect(
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds().width),
+  ).toBe(1200);
+
+  for (const width of [1200, 1500]) {
+    if (width !== 1200) await contentWidth(app, win, width);
+    await threads.hover(); // the spin buttons show on hover and take room from the number
+    expect.soft(await showsWhole(threads), `threads at ${width}`).toBe(true);
+    await env.focus();
+    await env.pressSequentially("production");
+    await expect(env).toHaveValue("production");
+    expect.soft(await showsWhole(env), `env at ${width}`).toBe(true);
+    await env.fill(""); // an empty box commits nothing when it is left
+    await env.blur();
+    await expect(env).toHaveAttribute("placeholder", "(none)");
+  }
+  expect(saved(userData, dir)?.env ?? null).toBeNull();
 });
 
 test("Maven layout with classpath resources", async () => {

@@ -17,13 +17,17 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "npm run package && npx electron --version && playwright test",
+    "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",
     "fixtures": "node scripts/capture-fixtures.mjs",
     "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
     "@solidjs/web": "2.0.0-rc.18",
+    "lucide": "1.64.0",
     "solid-js": "2.0.0-rc.18"
   },
   "devDependencies": {
