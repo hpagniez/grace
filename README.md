@@ -96,8 +96,8 @@ Every call of the run, grouped by status class. Headers, bodies as pretty JSON o
 <tr>
 <td valign="top">
 
-**History**<br>
-The last 20 runs of each project. Open a past report, re-run a run on its environment and tags, or re-run only what failed.
+**History and reports**<br>
+The last 20 runs of each project. Open Karate's HTML report of any of them, re-run a run on its environment and tags, or re-run only what failed.
 
 </td>
 <td valign="top">
@@ -110,14 +110,14 @@ A test that passed in one run and failed in another, with the same project files
 <tr>
 <td valign="top">
 
-**Karate's HTML report**<br>
-One click away, for the current run or any run in the history.
+**Updates in the app**<br>
+Grace checks for a new version at startup. Update in one click, or let Grace update itself. Your data is backed up first, and you can roll back to an earlier version.
 
 </td>
 <td valign="top">
 
 **Made for long sessions**<br>
-A home screen with your recent folders, light and dark themes, resizable panels, and a window that opens where you left it.
+A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
 
 </td>
 </tr>
@@ -146,7 +146,7 @@ A home screen with your recent folders, light and dark themes, resizable panels,
 Grace runs on Windows 11 (x64). The app is not code-signed yet, so Windows SmartScreen can stop the first start: click **More info**, then **Run anyway**.
 
 > [!NOTE]
-> Every version is a release candidate of 1.0.0 for now. There are no automatic updates: download the new zip to upgrade. Settings and run history from an older release candidate may not carry over.
+> Every version is a release candidate of 1.0.0 for now. From 1.0.0-rc.6, Grace updates itself: click **Update** in the status bar, or open **Settings › Updates**. On 1.0.0-rc.5 or older, download the new zip instead. Settings and run history from an older release candidate may not carry over.
 
 ## How it works
 
@@ -173,7 +173,7 @@ Next on the list:
 
 - **Project setup** for Maven, Gradle, a standalone jar and the Karate CLI ([#64](https://github.com/hpagniez/grace/issues/64)).
 - **Step debugger**: breakpoints on steps, step over, inspect variables ([#65](https://github.com/hpagniez/grace/issues/65)).
-- **App updates**: a way for new versions to reach you ([#77](https://github.com/hpagniez/grace/issues/77)).
+- **Big projects**: smooth runs with thousands of tests ([#123](https://github.com/hpagniez/grace/issues/123), [#124](https://github.com/hpagniez/grace/issues/124), [#125](https://github.com/hpagniez/grace/issues/125)).
 - **Keyboard navigation** in the test tree and the HTTP list ([#91](https://github.com/hpagniez/grace/issues/91)).
 
 The full backlog is one [issue](https://github.com/hpagniez/grace/issues) per feature, on the [Grace project](https://github.com/users/hpagniez/projects/2) board.
