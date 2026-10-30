@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { flush } from "solid-js";
+import { createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Tooltip } from "./Tooltip";
 
@@ -303,6 +303,72 @@ describe("Tooltip", () => {
       // @ts-expect-error jsdom has none; put it back as it was
       delete HTMLElement.prototype.showPopover;
     }
+  });
+
+  describe("pinned", () => {
+    const TEXT = "Refresh the tree";
+
+    /** A tooltip that its owner opens: a row that has the keyboard focus and a cut label. */
+    function pin(initial: boolean, text: string | undefined) {
+      const [pinned, setPinned] = createSignal(initial);
+      const [label, setLabel] = createSignal(text);
+      render(() => (
+        <Tooltip text={label()} pinned={pinned()}>
+          <button type="button">Refresh</button>
+        </Tooltip>
+      ));
+      flush();
+      return {
+        wrapper: wrapperOf(screen.getByRole("button")),
+        set: (on: boolean) => {
+          setPinned(on);
+          flush();
+        },
+        setText: (t: string | undefined) => {
+          setLabel(t);
+          flush();
+        },
+      };
+    }
+
+    it("shows at once while true, with the text, and hides when it turns false", () => {
+      const { set } = pin(false, TEXT);
+      expect(tips()).toHaveLength(0);
+      set(true);
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+      set(false);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("shows from the start when it is true on mount", () => {
+      pin(true, TEXT);
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+    });
+
+    it("shows nothing without a text, and shows once the text comes", () => {
+      const { set, setText } = pin(false, undefined);
+      set(true);
+      expect(tips()).toHaveLength(0);
+      setText(TEXT);
+      expect(tips()).toHaveLength(1);
+      setText(undefined);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("leaves hover as it was: a pointer resting on the target opens it, leaving closes it", () => {
+      const { wrapper } = pin(false, TEXT);
+      hover(wrapper);
+      expect(tips()).toHaveLength(1);
+      leave(wrapper);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("hides at the cleanup of its owner", () => {
+      const { set } = pin(false, TEXT);
+      set(true);
+      cleanup();
+      expect(tips()).toHaveLength(0);
+    });
   });
 
   describe("clicks on the tooltip", () => {
