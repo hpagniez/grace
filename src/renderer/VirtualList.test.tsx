@@ -225,11 +225,14 @@ describe("VirtualList", () => {
       target.dispatchEvent(down);
       expect(down.defaultPrevented).toBe(true);
     }
+    const focus = vi.spyOn(row("r3")!, "focus");
     fireEvent.click(button);
     flush();
     expect(document.activeElement).toBe(row("r3"));
     expect(stops()).toEqual([row("r3")]);
     expect(press).toHaveBeenCalledTimes(1);
+    // jsdom cannot tell :focus-visible: the click asks for no keyboard focus ring
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true, focusVisible: false });
   });
 
   it("keeps the rows in view still when rows are added above", () => {

@@ -238,7 +238,8 @@ export function VirtualList<T>(props: {
                 onClick={() => {
                   setActive(key);
                   flush(); // to the front first, then focus: a focused node that moves loses focus
-                  el.focus({ preventScroll: true });
+                  // A script focus would match :focus-visible: a click is not keyboard focus.
+                  el.focus({ preventScroll: true, focusVisible: false });
                 }}
                 {...props.attrs(item(), index())}
               >
