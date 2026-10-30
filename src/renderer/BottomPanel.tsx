@@ -1,5 +1,5 @@
 import { Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
-import { Match, Show, Switch } from "solid-js";
+import { createMemo, Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
@@ -64,6 +64,10 @@ export function BottomPanel(props: {
   setDragging: (on: boolean) => void;
 }) {
   const panel = () => props.state.panel;
+  // A memo: PanelTab reads the count twice, and each read walks every call of the tests in scope.
+  const httpCount = createMemo(
+    () => shownCalls(narrowedCalls(props.state), props.state.httpGroups).length,
+  );
   let section: HTMLElement | undefined;
   return (
     <section
@@ -103,7 +107,7 @@ export function BottomPanel(props: {
             id="http"
             icon={Globe}
             label="HTTP"
-            count={shownCalls(narrowedCalls(props.state), props.state.httpGroups).length}
+            count={httpCount()}
             active={panel() === "http"}
             show={() => props.showPanel("http")}
           />
