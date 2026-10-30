@@ -96,13 +96,43 @@ describe("VirtualList", () => {
   });
 
   it("draws the rows at the bottom after a scroll, and keeps the focus row", () => {
-    const { rows, row, scrollTo } = setup();
+    const { focus, rows, row, scrollTo } = setup();
+    focus("r0");
     scrollTo(23400);
     const drawn = rows().map((r) => r.dataset.key);
     expect(drawn).toEqual(expect.arrayContaining(keys(1000).slice(965)));
     expect(drawn).toHaveLength(36);
     expect(row("r0")?.getAttribute("tabindex")).toBe("0");
+    expect(document.activeElement).toBe(row("r0"));
     expect(row("r999")?.style.top).toBe("23976px");
+  });
+
+  it("keeps focus on its row when the list jumps back to the top", () => {
+    const { focus, row, scrollTo } = setup();
+    focus("r10");
+    scrollTo(2000);
+    scrollTo(0);
+    expect(document.activeElement).toBe(row("r10"));
+  });
+
+  it("keeps focus on its row when the list jumps onto rows below it", () => {
+    const { focus, row, scrollTo } = setup();
+    scrollTo(2400);
+    focus("r100");
+    expect(document.activeElement).toBe(row("r100"));
+    scrollTo(0);
+    expect(document.activeElement).toBe(row("r100"));
+  });
+
+  it("keeps focus on its row through 100 px steps both ways", () => {
+    const { focus, row, scrollTo } = setup();
+    scrollTo(1000);
+    focus("r50");
+    const steps = Array.from({ length: 21 }, (_, i) => i * 100);
+    for (const top of [...steps, ...steps.toReversed()]) {
+      scrollTo(top);
+      expect(document.activeElement, `at ${top}`).toBe(row("r50"));
+    }
   });
 
   it("has one tab stop: the selected row, else the first", () => {

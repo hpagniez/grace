@@ -73,11 +73,11 @@ export function VirtualList<T>(props: {
   const drawn = createMemo(() => {
     const { first, last } = drawnRange(keys().length, view(scrollTop()));
     const at = (index: number) => ({ key: keys()[index], index, item: props.items[index] });
-    const rows = Array.from({ length: last - first }, (_, k) => at(first + k));
-    // In order: a focused row that moved in the DOM would lose focus.
+    // The focus row comes first, so the DOM reconcile never moves its node: a focused node that moves loses
+    // focus. Its place on screen comes from `top`, its place in the list from the row's aria attributes.
     const f = focusIndex();
-    if (f >= 0 && f < first) rows.unshift(at(f));
-    if (f >= last) rows.push(at(f));
+    const rows = f >= 0 ? [at(f)] : [];
+    for (let i = first; i < last; i++) if (i !== f) rows.push(at(i));
     return rows;
   });
 
@@ -195,10 +195,18 @@ export function VirtualList<T>(props: {
         }}
         onKeyDown={onKeyDown}
         onFocusIn={(e) => {
-          const key = rowKey(e.target);
+          const row = e.target as HTMLElement;
+          const key = rowKey(row);
           if (key === null) return;
+          const moves = key !== focusKey();
           setActive(key);
-          setKeyboard(keyboardFocus(e.target) ? key : null);
+          // Focus that lands on another row first (a press, a screen reader): as the focus row it moves
+          // to the front, which drops its focus once.
+          if (moves) {
+            flush();
+            if (document.activeElement !== row) row.focus({ preventScroll: true });
+          }
+          setKeyboard(keyboardFocus(row) ? key : null);
         }}
         onFocusOut={(e) => rowKey(e.target) !== null && setKeyboard(null)}
       >
@@ -226,6 +234,7 @@ export function VirtualList<T>(props: {
                 // A click on a button in the row lands focus on the row, so the next key moves from it.
                 onClick={() => {
                   setActive(key);
+                  flush(); // to the front first, then focus: a focused node that moves loses focus
                   el.focus({ preventScroll: true });
                 }}
                 {...props.attrs(item(), index())}
