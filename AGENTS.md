@@ -14,6 +14,7 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | oxlint and oxfmt check |
 | `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
+| `npm run screens:readme` | Package the app, then retake the README's screenshots in `docs/images/` |
 
 Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
@@ -69,7 +70,7 @@ Decided in [ADR 0003](docs/decisions/0003-conventional-commits-and-git-flow.md);
 | `hotfix/vX.Y.Z-rc.N` | `main` | `main` and `develop` | Named after its tag, e.g. `hotfix/v1.0.0-rc.4`. Urgent fix to a released version. |
 
 - No stable release while the app is in development: every version is a release candidate of the first stable release, `1.0.0-rc.N`, in the branch, `package.json` and tag. Each release or hotfix bumps `N`. Stable `v1.0.0` needs a decision record that supersedes ADR 0015.
-- Before a `release/*` or `hotfix/*` PR into `main`, check the public docs against the version it ships: `README.md` (features, install and update steps, status, roadmap) and its screenshots in `docs/images/`. Fix them on the branch. The packaged-app check record, `docs/checks/<date>-<release|hotfix>-<version>-packaged.md`, gets a `## Public docs` section: what was checked, and what changed or why nothing had to. `scripts/check-pr.mjs` fails the PR without it.
+- Before a `release/*` or `hotfix/*` PR into `main`, check the public docs against the version it ships: `README.md` (features, install and update steps, status, roadmap) and its screenshots in `docs/images/`. Fix them on the branch; `npm run screens:readme` retakes the screenshots. The packaged-app check record, `docs/checks/<date>-<release|hotfix>-<version>-packaged.md`, gets a `## Public docs` section: what was checked, and what changed or why nothing had to. `scripts/check-pr.mjs` fails the PR without it.
 
 - Merge with `--no-ff`.
 - After a merge, always delete the merged `feature/*`, `release/*` or `hotfix/*` branch, local and remote (`git branch -d <branch>`, then `git push origin --delete <branch>`). Use `-d`, not `-D`: if git refuses, the branch is not merged. Never delete `main` or `develop`.
