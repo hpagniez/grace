@@ -5,7 +5,7 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { APP_FILES } from "./src/main/updates/preflight";
+import { APP_FILES } from "./src/shared/updates";
 
 // The renderer bundles these packages; their licences ship beside the JRE's and Karate's (ADRs 0021, 0022).
 const NPM_LICENSES = {
