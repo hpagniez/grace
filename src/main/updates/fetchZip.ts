@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, type WriteStream } from "node:fs";
 import { access, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -27,10 +27,12 @@ export async function download(
   maxBytes = Infinity,
 ): Promise<void> {
   await mkdir(path.dirname(dest), { recursive: true });
+  let out: WriteStream | undefined;
   try {
     const res = await fetchFn(url, { signal, headers: { "User-Agent": "Grace" } });
     if (!res.ok || !res.body) throw new Error(`The download answered ${res.status}`);
     let received = 0;
+    out = createWriteStream(dest);
     await pipeline(
       Readable.fromWeb(res.body as ReadableStream<Uint8Array>),
       async function* (chunks: AsyncIterable<Buffer>) {
@@ -41,10 +43,13 @@ export async function download(
           yield chunk;
         }
       },
-      createWriteStream(dest),
+      out,
       { signal },
     );
   } catch (e) {
+    // pipeline can reject before the file stream has even opened dest: removed sooner, it comes back
+    const stream = out;
+    if (stream && !stream.closed) await new Promise<void>((r) => stream.once("close", r));
     await rm(dest, { force: true });
     throw e;
   }
