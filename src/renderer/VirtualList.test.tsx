@@ -1,0 +1,243 @@
+import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { createSignal, flush } from "solid-js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { scrollToShow } from "./virtual";
+import { VirtualList, type VirtualListHandle } from "./VirtualList";
+
+afterEach(cleanup);
+
+const keys = (n: number) => Array.from({ length: n }, (_, i) => `r${i}`);
+/** The view jsdom has: no height, so the 600 px fallback. */
+const at = (scrollTop: number) => ({ scrollTop, height: 0, rowHeight: 24, pad: 0 });
+
+function setup(n = 1000, selected: string | null = null) {
+  const [items, setItems] = createSignal(keys(n));
+  const [selectedKey, setSelectedKey] = createSignal(selected);
+  const onSelect = vi.fn();
+  const onKey = vi.fn((_e: KeyboardEvent, _item: string, _index: number) => false);
+  const press = vi.fn();
+  let handle!: VirtualListHandle;
+  render(() => (
+    <VirtualList
+      items={items()}
+      keyOf={(k) => k}
+      rowHeight={24}
+      role="listbox"
+      itemRole="option"
+      label="Rows"
+      testid="list"
+      scrollerTestid="scroller"
+      attrs={(k) => ({ "aria-selected": k === selectedKey() ? "true" : "false" })}
+      selectedKey={selectedKey()}
+      onSelect={onSelect}
+      onKey={onKey}
+      ref={(h) => (handle = h)}
+    >
+      {(k, _i, keyboardFocused) => (
+        <span data-keyboard={keyboardFocused() ? "yes" : "no"}>
+          {k}
+          <button type="button" onClick={press}>
+            go
+          </button>
+        </span>
+      )}
+    </VirtualList>
+  ));
+  const scroller = screen.getByTestId("scroller");
+  const list = screen.getByTestId("list");
+  const rows = () => [...list.querySelectorAll<HTMLElement>("[role=option]")];
+  const row = (k: string) => rows().find((r) => r.dataset.key === k);
+  const stops = () => rows().filter((r) => r.getAttribute("tabindex") === "0");
+  const focus = (k: string) => {
+    row(k)!.focus();
+    flush();
+  };
+  const scrollTo = (top: number) => {
+    scroller.scrollTop = top;
+    scroller.dispatchEvent(new Event("scroll"));
+    flush();
+  };
+  /** Presses a key on the focused element; returns the event, to read defaultPrevented. */
+  const key = (k: string) => {
+    const e = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true });
+    document.activeElement!.dispatchEvent(e);
+    flush();
+    return e;
+  };
+  const change = (next: string[]) => {
+    setItems(next);
+    flush();
+  };
+  return {
+    scroller,
+    list,
+    rows,
+    row,
+    stops,
+    focus,
+    scrollTo,
+    key,
+    change,
+    onSelect,
+    onKey,
+    press,
+    setSelectedKey,
+    handle: () => handle,
+  };
+}
+
+describe("VirtualList", () => {
+  it("draws only the rows in view, plus the margin", () => {
+    const { list, rows } = setup();
+    expect(rows()).toHaveLength(35);
+    expect(list.dataset.rows).toBe("1000");
+    expect(list.style.height).toBe("24000px");
+    expect(list.parentElement).toBe(screen.getByTestId("scroller"));
+  });
+
+  it("draws the rows at the bottom after a scroll, and keeps the focus row", () => {
+    const { rows, row, scrollTo } = setup();
+    scrollTo(23400);
+    const drawn = rows().map((r) => r.dataset.key);
+    expect(drawn).toEqual(expect.arrayContaining(keys(1000).slice(965)));
+    expect(drawn).toHaveLength(36);
+    expect(row("r0")?.getAttribute("tabindex")).toBe("0");
+    expect(row("r999")?.style.top).toBe("23976px");
+  });
+
+  it("has one tab stop: the selected row, else the first", () => {
+    const { stops, setSelectedKey } = setup(1000, "r5");
+    expect(stops().map((r) => r.dataset.key)).toEqual(["r5"]);
+    setSelectedKey(null);
+    flush();
+    expect(stops().map((r) => r.dataset.key)).toEqual(["r0"]);
+  });
+
+  it("moves with Down, Up, Home, End, Page Down and Page Up, selecting as it goes", () => {
+    const { focus, row, key, scroller, onSelect } = setup();
+    focus("r0");
+    key("ArrowDown");
+    expect(document.activeElement).toBe(row("r1"));
+    expect(onSelect).toHaveBeenLastCalledWith("r1");
+    key("ArrowUp");
+    expect(document.activeElement).toBe(row("r0"));
+    key("PageDown");
+    expect(document.activeElement).toBe(row("r25"));
+    expect(onSelect).toHaveBeenLastCalledWith("r25");
+    key("End");
+    expect(document.activeElement).toBe(row("r999"));
+    expect(scroller.scrollTop).toBe(scrollToShow(999, at(0)));
+    expect(scroller.scrollTop).toBe(23400);
+    key("PageUp");
+    expect(document.activeElement).toBe(row("r974"));
+    key("Home");
+    expect(document.activeElement).toBe(row("r0"));
+    expect(onSelect).toHaveBeenLastCalledWith("r0");
+    expect(scroller.scrollTop).toBe(0);
+  });
+
+  it("does nothing at the ends, and keeps the page still", () => {
+    const { focus, row, key, onSelect } = setup();
+    focus("r0");
+    const e = key("ArrowUp");
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(row("r0"));
+  });
+
+  it("selects with Enter and Space", () => {
+    const { focus, key, onSelect } = setup();
+    focus("r2");
+    expect(key("Enter").defaultPrevented).toBe(true);
+    expect(onSelect).toHaveBeenLastCalledWith("r2");
+    expect(key(" ").defaultPrevented).toBe(true);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith("r2");
+  });
+
+  it("passes other keys to onKey, and stops what it handled", () => {
+    const { focus, key, onKey } = setup();
+    focus("r0");
+    const ignored = key("ArrowRight");
+    expect(onKey).toHaveBeenCalledWith(ignored, "r0", 0);
+    expect(ignored.defaultPrevented).toBe(false);
+    onKey.mockReturnValue(true);
+    expect(key("ArrowRight").defaultPrevented).toBe(true);
+  });
+
+  it("brings a scrolled-away focus row back before moving", () => {
+    const { focus, row, key, scrollTo, scroller } = setup();
+    focus("r10");
+    scrollTo(20000);
+    expect(document.activeElement).toBe(row("r10"));
+    key("ArrowDown");
+    expect(document.activeElement).toBe(row("r11"));
+    expect(scroller.scrollTop).toBe(scrollToShow(11, at(20000)));
+    expect(scroller.scrollTop).toBe(264);
+  });
+
+  it("takes focus to the row clicked, even through a button in it", () => {
+    const { row, key, press, onSelect } = setup();
+    fireEvent.click(row("r3")!.querySelector("button")!);
+    flush();
+    expect(press).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(row("r3"));
+    key(" ");
+    expect(onSelect).toHaveBeenLastCalledWith("r3");
+    expect(press).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the rows in view still when rows are added above", () => {
+    const { scrollTo, change, scroller } = setup();
+    scrollTo(240);
+    change(["n0", "n1", "n2", "n3", "n4", ...keys(1000)]);
+    expect(scroller.scrollTop).toBe(360);
+  });
+
+  it("moves focus to the nearest row above when the focus row leaves", () => {
+    const { focus, row, change } = setup();
+    focus("r5");
+    change(keys(1000).filter((k) => !["r3", "r4", "r5"].includes(k)));
+    expect(row("r2")?.getAttribute("tabindex")).toBe("0");
+    expect(document.activeElement).toBe(row("r2"));
+    // the nearest row above is the first row, the focus row while none is active
+    change(keys(1000).filter((k) => k !== "r1" && k !== "r2"));
+    expect(document.activeElement).toBe(row("r0"));
+  });
+
+  it("draws rows after the list shrinks below the scroll position", () => {
+    const { scrollTo, change, rows } = setup();
+    scrollTo(20000);
+    change(keys(5));
+    expect(rows().map((r) => r.dataset.key)).toEqual(keys(5));
+  });
+
+  it("reveals a row by key", () => {
+    const { handle, scroller, row } = setup();
+    handle().reveal("r500");
+    flush();
+    expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
+    expect(row("r500")).toBeDefined();
+    handle().reveal("nope");
+    flush();
+    expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
+  });
+
+  it("tells a row when it has keyboard focus", () => {
+    const { focus, row, rows, key } = setup();
+    focus("r0");
+    key("ArrowDown");
+    const told = rows().filter((r) => r.querySelector("[data-keyboard=yes]"));
+    expect(told).toEqual([row("r1")]);
+  });
+
+  it("keeps a drawn row's element through a scroll, and updates its attributes", () => {
+    const { row, scrollTo, setSelectedKey } = setup();
+    const r20 = row("r20");
+    scrollTo(24);
+    setSelectedKey("r20");
+    flush();
+    expect(row("r20")).toBe(r20);
+    expect(r20?.getAttribute("aria-selected")).toBe("true");
+  });
+});
