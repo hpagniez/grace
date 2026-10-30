@@ -1,4 +1,5 @@
-import { Match, Show, Switch } from "solid-js";
+import { Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
+import { createMemo, Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
@@ -6,14 +7,48 @@ import { Console } from "./Console";
 import { ClearHistory, History } from "./History";
 import { narrowedCalls, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
+import { Icon } from "./Icon";
 import { Splitter } from "./Splitter";
 import type { AppState } from "./reduce";
+import { countPill, tab, tabOn } from "./ui";
 
 type Panel = AppState["panel"];
 
-const TAB = "border-b-2 px-3 py-1 text-sm hover:text-zinc-900 dark:hover:text-zinc-100";
-const tabClass = (on: boolean) =>
-  `${TAB} ${on ? "border-sky-600 font-medium" : "border-transparent text-zinc-600 dark:text-zinc-400"}`;
+/**
+ * One tab: its icon, its label and, when it has one, the count in a pill (R18.2). The pill shows the bare
+ * figure; the brackets are spoken only, so the tab still reads "History (2)" to screen readers and tests.
+ */
+function PanelTab(props: {
+  id: Panel;
+  icon: IconNode;
+  label: string;
+  count?: number;
+  active: boolean;
+  show: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={`tab-${props.id}`}
+      data-testid={`tab-${props.id}`}
+      aria-selected={props.active ? "true" : "false"}
+      class={props.active ? tabOn : tab}
+      onClick={props.show}
+    >
+      <Icon icon={props.icon} size={14} />
+      {props.label}
+      <Show when={props.count !== undefined}>
+        {/* relative: the spoken brackets are absolute, and one with no positioned parent escapes the sheet's clip and makes the page scrollable */}
+        <span class={`${countPill} relative`}>
+          <span class="sr-only">{" ("}</span>
+          {props.count}
+          <span class="sr-only">)</span>
+        </span>
+      </Show>
+    </button>
+  );
+}
 
 /** The Console, History and HTTP tabs under the tree and details. The panel keeps one height for all. */
 export function BottomPanel(props: {
@@ -29,13 +64,17 @@ export function BottomPanel(props: {
   setDragging: (on: boolean) => void;
 }) {
   const panel = () => props.state.panel;
+  // A memo: PanelTab reads the count twice, and each read walks every call of the tests in scope.
+  const httpCount = createMemo(
+    () => shownCalls(narrowedCalls(props.state), props.state.httpGroups).length,
+  );
   let section: HTMLElement | undefined;
   return (
     <section
       ref={(e) => (section = e)}
       data-testid="bottom-panel"
       style={`height:${props.height}px`}
-      class="flex min-h-24 flex-col border-t border-zinc-200 dark:border-zinc-700"
+      class="flex min-h-24 flex-col"
     >
       <Splitter
         panel={() => section}
@@ -43,45 +82,35 @@ export function BottomPanel(props: {
         setHeight={props.setHeight}
         setDragging={props.setDragging}
       />
-      <div class="flex items-center border-b border-zinc-200 bg-zinc-50 px-2 dark:border-zinc-700 dark:bg-zinc-800">
+      <div class="flex items-center border-b border-line px-2">
         <div
           role="tablist"
           aria-label="Console, run history and HTTP calls"
-          class="flex items-center gap-1"
+          class="-mb-px flex items-center gap-1"
         >
-          <button
-            type="button"
-            role="tab"
-            id="tab-console"
-            data-testid="tab-console"
-            aria-selected={panel() === "console" ? "true" : "false"}
-            class={tabClass(panel() === "console")}
-            onClick={() => props.showPanel("console")}
-          >
-            Console
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="tab-history"
-            data-testid="tab-history"
-            aria-selected={panel() === "history" ? "true" : "false"}
-            class={tabClass(panel() === "history")}
-            onClick={() => props.showPanel("history")}
-          >
-            {`History (${props.state.history.length})`}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="tab-http"
-            data-testid="tab-http"
-            aria-selected={panel() === "http" ? "true" : "false"}
-            class={tabClass(panel() === "http")}
-            onClick={() => props.showPanel("http")}
-          >
-            {`HTTP (${shownCalls(narrowedCalls(props.state), props.state.httpGroups).length})`}
-          </button>
+          <PanelTab
+            id="console"
+            icon={SquareTerminal}
+            label="Console"
+            active={panel() === "console"}
+            show={() => props.showPanel("console")}
+          />
+          <PanelTab
+            id="history"
+            icon={HistoryIcon}
+            label="History"
+            count={props.state.history.length}
+            active={panel() === "history"}
+            show={() => props.showPanel("history")}
+          />
+          <PanelTab
+            id="http"
+            icon={Globe}
+            label="HTTP"
+            count={httpCount()}
+            active={panel() === "http"}
+            show={() => props.showPanel("http")}
+          />
         </div>
         <Show when={panel() === "history"}>
           <div class="ml-auto">

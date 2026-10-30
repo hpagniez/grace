@@ -7,6 +7,7 @@ import { defaultUpdateSettings } from "../shared/updates";
 import {
   emptyEnvSettings,
   forgetLastProject,
+  loadAppearance,
   loadLastProject,
   loadProjectEnv,
   loadProjectFilter,
@@ -16,6 +17,7 @@ import {
   loadWindowState,
   RECENT_LIMIT,
   removeRecentProject,
+  saveAppearance,
   saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
@@ -712,6 +714,48 @@ describe("settings", () => {
       saveUpdateSettings(dir, s);
       saveWindowState(dir, { x: 0, y: 0, width: 700, height: 500, maximized: false });
       expect(loadUpdateSettings(dir)).toEqual(s);
+    });
+  });
+
+  describe("appearance (spec R8)", () => {
+    const write = (data: string, settings: unknown) =>
+      writeFileSync(path.join(data, "settings.json"), JSON.stringify(settings));
+    const readJson = (data: string) =>
+      JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8"));
+
+    it("reads no file, a corrupt file or an unreadable one as Follow Windows", () => {
+      expect(loadAppearance(tmp())).toBe("system");
+      const corrupt = tmp();
+      writeFileSync(path.join(corrupt, "settings.json"), "{not json");
+      expect(loadAppearance(corrupt)).toBe("system");
+      const busy = tmp();
+      write(busy, { appearance: { theme: "dark" } });
+      readFails.code = "EBUSY";
+      try {
+        expect(loadAppearance(busy)).toBe("system");
+      } finally {
+        readFails.code = null;
+      }
+    });
+
+    it("reads a theme that is not one of the three, or a key that is not an object, as Follow Windows", () => {
+      for (const appearance of [{ theme: "purple" }, { theme: 3 }, {}, null, "dark", ["dark"]]) {
+        const dir = tmp();
+        write(dir, { appearance });
+        expect(loadAppearance(dir), JSON.stringify(appearance)).toBe("system");
+      }
+    });
+
+    it("saves a theme, keeps the other keys and loads it back", () => {
+      const dir = tmp();
+      write(dir, { lastProject: "D:\\p" });
+      saveAppearance(dir, "dark");
+      expect(readJson(dir)).toEqual({ lastProject: "D:\\p", appearance: { theme: "dark" } });
+      expect(loadAppearance(dir)).toBe("dark");
+      saveAppearance(dir, "light");
+      expect(loadAppearance(dir)).toBe("light");
+      saveWindowState(dir, { x: 0, y: 0, width: 700, height: 500, maximized: false });
+      expect(loadAppearance(dir)).toBe("light");
     });
   });
 });

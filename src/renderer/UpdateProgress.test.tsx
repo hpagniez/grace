@@ -4,6 +4,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
 import type { UpdateProgress as Progress } from "../shared/updates";
 import { initialState, type AppState } from "./reduce";
+import { btnDialog } from "./buttons";
+import { dialog as dialogStyle } from "./ui";
 import { UpdateProgress } from "./UpdateProgress";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
@@ -161,5 +163,34 @@ describe("UpdateProgress", () => {
     expect(document.activeElement).toBe(cancel());
     set(null);
     expect(document.activeElement).toBe(outside);
+  });
+
+  it("is a dialog-style box with a 16 px title and the run's bar (spec R19.1, R14.1)", () => {
+    const { set } = setup(download(92_000_000));
+    expect(dialog().className).toContain(dialogStyle);
+    expect(screen.getByRole("heading").className).toContain("text-lg");
+    expect(cancel().className).toContain(btnDialog);
+    const fill = () => screen.getByRole("progressbar").firstElementChild as HTMLElement;
+    expect(fill().className).toContain("bg-running");
+    expect(fill().style.width).toBe("42%");
+    set({ ...download(0), step: "unpack" }); // no figure: the waiting stripe crosses the bar
+    expect(fill().className).toContain("animate-slide");
+    expect(dialog().outerHTML).not.toMatch(/dark:|zinc-|green-|sky-|red-/);
+  });
+
+  it("shows a failure as an error notice", () => {
+    const { set } = setup(download(1));
+    set({ version: "1.0.0-rc.6", rollback: false, error: "Nope" });
+    const error = screen.getByTestId("update-error");
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.className).toContain("bg-failed-tint");
+  });
+
+  it("keeps its words while it fades out (R5.2)", () => {
+    const { set } = setup(download(92_000_000));
+    set(null);
+    expect(dialog().open).toBe(false);
+    expect(dialog().textContent).toContain("Updating to 1.0.0-rc.6");
+    expect(dialog().textContent).toContain("Downloading… 92 of 219 MB");
   });
 });

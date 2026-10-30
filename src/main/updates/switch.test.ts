@@ -6,9 +6,9 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -182,7 +182,7 @@ setInterval(() => {}, 1 << 30);
     write(path.join(data, "Local Storage", "y"));
   }, HOOK);
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const c of children.splice(0)) {
       c.stdin?.end();
       c.kill();
@@ -201,7 +201,9 @@ setInterval(() => {}, 1 << 30);
         // already gone
       }
     }
-    rmSync(path.dirname(install), {
+    // rm, not rmSync: on Windows, Node 24's rmSync throws EPERM at once whatever maxRetries says,
+    // and a process killed above holds its exe and folder until it has fully exited
+    await rm(path.dirname(install), {
       recursive: true,
       force: true,
       maxRetries: 20,
@@ -209,10 +211,7 @@ setInterval(() => {}, 1 << 30);
     });
   }, HOOK);
 
-  afterAll(
-    () => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }),
-    HOOK,
-  );
+  afterAll(() => rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }), HOOK);
 
   it("is ASCII: Windows PowerShell reads a script without a BOM in the ANSI code page", () => {
     expect(script).toMatch(/^[\t\n\r -~]*$/);

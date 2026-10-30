@@ -1,8 +1,10 @@
 import { createSignal, Show } from "solid-js";
 import { compareVersions } from "../shared/version";
 import type { Backup, Release } from "../shared/updates";
-import { btn, primary } from "./buttons";
+import { btnDialog, dangerDialog, primaryDialog } from "./buttons";
 import { showModalWhile } from "./modal";
+import { Notice } from "./Notice";
+import { dialog as dialogStyle } from "./ui";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** `YYYY-MM-DD`, the local date of an ISO time. */
@@ -12,11 +14,12 @@ const localDate = (iso: string) => {
 };
 
 /**
- * Asks before switching to `target` from the Versions table (R7): a rollback explains what happens to
- * the data and warns; an install of a newer version that has a saved copy asks which data to use.
- * Open while it is rendered: render it only while there is a question.
+ * Asks before switching to `target` from the Versions table (app-updates R7): a rollback explains what
+ * happens to the data and warns; an install of a newer version that has a saved copy asks which data to
+ * use. Open while `open` is true; keep it rendered after, so its words stay while it fades out (R5.2).
  */
 export function SwitchDialog(props: {
+  open: boolean;
   target: Release;
   running: string;
   backup: Backup | null;
@@ -33,7 +36,7 @@ export function SwitchDialog(props: {
   // a rollback focuses Cancel (R7.5); an install keeps the current data until another choice is made
   showModalWhile(
     () => dialog,
-    () => true,
+    () => props.open,
     () => (rollback() ? cancel : confirm),
   );
 
@@ -48,29 +51,31 @@ export function SwitchDialog(props: {
       ref={(e) => (dialog = e)}
       data-testid="switch-dialog"
       aria-labelledby="switch-dialog-title"
-      class="m-auto w-[28rem] max-w-[95vw] rounded-lg border border-zinc-300 bg-white p-4 text-zinc-900 shadow-xl backdrop:bg-black/40 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+      class={`${dialogStyle} w-[28rem] max-w-[95vw]`}
       onClose={() => dialog.open || props.onCancel()} // Escape; not a late event after a reopen
     >
-      <h2 id="switch-dialog-title" class="text-base font-semibold">
+      <h2 id="switch-dialog-title" class="text-lg font-semibold">
         {rollback() ? `Roll back to ${v()}?` : `Install ${v()}?`}
       </h2>
       <Show
         when={rollback()}
         fallback={
-          <div class="mt-3 flex flex-col gap-2 text-sm">
-            <label class="flex items-center gap-2">
+          <div class="mt-3 flex flex-col gap-1 text-sm">
+            <label class="flex min-h-6 items-center gap-2">
               <input
                 type="radio"
                 name="switch-data"
+                class="accent-accent"
                 checked={useSaved()}
                 onChange={() => setUseSaved(true)}
               />
               {`Use the data you had in ${v()} (${date()})`}
             </label>
-            <label class="flex items-center gap-2">
+            <label class="flex min-h-6 items-center gap-2">
               <input
                 type="radio"
                 name="switch-data"
+                class="accent-accent"
                 checked={!useSaved()}
                 onChange={() => setUseSaved(false)}
               />
@@ -79,36 +84,34 @@ export function SwitchDialog(props: {
           </div>
         }
       >
-        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p class="mt-2 text-sm">
           {props.backup
             ? `Grace backs up your current data, then restores the data saved when you last used ${v()} (${date()}).`
             : `Grace backs up your current data. ${v()} has no saved data on this computer, so it starts from your current data, which it may not read correctly.`}
         </p>
-        <p
-          data-testid="switch-warning"
-          class="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
-        >
-          <span aria-hidden="true">⚠</span> {warning()}
-        </p>
+        <div class="mt-3">
+          <Notice kind="warning" text={warning()} testid="switch-warning" />
+        </div>
       </Show>
-      <div class="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          data-testid="switch-cancel"
-          ref={(e) => (cancel = e)}
-          class={btn}
-          onClick={() => props.onCancel()}
-        >
-          Cancel
-        </button>
+      {/* the action first, Cancel last (spec R19.1); a rollback may break the data, so it is the danger style */}
+      <div class="mt-5 flex justify-end gap-2">
         <button
           type="button"
           data-testid="switch-confirm"
           ref={(e) => (confirm = e)}
-          class={primary}
+          class={rollback() ? dangerDialog : primaryDialog}
           onClick={() => props.onConfirm(rollback() ? props.backup !== null : useSaved())}
         >
           {rollback() ? "Roll back and restart" : "Install and restart"}
+        </button>
+        <button
+          type="button"
+          data-testid="switch-cancel"
+          ref={(e) => (cancel = e)}
+          class={btnDialog}
+          onClick={() => props.onCancel()}
+        >
+          Cancel
         </button>
       </div>
     </dialog>

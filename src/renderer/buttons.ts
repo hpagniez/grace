@@ -1,8 +1,35 @@
-const base = "rounded border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40";
-const small = "rounded border px-2 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-40";
-const plain =
-  "border-zinc-300 bg-white hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700";
-export const btn = `${base} ${plain}`;
-export const btnSmall = `${small} ${plain}`;
-export const primary = `${base} border-green-700 bg-green-600 text-white hover:bg-green-700`;
-export const danger = `${base} border-red-700 bg-red-600 text-white hover:bg-red-700`;
+const base =
+  "inline-flex items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors duration-(--duration-fast) ease-standard disabled:cursor-not-allowed disabled:opacity-40";
+const md = "h-7 px-3 text-sm"; // 28 px (spec R3.1)
+const mdDialog = "h-7 px-3 text-base"; // a dialog's buttons are 14 px (R2.2)
+const sm = "h-6 px-2 text-xs"; // 24 px
+const plain = "border border-control bg-surface text-ink enabled:hover:bg-hover";
+const quiet = "text-ink enabled:hover:bg-hover";
+
+const solid = "bg-primary font-semibold text-on-primary enabled:hover:bg-primary-hover";
+const solidDanger = "bg-failed text-on-danger enabled:hover:bg-failed-hover";
+
+export const btn = `${base} ${md} ${plain}`;
+export const btnSmall = `${base} ${sm} ${plain}`;
+export const primary = `${base} ${md} ${solid}`;
+export const danger = `${base} ${md} ${solidDanger}`;
+/** The same three in a dialog's footer: 14 px text (R2.2), with nothing to override. */
+export const btnDialog = `${base} ${mdDialog} ${plain}`;
+export const primaryDialog = `${base} ${mdDialog} ${solid}`;
+export const dangerDialog = `${base} ${mdDialog} ${solidDanger}`;
+/** No border, so a row of them stays quiet. */
+export const ghost = `${base} ${md} ${quiet}`;
+export const ghostSmall = `${base} ${sm} ${quiet}`;
+/** Icon only: 28 × 28, borderless. Give it an aria-label. */
+export const btnIcon = `${base} size-7 ${quiet}`;
+/** Icon only, 24 × 24 (R10.3): the remove and delete buttons of a list row. */
+export const btnIconSmall = `${base} size-6 ${quiet}`;
+
+/**
+ * The toolbar below 1280 px: a button's label is only spoken (put narrowLabel on a span around it)
+ * and the button shrinks to its icon, so the toolbar fits down to the window's 760 px minimum.
+ */
+export const narrowIcon = "max-[1280px]:w-7 max-[1280px]:px-0";
+export const narrowLabel = "max-[1280px]:sr-only";
+/** The width of the two strings above, for a script that must know (a tooltip only while the label is hidden). */
+export const NARROW_QUERY = "(width < 1280px)"; // what Tailwind's max-[1280px] means

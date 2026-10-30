@@ -1,54 +1,85 @@
+import { ChevronRight, CircleAlert, LoaderCircle, MousePointerClick } from "lucide";
 import { createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
+import { ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
+import { Cut } from "./Cut";
+import { EmptyState } from "./EmptyState";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
-import { findNode, formatMillis, leaves, nodeName, STATUS_DOT, STATUS_LABEL } from "./nodes";
+import { Icon } from "./Icon";
+import { findNode, formatMillis, leaves, nodeName, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
+import { MARK, StatusMark, type MarkStatus } from "./StatusMark";
+import { Tooltip } from "./Tooltip";
+import { badge, box, tagChip, TINT } from "./ui";
 
-const STEP_DOT: Record<string, string> = {
-  passed: "bg-green-500",
-  failed: "bg-red-500",
-  skipped: "bg-zinc-400",
+/** The tint a test's status takes in its badge: not run and pending are the grey of a skipped step. */
+const BADGE: Record<Status, keyof typeof TINT> = {
+  notRun: "skipped",
+  pending: "skipped",
+  running: "running",
+  passed: "passed",
+  failed: "failed",
+  interrupted: "cancelled",
 };
+
+/** The status as a badge: its icon and its word, which names it (R7.1), so the icon is decorative. */
+function StatusBadge(props: { status: Status }) {
+  return (
+    <span data-testid="details-status" class={`${badge} ${TINT[BADGE[props.status]]}`}>
+      <StatusMark status={props.status} decorative />
+      {STATUS_LABEL[props.status]}
+    </span>
+  );
+}
+
+/** A step status Karate has not shown us (the fixtures hold passed, failed and skipped) takes the amber mark. */
+const stepMark = (status: string): MarkStatus =>
+  Object.hasOwn(MARK, status) ? (status as MarkStatus) : "interrupted";
 
 function StepRow(props: { step: Step }) {
   const [open, setOpen] = createSignal(false);
+  const mark = () => stepMark(props.step.status);
   return (
-    <li data-testid="step" data-status={props.step.status} class="py-0.5">
-      <div class="flex items-center gap-2 text-sm">
-        <span
-          class={`size-2 shrink-0 rounded-full ${STEP_DOT[props.step.status] ?? "bg-amber-500"}`}
-          title={props.step.status}
-        />
+    <li data-testid="step" data-status={props.step.status} class="py-1">
+      <div class="flex min-h-6 items-center gap-2 text-sm">
+        <Tooltip text={MARK[mark()].label}>
+          <StatusMark status={mark()} />
+        </Tooltip>
         <Show when={props.step.background}>
-          <span class="shrink-0 rounded bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">
-            Background
-          </span>
+          <span class={`${tagChip} shrink-0`}>Background</span>
         </Show>
-        <span class="min-w-0 flex-1 truncate font-mono">{`${props.step.keyword} ${props.step.text}`}</span>
-        <span class="shrink-0 text-xs text-zinc-500">{formatMillis(props.step.millis)}</span>
+        <Cut full={`${props.step.keyword} ${props.step.text}`} wrap="flex-1" side="over">
+          <span class="font-medium">{props.step.keyword}</span>{" "}
+          <span class="font-mono text-xs">{props.step.text}</span>
+        </Cut>
+        <span class="shrink-0 font-mono text-xs text-muted tabular-nums">
+          {formatMillis(props.step.millis)}
+        </span>
         <Show when={props.step.log}>
           <button
             type="button"
             data-testid="step-toggle"
-            class="shrink-0 rounded px-1 text-xs text-sky-700 hover:bg-zinc-100 dark:text-sky-400 dark:hover:bg-zinc-800"
+            class={`${ghostSmall} shrink-0`}
             aria-expanded={open() ? "true" : "false"}
             aria-label={`${open() ? "Hide" : "Show"} log of ${props.step.text}`}
             onClick={() => setOpen(!open())}
           >
-            {open() ? "Hide log" : "Log"}
+            <Icon
+              icon={ChevronRight}
+              size={14}
+              class={`transition-transform duration-(--duration-base) ease-standard ${open() ? "rotate-90" : ""}`}
+            />
+            Log
           </button>
         </Show>
       </div>
       <Show when={open() && props.step.log}>
-        <pre
-          data-testid="step-log"
-          class="mt-1 max-h-60 overflow-auto rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800"
-        >
+        <pre data-testid="step-log" class={`${box} mt-1 ml-6 max-h-60 overflow-auto`}>
           {props.step.log}
         </pre>
       </Show>
@@ -60,28 +91,25 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
   const result = () => props.state.results[props.node.key];
   const steps = () => props.state.steps[props.node.key];
+  const location = () =>
+    props.node.line === null ? props.node.file : `${props.node.file}:${props.node.line}`;
   return (
     <>
-      <h2 class="text-lg font-semibold">{nodeName(props.node)}</h2>
-      <p class="flex items-center gap-2 text-sm">
-        <span class={`size-2.5 rounded-full ${STATUS_DOT[status()]}`} />
-        <span data-testid="details-status">{STATUS_LABEL[status()]}</span>
+      <h2 class="text-lg font-semibold break-words">{nodeName(props.node)}</h2>
+      <p>
+        <StatusBadge status={status()} />
       </p>
-      <p class="font-mono text-sm text-zinc-500" data-testid="details-location">
-        {props.node.line === null ? props.node.file : `${props.node.file}:${props.node.line}`}
-      </p>
-      <Show when={result()?.durationMillis !== undefined}>
-        <p class="text-sm" data-testid="details-duration">
-          {formatMillis(result()!.durationMillis!)}
-        </p>
-      </Show>
-      <Show when={props.node.tags.length > 0}>
-        <p class="flex gap-1">
-          <For each={props.node.tags}>
-            {(t) => <span class="rounded bg-zinc-200 px-1 text-xs dark:bg-zinc-700">{t}</span>}
-          </For>
-        </p>
-      </Show>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+        <Cut full={location()} testid="details-location" class="font-mono" wrap="max-w-full">
+          {location()}
+        </Cut>
+        <Show when={result()?.durationMillis !== undefined}>
+          <span data-testid="details-duration" class="font-mono tabular-nums">
+            {formatMillis(result()!.durationMillis!)}
+          </span>
+        </Show>
+        <For each={props.node.tags}>{(t) => <span class={tagChip}>{t}</span>}</For>
+      </div>
       <Show when={props.state.flaky[props.node.key]}>
         {(envs) => (
           <FlakyProof
@@ -93,20 +121,31 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
         )}
       </Show>
       <Show when={status() === "failed" && result()?.error}>
-        <pre
-          data-testid="details-error"
-          class="whitespace-pre-wrap rounded border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-        >
-          {result()!.error}
-        </pre>
+        <div class={`rounded-lg p-3 ${TINT.failed}`}>
+          <p class="flex items-center gap-1.5 text-sm font-semibold">
+            <Icon icon={CircleAlert} size={14} />
+            Error
+          </p>
+          <pre
+            data-testid="details-error"
+            class="mt-1 font-mono text-xs break-words whitespace-pre-wrap text-ink"
+          >
+            {result()!.error}
+          </pre>
+        </div>
       </Show>
       <Show
         when={steps()}
         fallback={
-          <p class="text-sm text-zinc-500">Steps are available when the feature finishes</p>
+          <p class="flex items-center gap-2 text-sm text-muted">
+            <Show when={props.state.run.active && status() !== "notRun"}>
+              <Icon icon={LoaderCircle} class="animate-spin" />
+            </Show>
+            Steps are available when the feature finishes
+          </p>
         }
       >
-        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <ul class="divide-y divide-line">
           <For each={steps()!}>{(step) => <StepRow step={step} />}</For>
         </ul>
       </Show>
@@ -123,21 +162,28 @@ function Group(props: { node: TestNode; state: AppState }) {
     }
     return Object.entries(out) as [Status, number][];
   };
+  const location = () => props.node.file || "/";
   return (
     <>
-      <h2 class="text-lg font-semibold">{props.node.name}</h2>
-      <p class="flex items-center gap-2 text-sm">
-        <span
-          class={`size-2.5 rounded-full ${STATUS_DOT[deriveStatus(props.node, props.state.statuses)]}`}
-        />
-        {STATUS_LABEL[deriveStatus(props.node, props.state.statuses)]}
+      <h2 class="text-lg font-semibold break-words">{props.node.name}</h2>
+      <p>
+        <StatusBadge status={deriveStatus(props.node, props.state.statuses)} />
       </p>
-      <p class="font-mono text-sm text-zinc-500" data-testid="details-location">
-        {props.node.file || "/"}
-      </p>
-      <p class="text-sm" data-testid="details-counts">
-        {`${leaves(props.node).length} scenarios`}
-        <For each={counts()}>{([s, n]) => ` · ${STATUS_LABEL[s]} ${n}`}</For>
+      <div class="flex text-xs text-muted">
+        <Cut full={location()} testid="details-location" class="font-mono" wrap="max-w-full">
+          {location()}
+        </Cut>
+      </div>
+      <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-testid="details-counts">
+        <span class="tabular-nums">{`${leaves(props.node).length} scenarios`}</span>
+        <For each={counts()}>
+          {([s, n]) => (
+            <span class="inline-flex items-center gap-1.5">
+              <StatusMark status={s} decorative />
+              <span class="tabular-nums">{n}</span> {STATUS_LABEL[s]}
+            </span>
+          )}
+        </For>
       </p>
     </>
   );
@@ -153,14 +199,16 @@ export function Details(props: { state: AppState; api: Api }) {
   return (
     <aside
       data-testid="details"
-      class="min-h-0 flex-1 space-y-2 overflow-auto border-l border-zinc-200 p-3 dark:border-zinc-700"
+      class="min-h-0 flex-1 space-y-3 overflow-auto border-l border-line p-4"
     >
       <Show
         when={call()}
         fallback={
           <Show
             when={node()}
-            fallback={<p class="text-sm text-zinc-500">Select a test to see its details</p>}
+            fallback={
+              <EmptyState icon={MousePointerClick} text="Select a test to see its details" />
+            }
           >
             {(n) => (
               <Show

@@ -39,19 +39,15 @@ test("open, run and run again", async () => {
   await expect(printed(win)).toHaveCount(1); // the first run's output is gone
 });
 
-const backgrounds = async (colorScheme: "light" | "dark") => {
+const consoleBackground = async (colorScheme: "light" | "dark") => {
   const { app, win } = await launch(undefined, {}, { colorScheme });
   await openProject(app, emptyProject()); // the home screen has no console
-  const bg = (id: string) =>
-    win.getByTestId(id).evaluate((e) => getComputedStyle(e).backgroundColor);
-  const found = { console: await bg("console"), app: await bg("app") };
+  const bg = await win.getByTestId("console").evaluate((e) => getComputedStyle(e).backgroundColor);
   await app.close();
-  return found;
+  return bg;
 };
 
-test("the console is darker than the window in dark mode only", async () => {
-  const dark = await backgrounds("dark");
-  const light = await backgrounds("light");
-  expect(dark.console).not.toBe(dark.app);
-  expect(light.console).toBe(dark.app); // both zinc-900
+test("the console is on the sunken colour in both themes", async () => {
+  expect(await consoleBackground("light")).toBe("rgb(248, 246, 241)"); // #f8f6f1
+  expect(await consoleBackground("dark")).toBe("rgb(11, 13, 17)"); // #0b0d11
 });

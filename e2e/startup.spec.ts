@@ -1,5 +1,6 @@
 import type { ElectronApplication, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { GROUND } from "../src/shared/theme";
 import { expect, launch, test } from "./helpers";
 
 /** Once the toolbar shows, the startup screen is gone and the page holds the app alone. */
@@ -24,7 +25,7 @@ test("the window opens painted in the app's theme", async () => {
   const { app, win } = await launch();
   await expect.poll(async () => (await windowState(app)).visible).toBe(true);
   const { background, dark } = await windowState(app);
-  expect(background).toBe(dark ? "#18181b" : "#ffffff");
+  expect(background).toBe(dark ? GROUND.dark : GROUND.light);
   await expectAppOnly(win);
 });
 
@@ -32,6 +33,10 @@ test("the window opens painted in the app's theme", async () => {
 test("the page starts with a static startup screen", () => {
   const html = readFileSync(".vite/renderer/main_window/index.html", "utf8");
   expect(html).toContain('<div id="startup" role="status" aria-label="Loading Grace">');
+  const startup = html.slice(html.indexOf('<div id="startup"'), html.indexOf('<div id="root">'));
+  expect(startup).toContain("<svg"); // the logo (assets/icon.svg, inlined)
+  // the word on screen, after the logo and before the spinner: the aria-label holds it too
+  expect(startup).toMatch(/<\/svg>\s*Grace\s*<div class="spinner">/);
   expect(html).toMatch(/prefers-color-scheme:\s*dark/);
   expect(html).toMatch(/prefers-reduced-motion:\s*reduce/);
   expect(html).toContain('<div id="root"></div>');

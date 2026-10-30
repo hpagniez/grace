@@ -1,10 +1,13 @@
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { CircleAlert, Info } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { drawn } from "../../test/drawn";
 import type { EnvView } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
+import { input as inputStyle } from "./ui";
 
 function setup() {
   let emit: (e: AppEvent) => void = () => {};
@@ -83,6 +86,7 @@ describe("environment combo", () => {
     expect(screen.getByRole("combobox", { name: "Env" })).toBe(input());
     expect(screen.queryByTestId("env-hint")).toBeNull();
     expect(screen.queryByTestId("env-error")).toBeNull();
+    expect(input().className).toContain(inputStyle); // the shared input (R19.2, R9.1)
   });
 
   it("is empty and disabled with no project", () => {
@@ -228,6 +232,12 @@ describe("environment combo", () => {
     expect(api.setEnv).not.toHaveBeenCalled();
     expect(screen.getByTestId("env-error").textContent).toMatch(/letters, digits/);
     expect(input().getAttribute("aria-invalid")).toBe("true");
+    // R20.2: 12 px in failed with the error icon, linked to the box
+    const error = screen.getByTestId("env-error");
+    expect(error.className).toContain("text-failed");
+    expect(error.className).toContain("text-xs");
+    expect(drawn(error.querySelector("svg"), CircleAlert)).toBe(true);
+    expect(input().getAttribute("aria-describedby")).toBe(error.id);
     // typing again clears it
     type("qa");
     expect(screen.queryByTestId("env-error")).toBeNull();
@@ -256,6 +266,11 @@ describe("environment combo", () => {
       "No karate-config-staging.js found. Fine if karate-config.js handles it.",
     );
     expect(input().getAttribute("aria-describedby")).toBe(screen.getByTestId("env-hint").id);
+    // R20.2: 12 px, muted, with the hint icon
+    const hint = screen.getByTestId("env-hint");
+    expect(hint.className).toContain("text-muted");
+    expect(hint.className).toContain("text-xs");
+    expect(drawn(hint.querySelector("svg"), Info)).toBe(true);
     send({ type: "environment", view: view({ env: "qa", overlays: ["qa"] }) });
     expect(screen.queryByTestId("env-hint")).toBeNull();
     // Windows finds karate-config-QA.js for -e qa

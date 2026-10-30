@@ -38,9 +38,11 @@ test("scroll areas get thin themed scrollbars", async () => {
       expect(width).toBe("thin");
       expect(color).toMatch(/ rgba\(0, 0, 0, 0\)$/); // transparent track
     }
-  expect(light.tree.color).not.toBe(dark.tree.color);
+  // the thumb is `control` at 60 % (R1.7): #8a8478 in the light theme, #6a707e in the dark one
+  expect(light.tree.color).toMatch(/^color\(srgb 0\.541176 0\.517647 0\.470588 \/ 0\.6\) /);
+  expect(dark.tree.color).toMatch(/^color\(srgb 0\.415686 0\.439216 0\.494118 \/ 0\.6\) /);
   expect(light.history.color).toBe(light.tree.color);
   expect(dark.http.color).toBe(dark.tree.color);
-  expect(light.console.color).toBe(dark.tree.color);
+  expect(light.console.color).toBe(light.tree.color);
   expect(dark.console.color).toBe(dark.tree.color);
 });

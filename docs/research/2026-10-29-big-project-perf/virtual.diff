@@ -1,0 +1,450 @@
+diff --git a/src/renderer/HttpCalls.tsx b/src/renderer/HttpCalls.tsx
+index f68c102..7e67197 100644
+--- a/src/renderer/HttpCalls.tsx
++++ b/src/renderer/HttpCalls.tsx
+@@ -1,5 +1,5 @@
+ import { Check, Globe } from "lucide";
+-import { createMemo, For, Show } from "solid-js";
++import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+ import { HTTP_GROUPS, httpGroup, type HttpGroup } from "../shared/http";
+ import {
+   groupCounts,
+@@ -52,7 +52,9 @@ const ROW =
+   "flex h-7 w-full items-center gap-3 border-b border-line px-3 text-left text-xs transition-colors duration-(--duration-fast) ease-standard focus-visible:-outline-offset-2";
+ const SELECTED = "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]";
+ 
+-function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
++const CALL_ROW = 28; // px, h-7 (PROTOTYPE: only the rows in view are in the DOM)
++
++function Row(props: { item: ListedCall; selected: boolean; onSelect(): void; i: number }) {
+   const call = () => props.item.call;
+   const time = () => (call().millis === null ? "—" : formatMillis(call().millis!));
+   return (
+@@ -62,6 +64,7 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
+       data-status={call().status ?? "none"}
+       aria-pressed={props.selected ? "true" : "false"}
+       class={`${ROW} ${props.selected ? SELECTED : "hover:bg-hover"}`}
++      style={`position:absolute;left:0;right:0;top:${props.i * CALL_ROW}px`}
+       onClick={props.onSelect}
+     >
+       <Tooltip text={groupLabel(call().status)} describe class="shrink-0" side="right">
+@@ -131,6 +134,17 @@ export function HttpCalls(props: {
+     g === "all" ? props.state.httpGroups.length === 0 : props.state.httpGroups.includes(g);
+   const isSelected = ({ key, index }: CallRef) =>
+     props.state.selectedCall?.key === key && props.state.selectedCall.index === index;
++  const [top, setTop] = createSignal(0);
++  const [height, setHeight] = createSignal(600);
++  let box!: HTMLDivElement;
++  const ro = new ResizeObserver(() => setHeight(box.clientHeight));
++  onCleanup(() => ro.disconnect());
++  const inView = createMemo(() => {
++    const list = shown();
++    const first = Math.max(0, Math.floor(top() / CALL_ROW) - 10);
++    const last = Math.min(list.length, Math.ceil((top() + height()) / CALL_ROW) + 10);
++    return list.slice(first, last).map((l, k) => ({ l, i: first + k }));
++  });
+   const empty = () => {
+     if (totalCalls(props.state.calls) === 0)
+       return "No HTTP calls yet. Calls appear when a feature finishes.";
+@@ -161,21 +175,33 @@ export function HttpCalls(props: {
+           )}
+         </For>
+       </div>
+-      <div data-testid="http-calls" class="min-h-0 flex-1 overflow-auto">
++      <div
++        ref={(e) => {
++          box = e;
++          ro.observe(e);
++        }}
++        data-testid="http-calls"
++        data-rows={shown().length}
++        class="min-h-0 flex-1 overflow-auto"
++        onScroll={() => setTop(box.scrollTop)}
++      >
+         <Show
+           when={shown().length > 0}
+           fallback={<EmptyState icon={Globe} text={empty()} testid="http-empty" />}
+         >
+           {/* keyed by place, not object: rows (and the focus on one) outlive the list being rebuilt */}
+-          <For each={shown()} keyed={(l) => `${l.ref.key}\n${l.ref.index}`}>
+-            {(l) => (
+-              <Row
+-                item={l()}
+-                selected={isSelected(l().ref)}
+-                onSelect={() => props.selectCall(l().ref)}
+-              />
+-            )}
+-          </For>
++          <div style={`position:relative;height:${shown().length * CALL_ROW}px`}>
++            <For each={inView()} keyed={(r) => `${r.l.ref.key}\n${r.l.ref.index}`}>
++              {(r) => (
++                <Row
++                  item={r().l}
++                  i={r().i}
++                  selected={isSelected(r().l.ref)}
++                  onSelect={() => props.selectCall(r().l.ref)}
++                />
++              )}
++            </For>
++          </div>
+         </Show>
+       </div>
+     </div>
+diff --git a/src/renderer/Tree.tsx b/src/renderer/Tree.tsx
+index 727fa26..aa2c068 100644
+--- a/src/renderer/Tree.tsx
++++ b/src/renderer/Tree.tsx
+@@ -9,12 +9,12 @@ import {
+   Play,
+   Shuffle,
+ } from "lucide";
+-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
++import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+ import { FLAKY_TITLE } from "../shared/flaky";
+ import type { Api } from "../shared/ipc";
+ import type { TestNode } from "../shared/model";
+ import { deriveStatus } from "../shared/status";
+-import { filterOn, matchingLeaves } from "../shared/tags";
++import { filterOn, matchingLeaves, type FilterState, type TagFilter } from "../shared/tags";
+ import { EmptyState } from "./EmptyState";
+ import { Icon } from "./Icon";
+ import { leaves, nodeName, STATUS_LABEL } from "./nodes";
+@@ -24,166 +24,215 @@ import { StatusMark } from "./StatusMark";
+ import { Tooltip } from "./Tooltip";
+ import { badge, tagChip, TINT } from "./ui";
+ 
++// PROTOTYPE (big-project perf research): only the rows in view are in the DOM.
++
+ interface Ctx {
+   state: AppState;
+   select(key: string): void;
+   api: Api;
+ }
+ 
+-// The tree scrolls, so a focus ring goes inside its row (spec R10.1). A row's tooltips stay on the row
+-// (beside their target, or over the cut label): one below would take the click meant for the next row.
++interface Row {
++  node: TestNode;
++  depth: number;
++  i: number; // place in the flat list
++}
++
++const ROW = 24; // px, h-6
++const OVERSCAN = 10;
++
+ const INSET = "focus-visible:-outline-offset-2";
+ const TAG = `${tagChip} shrink-0`;
+ const FLAKY = `${badge} ${TINT.cancelled} shrink-0`;
+-// 24 x 24 (R10.3). Muted until its row is hovered, focused or selected (the row sets `group`).
+ const RUN = `inline-flex size-6 shrink-0 items-center justify-center rounded-sm transition-colors duration-(--duration-fast) ease-standard enabled:group-hover:text-passed enabled:group-focus-within:text-passed disabled:cursor-not-allowed disabled:opacity-40 ${INSET}`;
+ 
+-function Node(props: { node: TestNode; ctx: Ctx }) {
+-  const [open, setOpen] = createSignal(true);
+-  const hasKids = () => props.node.children.length > 0;
+-  const status = createMemo(() => deriveStatus(props.node, props.ctx.state.statuses));
+-  const selected = () => props.ctx.state.selected === props.node.key;
+-  // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
+-  const isFeature = () => props.node.kind === "feature";
+-  const filter = () => props.ctx.state.filter;
+-  // A folder, feature or outline matches when a test under it does; with the filter off all match.
+-  const match = createMemo(
+-    () => !filterOn(filter()) || matchingLeaves(props.node, filter()).length > 0,
+-  );
+-  const hidden = () => !match() && filter().hideNonMatching;
+-  // Counts the tests the tag filter hides too: flakiness is not about tags.
++const matches = (n: TestNode, f: TagFilter) => !filterOn(f) || matchingLeaves(n, f).length > 0;
++
++/** The rows a person can see by scrolling: open folders' children, minus those the filter hides. */
++function flatten(root: TestNode, closed: Set<string>, f: FilterState): Row[] {
++  const out: Row[] = [];
++  const hide = filterOn(f) && f.hideNonMatching;
++  const walk = (n: TestNode, depth: number) => {
++    if (hide && !matches(n, f)) return;
++    out.push({ node: n, depth, i: out.length });
++    if (!closed.has(n.key)) for (const c of n.children) walk(c, depth + 1);
++  };
++  for (const c of root.children) walk(c, 0);
++  return out;
++}
++
++function Node(props: {
++  row: Row;
++  ctx: Ctx;
++  open: boolean;
++  toggle(): void;
++}) {
++  const node = () => props.row.node;
++  const hasKids = () => node().children.length > 0;
++  const status = createMemo(() => deriveStatus(node(), props.ctx.state.statuses));
++  const selected = () => props.ctx.state.selected === node().key;
++  const isFeature = () => node().kind === "feature";
++  const match = createMemo(() => matches(node(), props.ctx.state.filter));
+   const flakyCount = createMemo(
+-    () => leaves(props.node).filter((l) => l.key in props.ctx.state.flaky).length,
++    () => leaves(node()).filter((l) => l.key in props.ctx.state.flaky).length,
+   );
+-  const isTest = () => props.node.kind === "scenario" || props.node.kind === "row";
+-  const label = () => (isFeature() ? props.node.file.split("/").pop()! : nodeName(props.node));
++  const isTest = () => node().kind === "scenario" || node().kind === "row";
++  const label = () => (isFeature() ? node().file.split("/").pop()! : nodeName(node()));
+   const kindIcon = () =>
+-    isFeature() ? FileText : props.node.kind === "folder" ? (open() ? FolderOpen : Folder) : null;
+-  const title = () => (isFeature() && props.node.name !== label() ? props.node.name : null);
+-  // Cut: the label shows less than it holds. Measured when the tooltip would show, so it follows the window.
++    isFeature() ? FileText : node().kind === "folder" ? (props.open ? FolderOpen : Folder) : null;
++  const title = () => (isFeature() && node().name !== label() ? node().name : null);
+   let labelEl!: HTMLButtonElement;
+   const cut = () => labelEl.scrollWidth > labelEl.clientWidth;
+   const full = () => (title() ? `${label()} · ${title()}` : label());
+   return (
+-    <Show when={!hidden()}>
+-      <li
+-        role="treeitem"
+-        aria-expanded={hasKids() ? (open() ? "true" : "false") : undefined}
+-        aria-selected={selected() ? "true" : "false"}
++    <div
++      role="treeitem"
++      aria-level={props.row.depth + 1}
++      aria-expanded={hasKids() ? (props.open ? "true" : "false") : undefined}
++      aria-selected={selected() ? "true" : "false"}
++      style={`position:absolute;left:0;right:0;top:${props.row.i * ROW}px;padding-left:${props.row.depth * 16}px`}
++    >
++      <div
++        data-testid="tree-node"
++        data-key={node().key}
++        data-status={status()}
++        data-kind={node().kind}
++        data-match={match() ? "true" : "false"}
++        class={`group flex h-6 items-center gap-1 rounded-sm pr-1 ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
+       >
+-        <div
+-          data-testid="tree-node"
+-          data-key={props.node.key}
+-          data-status={status()}
+-          data-kind={props.node.kind}
+-          data-match={match() ? "true" : "false"}
+-          // A non-matching row is muted, not faded (R15.2): its status mark too, which sets its own colour.
+-          class={`group flex h-6 items-center gap-1 rounded-sm pr-1 [content-visibility:auto] [contain-intrinsic-size:auto_1.5rem] ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
++        <button
++          type="button"
++          class={`inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted ${INSET} ${hasKids() ? "" : "invisible"}`}
++          aria-label={`${props.open ? "Collapse" : "Expand"} ${label()}`}
++          onClick={() => props.toggle()}
+         >
++          <Icon icon={props.open ? ChevronDown : ChevronRight} size={14} />
++        </button>
++        <Tooltip text={STATUS_LABEL[status()]} side="right">
++          <StatusMark status={status()} />
++        </Tooltip>
++        <Show when={kindIcon()}>
++          <Icon icon={kindIcon()!} size={14} class="text-muted" />
++        </Show>
++        <Tooltip text={cut() ? full() : undefined} class="min-w-0 flex-1" side="over">
+           <button
++            ref={(e) => (labelEl = e)}
+             type="button"
+-            class={`inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted ${INSET} ${hasKids() ? "" : "invisible"}`}
+-            aria-label={`${open() ? "Collapse" : "Expand"} ${label()}`}
+-            onClick={() => setOpen(!open())}
++            class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
++            onClick={() => props.ctx.select(node().key)}
+           >
+-            <Icon icon={open() ? ChevronDown : ChevronRight} size={14} />
++            {label()}
++            <Show when={title()}>
++              <span class="ml-2 text-xs text-muted">{title()}</span>
++            </Show>
+           </button>
+-          <Tooltip text={STATUS_LABEL[status()]} side="right">
+-            <StatusMark status={status()} />
+-          </Tooltip>
+-          <Show when={kindIcon()}>
+-            <Icon icon={kindIcon()!} size={14} class="text-muted" />
++        </Tooltip>
++        <For each={node().tags}>{(tag) => <span class={TAG}>{tag}</span>}</For>
++        <Show when={flakyCount() > 0}>
++          <Show
++            when={isTest()}
++            fallback={
++              <span data-testid="flaky-count" class={FLAKY}>
++                <Icon icon={Shuffle} size={14} />
++                {`${flakyCount()} flaky`}
++              </span>
++            }
++          >
++            <Tooltip text={FLAKY_TITLE} class="shrink-0" side="left">
++              <span data-testid="flaky-mark" role="img" aria-label={FLAKY_TITLE} class={FLAKY}>
++                <Icon icon={Shuffle} size={14} />
++                flaky
++              </span>
++            </Tooltip>
+           </Show>
+-          <Tooltip text={cut() ? full() : undefined} class="min-w-0 flex-1" side="over">
++        </Show>
++        <Show when={match()}>
++          <Tooltip text={`Run ${label()}`} class="shrink-0" side="left">
+             <button
+-              ref={(e) => (labelEl = e)}
+               type="button"
+-              class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
+-              onClick={() => props.ctx.select(props.node.key)}
++              data-testid="run-node"
++              aria-label={`Run ${label()}`}
++              class={`${RUN} ${selected() ? "text-passed" : "text-muted"}`}
++              disabled={props.ctx.state.run.active || props.ctx.state.busy}
++              onClick={() => void props.ctx.api.run(node().key)}
+             >
+-              {label()}
+-              <Show when={title()}>
+-                <span class="ml-2 text-xs text-muted">{title()}</span>
+-              </Show>
++              <Icon icon={Play} size={14} />
+             </button>
+           </Tooltip>
+-          <For each={props.node.tags}>{(tag) => <span class={TAG}>{tag}</span>}</For>
+-          <Show when={flakyCount() > 0}>
+-            <Show
+-              when={isTest()}
+-              fallback={
+-                <span data-testid="flaky-count" class={FLAKY}>
+-                  <Icon icon={Shuffle} size={14} />
+-                  {`${flakyCount()} flaky`}
+-                </span>
+-              }
+-            >
+-              <Tooltip text={FLAKY_TITLE} class="shrink-0" side="left">
+-                <span
+-                  data-testid="flaky-mark"
+-                  role="img" // aria-label names only an element with a role
+-                  aria-label={FLAKY_TITLE}
+-                  class={FLAKY}
+-                >
+-                  <Icon icon={Shuffle} size={14} />
+-                  flaky
+-                </span>
+-              </Tooltip>
+-            </Show>
+-          </Show>
+-          <Show when={match()}>
+-            <Tooltip text={`Run ${label()}`} class="shrink-0" side="left">
+-              <button
+-                type="button"
+-                data-testid="run-node"
+-                aria-label={`Run ${label()}`}
+-                class={`${RUN} ${selected() ? "text-passed" : "text-muted"}`}
+-                disabled={props.ctx.state.run.active || props.ctx.state.busy}
+-                onClick={() => void props.ctx.api.run(props.node.key)}
+-              >
+-                <Icon icon={Play} size={14} />
+-              </button>
+-            </Tooltip>
+-          </Show>
+-        </div>
+-        <Show when={hasKids() && open()}>
+-          <ul role="group" class="pl-4">
+-            <For each={props.node.children}>{(child) => <Node node={child} ctx={props.ctx} />}</For>
+-          </ul>
+         </Show>
+-      </li>
+-    </Show>
++      </div>
++    </div>
++  );
++}
++
++function Rows(props: { ctx: Ctx; tree: TestNode }) {
++  const [closed, setClosed] = createSignal(new Set<string>());
++  const [top, setTop] = createSignal(0);
++  const [height, setHeight] = createSignal(800);
++  let scroller!: HTMLDivElement;
++  const rows = createMemo(() => flatten(props.tree, closed(), props.ctx.state.filter));
++  const shown = createMemo(() => {
++    const first = Math.max(0, Math.floor(top() / ROW) - OVERSCAN);
++    const last = Math.min(rows().length, Math.ceil((top() + height()) / ROW) + OVERSCAN);
++    return rows().slice(first, last);
++  });
++  const toggle = (key: string) => {
++    const next = new Set(closed());
++    if (!next.delete(key)) next.add(key);
++    setClosed(next);
++  };
++  const ro = new ResizeObserver(() => setHeight(scroller.clientHeight));
++  onCleanup(() => ro.disconnect());
++  return (
++    <div
++      ref={(e) => {
++        scroller = e;
++        ro.observe(e);
++      }}
++      class="min-h-0 flex-1 overflow-auto p-2"
++      onScroll={() => setTop(scroller.scrollTop)}
++    >
++      <div
++        role="tree"
++        data-testid="tree"
++        data-rows={rows().length}
++        style={`position:relative;height:${rows().length * ROW}px`}
++      >
++        <For each={shown()} keyed={(r) => r.node.key}>
++          {(r) => (
++            <Node
++              row={r()}
++              ctx={props.ctx}
++              open={!closed().has(r().node.key)}
++              toggle={() => toggle(r().node.key)}
++            />
++          )}
++        </For>
++      </div>
++    </div>
+   );
+ }
+ 
+ export function Tree(props: Ctx) {
+   const loading = () => !props.state.project || !props.state.tree;
+   return (
+-    <div class="min-h-0 flex-1 overflow-auto p-2">
+-      <Switch
+-        fallback={
+-          <ul role="tree" data-testid="tree">
+-            <For each={props.state.tree!.children}>{(n) => <Node node={n} ctx={props} />}</For>
+-          </ul>
+-        }
+-      >
+-        <Match when={props.state.error}>
++    <Switch fallback={<Rows ctx={props} tree={props.state.tree!} />}>
++      <Match when={props.state.error}>
++        <div class="min-h-0 flex-1 overflow-auto p-2">
+           <Notice kind="error" text={props.state.error!} testid="tree-message" />
+-        </Match>
+-        <Match when={loading()}>
+-          <div class="flex items-center gap-2 p-2 text-sm text-muted">
+-            <Icon icon={LoaderCircle} class="animate-spin" />
+-            <p data-testid="tree-message">Finding tests…</p>
+-          </div>
+-        </Match>
+-        <Match when={leaves(props.state.tree!).length === 0}>
+-          <EmptyState icon={FileSearch} text="No feature files found" testid="tree-message">
+-            <p class="text-xs text-muted">
+-              Grace looks for .feature files under the project folder.
+-            </p>
+-          </EmptyState>
+-        </Match>
+-      </Switch>
+-    </div>
++        </div>
++      </Match>
++      <Match when={loading()}>
++        <div class="flex items-center gap-2 p-2 text-sm text-muted">
++          <Icon icon={LoaderCircle} class="animate-spin" />
++          <p data-testid="tree-message">Finding tests…</p>
++        </div>
++      </Match>
++      <Match when={leaves(props.state.tree!).length === 0}>
++        <EmptyState icon={FileSearch} text="No feature files found" testid="tree-message">
++          <p class="text-xs text-muted">Grace looks for .feature files under the project folder.</p>
++        </EmptyState>
++      </Match>
++    </Switch>
+   );
+ }

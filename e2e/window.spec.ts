@@ -72,8 +72,8 @@ async function firstStart() {
   return first;
 }
 
-/** 700×500, 40 px right and 30 px down from the work area's corner: fits CI's small screen. */
-const inside = (wa: Rect): Rect => ({ x: wa.x + 40, y: wa.y + 30, width: 700, height: 500 });
+/** 800×500 (the window's minimum width is 760), 40 px right and 30 px down from the work area's corner: fits CI's small screen. */
+const inside = (wa: Rect): Rect => ({ x: wa.x + 40, y: wa.y + 30, width: 800, height: 500 });
 
 async function restart(app: ElectronApplication, userData: string) {
   await app.close();
@@ -168,15 +168,15 @@ test("a broken saved state opens the window as on a first start", async () => {
 
 test("a window partly off the screen is pulled onto it", async () => {
   const { workArea: wa } = await firstStart();
-  const saved = { x: wa.x + wa.width - 350, y: wa.y + 30, width: 700, height: 500 };
+  const saved = { x: wa.x + wa.width - 400, y: wa.y + 30, width: 800, height: 500 };
   const { app } = await launch(withSaved({ ...saved, maximized: false }));
-  near((await shown(app)).bounds, { ...saved, x: wa.x + wa.width - 700 });
+  near((await shown(app)).bounds, { ...saved, x: wa.x + wa.width - 800 });
 });
 
 test("a window flush with the screen edges keeps its size and place", async () => {
   const { workArea: wa } = await firstStart();
   // Snapped to the left: Windows' invisible resize border sticks out left and below the work area.
-  const saved = { x: wa.x - 7, y: wa.y, width: 600, height: wa.height + 7 };
+  const saved = { x: wa.x - 7, y: wa.y, width: 800, height: wa.height + 7 };
   const { app } = await launch(withSaved({ ...saved, maximized: false }));
   near((await shown(app)).bounds, saved);
 });
@@ -191,14 +191,14 @@ test("a window bigger than the screen is shrunk to fit", async () => {
 test("a window on a screen that is gone opens on the main screen", async () => {
   const { bounds } = await firstStart();
   const { app } = await launch(
-    withSaved({ x: -30000, y: -30000, width: 700, height: 500, maximized: false }),
+    withSaved({ x: -30000, y: -30000, width: 800, height: 500, maximized: false }),
   );
   near((await shown(app)).bounds, bounds);
 });
 
 test("a maximized window on a screen that is gone opens maximized on the main screen", async () => {
   const { app } = await launch(
-    withSaved({ x: -30000, y: -30000, width: 700, height: 500, maximized: true }),
+    withSaved({ x: -30000, y: -30000, width: 800, height: 500, maximized: true }),
   );
   expect((await shown(app)).maximized).toBe(true);
   expect(

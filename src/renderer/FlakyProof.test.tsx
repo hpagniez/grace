@@ -1,4 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
+import { CircleCheck, CircleX, Shuffle } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -6,6 +7,7 @@ import type { FlakyEnv, FlakyRun } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
+import { drawn } from "../../test/drawn";
 
 // "now" is Sunday 2026-10-25 15:00 local time; only Date is faked so flush() keeps working
 beforeEach(() => {
@@ -170,10 +172,38 @@ describe("flaky proof in the details pane", () => {
         .map((c) => c.textContent),
     );
     expect(cells).toEqual([
-      ["Today 14:32", "failed", "1 thread", "Report"],
-      ["Yesterday 17:20", "passed", "8 threads", "Report"],
-      ["2026-10-21 09:05", "failed", "—", "Report"],
+      ["Today 14:32", "Failed", "1 thread", "Report"],
+      ["Yesterday 17:20", "Passed", "8 threads", "Report"],
+      ["2026-10-21 09:05", "Failed", "—", "Report"],
     ]);
+  });
+
+  it("boxes the proof in the cancelled tint, headed by the shuffle icon", () => {
+    const { flaky } = setup();
+    flaky(env("qa", 1, 1));
+    const box = boxes()[0];
+    expect(box.className).toContain("rounded-lg");
+    expect(box.className).toContain("bg-cancelled-tint");
+    expect(drawn(within(box).getByRole("heading").querySelector("svg"), Shuffle)).toBe(true);
+    expect(box.outerHTML).not.toMatch(/\b(zinc|red|green|sky|amber)-\d|dark:|title=/);
+  });
+
+  it("marks each proof run by its status: a hidden mark, then the word that names it", () => {
+    const { flaky } = setup();
+    flaky(env("qa", 1, 1, [run("b", { status: "failed" }), run("a", { status: "passed" })]));
+    const rows = runs(boxes()[0]);
+    expect(within(boxes()[0]).queryAllByRole("img")).toHaveLength(0);
+    const marks = rows.map((r) => r.querySelector<HTMLElement>("[data-status]")!);
+    expect(
+      marks.every((m) => m.getAttribute("aria-hidden") === "true" && !m.hasAttribute("role")),
+    ).toBe(true);
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining("Failed"),
+      expect.stringContaining("Passed"),
+    ]);
+    expect(drawn(marks[0].querySelector("svg"), CircleX)).toBe(true);
+    expect(drawn(marks[1].querySelector("svg"), CircleCheck)).toBe(true);
+    expect(rows.map((r) => r.dataset.status)).toEqual(["failed", "passed"]); // tests read this
   });
 
   it("opens a run's report, only when it has one and the runner is idle", () => {

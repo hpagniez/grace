@@ -1,7 +1,9 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { validEnvName } from "../shared/env";
 import type { Api } from "../shared/ipc";
+import { FieldMessage } from "./FieldMessage";
 import type { AppState } from "./reduce";
+import { input } from "./ui";
 
 const NONE = "(none)";
 export const INVALID_ENV =
@@ -64,13 +66,13 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
 
   return (
     <div class="flex flex-col">
-      <label class="flex items-center gap-1 text-sm">
+      <label class="flex items-center gap-2 text-sm text-muted">
         Env
         <input
           type="text"
           data-testid="env-input"
           list="env-suggestions"
-          class="w-36 rounded border border-zinc-300 bg-white px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-800"
+          class={`${input} w-28`}
           autocomplete="off"
           spellcheck={false}
           disabled={locked() || !view()}
@@ -104,14 +106,14 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
         <For each={view()?.suggestions ?? []}>{(name) => <option value={name} />}</For>
       </datalist>
       <Show when={error()}>
-        <span id="env-error" data-testid="env-error" class="text-xs text-red-700 dark:text-red-400">
+        <FieldMessage kind="error" id="env-error" testid="env-error">
           {error()}
-        </span>
+        </FieldMessage>
       </Show>
       <Show when={hint()}>
-        <span id="env-hint" data-testid="env-hint" class="text-xs text-zinc-600 dark:text-zinc-400">
+        <FieldMessage kind="hint" id="env-hint" testid="env-hint">
           {hint()}
-        </span>
+        </FieldMessage>
       </Show>
     </div>
   );

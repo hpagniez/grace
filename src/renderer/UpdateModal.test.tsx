@@ -4,6 +4,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
 import { defaultUpdateSettings, type Release, type UpdateView } from "../shared/updates";
 import { initialState, type AppState } from "./reduce";
+import { btnDialog, primaryDialog } from "./buttons";
+import { dialog as dialogStyle } from "./ui";
 import { UpdateModal } from "./UpdateModal";
 
 // jsdom has no modal dialog: open and close only flip the attribute.
@@ -179,5 +181,30 @@ describe("UpdateModal", () => {
     fireEvent.click(button("Skip this version"));
     flush();
     expect(document.activeElement).toBe(outside);
+  });
+
+  it("is a dialog-style box: a 16 px title, Update and restart first, Skip this version last", () => {
+    setup();
+    expect(dialog().className).toContain(dialogStyle);
+    expect(screen.getByRole("heading").className).toContain("text-lg");
+    const update = button("Update and restart");
+    const skip = button("Skip this version");
+    expect(update.className).toContain(primaryDialog);
+    expect(skip.className).toContain(btnDialog);
+    expect(update.compareDocumentPosition(skip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(dialog().outerHTML).not.toMatch(/dark:|zinc-|sky-/);
+  });
+
+  it("keeps its words while it fades out, and starts afresh with the next prompt (R5.2)", () => {
+    const { setState } = setup();
+    fireEvent.click(checkbox());
+    dialog().removeAttribute("open"); // Escape
+    fireEvent(dialog(), new Event("close"));
+    flush();
+    expect(dialog().textContent).toContain("Grace 1.0.0-rc.6 is available");
+    setState((d) => void (d.updatePrompt = release("1.0.0-rc.7")));
+    flush();
+    expect(dialog().textContent).toContain("Grace 1.0.0-rc.7 is available");
+    expect(checkbox().checked).toBe(false);
   });
 });

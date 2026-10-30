@@ -1,6 +1,13 @@
 import { createSignal, onSettled } from "solid-js";
 import { clampPanel, keyHeight, maxPanel, PANEL_MIN, savePanelHeight } from "./panelHeight";
 
+/**
+ * A 1 px line (R18.1). `before:` is the 6 px hit area, centred on it; `after:` is the 2 px accent line that
+ * fades in on hover and press. Both are drawn over the panel and the area above, so the panel is no taller.
+ */
+const LINE =
+  "relative z-10 h-px shrink-0 cursor-row-resize bg-line before:absolute before:inset-x-0 before:-top-[3px] before:h-1.5 after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:bg-accent after:opacity-0 after:transition-opacity after:duration-(--duration-fast) after:ease-standard hover:after:opacity-100 active:after:opacity-100";
+
 /** The strip at the top of the bottom panel that resizes it, with the pointer or the keyboard. */
 export function Splitter(props: {
   panel: () => HTMLElement | undefined;
@@ -62,7 +69,7 @@ export function Splitter(props: {
       aria-valuemin={PANEL_MIN}
       aria-valuemax={aria().max}
       aria-valuenow={aria().shown}
-      class="h-1.5 shrink-0 cursor-row-resize bg-zinc-50 outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-inset dark:bg-zinc-800"
+      class={LINE}
       onPointerDown={start}
       onPointerMove={move}
       onPointerUp={end}

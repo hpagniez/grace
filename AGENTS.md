@@ -80,6 +80,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done.
+- Every PR links an issue, whatever its type (fixes, tests, CI, docs and releases too): `Closes #N` when it finishes the issue, `Part of #N` when it does not. If no issue fits, open one first: a bug with the `bug` label and the sections of `.github/ISSUE_TEMPLATE/bug.yml`, other work like a feature issue. A fix found while working on another PR gets its own issue, and that PR names it too. For a bot PR (Dependabot, `vendor-updates`), whoever takes it opens the issue and adds the line to its body before it merges.
 - CI runs no e2e on PRs into `develop`. Before marking one ready, run `npm run e2e` locally if it changes more than `docs/**` and `*.md`, and paste the summary in the PR. PRs into `main` run e2e on CI once ready.
 - Merge only when `checks` and `test` are green. Nothing enforces it.
 - To have a PR into `develop` merge itself once CI is green, add the `merge-when-green` label, only when the user asks for the merge. It merges with a merge commit, deletes the branch, and closes the issues the PR names with `Closes #N` (GitHub ignores closing keywords in a merge made with the workflow token). PRs into `main` and PRs from forks are merged by hand.
@@ -133,6 +134,17 @@ Most training data is Solid 1. Do not write Solid 1 code:
 - No `use:` directives, `classList`, `on:`, `attr:`, `bool:`. Use `onClick`, not `onclick`.
 
 Source: https://v2.solidjs.com/migration/from-solid-1
+
+### UI conventions
+
+Spec: [docs/specs/2026-10-29-premium-ui.md](docs/specs/2026-10-29-premium-ui.md).
+
+- Colours only through the semantic tokens in `src/index.css`. Tailwind's default palette is removed: no raw palette class (`zinc-500`), no `dark:`, no `title=`. `src/renderer/palette.test.ts` enforces it.
+- The two themes differ only in colours: the dark block of `src/index.css` may override only colour tokens, shadows and the backdrop, never a size, spacing or radius. `src/renderer/tokens.test.ts` enforces it.
+- Shared class strings live in `src/renderer/buttons.ts` and `src/renderer/ui.ts`. Reuse them.
+- Icons only through `Icon` with `lucide` icon data. Statuses only through `StatusMark`.
+- Tooltips only through `Tooltip`, or `Cut` for text that may be cut. In a row, set `side` so a one-line tooltip stays on its row; a click on any tooltip closes it.
+- A dialog keeps its content through its 100 ms exit (`--duration-fast`), then drops it.
 
 ## Karate integration rules
 

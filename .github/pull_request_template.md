@@ -22,7 +22,7 @@ Tick what applies. Strike out (~~text~~) or write "N/A: <reason>" for items that
 
 - Spec: <!-- docs/specs/YYYY-MM-DD-<topic>.md, or "none" -->
 - Decision record: <!-- docs/decisions/NNNN-<title>.md, or "none" -->
-- Issue: <!-- Closes #N (builds the feature), Part of #N (spec, or one of several PRs), or "none" -->
+- Issue: <!-- Closes #N (finishes the issue) or Part of #N (spec, or one of several PRs). Never "none": open an issue first if none fits (AGENTS.md) -->
 
 ## Changes
 
