@@ -81,9 +81,12 @@ export function Tooltip(props: {
   };
 
   // Only a scroll that moves the target hides the tooltip: the page, or a box that holds it. A console
-  // following its tail leaves the tooltip of a disabled button alone, as a run goes on.
+  // following its tail leaves the tooltip of a disabled button alone, as a run goes on. A pinned one
+  // is the owner's to keep: it follows its target instead (a key press that scrolls the list).
   const onScroll = (e: Event) => {
-    if (e.target instanceof Node && e.target.contains(wrap)) hide();
+    if (!(e.target instanceof Node && e.target.contains(wrap))) return;
+    if (props.pinned) place();
+    else hide();
   };
 
   // A click inside closes it, rather than being lost on it. One `over` its target lies on it: a click
@@ -122,10 +125,8 @@ export function Tooltip(props: {
     flush(); // runs the placing effect below at once; inside an effect it is a no-op, the effect runs next
   };
 
-  // Once the tooltip exists: shown and measured, then placed.
-  createEffect(open, (on) => {
-    if (!on || !tip) return;
-    tip.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
+  const place = () => {
+    if (!tip) return;
     const target = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
     const { width, height } = tip.getBoundingClientRect();
     const view = { width: innerWidth, height: innerHeight };
@@ -133,6 +134,13 @@ export function Tooltip(props: {
     tip.style.top = `${at.top}px`;
     tip.style.left = `${at.left}px`;
     tip.dataset.side = at.side;
+  };
+
+  // Once the tooltip exists: shown, then measured and placed.
+  createEffect(open, (on) => {
+    if (!on || !tip) return;
+    tip.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
+    place();
   });
 
   // Added to the target's ids, not set over them: an input may already point at its error message.

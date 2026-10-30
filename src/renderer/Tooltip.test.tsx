@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { Tooltip } from "./Tooltip";
 
 // Only the timers: a full fake would stop Solid's microtask flush.
@@ -313,9 +313,11 @@ describe("Tooltip", () => {
       const [pinned, setPinned] = createSignal(initial);
       const [label, setLabel] = createSignal(text);
       render(() => (
-        <Tooltip text={label()} pinned={pinned()}>
-          <button type="button">Refresh</button>
-        </Tooltip>
+        <div data-testid="list">
+          <Tooltip text={label()} pinned={pinned()}>
+            <button type="button">Refresh</button>
+          </Tooltip>
+        </div>
       ));
       flush();
       return {
@@ -368,6 +370,78 @@ describe("Tooltip", () => {
       set(true);
       cleanup();
       expect(tips()).toHaveLength(0);
+    });
+
+    describe("placed", () => {
+      let target: DOMRect;
+      let show: Mock<(this: HTMLElement) => void>;
+      beforeEach(() => {
+        target = DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 });
+        const tip = DOMRect.fromRect({ x: 0, y: 0, width: 24, height: 24 });
+        vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+          this: Element,
+        ) {
+          return this.getAttribute("role") === "tooltip" ? tip : target;
+        });
+        show = vi.fn(function (this: HTMLElement) {
+          expect(this.isConnected).toBe(true);
+        });
+        HTMLElement.prototype.showPopover = show;
+      });
+      afterEach(() => {
+        // @ts-expect-error jsdom has none; put it back as it was
+        delete HTMLElement.prototype.showPopover;
+      });
+
+      it("shows the popover once and places it below the target when pinned turns true", () => {
+        const { set } = pin(false, TEXT);
+        set(true);
+        expect(show).toHaveBeenCalledTimes(1);
+        expect(tipOf()!.dataset.side).toBe("below");
+        expect(tipOf()!.style.top).toBe("330px");
+        expect(tipOf()!.style.left).toBe("500px");
+      });
+
+      it("does the same when pinned is true on mount", () => {
+        pin(true, TEXT);
+        expect(show).toHaveBeenCalledTimes(1);
+        expect(tipOf()!.dataset.side).toBe("below");
+        expect(tipOf()!.style.top).toBe("330px");
+      });
+
+      it("stays up and is placed again when a box that holds it scrolls, while pinned", () => {
+        const { set } = pin(true, TEXT);
+        target = DOMRect.fromRect({ x: 500, y: 400, width: 24, height: 24 }); // the scroll moved it
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tips()).toHaveLength(1);
+        expect(tipOf()!.style.top).toBe("430px");
+        expect(show).toHaveBeenCalledTimes(1); // placed again, not shown again
+
+        set(false); // the scroll listener did not outlive the close
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("still hides on that scroll when it is not pinned", () => {
+        const { wrapper } = pin(false, TEXT);
+        hover(wrapper);
+        expect(tips()).toHaveLength(1);
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("hides on Escape and on a pointer leave even while pinned", () => {
+        const { wrapper } = pin(true, TEXT);
+        fireEvent.keyDown(wrapper, { key: "Escape" });
+        flush();
+        expect(tips()).toHaveLength(0);
+
+        cleanup();
+        const again = pin(true, TEXT);
+        leave(again.wrapper);
+        expect(tips()).toHaveLength(0);
+      });
     });
   });
 
