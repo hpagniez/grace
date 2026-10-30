@@ -51,7 +51,7 @@ const release = (version: string, publishedAt: string): Release => ({
 /** Sends `event` from main to the window, as main would. */
 const send = (app: ElectronApplication, event: unknown) =>
   app.evaluate(
-    ({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send("app:event", e),
+    ({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send("app:event", [e]),
     event,
   );
 
