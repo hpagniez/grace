@@ -106,9 +106,17 @@ const click = (el: HTMLElement) => {
   fireEvent.click(el);
   flush();
 };
+/** Clicks what the i-th call of the list draws. The focus row is first in the DOM: find a row by position. */
+const clickCall = (i: number) =>
+  click(
+    screen
+      .getAllByTestId("http-call")
+      .find((r) => r.getAttribute("aria-posinset") === String(i + 1))!
+      .firstElementChild as HTMLElement,
+  );
 const selectCall = (i: number) => {
   click(screen.getByTestId("tab-http"));
-  click(screen.getAllByTestId("http-call")[i]);
+  clickCall(i);
 };
 const id = (testid: string) => screen.getByTestId(testid);
 const heading = (name: string) => screen.queryByRole("heading", { name });
@@ -182,14 +190,14 @@ describe("call details", () => {
     expect(heading("Request")).toBeNull();
     expect(heading("Response")).toBeNull();
     // No response and no error either
-    click(screen.getAllByTestId("http-call")[5]);
+    clickCall(5);
     expect(textOf("call-status")).toBe("No response");
     expect(textOf("call-url")).toBe("http://localhost/hang");
     expect(screen.queryByTestId("call-error")).toBeNull();
     expect(heading("Request")).toBeNull();
     expect(heading("Response")).toBeNull();
     // no logged request: Response still holds the error
-    click(screen.getAllByTestId("http-call")[3]);
+    clickCall(3);
     expect(heading("Request")).toBeNull();
     expect(heading("Response")).toBeTruthy();
     expect(textOf("call-error")).toBe("Connection refused");
@@ -278,11 +286,11 @@ describe("call details", () => {
       expect(id("call-status").className).toContain(TINT[tint]);
     };
     check("404 · 4xx Client error", GROUP_TINT["4xx"]);
-    click(screen.getAllByTestId("http-call")[3]);
+    clickCall(3);
     check("503 · 5xx Server error", GROUP_TINT["5xx"]);
-    click(screen.getAllByTestId("http-call")[4]);
+    clickCall(4);
     check("999", "skipped");
-    click(screen.getAllByTestId("http-call")[5]);
+    clickCall(5);
     check("No response", GROUP_TINT.none);
   });
 
@@ -334,7 +342,7 @@ describe("call details", () => {
     click(id("copy-curl"));
     await settle();
     expect(textOf("copy-curl")).toBe("Copied");
-    click(screen.getAllByTestId("http-call")[1]);
+    clickCall(1);
     expect(textOf("call-request-body")).toContain("<user>");
     expect(textOf("copy-curl")).toBe("Copy as cURL");
   });
@@ -364,7 +372,7 @@ describe("call details", () => {
     // the HTTP tab is still up, but nothing is selected in it
     expect(id("tab-http").getAttribute("aria-selected")).toBe("true");
 
-    click(screen.getAllByTestId("http-call")[0]);
+    clickCall(0);
     expect(screen.getByTestId("call-details")).toBeTruthy();
     click(id("tab-console"));
     expect(screen.queryByTestId("call-details")).toBeNull();
