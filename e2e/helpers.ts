@@ -15,6 +15,7 @@ import { createRunDir, writeRunRecord } from "../src/main/history";
 import type { RunRecord } from "../src/shared/history";
 import { NO_FILTER } from "../src/shared/tags";
 import { copyFixture } from "../test/fixtures/copy";
+import { writeBigProject } from "./big-project";
 
 const apps: ElectronApplication[] = [];
 const dirs: string[] = [];
@@ -47,6 +48,13 @@ export function project(
 ): string {
   const dir = copyFixture(name);
   dirs.push(dir);
+  return dir;
+}
+
+/** A generated project of 8 x 5 x `featuresPerModule` features (5: 2,000 tests), deleted after the test. */
+export function bigProject(featuresPerModule = 5): string {
+  const dir = tempDir("kk-big-");
+  writeBigProject(dir, featuresPerModule);
   return dir;
 }
 
