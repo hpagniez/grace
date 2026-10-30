@@ -9,7 +9,7 @@ import {
   Play,
   Shuffle,
 } from "lucide";
-import { createMemo, createSignal, flush, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { FLAKY_TITLE } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
@@ -193,17 +193,7 @@ export function Tree(props: Ctx) {
   );
   let list: VirtualListHandle | undefined;
 
-  /** Right and Left move as the arrows do: the row shown, focused, then selected (R3.3, R4.1). */
-  const moveTo = (from: EventTarget | null, key: string) => {
-    list?.reveal(key);
-    flush(); // the row must be drawn to take focus
-    const row = [...((from as HTMLElement).closest("[role=tree]")?.children ?? [])].find(
-      (el) => (el as HTMLElement).dataset.key === key,
-    ) as HTMLElement | undefined;
-    row?.focus({ preventScroll: true, focusVisible: true });
-    props.select(key);
-  };
-
+  // Right and Left move to a child or the parent as the arrows move (R3.3).
   const onKey = (e: KeyboardEvent, row: TreeRow, index: number) => {
     const { key } = row.node;
     if (e.ctrlKey && e.key === "Enter") {
@@ -219,9 +209,9 @@ export function Tree(props: Ctx) {
     if (e.key === "ArrowRight") {
       const child = rows()[index + 1]; // an open row's first child follows it
       if (kids && !open) toggle(key);
-      else if (child?.parentKey === key) moveTo(e.target, child.node.key);
+      else if (child?.parentKey === key) list?.moveTo(child.node.key);
     } else if (open) toggle(key);
-    else if (row.parentKey !== null) moveTo(e.target, row.parentKey);
+    else if (row.parentKey !== null) list?.moveTo(row.parentKey);
     return true;
   };
 

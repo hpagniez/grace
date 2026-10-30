@@ -304,6 +304,21 @@ describe("VirtualList", () => {
     expect(scroller.scrollTop).toBe(0);
   });
 
+  it("moves to a row by key from the handle, as an arrow key does", () => {
+    const { handle, row, rows, stops, scroller, onSelect } = setup();
+    handle().moveTo("r500");
+    flush();
+    expect(document.activeElement).toBe(row("r500"));
+    expect(stops()).toEqual([row("r500")]);
+    expect(onSelect).toHaveBeenLastCalledWith("r500");
+    expect(rows().filter((r) => r.querySelector("[data-keyboard=yes]"))).toEqual([row("r500")]);
+    expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
+    handle().moveTo("nope");
+    flush();
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(row("r500"));
+  });
+
   it("tells a row when it has keyboard focus", () => {
     const { focus, row, rows, key } = setup();
     focus("r0");

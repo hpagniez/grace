@@ -1150,6 +1150,25 @@ describe("virtual tree", () => {
       expect(tip()).toBeNull();
     });
 
+    it("shows a cut label whole when Left or Right moves to its row", () => {
+      const { load } = setup();
+      load();
+      const cut = (label: HTMLElement) => {
+        Object.defineProperty(label, "scrollWidth", { value: 200, configurable: true });
+        Object.defineProperty(label, "clientWidth", { value: 100, configurable: true });
+      };
+      cut(within(rowByKey("f:tests/basic.feature")).getAllByRole("button")[1]);
+      cut(screen.getByText("passing hello"));
+      const tip = () => document.querySelector<HTMLElement>("[role=tooltip]");
+      focusRow("s:tests/basic.feature#2");
+      press("ArrowLeft");
+      expect(focused()).toBe("f:tests/basic.feature");
+      expect(tip()!.textContent).toBe("basic.feature · basic API checks");
+      press("ArrowRight");
+      expect(focused()).toBe("s:tests/basic.feature#1");
+      expect(tip()!.textContent).toBe("passing hello");
+    });
+
     it("names the run shortcut on every row and on the run button's tooltip", () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       try {

@@ -13,6 +13,8 @@ import {
 export interface VirtualListHandle {
   /** Scrolls the least to show the row with this key (R4.1); nothing when it is not in the list. */
   reveal(key: string): void;
+  /** Moves to the row with this key as an arrow key does: shown, focused from the keyboard, selected. */
+  moveTo(key: string): void;
 }
 
 /**
@@ -179,7 +181,13 @@ export function VirtualList<T>(props: {
     return () => ro.disconnect();
   });
 
-  props.ref?.({ reveal });
+  props.ref?.({
+    reveal,
+    moveTo(key) {
+      const i = keys().indexOf(key);
+      if (i >= 0) moveTo(i);
+    },
+  });
 
   return (
     <div
