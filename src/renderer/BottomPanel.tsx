@@ -5,7 +5,7 @@ import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
 import { Console } from "./Console";
 import { ClearHistory, History } from "./History";
-import { narrowedCalls, shownCalls, type CallRef } from "./http";
+import { callsOf, scopeTests, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
 import { Icon } from "./Icon";
 import { Splitter } from "./Splitter";
@@ -64,10 +64,11 @@ export function BottomPanel(props: {
   setDragging: (on: boolean) => void;
 }) {
   const panel = () => props.state.panel;
-  // A memo: PanelTab reads the count twice, and each read walks every call of the tests in scope.
-  const httpCount = createMemo(
-    () => shownCalls(narrowedCalls(props.state), props.state.httpGroups).length,
-  );
+  // Memos, so a run's status updates do not walk the tree: the tests in scope change with the tree and
+  // selection only, and one list feeds both the tab's count (read twice) and the tab.
+  const scope = createMemo(() => scopeTests(props.state));
+  const narrowed = createMemo(() => callsOf(scope(), props.state.calls));
+  const httpCount = createMemo(() => shownCalls(narrowed(), props.state.httpGroups).length);
   let section: HTMLElement | undefined;
   return (
     <section
@@ -131,6 +132,7 @@ export function BottomPanel(props: {
           <Match when={panel() === "http"}>
             <HttpCalls
               state={props.state}
+              narrowed={narrowed()}
               selectCall={props.selectCall}
               toggleGroup={props.toggleGroup}
             />

@@ -9,7 +9,9 @@ import {
   toggledGroups,
   totalCalls,
   type CallRef,
+  type ListedCall,
 } from "./http";
+import { findNode } from "./nodes";
 
 const node = (key: string, kind: TestNode["kind"], children: TestNode[] = []): TestNode => ({
   key,
@@ -78,6 +80,26 @@ describe("narrowedCalls", () => {
     const [first] = narrowedCalls(state("f:b.feature"));
     expect(first.test.key).toBe("s:b.feature#1");
     expect(first.call.status).toBeNull();
+  });
+
+  it("keeps the rows of a test whose calls did not change", () => {
+    const at = (list: ListedCall[], ref: string) =>
+      list.find((l) => `${l.ref.key}/${l.ref.index}` === ref);
+    const before = narrowedCalls(state());
+    const after = narrowedCalls({
+      tree,
+      selected: null,
+      calls: { ...calls, "s:a.feature#2": [call(500, 200)] },
+    });
+    expect(at(after, "s:a.feature#1/1")).toBe(at(before, "s:a.feature#1/1"));
+    expect(at(after, "s:a.feature#2/0")).not.toBe(at(before, "s:a.feature#2/0"));
+  });
+
+  it("lists kept calls under the nodes of a refreshed tree", () => {
+    narrowedCalls(state());
+    const refreshed = structuredClone(tree);
+    const [first] = narrowedCalls({ tree: refreshed, selected: "s:b.feature#1", calls });
+    expect(first.test).toBe(findNode(refreshed, "s:b.feature#1"));
   });
 });
 
