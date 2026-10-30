@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+// not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
+import { existsSync, rmSync, writeFileSync } from "original-fs";
 import path from "node:path";
 import type { UpdateSettings } from "../../shared/updates";
 import script from "./switch.ps1?raw";

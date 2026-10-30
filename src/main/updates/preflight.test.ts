@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { APP_FILES, preflight } from "./preflight";
+import { APP_FILES } from "../../shared/updates";
+import { preflight } from "./preflight";
 
 const roomy = async () => 1e9;
 

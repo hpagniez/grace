@@ -19,6 +19,8 @@ export default defineConfig({
   test: {
     projects: [
       {
+        // Electron's fs without asar support; Node has no asar support to leave out
+        resolve: { alias: { "original-fs": "node:fs" } },
         test: { name: "node", include: ["**/*.test.ts"], exclude, environment: "node" },
       },
       {
