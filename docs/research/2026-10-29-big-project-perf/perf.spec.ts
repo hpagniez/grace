@@ -8,10 +8,10 @@ import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:f
 import path from "node:path";
 import { expect, launch, openProject, projectDataDir, test } from "../../../e2e/helpers";
 
-// The sizes generate.mjs wrote: tests, HTTP calls, and tree rows with every folder open.
-const { tests: TESTS, calls: CALLS, rows: TOTAL } = JSON.parse(
+// The sizes generate.mjs wrote: HTTP calls, and tree rows with every folder open.
+const { calls: CALLS, rows: TOTAL } = JSON.parse(
   readFileSync(path.join(process.env.PERF_PROJECT!, "perf-meta.json"), "utf8"),
-) as { tests: number; calls: number; rows: number };
+) as { calls: number; rows: number };
 const result: Record<string, unknown> = {};
 
 type Metrics = Record<string, number>;
@@ -27,6 +27,22 @@ const busy = (a: Metrics, b: Metrics) => ({
   layout: Math.round((b.LayoutDuration - a.LayoutDuration) * 1000),
 });
 
+/** What a probe clicks: the `index`th match of `sel` (the first by default), or that row's label: its button with no aria-label. */
+interface Target {
+  sel: string;
+  index?: number;
+  label?: boolean;
+}
+/** When a click has taken effect: a list's row count reached or fell under a number, or an element is selected or pressed. */
+type Done =
+  | { rows: "tree" | "http"; atLeast: number }
+  | { rows: "tree" | "http"; under: number }
+  | { attr: "aria-selected" | "aria-pressed"; of: Target };
+/** The page side `instrument` installs. */
+interface Probe {
+  clickToPaint(target: Target, done: Done): Promise<number>;
+}
+
 /** Installs the page side: long-task log, frame log, and `clickToPaint`. */
 async function instrument(win: Page) {
   await win.evaluate(() => {
@@ -36,19 +52,29 @@ async function instrument(win: Page) {
       for (const e of l.getEntries()) longTasks.push(e.duration);
     }).observe({ type: "longtask" });
     w.longTasks = longTasks;
-    w.paint = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+    const paint = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     // Rows in the list, drawn or not: a virtual list draws only those in view and says how many in data-rows.
     const count = (box: string, row: string) =>
       Number((document.querySelector(box) as HTMLElement | null)?.dataset.rows) ||
       document.querySelectorAll(row).length;
-    w.treeRows = () => count("[data-testid=tree]", "[data-testid=tree-node]");
-    w.httpRows = () => count("[data-testid=http-calls]", "[data-testid=http-call]");
-    // Clicks `el`, then waits until `done()` holds (checked each frame) and the frame after it is painted.
-    w.clickToPaint = async (el: HTMLElement, done: () => boolean) => {
+    const rows = (list: "tree" | "http") =>
+      list === "tree"
+        ? count("[data-testid=tree]", "[data-testid=tree-node]")
+        : count("[data-testid=http-calls]", "[data-testid=http-call]");
+    const find = (t: Target) => {
+      const el = document.querySelectorAll<HTMLElement>(t.sel)[t.index ?? 0];
+      return t.label ? [...el.querySelectorAll("button")].find((b) => !b.hasAttribute("aria-label"))! : el;
+    };
+    const holds = (d: Done) => {
+      if ("attr" in d) return find(d.of).closest(`[${d.attr}]`)?.getAttribute(d.attr) === "true";
+      return "atLeast" in d ? rows(d.rows) >= d.atLeast : rows(d.rows) < d.under;
+    };
+    // Clicks the target, then waits until `done` holds (checked each frame) and the frame after it is painted.
+    w.clickToPaint = async (target: Target, done: Done) => {
       const t0 = performance.now();
-      el.click();
-      while (!done()) await new Promise((r) => requestAnimationFrame(r));
-      await (w.paint as () => Promise<void>)();
+      find(target).click();
+      while (!holds(done)) await new Promise((r) => requestAnimationFrame(r));
+      await paint();
       return Math.round(performance.now() - t0);
     };
     // Frame gaps while `frames.on`: the longest gap is the worst freeze a person would see.
@@ -79,19 +105,12 @@ const longTasksSince = (win: Page, from: number) =>
   }, from);
 
 /** Times one click to paint, with the renderer's busy time and long tasks around it. */
-async function probe(
-  win: Page,
-  cdp: CDPSession,
-  name: string,
-  click: string,
-  done: string,
-  arg?: unknown,
-) {
+async function probe(win: Page, cdp: CDPSession, name: string, target: Target, done: Done) {
   const lt = await longTaskMark(win);
   const before = await metrics(cdp);
-  // A string, not a function: Playwright evaluates it over CDP, where the page's CSP does not apply.
-  const ms = await win.evaluate<number>(
-    `(() => { const arg = ${JSON.stringify(arg ?? null)}; return window.clickToPaint((() => { ${click} })(), () => { ${done} }); })()`,
+  const ms = await win.evaluate(
+    ([t, d]) => (window as unknown as Probe).clickToPaint(t, d),
+    [target, done] as const,
   );
   const after = await metrics(cdp);
   const entry = { ms, busy: busy(before, after), longTasks: await longTasksSince(win, lt) };
@@ -118,13 +137,8 @@ test("big project", async () => {
   await app.evaluate(({ dialog }, d) => {
     dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [d] })) as never;
   }, dir);
-  await probe(
-    win,
-    cdp,
-    "open",
-    `return document.querySelector("[data-testid=open-button]")`,
-    `return window.treeRows() >= ${TOTAL}`,
-  );
+  await win.getByTestId("open-button").waitFor(); // the home page draws after the store loads
+  await probe(win, cdp, "open", { sel: "[data-testid=open-button]" }, { rows: "tree", atLeast: TOTAL });
   void openProject; // the probe clicks Open itself, inside the page, to start its clock there
   result.rows = await win.locator(ROWS).count();
   const opened = await metrics(cdp);
@@ -132,16 +146,17 @@ test("big project", async () => {
   console.log("afterOpen", JSON.stringify(result.afterOpen));
 
   // Collapse and expand the top folder: every row goes, then comes back.
-  const toggle = `return document.querySelector(${JSON.stringify(TOP)}).querySelector("button")`;
-  await probe(win, cdp, "collapseAll", toggle, `return window.treeRows() < 10`);
-  await probe(win, cdp, "expandAll", toggle, `return window.treeRows() >= ${TOTAL}`);
+  const toggle = { sel: `${TOP} button` }; // its first button: expand or collapse
+  await probe(win, cdp, "collapseAll", toggle, { rows: "tree", under: 10 });
+  await probe(win, cdp, "expandAll", toggle, { rows: "tree", atLeast: TOTAL });
 
-  // Select the first 20 tests, which every build draws: the label is the row's button with no aria-label.
-  const pick = `const r = document.querySelectorAll(${JSON.stringify(TEST_ROWS)})[arg]; return [...r.querySelectorAll("button")].find(b => !b.hasAttribute("aria-label"))`;
-  const selected = `return document.querySelectorAll(${JSON.stringify(TEST_ROWS)})[arg].closest("[aria-selected]").getAttribute("aria-selected") === "true"`;
+  // Select the first 20 tests, which every build draws.
   const selects: number[] = [];
-  for (let i = 0; i < 20; i++)
-    selects.push((await probe(win, cdp, `select${i}`, pick, selected, i)).ms);
+  for (let i = 0; i < 20; i++) {
+    const row = { sel: TEST_ROWS, index: i };
+    const label = { ...row, label: true };
+    selects.push((await probe(win, cdp, `select${i}`, label, { attr: "aria-selected", of: row })).ms);
+  }
   for (let i = 0; i < 20; i++) delete result[`select${i}`];
   selects.sort((a, b) => a - b);
   result.select = { median: selects[10], max: selects[19], all: selects };
@@ -231,9 +246,7 @@ test("big project", async () => {
     console.log(name, JSON.stringify(entry));
   }
   // The HTTP tab lists the calls under the tree selection: select the whole project first.
-  const label = (sel: string) =>
-    `return [...document.querySelector(${JSON.stringify(sel)}).querySelectorAll("button")].find(b => !b.hasAttribute("aria-label"))`;
-  await probe(win, cdp, "selectTop", label(TOP), `return document.querySelector(${JSON.stringify(TOP)}).closest("[aria-selected]").getAttribute("aria-selected") === "true"`);
+  await probe(win, cdp, "selectTop", { sel: TOP, label: true }, { attr: "aria-selected", of: { sel: TOP } });
   await run("runConsole");
   // PERF_ONLY_CONSOLE=1 stops here: a build whose HTTP-tab run would take too long to wait for.
   if (process.env.PERF_ONLY_CONSOLE) {
@@ -242,32 +255,17 @@ test("big project", async () => {
   }
   await expect(win.getByTestId("tab-http")).toContainText(String(CALLS), { timeout: 30_000 });
 
-  const rows = `return window.httpRows()`;
-  await probe(win, cdp, "httpTab", `return document.querySelector("[data-testid=tab-http]")`, `${rows} >= ${CALLS}`);
-  await probe(
-    win,
-    cdp,
-    "http2xxOnly",
-    `return document.querySelector("[data-testid=http-group][data-group='2xx']")`,
-    `${rows} < ${CALLS}`,
-  );
-  await probe(
-    win,
-    cdp,
-    "httpAll",
-    `return document.querySelector("[data-testid=http-group][data-group='all']")`,
-    `${rows} >= ${CALLS}`,
-  );
-  await probe(
-    win,
-    cdp,
-    "httpSelectCall",
-    `return document.querySelectorAll("[data-testid=http-call]")[5]`,
-    `return document.querySelectorAll("[data-testid=http-call]")[5].getAttribute("aria-pressed") === "true"`,
-  );
+  const all: Done = { rows: "http", atLeast: CALLS };
+  await probe(win, cdp, "httpTab", { sel: "[data-testid=tab-http]" }, all);
+  const group = (g: string) => ({ sel: `[data-testid=http-group][data-group="${g}"]` });
+  await probe(win, cdp, "http2xxOnly", group("2xx"), { rows: "http", under: CALLS });
+  await probe(win, cdp, "httpAll", group("all"), all);
+  const call = { sel: "[data-testid=http-call]", index: 5 };
+  await probe(win, cdp, "httpSelectCall", call, { attr: "aria-pressed", of: call });
   // Narrowing to one feature, then back to the whole project (the top folder).
-  await probe(win, cdp, "httpNarrow", label(`${ROWS}[data-key^="f:tests/"]`), `${rows} < 10`);
-  await probe(win, cdp, "httpWiden", label(TOP), `${rows} >= ${CALLS}`);
+  const feature = { sel: `${ROWS}[data-key^="f:tests/"]`, label: true };
+  await probe(win, cdp, "httpNarrow", feature, { rows: "http", under: 10 });
+  await probe(win, cdp, "httpWiden", { sel: TOP, label: true }, all);
 
   await run("runHttp");
   await cdp.send("HeapProfiler.collectGarbage"); // what is left is held, not garbage
