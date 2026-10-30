@@ -14,7 +14,9 @@ import type { AppEvent } from "../shared/events";
 import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
+import { NO_FILTER } from "../shared/tags";
 import { App } from "./App";
+import { treeRows } from "./treeRows";
 import { drawn } from "../../test/drawn";
 
 const node = (
@@ -165,14 +167,14 @@ describe("main screen", () => {
   it("swaps the chevron when a folder opens and closes, and icons folders and features", () => {
     const { load } = setup();
     load();
-    const row = rowByKey("d:tests");
-    const toggle = within(row).getByRole("button", { name: "Collapse tests" });
+    const row = () => rowByKey("d:tests"); // a toggle draws the row again
+    const toggle = within(row()).getByRole("button", { name: "Collapse tests" });
     const chevron = toggle.querySelector("svg");
     expect(drawn(chevron, ChevronDown)).toBe(true);
     // no transform: one on every open row slows every hit test of a large tree
     expect(chevron!.getAttribute("class") ?? "").not.toContain("rotate");
     // svgs in a row: chevron, status mark, then the folder or file icon
-    expect(drawn(row.querySelectorAll("svg")[2], FolderOpen)).toBe(true);
+    expect(drawn(row().querySelectorAll("svg")[2], FolderOpen)).toBe(true);
     expect(drawn(rowByKey("f:tests/basic.feature").querySelectorAll("svg")[2], FileText)).toBe(
       true,
     );
@@ -182,10 +184,10 @@ describe("main screen", () => {
     );
     fireEvent.click(toggle);
     flush();
-    const closed = within(row).getByRole("button", { name: "Expand tests" });
+    const closed = within(row()).getByRole("button", { name: "Expand tests" });
     expect(drawn(closed.querySelector("svg"), ChevronRight)).toBe(true);
-    expect(drawn(row.querySelectorAll("svg")[2], Folder)).toBe(true);
-    expect(row.parentElement!.getAttribute("aria-expanded")).toBe("false");
+    expect(drawn(row().querySelectorAll("svg")[2], Folder)).toBe(true);
+    expect(row().parentElement!.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("marks the selected row with its background and the accent bar, rings focus inside the row", () => {
@@ -772,5 +774,471 @@ describe("flaky marks", () => {
     expect(markOf("s:tests/basic.feature#1")).toBeTruthy();
     expect(markOf("s:tests/basic.feature#2")).toBeNull();
     expect(countOf("f:tests/basic.feature")!.textContent).toBe("1 flaky");
+  });
+});
+
+// The virtual tree: only the rows in view are drawn, as one tab stop with arrow keys (spec 2026-10-30).
+describe("virtual tree", () => {
+  /** One folder of features of 10 scenarios each; even tests carry the tag `even`. */
+  const bigTree = (tests: number): TestNode =>
+    node("folder", "d:", "big", {
+      children: [
+        node("folder", "d:tests", "tests", {
+          children: Array.from({ length: tests / 10 }, (_, f) =>
+            node("feature", `f:tests/f${f}.feature`, `f${f}`, {
+              file: `tests/f${f}.feature`,
+              children: Array.from({ length: 10 }, (_, s) => {
+                const i = f * 10 + s;
+                return node("scenario", `s:tests/f${f}.feature#${s + 1}`, `test ${i}`, {
+                  line: s + 1,
+                  tags: i % 2 ? [] : ["even"],
+                });
+              }),
+            }),
+          ),
+        }),
+      ],
+    });
+  /** The keys of the rows a person can scroll to, all open and unfiltered. */
+  const order = (t: TestNode) => treeRows(t, new Set(), NO_FILTER).map((r) => r.node.key);
+  const open = (send: (e: AppEvent) => void, t: TestNode, root = "D:/p") =>
+    send({ type: "project", project: { root, layout: "standalone" }, tree: t, error: null });
+  const startRun = (send: (e: AppEvent) => void) =>
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261030-120000-000",
+      keys: [],
+      total: 4,
+      startedAt: Date.now(),
+      env: null,
+    });
+
+  const items = () => [
+    ...screen.getByTestId("tree").querySelectorAll<HTMLElement>("[role=treeitem]"),
+  ];
+  const item = (key: string) => items().find((r) => r.dataset.key === key);
+  /** The drawn rows top to bottom: the focus row is first in the DOM, wherever it sits. */
+  const shown = () =>
+    items()
+      .sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top))
+      .map((r) => r.dataset.key!);
+  const scroller = () => screen.getByTestId("tree").parentElement!;
+  const scrollTo = (top: number) => {
+    scroller().scrollTop = top;
+    scroller().dispatchEvent(new Event("scroll"));
+    flush();
+  };
+  /** jsdom has no layout: the tree reads a 600 px view. */
+  const expectInView = (key: string) => {
+    const top = parseFloat(item(key)!.style.top);
+    expect(top).toBeGreaterThanOrEqual(scroller().scrollTop);
+    expect(top + 24).toBeLessThanOrEqual(scroller().scrollTop + 600);
+  };
+  const focusRow = (key: string) => {
+    item(key)!.focus();
+    flush();
+  };
+  /** A key on the focused element; returns the event. */
+  const press = (key: string, init: KeyboardEventInit = {}) => {
+    const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+    document.activeElement!.dispatchEvent(e);
+    flush();
+    return e;
+  };
+  const focused = () => (document.activeElement as HTMLElement).dataset.key;
+  const selected = () => items().filter((r) => r.getAttribute("aria-selected") === "true");
+  const chevron = (key: string) => within(rowByKey(key)).getAllByRole("button")[0];
+  const click = (el: HTMLElement) => {
+    fireEvent.click(el);
+    flush();
+  };
+  const heading = () => screen.getByRole("heading").textContent;
+  /** What Tab can reach inside the tree. */
+  const tabbable = () =>
+    [...screen.getByTestId("tree").querySelectorAll<HTMLElement>("button, [tabindex]")].filter(
+      (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled,
+    );
+
+  describe("drawing (R1, R2)", () => {
+    it("draws the first 25 rows of a project of 30 tests", () => {
+      const { send } = setup();
+      const t = bigTree(30);
+      open(send, t);
+      const drawnKeys = items().map((r) => r.dataset.key);
+      for (const key of order(t).slice(0, 25)) expect(drawnKeys).toContain(key);
+    });
+
+    it("shows the same rows, order and indents as before, and only matches under Hide non-matching", () => {
+      const { send, load } = setup();
+      load();
+      expect(shown()).toEqual([
+        "d:tests",
+        "f:tests/basic.feature",
+        "s:tests/basic.feature#1",
+        "s:tests/basic.feature#2",
+        "f:tests/outline.feature",
+        "o:tests/outline.feature#1",
+        "s:tests/outline.feature#1.1",
+        "s:tests/outline.feature#1.2",
+      ]);
+      // 16 px per level, as the nested lists gave
+      expect(shown().map((k) => rowByKey(k).style.marginLeft)).toEqual([
+        "0px",
+        "16px",
+        "32px",
+        "32px",
+        "16px",
+        "32px",
+        "48px",
+        "48px",
+      ]);
+      expect(items().every((r) => r.style.height === "24px")).toBe(true);
+      send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: true } });
+      expect(shown()).toEqual(["d:tests", "f:tests/basic.feature", "s:tests/basic.feature#1"]);
+    });
+
+    it("keeps closed folders through a refresh, and opens them for another project", () => {
+      const { send, load } = setup();
+      load();
+      click(chevron("f:tests/basic.feature"));
+      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
+      expect(item("s:tests/basic.feature#1")).toBeUndefined();
+      load(); // a refresh: the same project, a new tree
+      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
+      expect(item("s:tests/basic.feature#1")).toBeUndefined();
+      open(send, tree(), "D:/other");
+      load();
+      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("true");
+      expect(item("s:tests/basic.feature#1")).toBeDefined();
+    });
+
+    it("starts everything open in another project", () => {
+      const { send, load } = setup();
+      load();
+      click(chevron("f:tests/basic.feature"));
+      open(send, tree(), "D:/other");
+      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("keeps the scroll position and the drawn rows when a run updates 500 statuses", () => {
+      const { send } = setup();
+      const t = bigTree(2000);
+      open(send, t);
+      scrollTo(26_408); // half way
+      const before = shown();
+      const nodes = screen.getAllByTestId("tree-node");
+      const tests = order(t)
+        .filter((k) => k.startsWith("s:"))
+        .slice(800, 1300); // tests 800 to 1299, the drawn ones among them
+      send({
+        type: "runStarted",
+        selection: "d:",
+        runId: "20261030-120000-000",
+        keys: tests,
+        total: tests.length,
+        startedAt: Date.now(),
+        env: null,
+      });
+      send({ type: "scenarios", updates: tests.map((key) => ({ key, status: "passed" })) });
+      expect(rowByKey("s:tests/f100.feature#1").dataset.status).toBe("passed");
+      expect(scroller().scrollTop).toBe(26_408);
+      expect(shown()).toEqual(before);
+      expect(screen.getAllByTestId("tree-node")).toEqual(nodes); // not one row drawn again
+    });
+  });
+
+  describe("keys (R3)", () => {
+    it("is one tab stop: the first row, with nothing selected", () => {
+      const { load } = setup();
+      load();
+      expect(tabbable()).toEqual([item("d:tests")]);
+    });
+
+    it("moves and selects with Down, and the details pane follows", () => {
+      const { load } = setup();
+      load();
+      focusRow("d:tests");
+      press("ArrowDown");
+      expect(focused()).toBe("f:tests/basic.feature");
+      expect(selected()).toEqual([item("f:tests/basic.feature")]);
+      expect(heading()).toBe("basic API checks");
+    });
+
+    describe("Right and Left", () => {
+      it("opens a closed feature with Right, focus staying on it", () => {
+        const { load } = setup();
+        load();
+        click(chevron("f:tests/basic.feature"));
+        focusRow("f:tests/basic.feature");
+        expect(press("ArrowRight").defaultPrevented).toBe(true);
+        expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("true");
+        expect(focused()).toBe("f:tests/basic.feature");
+        expect(item("s:tests/basic.feature#1")).toBeDefined();
+      });
+
+      it("moves to the first scenario of an open feature with Right, and selects it", () => {
+        const { load } = setup();
+        load();
+        focusRow("f:tests/basic.feature");
+        press("ArrowRight");
+        expect(focused()).toBe("s:tests/basic.feature#1");
+        expect(selected()).toEqual([item("s:tests/basic.feature#1")]);
+      });
+
+      it("closes an open feature with Left, focus staying on it", () => {
+        const { load } = setup();
+        load();
+        focusRow("f:tests/basic.feature");
+        press("ArrowLeft");
+        expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
+        expect(item("s:tests/basic.feature#1")).toBeUndefined();
+        expect(focused()).toBe("f:tests/basic.feature");
+      });
+
+      it("moves from a scenario to its feature with Left, and selects it", () => {
+        const { load } = setup();
+        load();
+        focusRow("s:tests/basic.feature#2");
+        press("ArrowLeft");
+        expect(focused()).toBe("f:tests/basic.feature");
+        expect(selected()).toEqual([item("f:tests/basic.feature")]);
+      });
+
+      it("does nothing with Left on a closed top-level folder", () => {
+        const { load } = setup();
+        load();
+        click(chevron("d:tests"));
+        focusRow("d:tests");
+        press("ArrowLeft");
+        expect(shown()).toEqual(["d:tests"]);
+        expect(item("d:tests")!.getAttribute("aria-expanded")).toBe("false");
+        expect(focused()).toBe("d:tests");
+        expect(selected()).toEqual([]);
+      });
+    });
+
+    it("moves to the last row with End, a screen up with Page Up, and the first with Home", () => {
+      const { send } = setup();
+      const t = bigTree(2000);
+      open(send, t);
+      expect(items()).toHaveLength(35); // of 2,201 rows
+      const keys = order(t);
+      focusRow("d:tests");
+      press("End");
+      expect(focused()).toBe(keys[2200]);
+      expect(selected()).toEqual([item(keys[2200])]);
+      expectInView(keys[2200]);
+      press("PageUp"); // 25 whole rows in the 600 px view
+      expect(focused()).toBe(keys[2175]);
+      press("Home");
+      expect(focused()).toBe("d:tests");
+      expectInView("d:tests");
+    });
+
+    it("runs the focused row with Ctrl+Enter, and not during a run", () => {
+      const { api, send, load } = setup();
+      load();
+      focusRow("s:tests/basic.feature#1");
+      expect(press("Enter", { ctrlKey: true }).defaultPrevented).toBe(true);
+      expect(api.run).toHaveBeenCalledTimes(1);
+      expect(api.run).toHaveBeenCalledWith("s:tests/basic.feature#1");
+      expect(selected()).toEqual([]); // runs, does not select
+      startRun(send);
+      press("Enter", { ctrlKey: true });
+      expect(api.run).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs nothing with Ctrl+Enter on a row the filter mutes: it has no run button", () => {
+      const { api, send, load } = setup();
+      load();
+      send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: false } });
+      focusRow("s:tests/basic.feature#2");
+      press("Enter", { ctrlKey: true });
+      expect(api.run).not.toHaveBeenCalled();
+    });
+
+    it("keeps the row's buttons out of the tab order, and they still click", () => {
+      const { api, load } = setup();
+      load();
+      const buttons = within(screen.getByTestId("tree")).getAllByRole("button");
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const b of buttons) expect(b.getAttribute("tabindex")).toBe("-1");
+      click(screen.getByRole("button", { name: "Run passing hello" }));
+      expect(api.run).toHaveBeenCalledWith("s:tests/basic.feature#1");
+    });
+
+    it("makes a clicked row the focused one, so the next key moves from it", () => {
+      const { load } = setup();
+      load();
+      focusRow("d:tests");
+      click(within(rowByKey("f:tests/outline.feature")).getByText("outline.feature"));
+      press("ArrowDown");
+      expect(focused()).toBe("o:tests/outline.feature#1");
+      expect(selected()).toEqual([item("o:tests/outline.feature#1")]);
+    });
+  });
+
+  describe("focus and scrolling (R4)", () => {
+    it("takes focus to a folder closed by its chevron, keeping the selection", () => {
+      const { load } = setup();
+      load();
+      click(screen.getByText("passing hello"));
+      expect(focused()).toBe("s:tests/basic.feature#1");
+      click(chevron("f:tests/basic.feature"));
+      expect(focused()).toBe("f:tests/basic.feature");
+      expect(heading()).toBe("passing hello");
+    });
+
+    it("moves focus to the nearest shown row above when Hide non-matching hides it", () => {
+      const { send, load } = setup();
+      load();
+      click(screen.getByText("failing match"));
+      send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: true } });
+      expect(focused()).toBe("s:tests/basic.feature#1");
+      expect(heading()).toBe("failing match");
+    });
+
+    it("keeps focus in the tree when a refresh removes the focused row", () => {
+      const { send, load } = setup();
+      load();
+      focusRow("s:tests/basic.feature#2");
+      const t = tree();
+      t.children[0].children.shift(); // basic.feature is gone
+      open(send, t);
+      expect(document.activeElement!.getAttribute("role")).toBe("treeitem");
+      expect(focused()).toBe("d:tests");
+    });
+
+    it("scrolls to the selected row after a filter change takes rows away above the view", () => {
+      const { send } = setup();
+      open(send, bigTree(2000));
+      const target = "s:tests/f150.feature#1"; // test 1500, even, row 1652
+      scrollTo(8 + 1652 * 24 - 300);
+      click(screen.getByText("test 1500"));
+      scrollTo(8 + 1000 * 24); // row 1000 on top, the selected row far below
+      send({ type: "filter", filter: { include: ["even"], exclude: [], hideNonMatching: true } });
+      expect(selected()).toEqual([item(target)]);
+      expectInView(target);
+    });
+
+    it("does not scroll to the selected row for a new tree and the same filter", () => {
+      const { send } = setup();
+      open(send, bigTree(2000));
+      scrollTo(8 + 1652 * 24 - 300);
+      click(screen.getByText("test 1500"));
+      scrollTo(8 + 200 * 24);
+      open(send, bigTree(2000)); // a refresh, which main follows with the filter in force
+      send({ type: "filter", filter: { ...NO_FILTER } });
+      expect(scroller().scrollTop).toBe(8 + 200 * 24);
+    });
+
+    it("shows a cut label whole when Down moves to its row, and closes it on the next Down", () => {
+      const { load } = setup();
+      load();
+      const label = screen.getByText("failing match");
+      Object.defineProperty(label, "scrollWidth", { value: 200, configurable: true });
+      Object.defineProperty(label, "clientWidth", { value: 100, configurable: true });
+      const tip = () => document.querySelector<HTMLElement>("[role=tooltip]");
+      focusRow("s:tests/basic.feature#1");
+      expect(tip()).toBeNull();
+      press("ArrowDown");
+      expect(tip()!.textContent).toBe("failing match");
+      expect(tip()!.dataset.side).toBe("over");
+      expect(label.parentElement!.contains(tip())).toBe(true);
+      press("ArrowDown");
+      expect(tip()).toBeNull();
+    });
+
+    it("names the run shortcut on every row and on the run button's tooltip", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { load } = setup();
+        load();
+        expect(items().map((r) => r.getAttribute("aria-keyshortcuts"))).toEqual(
+          Array(8).fill("Control+Enter"),
+        );
+        const run = screen.getByRole("button", { name: "Run passing hello" });
+        fireEvent.pointerEnter(run.parentElement!);
+        vi.advanceTimersByTime(500);
+        expect(document.querySelector("[role=tooltip]")!.textContent).toBe(
+          "Run passing hello (Ctrl+Enter)",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("screen readers (R5)", () => {
+    it("gives rows their level, place and open state, in a tree named Tests", () => {
+      const { send } = setup();
+      const scenario = (f: string, n: number) =>
+        node("scenario", `s:tests/${f}.feature#${n}`, `${f}${n}`, { line: n });
+      open(
+        send,
+        node("folder", "d:", "p", {
+          children: [
+            node("folder", "d:tests", "tests", {
+              children: [
+                node("feature", "f:tests/a.feature", "a", {
+                  file: "tests/a.feature",
+                  children: [scenario("a", 1)],
+                }),
+                node("feature", "f:tests/b.feature", "b", {
+                  file: "tests/b.feature",
+                  children: [1, 2, 3].map((n) => scenario("b", n)),
+                }),
+              ],
+            }),
+          ],
+        }),
+      );
+      const aria = (key: string) =>
+        ["level", "posinset", "setsize", "expanded"].map((a) =>
+          item(key)!.getAttribute(`aria-${a}`),
+        );
+      expect(aria("f:tests/b.feature")).toEqual(["2", "2", "2", "true"]);
+      expect(aria("s:tests/b.feature#3")).toEqual(["3", "3", "3", null]);
+      expect(screen.getByRole("tree", { name: "Tests" })).toBe(screen.getByTestId("tree"));
+    });
+
+    it("names a row by its label, status, flaky chip and tags", () => {
+      const { send } = setup();
+      open(
+        send,
+        node("folder", "d:", "p", {
+          children: [
+            node("feature", "f:tests/login.feature", "login", {
+              file: "tests/login.feature",
+              tags: ["smoke"],
+              children: [
+                node("scenario", "s:tests/login.feature#1", "login works", { line: 3 }),
+                node("scenario", "s:tests/login.feature#2", "logout", { line: 8 }),
+              ],
+            }),
+          ],
+        }),
+      );
+      startRun(send);
+      send({
+        type: "scenarios",
+        updates: [{ key: "s:tests/login.feature#1", status: "failed", error: "boom" }],
+      });
+      const proof: FlakyEnv[] = [{ env: null, passed: 1, failed: 1, runs: [] }];
+      send({
+        type: "flaky",
+        tests: [
+          { key: "s:tests/login.feature#1", envs: proof },
+          { key: "s:tests/login.feature#2", envs: proof },
+        ],
+      });
+      expect(screen.getByRole("treeitem", { name: "login.feature, failed, 2 flaky, smoke" })).toBe(
+        item("f:tests/login.feature"),
+      );
+      expect(screen.getByRole("treeitem", { name: "login works, failed, flaky" })).toBe(
+        item("s:tests/login.feature#1"),
+      );
+    });
   });
 });
