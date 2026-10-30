@@ -231,7 +231,10 @@ export function VirtualList<T>(props: {
                   top: `${pad() + index() * props.rowHeight}px`,
                   height: `${props.rowHeight}px`,
                 }}
-                // A click on a button in the row lands focus on the row, so the next key moves from it.
+                // A press takes no focus: Chromium drops the click of a row that moves during its press, as
+                // the focus row moves to the front. The click then focuses the row, from a button in it too,
+                // so the next key moves from it.
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setActive(key);
                   flush(); // to the front first, then focus: a focused node that moves loses focus

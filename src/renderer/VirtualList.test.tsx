@@ -217,6 +217,21 @@ describe("VirtualList", () => {
     expect(press).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a press on a row from taking focus, so its click arrives", () => {
+    const { row, stops, press } = setup();
+    const button = row("r3")!.querySelector("button")!;
+    for (const target of [row("r3")!, button]) {
+      const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+      target.dispatchEvent(down);
+      expect(down.defaultPrevented).toBe(true);
+    }
+    fireEvent.click(button);
+    flush();
+    expect(document.activeElement).toBe(row("r3"));
+    expect(stops()).toEqual([row("r3")]);
+    expect(press).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the rows in view still when rows are added above", () => {
     const { scrollTo, change, scroller } = setup();
     scrollTo(240);
