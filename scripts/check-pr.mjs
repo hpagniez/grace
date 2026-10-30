@@ -1,4 +1,5 @@
-// Checks a PR against AGENTS.md: Conventional Commits headers (ADR 0003) and git flow branch targets.
+// Checks a PR against AGENTS.md: Conventional Commits headers (ADR 0003), git flow branch targets,
+// and a release's check of the public docs.
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
@@ -36,11 +37,33 @@ export function branchError(head, base) {
   return `${head} may not target ${base}: feature/* and dependabot/* go to develop, release/vX.Y.Z-rc.N and hotfix/vX.Y.Z-rc.N to main or develop`;
 }
 
+/**
+ * Null unless a release or hotfix PR into main lacks its packaged-app check record or the record's
+ * `## Public docs` section (AGENTS.md). `files` are the paths under docs/checks; `read` gives one's text.
+ */
+export function publicDocsError(head, base, files, read) {
+  if (base !== "main" || !VERSIONED.test(head)) return null;
+  const version = head.slice(head.indexOf("/v") + 2);
+  const record = files.find((f) => f.endsWith(`-${version}-packaged.md`));
+  if (!record) return `${head} has no docs/checks/<date>-<release|hotfix>-${version}-packaged.md`;
+  if (!/^## Public docs\s*$/m.test(read(record)))
+    return `${record} has no "## Public docs" section: check README.md and its screenshots against ${version} (AGENTS.md)`;
+  return null;
+}
+
 function main() {
   const { HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA } = process.env;
   const errors = [];
   const branch = branchError(HEAD_REF, BASE_REF);
   if (branch) errors.push(branch);
+  const git = (...args) => execFileSync("git", args, { encoding: "utf8" });
+  const docs = publicDocsError(
+    HEAD_REF,
+    BASE_REF,
+    git("ls-tree", "--name-only", HEAD_SHA, "docs/checks/").split("\n").filter(Boolean),
+    (f) => git("show", `${HEAD_SHA}:${f}`),
+  );
+  if (docs) errors.push(docs);
   // Dependabot writes its own commit headers, often over 72 characters
   if (!HEAD_REF.startsWith("dependabot/")) {
     // commits already on develop were checked in their own PR; a release PR into main carries them all
