@@ -39,6 +39,8 @@ export function VirtualList<T>(props: {
   /** Spread on the row element. */
   attrs(item: T, index: number): Record<string, string | number | undefined>;
   selectedKey: string | null;
+  /** When this value changes, the selected row scrolls into view once the rows in view are kept still (R4.7). */
+  revealSelectedOn?: unknown;
   onSelect(item: T): void;
   /** The list's own keys; true when handled. */
   onKey?(e: KeyboardEvent, item: T, index: number): boolean;
@@ -92,6 +94,10 @@ export function VirtualList<T>(props: {
     scroller.scrollTop = top;
     setScrollTop(scroller.scrollTop); // as the browser clamped it
   };
+  const reveal = (key: string) => {
+    const i = keys().indexOf(key);
+    if (i >= 0) scrollTo(scrollToShow(i, view(scroller.scrollTop)));
+  };
 
   const moveTo = (index: number) => {
     const item = props.items[index];
@@ -136,11 +142,15 @@ export function VirtualList<T>(props: {
       keys: keys(),
       top: scroller?.scrollTop ?? 0,
       holds: !!list?.contains(document.activeElement),
+      cue: props.revealSelectedOn,
     }),
     (now, before) => {
       if (!before) return;
       const top = untrack(() => anchoredScrollTop(view(now.top), before.keys, now.keys));
       if (top !== now.top) scrollTo(top);
+      // Here, not in an effect of the owner's: that would run first, and the anchoring would undo it.
+      const selected = untrack(() => props.selectedKey);
+      if (now.cue !== before.cue && selected !== null) untrack(() => reveal(selected));
       const a = untrack(active);
       if (a === null || now.keys.includes(a)) return;
       // An unfocused list falls back to the selected row, else the first (R3.1).
@@ -169,12 +179,7 @@ export function VirtualList<T>(props: {
     return () => ro.disconnect();
   });
 
-  props.ref?.({
-    reveal(key) {
-      const i = keys().indexOf(key);
-      if (i >= 0) scrollTo(scrollToShow(i, view(scroller.scrollTop)));
-    },
-  });
+  props.ref?.({ reveal });
 
   return (
     <div

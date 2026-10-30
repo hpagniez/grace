@@ -13,6 +13,7 @@ const at = (scrollTop: number) => ({ scrollTop, height: 0, rowHeight: 24, pad: 0
 function setup(n = 1000, selected: string | null = null) {
   const [items, setItems] = createSignal(keys(n));
   const [selectedKey, setSelectedKey] = createSignal(selected);
+  const [cue, setCue] = createSignal(0);
   const onSelect = vi.fn();
   const onKey = vi.fn((_e: KeyboardEvent, _item: string, _index: number) => false);
   const press = vi.fn();
@@ -31,6 +32,7 @@ function setup(n = 1000, selected: string | null = null) {
       selectedKey={selectedKey()}
       onSelect={onSelect}
       onKey={onKey}
+      revealSelectedOn={cue()}
       ref={(h) => (handle = h)}
     >
       {(k, _i, keyboardFocused) => (
@@ -68,6 +70,12 @@ function setup(n = 1000, selected: string | null = null) {
     setItems(next);
     flush();
   };
+  /** A change the person made, as a filter: the rows and the cue in one update. */
+  const filter = (next: string[]) => {
+    setItems(next);
+    setCue((c) => c + 1);
+    flush();
+  };
   return {
     scroller,
     list,
@@ -78,6 +86,7 @@ function setup(n = 1000, selected: string | null = null) {
     scrollTo,
     key,
     change,
+    filter,
     onSelect,
     onKey,
     press,
@@ -281,6 +290,18 @@ describe("VirtualList", () => {
     handle().reveal("nope");
     flush();
     expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
+  });
+
+  it("reveals the selected row after keeping the rows in view still, when revealSelectedOn changes", () => {
+    const { scrollTo, change, filter, scroller } = setup(1000, "r900");
+    scrollTo(2400); // r100 is the top row, r900 far below
+    const rest = keys(1000).slice(50);
+    filter(rest); // 50 rows leave above the view: r100 stays on top (1200), then r900 comes into view
+    expect(scroller.scrollTop).toBe(scrollToShow(850, at(1200)));
+    expect(scroller.scrollTop).toBe(19824);
+    scrollTo(0);
+    change([...rest]); // rows that change without the cue never scroll to the selection
+    expect(scroller.scrollTop).toBe(0);
   });
 
   it("tells a row when it has keyboard focus", () => {
