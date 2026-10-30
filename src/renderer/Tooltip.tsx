@@ -82,11 +82,18 @@ export function Tooltip(props: {
 
   // Only a scroll that moves the target hides the tooltip: the page, or a box that holds it. A console
   // following its tail leaves the tooltip of a disabled button alone, as a run goes on. A pinned one
-  // is the owner's to keep: it follows its target instead (a key press that scrolls the list).
+  // is the owner's to keep: it follows its target instead (a key press that scrolls the list), until
+  // the box no longer shows the target (a wheel that scrolls the focused row away).
   const onScroll = (e: Event) => {
     if (!(e.target instanceof Node && e.target.contains(wrap))) return;
-    if (props.pinned) place();
+    if (props.pinned && shows(e.target)) place();
     else hide();
+  };
+  const shows = (box: Node) => {
+    if (!(box instanceof Element)) return true; // the page
+    const b = box.getBoundingClientRect();
+    const t = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
+    return t.bottom > b.top && t.top < b.bottom && t.right > b.left && t.left < b.right;
   };
 
   // A click inside closes it, rather than being lost on it. One `over` its target lies on it: a click

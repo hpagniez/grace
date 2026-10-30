@@ -374,13 +374,16 @@ describe("Tooltip", () => {
 
     describe("placed", () => {
       let target: DOMRect;
+      let box: DOMRect | undefined; // the scrolling box's own, when a test gives it one
       let show: Mock<(this: HTMLElement) => void>;
       beforeEach(() => {
         target = DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 });
+        box = undefined;
         const tip = DOMRect.fromRect({ x: 0, y: 0, width: 24, height: 24 });
         vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
           this: Element,
         ) {
+          if (box && this.getAttribute("data-testid") === "list") return box;
           return this.getAttribute("role") === "tooltip" ? tip : target;
         });
         show = vi.fn(function (this: HTMLElement) {
@@ -419,6 +422,19 @@ describe("Tooltip", () => {
         expect(show).toHaveBeenCalledTimes(1); // placed again, not shown again
 
         set(false); // the scroll listener did not outlive the close
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("hides, though pinned, once that scroll takes its target out of the box", () => {
+        box = DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 400 });
+        pin(true, TEXT);
+        target = DOMRect.fromRect({ x: 500, y: 350, width: 24, height: 24 }); // still in the box
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tipOf()!.style.top).toBe("380px");
+        target = DOMRect.fromRect({ x: 500, y: 400, width: 24, height: 24 }); // just below it
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
         expect(tips()).toHaveLength(0);
       });
 
