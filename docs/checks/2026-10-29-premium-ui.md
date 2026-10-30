@@ -104,7 +104,7 @@ Scrolling is smooth again, idle and during a run. Run all still ends seconds aft
 
 Checks on the fixed code: `npm test` `Test Files  88 passed (88)`, `Tests  1293 passed (1293)`; `npm run typecheck` and `npm run lint` clean; `npm run e2e` `161 passed (8.2m)`.
 
-A first e2e run had `1 failed` and `160 passed (8.5m)`: `look.spec.ts` "A row's tooltip leaves the next row's run button to the pointer", with no tooltip after the first hover. Repeated, that test failed this way 2 times in 41 runs with the fix, and 1 time in 24 runs on a build without `content-visibility`. It is a flake of the hover test, not of this fix.
+A first e2e run had `1 failed` and `160 passed (8.5m)`: `look.spec.ts` "A row's tooltip leaves the next row's run button to the pointer", with no tooltip after the first hover. Repeated, that test failed this way 2 times in 41 runs with the fix, and 1 time in 24 runs on a build without `content-visibility`, so not because of this fix. An instrumented copy of the test caught the cause: the tooltip showed at 544 ms, then real mouse moves, not Playwright's, crossed the window at 613–643 ms, and their `pointerleave` closed it. This is likely also why the two earlier tooltip failures of the Automated part happened. Now `launch` in `e2e/helpers.ts` calls `setIgnoreMouseEvents(true)` on the app's window: Windows sends the real mouse to the window below (checked with `WindowFromPoint` at the window's centre: the window below with it, Grace's own without it), and Playwright's input still reaches the page. With it, the four tooltip tests and the instrumented copy passed 40 of 40 runs, and `npm run e2e` `161 passed (8.1m)`.
 
 ## Deviations from the spec decided during the build
 
