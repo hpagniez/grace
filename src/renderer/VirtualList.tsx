@@ -128,7 +128,7 @@ export function VirtualList<T>(props: {
     } else if (props.onKey?.(e, props.items[f], f)) e.preventDefault();
   };
 
-  // Rows added or removed above the view keep the rows in view still (R4.6). A focus row that left hands
+  // Rows added or removed above the view keep the rows in view still (R4.6). A focused row that left hands
   // over to the nearest row above (R4.4, R4.5). The scroll position and the focus are read before the rows
   // are redrawn: Chromium fires focusout when it removes the focused row, and clamps the scroll.
   createEffect(
@@ -143,8 +143,13 @@ export function VirtualList<T>(props: {
       if (top !== now.top) scrollTo(top);
       const a = untrack(active);
       if (a === null || now.keys.includes(a)) return;
+      // An unfocused list falls back to the selected row, else the first (R3.1).
+      if (!now.holds) {
+        setActive(null);
+        return;
+      }
       const next = survivor(a, before.keys, now.keys);
-      if (now.holds) refocus = next;
+      refocus = next;
       setActive(next);
     },
   );
