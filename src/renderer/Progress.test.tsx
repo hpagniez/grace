@@ -11,6 +11,7 @@ import { initialState, reduce } from "./reduce";
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 const leaf = (n: number): TestNode => ({
@@ -268,6 +269,28 @@ describe("the bar (R14.1)", () => {
       expect(s.className).toContain("transition-[width]");
       expect(s.className).toContain("motion-reduce:transition-none");
     }
+  });
+
+  it("gives a segment its next width only once its last transition has started (Chromium holds one beside a starting spinner)", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    const { send } = setup();
+    send(loaded(4), started(4), result(1, "passed"));
+    const [passed] = segments() as HTMLElement[];
+    expect(passed.style.width).toBe("25%");
+    let startTime: number | null = null; // waiting for the compositor to start it
+    passed.getAnimations = () => [{ startTime } as Animation];
+    send(result(2, "passed"));
+    expect(text("progress-passed")).toBe("2"); // the words do not wait
+    expect(passed.style.width).toBe("25%");
+    frames.shift()!(0);
+    flush();
+    expect(passed.style.width).toBe("25%");
+    startTime = 100;
+    frames.shift()!(16);
+    flush();
+    expect(passed.style.width).toBe("50%");
+    expect(frames).toHaveLength(0);
   });
 
   it("keeps the waiting stripe in the running colour, over the segments and still under reduced motion", () => {
