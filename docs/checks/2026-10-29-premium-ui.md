@@ -1,7 +1,7 @@
 # App check: premium look and feel (#107)
 
 Date: 2026-10-29
-Branch: `feature/premium-ui`. The code is as at 3102db7e; the commits since then only edit docs and retake screenshots.
+Branch: `feature/premium-ui`. The code is as at 3102db7e, except the merge of `develop` (#117) and the fix timed in [Large project timing](#large-project-timing) (2026-10-30); the other commits since then only edit docs and retake screenshots.
 Machine: Windows 11 Pro 10.0.26300 (x64), AMD Ryzen 7 5800X, 32 GB, NVIDIA GeForce RTX 4060 Ti, Windows in dark mode, Node 24.15.0, npm 11.16.0, Electron 45.0.0, bundled Temurin 21.0.12.1 and Karate 2.1.4.
 Spec: [Premium look and feel](../specs/2026-10-29-premium-ui.md), with the [mockup](../specs/2026-10-29-premium-ui-mockup.png) and the [plan](../plans/2026-10-29-premium-ui.md).
 
@@ -80,10 +80,37 @@ Method: `npm run make`, the zip unzipped into a folder under `out/`, `Grace.exe`
 - A person's eye on the look, in both themes, at the screen's real scale: the shots against the mockup, the first frames of a start on a slower machine, the feel of hover, press, tooltip and dialog motion.
 - The Tab walk of the update, roll back, progress and Clear history dialogs, and of the History and HTTP rows after a run.
 
+## Large project timing
+
+Date: 2026-10-30, same machine. The research of draft PR #118 found two regressions of this branch on a large project: a `rotate` on every open tree row's chevron, which every hit test must undo, and hover transitions that repaint the whole tree while it scrolls; and the HTTP tab's count walking every call twice per change. The fix: the chevron swaps `chevron-right` for `chevron-down` instead of turning, tree rows set `content-visibility: auto` so rows out of view are not painted, and the HTTP count is a memo.
+
+Method: #118's probes (`generate.mjs`, `perf.spec.ts`, `scroll.spec.ts` from `docs/research/2026-10-29-big-project-perf/` on `feature/big-project-perf`) were copied in, run against an `npm run package` build of this branch before and after the fix, on a generated project of 2,000 tests and 600 HTTP calls (2,449 tree rows, every folder open), then removed. One round each; #118 saw run times move by a few seconds between rounds.
+
+| Measure | Before | After |
+|---|---|---|
+| Scroll the tree, idle: paint (down / up) | 2.70 / 3.25 s | 0.16 / 0.16 s |
+| … hit tests (down / up) | 281 / 294 ms | 107 / 112 ms |
+| … per wheel notch, median / max | 19–23 / 48–49 ms | 14–15 / 19–20 ms |
+| Scroll during Run all: per wheel notch, median / max | 244 / 398 ms | 21 / 219 ms |
+| Expand all | 851 ms | 591 ms |
+| Select a test (median of 20) | 55 ms | 41 ms |
+| Run all, Console tab: click to "Finished" | 13.8 s | 10.3 s |
+| … Karate's last test (same clock) | 6.1 s | 6.5 s |
+| … frame rate / longest frame | 16 fps / 983 ms | 30 fps / 533 ms |
+| Run all, HTTP tab open: click to "Finished" | 26.5 s | 21.4 s |
+| … frame rate / longest frame | 11 fps / 875 ms | 17 fps / 825 ms |
+
+Scrolling is smooth again, idle and during a run. Run all still ends seconds after Karate, more so with the HTTP tab open: that cost is per-event work in the renderer that `develop` has too (one IPC message per event, the HTTP list rebuilt per change). #118 measures fixes for it and for trees of 10,000 tests; they are not part of this PR.
+
+Checks on the fixed code: `npm test` `Test Files  88 passed (88)`, `Tests  1293 passed (1293)`; `npm run typecheck` and `npm run lint` clean; `npm run e2e` `161 passed (8.2m)`.
+
+A first e2e run had `1 failed` and `160 passed (8.5m)`: `look.spec.ts` "A row's tooltip leaves the next row's run button to the pointer", with no tooltip after the first hover. Repeated, that test failed this way 2 times in 41 runs with the fix, and 1 time in 24 runs on a build without `content-visibility`. It is a flake of the hover test, not of this fix.
+
 ## Deviations from the spec decided during the build
 
 - The two themes have one structure and differ only in colours (the person, after seeing the built app): the dark theme has the light theme's inset, rounded sheet with its side borders and Home on `ground`, instead of flush panels and Home on `surface`. The dark block of `src/index.css` may override only colour tokens, shadows and the backdrop, and `tokens.test.ts` fails on anything else (R1.2, R3.3, R12.1). The floating shadow has the same offsets and blur in both themes too (R3.5).
 - The primary buttons are the progress bar's passed green, not near-black (the person, after seeing the built app): `#1b7a4c` with white text in light, `#3fcf6e` with ink text in dark. New tokens `primary`, `on-primary` and `primary-hover` replace the `accent` fill, `accent-hover` and `play`; `accent` stays for the tab line, the selection bar, the included tag chip and the splitter (R1.3, R13.2).
+- The tree's chevron swaps `chevron-right` for `chevron-down` instead of turning 90°, and tree rows set `content-visibility: auto`: on 2,000 tests the turn and the repaint of rows out of view made scrolling stutter (see [Large project timing](#large-project-timing); R4.5, R5.2). The step log's chevron still turns.
 - Tags in tree rows are 20 px chips, not 24 px: 24 px bordered chips in 24 px rows with no gap touched the rows above and below (R15.1, R16.1).
 - The toolbar shows icons only below 1280 px (the buttons keep their accessible names and a tooltip), and the window's minimum width is 760 px so Run all and Cancel stay on screen. The default 1200 px window is therefore icon-only (R13).
 - "Not run yet" shows only when the project has no run history (R14.3).
