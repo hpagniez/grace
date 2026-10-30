@@ -1,0 +1,190 @@
+diff --git a/src/main.ts b/src/main.ts
+index f6c45cae..e9fc4066 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -84,10 +84,16 @@ app.on("second-instance", () => {
+   win.focus();
+ });
+ 
++let queued: AppEvent[] = [];
+ const emit = (e: AppEvent) => {
+-  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+-    win.webContents.send(CH.event, e);
+-  }
++  if (queued.push(e) > 1) return;
++  setImmediate(() => {
++    const events = queued;
++    queued = [];
++    if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
++      win.webContents.send(CH.event, events);
++    }
++  });
+ };
+ 
+ const createWindow = (dataDir: string) => {
+diff --git a/src/preload.ts b/src/preload.ts
+index cc0e30bd..72d85fa5 100644
+--- a/src/preload.ts
++++ b/src/preload.ts
+@@ -30,7 +30,9 @@ const api: Api = {
+   getAppearance: () => ipcRenderer.invoke(CH.getAppearance),
+   setAppearance: (theme) => ipcRenderer.invoke(CH.setAppearance, theme),
+   onEvent: (cb) => {
+-    const listener = (_: unknown, e: AppEvent) => cb(e);
++    const listener = (_: unknown, events: AppEvent[]) => {
++      for (const e of events) cb(e);
++    };
+     ipcRenderer.on(CH.event, listener);
+     return () => ipcRenderer.removeListener(CH.event, listener);
+   },
+diff --git a/src/renderer/BottomPanel.tsx b/src/renderer/BottomPanel.tsx
+index c0148070..be620e81 100644
+--- a/src/renderer/BottomPanel.tsx
++++ b/src/renderer/BottomPanel.tsx
+@@ -1,11 +1,11 @@
+ import { Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
+-import { Match, Show, Switch } from "solid-js";
++import { createMemo, Match, Show, Switch } from "solid-js";
+ import type { HttpGroup } from "../shared/http";
+ import type { Api } from "../shared/ipc";
+ import { Banner } from "./Banner";
+ import { Console } from "./Console";
+ import { ClearHistory, History } from "./History";
+-import { narrowedCalls, shownCalls, type CallRef } from "./http";
++import { callsOf, scopeTests, shownCalls, type CallRef } from "./http";
+ import { HttpCalls } from "./HttpCalls";
+ import { Icon } from "./Icon";
+ import { Splitter } from "./Splitter";
+@@ -64,6 +64,9 @@ export function BottomPanel(props: {
+   setDragging: (on: boolean) => void;
+ }) {
+   const panel = () => props.state.panel;
++  const scope = createMemo(() => scopeTests(props.state));
++  const narrowed = createMemo(() => callsOf(scope(), props.state.calls));
++  const httpCount = createMemo(() => shownCalls(narrowed(), props.state.httpGroups).length);
+   let section: HTMLElement | undefined;
+   return (
+     <section
+@@ -103,7 +106,7 @@ export function BottomPanel(props: {
+             id="http"
+             icon={Globe}
+             label="HTTP"
+-            count={shownCalls(narrowedCalls(props.state), props.state.httpGroups).length}
++            count={httpCount()}
+             active={panel() === "http"}
+             show={() => props.showPanel("http")}
+           />
+@@ -127,6 +130,7 @@ export function BottomPanel(props: {
+           <Match when={panel() === "http"}>
+             <HttpCalls
+               state={props.state}
++              narrowed={narrowed()}
+               selectCall={props.selectCall}
+               toggleGroup={props.toggleGroup}
+             />
+diff --git a/src/renderer/HttpCalls.tsx b/src/renderer/HttpCalls.tsx
+index 26478adb..f68c102b 100644
+--- a/src/renderer/HttpCalls.tsx
++++ b/src/renderer/HttpCalls.tsx
+@@ -3,7 +3,6 @@ import { createMemo, For, Show } from "solid-js";
+ import { HTTP_GROUPS, httpGroup, type HttpGroup } from "../shared/http";
+ import {
+   groupCounts,
+-  narrowedCalls,
+   shownCalls,
+   totalCalls,
+   type CallRef,
+@@ -121,10 +120,11 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
+ /** The HTTP tab: status-group chips over one row per call of the tests under the tree selection. */
+ export function HttpCalls(props: {
+   state: AppState;
++  narrowed: ListedCall[];
+   selectCall(ref: CallRef): void;
+   toggleGroup(g: HttpGroup | "all"): void;
+ }) {
+-  const narrowed = createMemo(() => narrowedCalls(props.state));
++  const narrowed = () => props.narrowed;
+   const counts = createMemo(() => groupCounts(narrowed()));
+   const shown = createMemo(() => shownCalls(narrowed(), props.state.httpGroups));
+   const pressed = (g: HttpGroup | "all") =>
+diff --git a/src/renderer/Tree.tsx b/src/renderer/Tree.tsx
+index 16aef94f..727fa267 100644
+--- a/src/renderer/Tree.tsx
++++ b/src/renderer/Tree.tsx
+@@ -1,4 +1,5 @@
+ import {
++  ChevronDown,
+   ChevronRight,
+   FileSearch,
+   FileText,
+@@ -77,7 +78,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
+           data-kind={props.node.kind}
+           data-match={match() ? "true" : "false"}
+           // A non-matching row is muted, not faded (R15.2): its status mark too, which sets its own colour.
+-          class={`group flex h-6 items-center gap-1 rounded-sm pr-1 ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
++          class={`group flex h-6 items-center gap-1 rounded-sm pr-1 [content-visibility:auto] [contain-intrinsic-size:auto_1.5rem] ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
+         >
+           <button
+             type="button"
+@@ -85,11 +86,7 @@ function Node(props: { node: TestNode; ctx: Ctx }) {
+             aria-label={`${open() ? "Collapse" : "Expand"} ${label()}`}
+             onClick={() => setOpen(!open())}
+           >
+-            <Icon
+-              icon={ChevronRight}
+-              size={14}
+-              class={`transition-transform duration-(--duration-base) ease-standard ${open() ? "rotate-90" : ""}`}
+-            />
++            <Icon icon={open() ? ChevronDown : ChevronRight} size={14} />
+           </button>
+           <Tooltip text={STATUS_LABEL[status()]} side="right">
+             <StatusMark status={status()} />
+diff --git a/src/renderer/http.ts b/src/renderer/http.ts
+index fb3feeeb..8c417070 100644
+--- a/src/renderer/http.ts
++++ b/src/renderer/http.ts
+@@ -15,21 +15,33 @@ export interface ListedCall {
+   test: TestNode;
+ }
+ 
+-/** The calls of the tests under the tree selection (all of them with none), in run order. */
+-export function narrowedCalls(s: Pick<AppState, "tree" | "selected" | "calls">): ListedCall[] {
++/** The tests under the tree selection (all of them with none). */
++export function scopeTests(s: Pick<AppState, "tree" | "selected">): TestNode[] {
+   if (!s.tree) return [];
+-  const scope = (s.selected && findNode(s.tree, s.selected)) || s.tree;
+-  return leaves(scope)
+-    .flatMap((test) =>
+-      (s.calls[test.key] ?? []).map((call, index) => ({
+-        ref: { key: test.key, index },
+-        call,
+-        test,
+-      })),
+-    )
++  return leaves((s.selected && findNode(s.tree, s.selected)) || s.tree);
++}
++
++const listed = new WeakMap<HttpCall[], ListedCall[]>();
++
++/** The calls of these tests, in run order. */
++export function callsOf(tests: TestNode[], calls: AppState["calls"]): ListedCall[] {
++  return tests
++    .flatMap((test) => {
++      const list = calls[test.key];
++      if (!list) return [];
++      let l = listed.get(list);
++      if (!l)
++        listed.set(list, (l = list.map((call, index) => ({ ref: { key: test.key, index }, call, test }))));
++      return l;
++    })
+     .sort((a, b) => a.call.startTime - b.call.startTime); // stable: log order breaks ties
+ }
+ 
++/** The calls of the tests under the tree selection (all of them with none), in run order. */
++export function narrowedCalls(s: Pick<AppState, "tree" | "selected" | "calls">): ListedCall[] {
++  return callsOf(scopeTests(s), s.calls);
++}
++
+ export function groupCounts(list: ListedCall[]): Record<HttpGroup | "all", number> {
+   const counts = { all: list.length, "1xx": 0, "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, none: 0 };
+   for (const { call } of list) {
