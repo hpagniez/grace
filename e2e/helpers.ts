@@ -125,6 +125,16 @@ export async function launchWithSettings(
 export const settingsOf = (userData: string): Record<string, unknown> =>
   JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8"));
 
+/** Sets the window to its default 1200 × 800, which Windows fits to a smaller screen (1024 × 768 on CI). */
+export async function defaultWindow(app: ElectronApplication, win: Page): Promise<void> {
+  const inner = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(1200, 800);
+    return w.getContentSize();
+  });
+  await expect.poll(() => win.evaluate(() => [innerWidth, innerHeight])).toEqual(inner);
+}
+
 /** Makes the folder picker return `dir`, then clicks Open. */
 export async function openProject(app: ElectronApplication, dir: string): Promise<void> {
   await app.evaluate(({ dialog }, d) => {
