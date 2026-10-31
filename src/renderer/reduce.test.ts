@@ -223,7 +223,7 @@ describe("reduce", () => {
     s.statuses["gone"] = "failed";
     s.results["gone"] = { durationMillis: 1 };
     s.steps["gone"] = [];
-    s.notice = "x";
+    s.notice = { text: "x", success: false };
     apply(s, project());
     expect(s.statuses[keys[0]]).toBe("passed");
     expect(s.statuses["gone"]).toBeUndefined();
@@ -452,10 +452,12 @@ describe("reduce", () => {
     expect(s.busy).toBe(false);
   });
 
-  it("notice sets the notice", () => {
+  it("notice sets the notice, a warning unless main says it reports a success", () => {
     const s = initialState();
     apply(s, { type: "notice", message: "hi" });
-    expect(s.notice).toBe("hi");
+    expect(s.notice).toEqual({ text: "hi", success: false });
+    apply(s, { type: "notice", message: "Updated to 1.0.0-rc.8.", success: true });
+    expect(s.notice).toEqual({ text: "Updated to 1.0.0-rc.8.", success: true });
   });
 
   describe("home screen", () => {

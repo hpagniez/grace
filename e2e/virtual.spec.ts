@@ -1,7 +1,16 @@
 // Virtual lists (spec 2026-10-30-virtual-lists): what only a real browser can show, on a generated project
 // of 2,000 tests. Rows, keys and ARIA are checked by unit tests.
 import type { Page } from "@playwright/test";
-import { bigProject, expect, launch, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  bigProject,
+  defaultWindow,
+  expect,
+  launch,
+  nodeByKey,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 const ROW = 24; // px, a tree row
 const PAD = 8; // px before the first row and after the last
@@ -21,6 +30,7 @@ const BEFORE_CUT = "s:tests/area-1/module-1/feature-2.feature#3"; // a short nam
 async function openBig() {
   const dir = bigProject();
   const { app, win } = await launch();
+  await defaultWindow(app, win); // the rows these tests use are drawn only while in view
   await openProject(app, dir);
   await expect(tree(win)).toHaveAttribute("data-rows", String(ROWS), { timeout: 60_000 });
   return { app, win };

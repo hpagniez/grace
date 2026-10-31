@@ -82,11 +82,13 @@ export const emptyProject = () => tempDir("kk-empty-");
  * Playwright emulates light unless told otherwise: `colorScheme: null` turns the emulation off, so the
  * page follows `nativeTheme` (the Appearance tests).
  * Its update check reads an empty feed, never GitHub, unless `extraEnv` gives `GRACE_UPDATE_FEED`.
+ * On a machine with more than one screen, the window opens centred on one that is not the main one,
+ * out of the way of someone working there, unless `primaryScreen` keeps it where the app put it.
  */
 export async function launch(
   userDataDir?: string,
   extraEnv: Record<string, string> = {},
-  opts: { colorScheme?: "light" | "dark" | null } = {},
+  opts: { colorScheme?: "light" | "dark" | null; primaryScreen?: boolean } = {},
 ): Promise<{ app: ElectronApplication; win: Page; userData: string }> {
   const userData = userDataDir ?? tempDir("kk-userdata-");
   const noFeed = path.join(tempDir("kk-feed-"), "releases.json");
@@ -101,9 +103,21 @@ export async function launch(
   // The real mouse of someone using the machine would reach the window between Playwright's moves and
   // end a hover (a tooltip test then fails). Windows passes it through to what lies below; Playwright's
   // input goes to the page directly and still arrives.
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) w.setIgnoreMouseEvents(true);
-  });
+  await app.evaluate(({ BrowserWindow, screen }, move) => {
+    // the app shows its window once painted: moved now, it first appears on the other screen
+    const other = screen.getAllDisplays().find((d) => d.id !== screen.getPrimaryDisplay().id);
+    for (const w of BrowserWindow.getAllWindows()) {
+      w.setIgnoreMouseEvents(true);
+      if (move && other) {
+        const { width, height } = w.getBounds();
+        const a = other.workArea;
+        w.setPosition(
+          a.x + Math.max(0, Math.round((a.width - width) / 2)),
+          a.y + Math.max(0, Math.round((a.height - height) / 2)),
+        );
+      }
+    }
+  }, !opts.primaryScreen);
   return { app, win, userData };
 }
 
@@ -124,6 +138,16 @@ export async function launchWithSettings(
 /** The parsed settings.json of an app data folder. */
 export const settingsOf = (userData: string): Record<string, unknown> =>
   JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8"));
+
+/** Sets the window to its default 1200 × 800, which Windows fits to a smaller screen (1024 × 768 on CI). */
+export async function defaultWindow(app: ElectronApplication, win: Page): Promise<void> {
+  const inner = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(1200, 800);
+    return w.getContentSize();
+  });
+  await expect.poll(() => win.evaluate(() => [innerWidth, innerHeight])).toEqual(inner);
+}
 
 /** Makes the folder picker return `dir`, then clicks Open. */
 export async function openProject(app: ElectronApplication, dir: string): Promise<void> {
