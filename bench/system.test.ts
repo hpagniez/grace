@@ -1,7 +1,9 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import {
   cpuLoad,
@@ -56,6 +58,29 @@ const fake = (values: number[]) => {
   let i = 0;
   return async () => values[Math.min(i++, values.length - 1)];
 };
+
+/** The id of a process that has just exited. */
+async function deadPid() {
+  const proc = spawn(process.execPath, ["-e", "0"], { stdio: "ignore" });
+  await once(proc, "exit");
+  return proc.pid!;
+}
+
+/** Ends the PowerShell that `startSampler(rootPid)` runs: the one whose script walks the tree from `rootPid`. */
+function killSampler(rootPid: number) {
+  execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -Property ProcessId, CommandLine |
+  Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*ids.Add(${rootPid})*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`,
+    ],
+    { stdio: "ignore" },
+  );
+}
 
 /** A copy of a small console program under the name `conhost.exe`, so a conhost sits in the tree without any Java. */
 function fakeConhost(dir: string) {
@@ -123,6 +148,10 @@ describe("sample", () => {
     },
   );
 
+  it("rejects for a process that is not running, not zeros", { timeout: SLOW }, async () => {
+    await expect(sample(await deadPid())).rejects.toThrow(/is not running/);
+  });
+
   it("counts a conhost.exe that is not under a java.exe as app", { timeout: SLOW }, async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "bench-system-"));
     const child = await holder(fakeConhost(dir));
@@ -147,6 +176,27 @@ describe("startSampler", () => {
       kill(child);
     }
   });
+
+  it("rejects for a process that is not running, not a peak of 0", { timeout: SLOW }, async () => {
+    await expect(startSampler(await deadPid(), 100).stop()).rejects.toThrow(/is not running/);
+  });
+
+  it(
+    "rejects when its PowerShell died, not an under-reported peak",
+    { timeout: SLOW },
+    async () => {
+      const child = await holder();
+      try {
+        const sampler = startSampler(child.pid!, 100);
+        await sleep(3000); // usually long enough for a few samples; if not, the sampler dies before its first
+        killSampler(child.pid!);
+        await sleep(500); // for Node to see the exit
+        await expect(sampler.stop()).rejects.toThrow(/the sampler died/);
+      } finally {
+        kill(child);
+      }
+    },
+  );
 });
 
 describe("waitForQuiet", () => {

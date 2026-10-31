@@ -78,23 +78,38 @@ export function splitTree(procs) {
   return { app: usage(sums.app), java: usage(sums.java) };
 }
 
-/** @returns {Sample} */
-const parse = (line) => splitTree([JSON.parse(line)].flat());
+/**
+ * The sample in one `Measure-Tree` line, or null when `rootPid` is not in it: the process is gone, and zeros would
+ * read as a tree that uses no memory.
+ * @param {string} line
+ * @param {number} rootPid
+ * @returns {Sample | null}
+ */
+function parse(line, rootPid) {
+  const procs = [JSON.parse(line)].flat();
+  return procs.some((p) => p.id === rootPid) ? splitTree(procs) : null;
+}
 
 /**
  * Private working set (MB of 10^6 bytes) and CPU time (kernel plus user, ms) of the process tree under `rootPid`.
+ * Rejects when `rootPid` is not running.
  * @param {number} rootPid
  * @returns {Promise<Sample>}
  */
 export async function sample(rootPid) {
-  return parse(
-    await powershell(`$ErrorActionPreference = 'Stop'\n${treeScript(rootPid)}\nMeasure-Tree`),
+  const out = await powershell(
+    `$ErrorActionPreference = 'Stop'\n${treeScript(rootPid)}\nMeasure-Tree`,
   );
+  const s = parse(out, rootPid);
+  if (!s) throw new Error(`process ${rootPid} is not running`);
+  return s;
 }
 
 /**
  * Samples the tree under `rootPid` every `everyMs` from one PowerShell loop. `stop()` ends the loop, waiting for the
- * first sample if none came yet, and gives the peak private memory seen; it rejects when none comes in a minute.
+ * first sample if none came yet, and gives the peak private memory seen. It rejects, rather than give a peak that
+ * under-reports, when `rootPid` was not running at the first sample, no sample came in a minute, or the sampler's
+ * PowerShell died before `stop()`. A root that exits later just ends the samples: the peaks so far stand.
  * @param {number} rootPid
  * @param {number} [everyMs]
  * @returns {{ stop(): Promise<{ appPeakMB: number, javaPeakMB: number }> }}
@@ -137,17 +152,25 @@ while ($true) {
 
   let appPeakMB = 0;
   let javaPeakMB = 0;
+  let sampled = false;
   readline.createInterface({ input: ps.stdout }).on("line", (line) => {
-    const { app, java } = parse(line);
-    appPeakMB = Math.max(appPeakMB, app.privateMB);
-    javaPeakMB = Math.max(javaPeakMB, java.privateMB);
+    const s = parse(line, rootPid);
+    if (!s) {
+      if (!sampled) fail(new Error(`process ${rootPid} is not running`));
+      return;
+    }
+    appPeakMB = Math.max(appPeakMB, s.app.privateMB);
+    javaPeakMB = Math.max(javaPeakMB, s.java.privateMB);
+    sampled = true;
     clearTimeout(late);
     first.resolve();
   });
 
   return {
     async stop() {
+      const died = ps.exitCode !== null || ps.signalCode !== null;
       try {
+        if (died) throw new Error("the sampler died");
         await first.promise;
       } finally {
         ps.kill();
