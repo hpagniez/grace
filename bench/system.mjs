@@ -10,8 +10,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
 /** @typedef {{ privateMB: number, cpuMs: number }} Usage */
-/** @typedef {{ app: Usage, java: Usage }} Sample `java.exe` and its `conhost.exe` are `java`, everything else is `app`. */
+/** @typedef {{ app: Usage, java: Usage }} Sample `java.exe` and the `conhost.exe` under it are `java`, everything else is `app`. */
+/** @typedef {{ id: number, parent: number, name: string, bytes: number, cpu: number }} Proc One process: its private working set in bytes and its CPU time in 100 ns ticks. */
 
+const JAVA = /^java\.exe$/i;
+const CONHOST = /^conhost\.exe$/i;
 const PS_FLAGS = ["-NoProfile", "-NonInteractive", "-Command"];
 const execFileAsync = promisify(execFile);
 /** A cold PowerShell and its first CIM call take seconds on a loaded machine. */
@@ -32,7 +35,7 @@ async function powershell(script) {
   }
 }
 
-/** PowerShell that defines `Measure-Tree`: one JSON line, bytes and 100 ns ticks, for the tree under `rootPid`. */
+/** PowerShell that defines `Measure-Tree`: one JSON line, the processes of the tree under `rootPid` (a `Proc` each). */
 function treeScript(rootPid) {
   if (!Number.isInteger(rootPid)) throw new TypeError(`not a process id: ${rootPid}`);
   return `
@@ -44,27 +47,39 @@ function Measure-Tree {
   $private = @{}
   Get-CimInstance Win32_PerfRawData_PerfProc_Process -Filter (($ids | ForEach-Object { "IDProcess=$_" }) -join ' OR ') -Property IDProcess, WorkingSetPrivate |
     ForEach-Object { $private[[int]$_.IDProcess] = [long]$_.WorkingSetPrivate }
-  $sum = @{ app = @{ bytes = 0L; cpu = 0L }; java = @{ bytes = 0L; cpu = 0L } }
-  foreach ($p in $all) {
-    if (-not $ids.Contains([int]$p.ProcessId)) { continue }
-    $side = if ($p.Name -match '^(java|conhost)\\.exe$') { 'java' } else { 'app' }
-    $sum[$side].bytes += [long]$private[[int]$p.ProcessId]
-    $sum[$side].cpu += [long]($p.KernelModeTime + $p.UserModeTime)
-  }
-  ConvertTo-Json -Compress $sum
+  $tree = @($all | Where-Object { $ids.Contains([int]$_.ProcessId) } | ForEach-Object {
+    [pscustomobject]@{ id = [int]$_.ProcessId; parent = [int]$_.ParentProcessId; name = $_.Name; bytes = [long]$private[[int]$_.ProcessId]; cpu = [long]($_.KernelModeTime + $_.UserModeTime) }
+  })
+  ConvertTo-Json -Compress -InputObject $tree
 }
 `;
 }
 
-/** @returns {Sample} */
-function parse(line) {
-  const side = ({ bytes, cpu }) => ({
+/**
+ * Splits a process tree into the Java side and the app side. `java.exe` is Java, and so is a `conhost.exe` whose parent
+ * is a `java.exe` of the tree: Windows gives a console process a conhost, and only Java's belongs to Java. Any other
+ * conhost, such as one under a console tool the app started, is the app's.
+ * @param {Proc[]} procs
+ * @returns {Sample}
+ */
+export function splitTree(procs) {
+  const javaIds = new Set(procs.filter((p) => JAVA.test(p.name)).map((p) => p.id));
+  const sums = { app: { bytes: 0, cpu: 0 }, java: { bytes: 0, cpu: 0 } };
+  for (const p of procs) {
+    const isJava = javaIds.has(p.id) || (CONHOST.test(p.name) && javaIds.has(p.parent));
+    const sum = isJava ? sums.java : sums.app;
+    sum.bytes += p.bytes;
+    sum.cpu += p.cpu;
+  }
+  const usage = ({ bytes, cpu }) => ({
     privateMB: Math.round(bytes / 1e5) / 10,
     cpuMs: Math.round(cpu / 1e4),
   });
-  const { app, java } = JSON.parse(line);
-  return { app: side(app), java: side(java) };
+  return { app: usage(sums.app), java: usage(sums.java) };
 }
+
+/** @returns {Sample} */
+const parse = (line) => splitTree([JSON.parse(line)].flat());
 
 /**
  * Private working set (MB of 10^6 bytes) and CPU time (kernel plus user, ms) of the process tree under `rootPid`.
