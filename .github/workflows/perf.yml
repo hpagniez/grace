@@ -28,11 +28,11 @@ jobs:
       run:
         shell: bash
     steps:
-      # the bench always runs from head/: base/ has no bench code, and only its packaged exe is driven
+      # head/ is what test.yml builds: the PR merged into its base (refs/pull/N/merge), or the dispatched ref. Base against
+      # it measures only this PR's change. The bench always runs from head/: base/ has no bench code, and only its exe is driven.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: head
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,15 +75,20 @@ jobs:
           npm ci
           npm run vendor
           npm run package
+      # the labels name the PR's head commit (what merge-when-green keys on), not the merge commit that was built
       - id: sha
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          echo "base=$(git -C base rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
-          echo "head=$(git -C head rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          base=$(git -C base rev-parse --short=7 HEAD)
+          if [ -n "$PR_HEAD" ]; then head="head ${PR_HEAD:0:7} on $base"; else head="head $(git -C head rev-parse --short=7 HEAD)"; fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
       - name: bench
         working-directory: head
         run: >-
           node bench/bench.mjs --a ../base/out/Grace-win32-x64/Grace.exe
-          --label-a "base ${{ steps.sha.outputs.base }}" --label-b "head ${{ steps.sha.outputs.head }}" --out bench-out
+          --label-a "base ${{ steps.sha.outputs.base }}" --label-b "${{ steps.sha.outputs.head }}" --out bench-out
       # a bench that measured but could not stop an app exits 1 after writing the table: still show it
       - name: summary
         if: ${{ !cancelled() && hashFiles('head/bench-out/bench.md') != '' }}
