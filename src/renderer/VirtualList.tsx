@@ -38,6 +38,8 @@ export function VirtualList<T, S = undefined>(props: {
   scrollerTestid?: string;
   /** On every row element. */
   itemClass?: string;
+  /** Px from the left of a row element, so its focus ring starts where its content does (a tree's level). */
+  indent?(item: T): number;
   /**
    * Made once per drawn row, in the row's scope, and handed to `attrs` and `children`: memos both read are
    * worked out once, and `attrs`, which runs again on every move of the focus or the selection, stays cheap.
@@ -253,7 +255,7 @@ export function VirtualList<T, S = undefined>(props: {
                 class={props.itemClass}
                 style={{
                   position: "absolute",
-                  left: "0",
+                  left: `${props.indent?.(item()) ?? 0}px`,
                   right: "0",
                   top: `${pad() + index() * props.rowHeight}px`,
                   height: `${props.rowHeight}px`,

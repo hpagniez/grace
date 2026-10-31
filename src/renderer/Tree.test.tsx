@@ -894,17 +894,11 @@ describe("virtual tree", () => {
         "s:tests/outline.feature#1.1",
         "s:tests/outline.feature#1.2",
       ]);
-      // 16 px per level, as the nested lists gave
-      expect(shown().map((k) => rowByKey(k).style.marginLeft)).toEqual([
-        "0px",
-        "16px",
-        "32px",
-        "32px",
-        "16px",
-        "32px",
-        "48px",
-        "48px",
-      ]);
+      // 16 px per level, as the nested lists gave, on the treeitem: its focus ring starts where the fill does
+      expect(shown().map((k) => rowByKey(k).style.marginLeft)).toEqual(Array(8).fill(""));
+      expect(
+        shown().map((k) => rowByKey(k).closest<HTMLElement>("[role=treeitem]")!.style.left),
+      ).toEqual(["0px", "16px", "32px", "32px", "16px", "32px", "48px", "48px"]);
       expect(items().every((r) => r.style.height === "24px")).toBe(true);
       send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: true } });
       expect(shown()).toEqual(["d:tests", "f:tests/basic.feature", "s:tests/basic.feature#1"]);

@@ -57,7 +57,6 @@ const flakyChip = (n: TestNode, flaky: AppState["flaky"]) => {
 /** What a tree row draws; the list around it makes it a treeitem, named from the same status and flaky chip. */
 function Row(props: {
   node: TestNode;
-  level: number;
   open: boolean;
   toggle(): void;
   keyboardFocused: boolean;
@@ -98,7 +97,6 @@ function Row(props: {
       data-match={match() ? "true" : "false"}
       // A non-matching row is muted, not faded (R15.2): its status mark too, which sets its own colour.
       class={`group flex h-6 items-center gap-1 rounded-sm pr-1 ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
-      style={{ "margin-left": `${(props.level - 1) * 16}px` }}
     >
       <button
         type="button"
@@ -234,6 +232,7 @@ export function Tree(props: Ctx) {
           label="Tests"
           testid="tree"
           itemClass={ITEM}
+          indent={(row) => (row.level - 1) * 16}
           // Each walks the row's subtree: once per change for the row and its name, not on every attrs run.
           shared={(r) => ({
             status: createMemo(() => deriveStatus(r().node, props.state.statuses)),
@@ -262,7 +261,6 @@ export function Tree(props: Ctx) {
           {(r, _index, keyboardFocused, row) => (
             <Row
               node={r.node}
-              level={r.level}
               open={!closed().has(r.node.key)}
               toggle={() => toggle(r.node.key)}
               keyboardFocused={keyboardFocused()}
