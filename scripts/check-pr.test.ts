@@ -131,14 +131,25 @@ describe("limitRaiseError", () => {
   });
 });
 
-/** A bench report in the shape bench/judge.mjs documents, with build b's idle memory at `memory` MB. */
-const bench = (memory: number, mode = "release") =>
+/**
+ * A release bench report in the shape bench/judge.mjs documents: build b's idle memory at `memory` MB against
+ * build a's at `base`, after a warm-up and `rounds` rounds of each.
+ */
+const bench = (memory: number, { mode = "release", a = true, base = 80, rounds = 5 } = {}) =>
   JSON.stringify({
     mode,
     machine: "test",
-    builds: { a: null, b: { label: "b", exe: "b.exe" } },
-    rounds: [],
-    medians: { a: null, b: { "idle.memory": memory } },
+    screen: "test",
+    builds: { a: a ? { label: "a", exe: "a.exe" } : null, b: { label: "b", exe: "b.exe" } },
+    rounds: [true, ...Array(rounds).fill(false)].flatMap((warmup) =>
+      ["a", "b"].map((build) => ({
+        build,
+        warmup,
+        load: 10,
+        values: { "idle.memory": build === "b" ? memory : base },
+      })),
+    ),
+    medians: { a: a ? { "idle.memory": base } : null, b: { "idle.memory": memory } },
   });
 
 /** A release check record whose Performance section holds `lines`. */
@@ -203,9 +214,24 @@ describe("performanceError", () => {
   });
 
   it("rejects a PR-mode report, which judges no machine limit", () => {
-    expect(check(performance("Result: pass"), bench(999, "pr"))).toBe(
+    expect(check(performance("Result: pass"), bench(999, { mode: "pr" }))).toBe(
       `${json} is a pr-mode report: run the bench with --release`,
     );
+  });
+
+  it("rejects a report with no previous release to compare with", () => {
+    expect(check(performance("Result: pass"), bench(80, { a: false }))).toBe(
+      `${json} compares with no previous release: run the release bench with --a <previous release exe>`,
+    );
+    const noMedians = { ...JSON.parse(bench(80)), medians: { a: null, b: { "idle.memory": 80 } } };
+    expect(check(performance("Result: pass"), JSON.stringify(noMedians))).toContain("--a");
+  });
+
+  it("rejects a report with fewer than 5 rounds of the release build", () => {
+    expect(check(performance("Result: pass"), bench(80, { rounds: 4 }))).toBe(
+      `${json} has 4 rounds of the release build after the warm-up, not 5: run the release bench without --rounds`,
+    );
+    expect(check(performance("Result: pass"), bench(80, { rounds: 6 }))).toBeNull();
   });
 
   it("names the bench JSON when it is not valid JSON", () => {
@@ -222,7 +248,8 @@ describe("performanceError", () => {
 
   it("judges against no limits when the head has no limits file", () => {
     const md = performance("Result: pass");
-    const read = (f: string) => (f === record ? md : bench(999));
+    // 999 MB, as much as the previous release: over the 95 MB of limits(95), not worse than a
+    const read = (f: string) => (f === record ? md : bench(999, { base: 999 }));
     expect(performanceError(release, "main", [record, json], read, null)).toBeNull();
   });
 });

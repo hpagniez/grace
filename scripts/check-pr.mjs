@@ -70,8 +70,9 @@ export function limitRaiseError(base, head, added) {
 
 /**
  * Null unless a release or hotfix PR into main lacks the `## Performance` section of its check record, the
- * bench JSON beside it (`<record name>.bench.json`), or a `Result:` line that agrees with that JSON judged
- * against `limits` (the text of bench/limits.json, null when missing). A miss also needs `Decision: go`.
+ * bench JSON beside it (`<record name>.bench.json`: release mode, against a previous release, 5 rounds), or a
+ * `Result:` line that agrees with that JSON judged against `limits` (the text of bench/limits.json, null when
+ * missing). A miss also needs `Decision: go`.
  * `files` are the paths under docs/checks; `read` gives one's text.
  */
 export function performanceError(head, base, files, read, limits) {
@@ -96,6 +97,12 @@ export function performanceError(head, base, files, read, limits) {
   // a PR-mode report judges no machine limit, so it would pass nearly whatever it measured
   if (report?.mode !== "release")
     return `${json} is a ${report?.mode}-mode report: run the bench with --release`;
+  // with no build a, nothing can read "worse": only the limits would judge the release
+  if (!report.builds?.a || !report.medians?.a)
+    return `${json} compares with no previous release: run the release bench with --a <previous release exe>`;
+  const rounds = (report.rounds ?? []).filter((r) => r.build === "b" && !r.warmup).length;
+  if (rounds < 5)
+    return `${json} has ${rounds} rounds of the release build after the warm-up, not 5: run the release bench without --rounds`;
   let limitsFile;
   try {
     limitsFile = JSON.parse(limits ?? '{"machine":"","commit":"","measures":{}}');
