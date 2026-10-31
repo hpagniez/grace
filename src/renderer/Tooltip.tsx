@@ -120,9 +120,10 @@ export function Tooltip(props: {
     setOpen(false);
   };
 
-  const show = () => {
+  // `text` read anew, not kept in a memo: a cut is measured when the tooltip would show (Cut, the tree).
+  const show = (text = props.text) => {
     clearTimeout(timer);
-    if (shown || !props.text) return;
+    if (shown || !text) return;
     openTip?.();
     openTip = hide;
     shown = true;
@@ -169,10 +170,11 @@ export function Tooltip(props: {
   );
   onCleanup(hide);
 
-  // The owner opens it: a virtual row keeps the focus itself, so the target never gets a focusin.
+  // The owner opens it: a virtual row keeps the focus itself, so the target never gets a focusin. The
+  // text is read in the compute: a ternary `text` makes a memo, which the callback may not create.
   createEffect(
-    () => !!props.pinned && !!props.text,
-    (on) => (on ? show() : hide()),
+    () => (props.pinned ? props.text : undefined),
+    (text) => (text ? show(text) : hide()),
   );
 
   return (

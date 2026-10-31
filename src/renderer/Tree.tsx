@@ -85,9 +85,8 @@ function Row(props: {
   let labelEl: HTMLButtonElement | undefined;
   const cut = () => !!labelEl && labelEl.scrollWidth > labelEl.clientWidth;
   const full = () => (title() ? `${label()} · ${title()}` : label());
-  // Getters, not a ternary in the prop: the compiler makes that a memo, which the tooltip's pinned
-  // effect may not create.
-  const tip = () => (cut() ? full() : undefined);
+  // A getter, not `&&` in the prop: the compiler makes that a new memo on every read, and the tooltip
+  // reads `pinned` on every scroll.
   const pinned = () => props.keyboardFocused && cut();
   // The buttons are out of the tab order: the row is the tab stop, its keys reach them (R3.2).
   return (
@@ -118,7 +117,12 @@ function Row(props: {
         <Icon icon={kindIcon()!} size={14} class="text-muted" />
       </Show>
       {/* A keyboard user reads a cut label as a mouse user does (R4.10). */}
-      <Tooltip text={tip()} class="min-w-0 flex-1" side="over" pinned={pinned()}>
+      <Tooltip
+        text={cut() ? full() : undefined}
+        class="min-w-0 flex-1"
+        side="over"
+        pinned={pinned()}
+      >
         <button
           ref={(e) => (labelEl = e)}
           type="button"

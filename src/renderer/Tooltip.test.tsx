@@ -357,6 +357,20 @@ describe("Tooltip", () => {
       expect(tips()).toHaveLength(0);
     });
 
+    it("opens with a ternary text, which the compiler reads through a new memo each time", () => {
+      const [on, setOn] = createSignal(false);
+      const [label] = createSignal(TEXT); // a dynamic branch: a static one gets no memo
+      render(() => (
+        <Tooltip text={on() ? label() : undefined} pinned={on()}>
+          <button type="button">Refresh</button>
+        </Tooltip>
+      ));
+      flush();
+      setOn(true);
+      flush();
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+    });
+
     it("leaves hover as it was: a pointer resting on the target opens it, leaving closes it", () => {
       const { wrapper } = pin(false, TEXT);
       hover(wrapper);
