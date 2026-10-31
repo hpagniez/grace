@@ -137,8 +137,12 @@ export function VirtualList<T, S = undefined>(props: {
       if (to >= 0 && to <= last && to !== f) moveTo(to);
     } else if (plain && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
+      reveal(keys()[f]); // a key that does not move still brings a scrolled-away row back (R4.2)
       props.onSelect(props.items[f]);
-    } else if (props.onKey?.(e, props.items[f], f)) e.preventDefault();
+    } else if (props.onKey?.(e, props.items[f], f)) {
+      e.preventDefault();
+      if (focusKey() === keys()[f]) reveal(keys()[f]); // moveTo scrolls when focus moved
+    }
   };
 
   // Rows added or removed above the view keep the rows in view still (R4.6). A focused row that left hands

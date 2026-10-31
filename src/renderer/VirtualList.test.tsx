@@ -194,6 +194,16 @@ describe("VirtualList", () => {
     expect(onSelect).toHaveBeenLastCalledWith("r2");
   });
 
+  it("brings a scrolled-away focus row back before Enter selects it (R4.2)", () => {
+    const { focus, key, scrollTo, scroller, onSelect } = setup();
+    focus("r10");
+    scrollTo(20000);
+    key("Enter");
+    expect(onSelect).toHaveBeenLastCalledWith("r10");
+    expect(scroller.scrollTop).toBe(scrollToShow(10, at(20000)));
+    expect(scroller.scrollTop).toBe(240);
+  });
+
   it("passes other keys to onKey, and stops what it handled", () => {
     const { focus, key, onKey } = setup();
     focus("r0");

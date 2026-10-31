@@ -1049,6 +1049,18 @@ describe("virtual tree", () => {
       expect(scroller().scrollTop).toBe(0); // its 8 px pad too: at the very top (R4.6)
     });
 
+    it("brings a scrolled-away focused row back before Right opens it (R4.2)", () => {
+      const { send } = setup();
+      open(send, bigTree(2000));
+      click(chevron("f:tests/f0.feature"));
+      expect(focused()).toBe("f:tests/f0.feature");
+      scrollTo(20_000);
+      press("ArrowRight");
+      expect(item("f:tests/f0.feature")!.getAttribute("aria-expanded")).toBe("true");
+      expect(focused()).toBe("f:tests/f0.feature");
+      expectInView("f:tests/f0.feature");
+    });
+
     it("runs the focused row with Ctrl+Enter, and not during a run", () => {
       const { api, send, load } = setup();
       load();
