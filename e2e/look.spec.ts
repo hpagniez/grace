@@ -194,13 +194,11 @@ test("Reduced motion stops every animation", async () => {
           String((a as CSSAnimation).animationName ?? (a as CSSTransition).transitionProperty),
         ),
     );
-  const cursor = win.getByTestId("console-cursor");
-  await expect(cursor).toBeVisible(); // "Ready." while nothing runs
-  // the control: with motion allowed, the cursor blinks
-  expect(await cursor.evaluate((e) => e.getAnimations().length)).toBeGreaterThan(0);
+  await expect(win.getByTestId("console-cursor")).toBeVisible(); // "Ready." while nothing runs
+  // idle costs nothing: even with motion allowed, nothing moves while no run is going
+  await expect.poll(running).toEqual([]);
 
   await win.emulateMedia({ reducedMotion: "reduce" });
-  await expect.poll(() => cursor.evaluate((e) => e.getAnimations().length)).toBe(0);
 
   await nodeByKey(win, "f:tests/slow.feature").getByTestId("run-node").click();
   await expect(win.getByTestId("progress-stripe")).toBeVisible({ timeout: 15_000 });

@@ -67,12 +67,26 @@ describe("Banner", () => {
     expect(text("console-state")).toBe("Starting Karate…");
   });
 
-  it("ends the state line with a cursor that screen readers skip and reduced motion stills", () => {
-    render(() => <Banner state={opened()} />);
-    const cursor = screen.getByTestId("console-cursor");
-    expect(cursor.getAttribute("aria-hidden")).toBe("true");
-    expect(cursor.className).toContain("animate-blink");
-    expect(cursor.className).toContain("motion-reduce:animate-none");
+  it("ends the state line with a cursor that blinks only while Grace works, and reduced motion stills", () => {
+    const run = { ...initialState().run, active: true };
+    for (const state of [opened({ busy: true }), opened({ busy: true, run })]) {
+      render(() => <Banner state={state} />);
+      const cursor = screen.getByTestId("console-cursor");
+      expect(cursor.getAttribute("aria-hidden")).toBe("true");
+      expect(cursor.className).toContain("animate-blink");
+      expect(cursor.className).toContain("motion-reduce:animate-none");
+      cleanup();
+    }
+  });
+
+  it("holds the cursor still while Grace is idle, so idle draws nothing", () => {
+    for (const state of [opened(), initialState()]) {
+      render(() => <Banner state={state} />);
+      const cursor = screen.getByTestId("console-cursor");
+      expect(cursor.getAttribute("aria-hidden")).toBe("true");
+      expect(cursor.className).not.toContain("animate-");
+      cleanup();
+    }
   });
 
   it("drops the state line once the console has output", () => {

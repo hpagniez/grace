@@ -85,7 +85,7 @@ For where the versions come from:
    - a run active: `Starting Karate…`
    - when Run all can run (the toolbar's rule: a tree, no discovery error, at least one test matching the tag filter): `Ready. Press Run all, or ▶ on a test.`
    - otherwise no state line: the tests line or the tree says why (changed after the final review, 2026-10-27: "Ready" next to a disabled Run all read as a contradiction).
-2. The state line ends with a block cursor that blinks. It does not blink when the system asks for reduced motion. The cursor is hidden from screen readers.
+2. The state line ends with a block cursor. It blinks only while Grace finds tests or starts Karate; with "Open a Karate project folder" or "Ready." it stands still, since a blink redraws the window while Grace is idle (changed 2026-10-31, light and fast spec R1). It does not blink when the system asks for reduced motion. The cursor is hidden from screen readers.
 3. Once the console has output lines, the state line is gone and the lines follow the banner.
 
 ### R3. Runs
@@ -155,7 +155,7 @@ Feature: Console banner
     Then the console shows "project  D:\work\orders-api"
     And the console shows "tests    3 scenarios in 2 features"
     And the state line says "Ready. Press Run all, or ▶ on a test."
-    And the state line ends with a blinking cursor
+    And the state line ends with a cursor that stands still
 
   Scenario: One scenario in one feature
     Given a project is open with 1 scenario in 1 feature
@@ -169,6 +169,7 @@ Feature: Console banner
     Given a project is being opened and no tree has been found yet
     Then the console shows "tests    finding tests…"
     And the state line says "Finding tests…"
+    And the state line ends with a blinking cursor
 
   Scenario: Discovery failed
     Given a project is open and its discovery failed with an error
