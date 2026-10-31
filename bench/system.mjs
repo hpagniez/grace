@@ -56,18 +56,27 @@ function Measure-Tree {
 }
 
 /**
- * Splits a process tree into the Java side and the app side. `java.exe` is Java, and so is a `conhost.exe` whose parent
- * is a `java.exe` of the tree: Windows gives a console process a conhost, and only Java's belongs to Java. Any other
- * conhost, such as one under a console tool the app started, is the app's.
+ * Which processes of a tree are Java's: `java.exe` is, and so is a `conhost.exe` whose parent is a `java.exe` of the tree:
+ * Windows gives a console process a conhost, and only Java's belongs to Java. Any other conhost, such as one under a
+ * console tool the app started, is the app's.
+ * @param {Proc[]} procs
+ * @returns {(p: Proc) => boolean}
+ */
+function javaOf(procs) {
+  const javaIds = new Set(procs.filter((p) => JAVA.test(p.name)).map((p) => p.id));
+  return (p) => javaIds.has(p.id) || (CONHOST.test(p.name) && javaIds.has(p.parent));
+}
+
+/**
+ * Splits a process tree into the Java side and the app side (see `javaOf`).
  * @param {Proc[]} procs
  * @returns {Sample}
  */
 export function splitTree(procs) {
-  const javaIds = new Set(procs.filter((p) => JAVA.test(p.name)).map((p) => p.id));
+  const isJava = javaOf(procs);
   const sums = { app: { bytes: 0, cpu: 0 }, java: { bytes: 0, cpu: 0 } };
   for (const p of procs) {
-    const isJava = javaIds.has(p.id) || (CONHOST.test(p.name) && javaIds.has(p.parent));
-    const sum = isJava ? sums.java : sums.app;
+    const sum = isJava(p) ? sums.java : sums.app;
     sum.bytes += p.bytes;
     sum.cpu += p.cpu;
   }
@@ -79,15 +88,47 @@ export function splitTree(procs) {
 }
 
 /**
- * The sample in one `Measure-Tree` line, or null when `rootPid` is not in it: the process is gone, and zeros would
- * read as a tree that uses no memory.
+ * Adds up the CPU time each process of a tree used while it was watched, app and Java apart. A process counts from its
+ * first reading (from zero when it appeared after the first reading) to its last, so one that has exited keeps what it
+ * used: the tree's own total loses it, and the Karate JVM is gone by the time a run reads "Finished". What a process used
+ * between its last reading and its exit, up to one sampling period, is not seen.
+ * @returns {{ add(procs: Proc[]): void, total(): { appCpuMs: number, javaCpuMs: number } }}
+ */
+export function cpuMeter() {
+  /** @type {Map<number, { java: boolean, base: number, last: number }>} */
+  const seen = new Map();
+  let first = true;
+  return {
+    add(procs) {
+      const isJava = javaOf(procs);
+      for (const p of procs) {
+        const before = seen.get(p.id);
+        seen.set(p.id, {
+          java: isJava(p),
+          base: before?.base ?? (first ? p.cpu : 0),
+          last: Math.max(before?.last ?? 0, p.cpu),
+        });
+      }
+      first = false;
+    },
+    total() {
+      const sums = { app: 0, java: 0 };
+      for (const { java, base, last } of seen.values()) sums[java ? "java" : "app"] += last - base;
+      return { appCpuMs: Math.round(sums.app / 1e4), javaCpuMs: Math.round(sums.java / 1e4) };
+    },
+  };
+}
+
+/**
+ * The processes in one `Measure-Tree` line, or null when `rootPid` is not among them: the process is gone, and zeros
+ * would read as a tree that uses no memory.
  * @param {string} line
  * @param {number} rootPid
- * @returns {Sample | null}
+ * @returns {Proc[] | null}
  */
 function parse(line, rootPid) {
   const procs = [JSON.parse(line)].flat();
-  return procs.some((p) => p.id === rootPid) ? splitTree(procs) : null;
+  return procs.some((p) => p.id === rootPid) ? procs : null;
 }
 
 /**
@@ -100,19 +141,21 @@ export async function sample(rootPid) {
   const out = await powershell(
     `$ErrorActionPreference = 'Stop'\n${treeScript(rootPid)}\nMeasure-Tree`,
   );
-  const s = parse(out, rootPid);
-  if (!s) throw new Error(`process ${rootPid} is not running`);
-  return s;
+  const procs = parse(out, rootPid);
+  if (!procs) throw new Error(`process ${rootPid} is not running`);
+  return splitTree(procs);
 }
 
 /**
- * Samples the tree under `rootPid` every `everyMs` from one PowerShell loop. `stop()` ends the loop, waiting for the
- * first sample if none came yet, and gives the peak private memory seen. It rejects, rather than give a peak that
- * under-reports, when `rootPid` was not running at the first sample, no sample came in a minute, or the sampler's
- * PowerShell died before `stop()`. A root that exits later just ends the samples: the peaks so far stand.
+ * Samples the tree under `rootPid` every `everyMs` from one PowerShell loop. `ready` settles with the first sample: wait
+ * for it before what is to be measured starts, or the PowerShell's slow start eats the beginning. `stop()` ends the
+ * loop, waiting for the first sample if none came yet, and gives the peak private memory seen and the CPU time used
+ * since the first sample (see `cpuMeter`). `ready` and `stop()` reject, rather than give figures that under-report,
+ * when `rootPid` was not running at the first sample, no sample came in a minute, or the sampler's PowerShell died
+ * before `stop()`. A root that exits later just ends the samples: the figures so far stand.
  * @param {number} rootPid
  * @param {number} [everyMs]
- * @returns {{ stop(): Promise<{ appPeakMB: number, javaPeakMB: number }> }}
+ * @returns {{ ready: Promise<void>, stop(): Promise<{ appPeakMB: number, javaPeakMB: number, appCpuMs: number, javaCpuMs: number }> }}
  */
 export function startSampler(rootPid, everyMs = 500) {
   if (!Number.isInteger(everyMs) || everyMs < 1)
@@ -153,12 +196,15 @@ while ($true) {
   let appPeakMB = 0;
   let javaPeakMB = 0;
   let sampled = false;
+  const meter = cpuMeter();
   readline.createInterface({ input: ps.stdout }).on("line", (line) => {
-    const s = parse(line, rootPid);
-    if (!s) {
+    const procs = parse(line, rootPid);
+    if (!procs) {
       if (!sampled) fail(new Error(`process ${rootPid} is not running`));
       return;
     }
+    const s = splitTree(procs);
+    meter.add(procs);
     appPeakMB = Math.max(appPeakMB, s.app.privateMB);
     javaPeakMB = Math.max(javaPeakMB, s.java.privateMB);
     sampled = true;
@@ -167,6 +213,7 @@ while ($true) {
   });
 
   return {
+    ready: first.promise,
     async stop() {
       const died = ps.exitCode !== null || ps.signalCode !== null;
       try {
@@ -176,7 +223,7 @@ while ($true) {
         ps.kill();
         await exited;
       }
-      return { appPeakMB, javaPeakMB };
+      return { appPeakMB, javaPeakMB, ...meter.total() };
     },
   };
 }

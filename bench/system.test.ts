@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import {
   cpuLoad,
+  cpuMeter,
   folderMB,
   minimise,
   sample,
@@ -131,6 +132,37 @@ describe("splitTree", () => {
   });
 });
 
+describe("cpuMeter", () => {
+  const TICKS = 1e4; // one ms in 100 ns ticks
+  const proc = (id: number, parent: number, name: string, ms: number) => ({
+    id,
+    parent,
+    name,
+    bytes: 0,
+    cpu: ms * TICKS,
+  });
+
+  it("keeps what a java that has exited used, which the tree's own total loses", () => {
+    const meter = cpuMeter();
+    meter.add([proc(1, 0, "Grace.exe", 100), proc(2, 1, "java.exe", 50)]);
+    meter.add([
+      proc(1, 0, "Grace.exe", 300),
+      proc(2, 1, "java.exe", 200),
+      proc(3, 1, "java.exe", 80),
+      proc(4, 3, "conhost.exe", 10),
+    ]);
+    meter.add([proc(1, 0, "Grace.exe", 400)]); // both javas and the conhost are gone
+    expect(meter.total()).toEqual({ appCpuMs: 300, javaCpuMs: 150 + 80 + 10 });
+  });
+
+  it("counts a process that appears later from zero, and one there at the start from its first reading", () => {
+    const meter = cpuMeter();
+    meter.add([proc(1, 0, "Grace.exe", 1000)]);
+    meter.add([proc(1, 0, "Grace.exe", 1100), proc(5, 1, "Grace.exe", 40)]);
+    expect(meter.total()).toEqual({ appCpuMs: 140, javaCpuMs: 0 });
+  });
+});
+
 describe("sample", () => {
   it(
     "sums the memory and cpu of a process tree, with no java in it",
@@ -179,6 +211,29 @@ describe("startSampler", () => {
 
   it("rejects for a process that is not running, not a peak of 0", { timeout: SLOW }, async () => {
     await expect(startSampler(await deadPid(), 100).stop()).rejects.toThrow(/is not running/);
+  });
+
+  it(
+    "is ready once its first sample is in, and reports the cpu seen",
+    { timeout: SLOW },
+    async () => {
+      const child = await holder();
+      try {
+        const sampler = startSampler(child.pid!, 100);
+        await sampler.ready;
+        const peaks = await sampler.stop();
+        expect(peaks.appCpuMs).toBeGreaterThanOrEqual(0);
+        expect(peaks.javaCpuMs).toBe(0);
+      } finally {
+        kill(child);
+      }
+    },
+  );
+
+  it("is never ready for a process that is not running", { timeout: SLOW }, async () => {
+    const sampler = startSampler(await deadPid(), 100);
+    await expect(sampler.ready).rejects.toThrow(/is not running/);
+    await sampler.stop().catch(() => {});
   });
 
   it(
