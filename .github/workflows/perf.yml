@@ -1,0 +1,116 @@
+# Bench numbers on every code PR (docs/specs/2026-10-31-light-and-fast.md, R4). One Windows runner packages the PR's base
+# and head, runs bench/bench.mjs on both, and posts the table as one PR comment, updated on every push, and in the job
+# summary. A worse number never fails the job; only a bench that cannot measure does. Same triggers and skips as test.yml.
+# A fork's or Dependabot's token is read-only: those PRs get the job summary only. By hand: the chosen ref against develop.
+name: perf
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  perf:
+    if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # head/ is what test.yml builds: the PR merged into its base (refs/pull/N/merge), or the dispatched ref. Base against
+      # it measures only this PR's change. The bench always runs from head/: base/ has no bench code, and only its exe is driven.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || 'develop' }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('head/package-lock.json', 'base/package-lock.json') }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # the unpacked JRE and jar only; fetch-vendor.mjs re-verifies the jar
+          path: |
+            head/vendor
+            !head/vendor/.download
+          key: vendor-${{ runner.os }}-head-${{ hashFiles('head/scripts/fetch-vendor.mjs', 'head/scripts/vendor.json') }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            base/vendor
+            !base/vendor/.download
+          key: vendor-${{ runner.os }}-base-${{ hashFiles('base/scripts/fetch-vendor.mjs', 'base/scripts/vendor.json') }}
+      - name: build head
+        working-directory: head
+        run: |
+          npm ci
+          npm run vendor
+          npm run package
+      - name: build base
+        working-directory: base
+        run: |
+          npm ci
+          npm run vendor
+          npm run package
+      # the labels name the PR's head commit (what merge-when-green keys on), not the merge commit that was built
+      - id: sha
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base=$(git -C base rev-parse --short=7 HEAD)
+          if [ -n "$PR_HEAD" ]; then head="head ${PR_HEAD:0:7} on $base"; else head="head $(git -C head rev-parse --short=7 HEAD)"; fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+      - name: bench
+        working-directory: head
+        run: >-
+          node bench/bench.mjs --a ../base/out/Grace-win32-x64/Grace.exe
+          --label-a "base ${{ steps.sha.outputs.base }}" --label-b "${{ steps.sha.outputs.head }}" --out bench-out
+      # a bench that measured but could not stop an app exits 1 after writing the table: still show it
+      - name: summary
+        if: ${{ !cancelled() && hashFiles('head/bench-out/bench.md') != '' }}
+        run: cat head/bench-out/bench.md >> "$GITHUB_STEP_SUMMARY"
+      - name: comment
+        if: ${{ !cancelled() && hashFiles('head/bench-out/bench.md') != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          { echo '<!-- grace-perf -->'; cat head/bench-out/bench.md; echo; echo "[perf run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"; } > comment.md
+          id=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- grace-perf -->"))) | .id' | sed -n 1p)
+          if [ -n "$id" ]; then
+            gh api --silent -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@comment.md
+          else
+            gh api --silent "repos/$GH_REPO/issues/$PR/comments" -F body=@comment.md
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: bench
+          path: head/bench-out
+          retention-days: 14
+          if-no-files-found: ignore

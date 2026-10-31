@@ -16,6 +16,7 @@
     "lint:fix": "oxlint --fix && oxfmt --write",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "bench": "npm run package && node --no-warnings bench/bench.mjs",
     "e2e": "npm run package && npx electron --version && playwright test",
     "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts screens.shots",
     "screens:readme": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts readme.shots",
