@@ -7,6 +7,7 @@ import { MEASURES } from "./measures.mjs";
  * @typedef {object} Report What the bench writes: every round, and the medians the table and the judge read.
  * @property {"pr" | "release"} mode
  * @property {string} machine
+ * @property {string} screen Where the bench placed the app's window.
  * @property {{ a: { label: string, exe: string } | null, b: { label: string, exe: string } }} builds `b` is the build under test, `a` the one it is compared with.
  * @property {{ build: "a" | "b", warmup: boolean, load: number, values: Values }[]} rounds
  * @property {{ a: Values | null, b: Values }} medians

@@ -11,9 +11,11 @@ import {
   folderMB,
   minimise,
   sample,
+  screens,
   splitTree,
   startSampler,
   waitForQuiet,
+  windowSpot,
 } from "./system.mjs";
 
 // PowerShell starts slowly on a loaded CI machine
@@ -284,6 +286,53 @@ describe("minimise", () => {
     } finally {
       kill(child);
     }
+  });
+});
+
+describe("screens", () => {
+  it("lists one main screen with a work area", { timeout: SLOW }, async () => {
+    const all = await screens();
+    expect(all.filter((s) => s.primary)).toHaveLength(1);
+    for (const s of all) {
+      expect(s.name).toEqual(expect.any(String));
+      expect(s.width).toBeGreaterThan(0);
+      expect(s.height).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("windowSpot", () => {
+  const screen = (name: string, primary: boolean, x: number, width = 2560, height = 1392) => ({
+    name,
+    primary,
+    x,
+    y: 0,
+    width,
+    height,
+  });
+
+  it("keeps the window at 40, 40 when the main screen is the only one", () => {
+    expect(windowSpot([screen("\\\\.\\DISPLAY1", true, 0)])).toEqual({
+      x: 40,
+      y: 40,
+      screen: null,
+    });
+  });
+
+  it("centres it on the first other screen by device name", () => {
+    const main = screen("\\\\.\\DISPLAY2", true, 0);
+    const third = screen("\\\\.\\DISPLAY3", false, -1920, 1920, 1040);
+    const first = screen("\\\\.\\DISPLAY1", false, 2560);
+    expect(windowSpot([main, third, first])).toEqual({ x: 3140, y: 246, screen: first });
+    expect(windowSpot([main, third])).toEqual({ x: -1660, y: 70, screen: third });
+  });
+
+  it("puts it at the top left of a work area smaller than the window", () => {
+    const small = screen("\\\\.\\DISPLAY2", false, 2560, 1366, 728);
+    expect(windowSpot([screen("\\\\.\\DISPLAY1", true, 0), small])).toMatchObject({
+      x: 2560,
+      y: 0,
+    });
   });
 });
 

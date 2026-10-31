@@ -7,7 +7,8 @@
 //
 // B is the build under test (out/Grace-win32-x64/Grace.exe unless given), A the one it is compared with. Rounds run
 // after one warm-up per build and alternate between the builds. Release mode adds the fresh-profile start, the minimised
-// idle CPU and the 10,000-test project. A worse number never fails the bench; only a failure to measure does (exit 1).
+// idle CPU and the 10,000-test project, and needs bench/limits.json. A worse number never fails the bench; only a failure
+// to measure does (exit 1). The windows open on the first screen that is not the main one, when there is one.
 // `--limits-from` measures nothing: it turns the rounds of a release-mode bench.json of build B into bench/limits.json.
 import { execFileSync } from "node:child_process";
 import {
@@ -39,7 +40,15 @@ import {
 } from "./probes.mjs";
 import { markdown } from "./report.mjs";
 import { median, order } from "./stats.mjs";
-import { folderMB, minimise, sample, startSampler, waitForQuiet } from "./system.mjs";
+import {
+  folderMB,
+  minimise,
+  sample,
+  screens,
+  startSampler,
+  waitForQuiet,
+  windowSpot,
+} from "./system.mjs";
 
 /** @typedef {import("./judge.mjs").Report} Report */
 /** @typedef {import("./judge.mjs").Values} Values */
@@ -85,6 +94,8 @@ const live = new Set();
 const starting = new Set();
 /** @type {string | null} */
 let workDir = null;
+/** Where every window opens: chosen once per bench run, so each start draws on the same screen. */
+let windowAt = { x: 40, y: 40 };
 
 let dataCount = 0;
 /** A data folder for one start, inside the work folder: removing that one folder removes them all. */
@@ -153,7 +164,11 @@ async function launch(
   /** @type {number | undefined} */
   let pid;
   try {
-    const app = await startApp(exe, { ...opts, onSpawn: (p) => starting.add((pid = p)) });
+    const app = await startApp(exe, {
+      ...opts,
+      at: windowAt,
+      onSpawn: (p) => starting.add((pid = p)),
+    });
     live.add(app);
     return app;
   } finally {
@@ -532,6 +547,16 @@ async function main() {
   };
   const outDir = path.resolve(String(args.out ?? "bench-out"));
 
+  const spot = await screens().then(windowSpot, (e) => {
+    log(`could not read the screens, so the windows open on the main one: ${e.message}`);
+    return windowSpot([]);
+  });
+  windowAt = { x: spot.x, y: spot.y };
+  const screen = spot.screen
+    ? `${spot.screen.name.replace(/^\\\\\.\\/, "")}, not the main screen (work area ${spot.screen.width} x ${spot.screen.height} at ${spot.screen.x}, ${spot.screen.y})`
+    : "the main screen";
+  log(`windows open at ${spot.x}, ${spot.y} on ${screen}`);
+
   workDir = mkdtempSync(path.join(os.tmpdir(), "grace-bench-projects-"));
   /** @type {{ small: Project, large: Project | null }} */
   const projects = {
@@ -588,6 +613,7 @@ async function main() {
   const report = {
     mode: release ? "release" : "pr",
     machine: machine(),
+    screen,
     builds: {
       a: builds.a && { label: builds.a.label, exe: shown(builds.a.exe) },
       b: { label: builds.b.label, exe: shown(builds.b.exe) },

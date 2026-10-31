@@ -129,13 +129,14 @@ async function removeDir(dir) {
 /**
  * Starts the exe on `opts.project`. With `cdp` it connects to the page, and rejects when the exe cannot be driven in 60 s
  * or dies first; whatever it started is stopped then. `dataDir` is a fresh temp folder unless given (to start again on the
- * same profile); the window is placed at 1400 x 900 so every run draws the same page. `onSpawn` gets the pid as soon as
- * the process exists, before the start has finished: a caller that is stopped during the start still knows what to kill.
+ * same profile); the window is 1400 x 900 so every run draws the same page, with its top left corner at `at`. `onSpawn`
+ * gets the pid as soon as the process exists, before the start has finished: a caller that is stopped during the start
+ * still knows what to kill.
  * @param {string} exe
- * @param {{ project: string, dataDir?: string, cdp: boolean, port?: number, onSpawn?: (pid: number) => void }} opts
+ * @param {{ project: string, dataDir?: string, cdp: boolean, port?: number, at?: { x: number, y: number }, onSpawn?: (pid: number) => void }} opts
  * @returns {Promise<App>}
  */
-export async function startApp(exe, { project, dataDir, cdp, port, onSpawn }) {
+export async function startApp(exe, { project, dataDir, cdp, port, at, onSpawn }) {
   const dir = dataDir ?? mkdtempSync(path.join(tmpdir(), "grace-bench-"));
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -143,7 +144,7 @@ export async function startApp(exe, { project, dataDir, cdp, port, onSpawn }) {
     JSON.stringify({
       lastProject: project,
       updates: { checkAtStartup: false },
-      window: { x: 40, y: 40, width: 1400, height: 900, maximized: false },
+      window: { x: at?.x ?? 40, y: at?.y ?? 40, width: 1400, height: 900, maximized: false },
     }),
   );
   const debugPort = cdp ? (port ?? (await freePort())) : null;

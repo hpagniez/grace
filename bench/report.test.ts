@@ -13,6 +13,7 @@ function report(mode: "pr" | "release", b: Values, a: Values | null = null) {
   return {
     mode,
     machine: "Windows 11 Pro, Ryzen 7 5800X, 32 GB",
+    screen: "DISPLAY1, not the main screen",
     builds: {
       a: a && { label: "1.0.0-rc.6", exe: "a.exe" },
       b: { label: "this branch", exe: "b.exe" },
@@ -40,12 +41,13 @@ function row(md: string, id: string) {
 }
 
 describe("markdown", () => {
-  it("names both builds and the machine in the header", () => {
+  it("names both builds, the machine and the screen under a level-3 heading", () => {
     const r = report("pr", all(1), all(1));
     const md = markdown(r, judge(r, limits()));
     const header = md.slice(0, md.indexOf("| Measure"));
     expect(md.split("\n")[0]).toBe("### Bench: this branch against 1.0.0-rc.6");
     expect(header).toContain("Windows 11 Pro, Ryzen 7 5800X, 32 GB");
+    expect(header).toContain("Screen: DISPLAY1, not the main screen");
   });
 
   it("has one row per measure, in the catalogue's order", () => {

@@ -19,6 +19,7 @@ function report(mode: "pr" | "release", b: Values, a: Values | null = null, roun
   return {
     mode,
     machine: "test",
+    screen: "test",
     builds: { a: a && { label: "a", exe: "a.exe" }, b: { label: "b", exe: "b.exe" } },
     rounds,
     medians: { a, b },

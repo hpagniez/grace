@@ -288,6 +288,44 @@ if ($handle -eq 0) { [Console]::Error.WriteLine('process ${pid} has no window');
 [void][Win32.User32]::ShowWindow($handle, 6)`);
 }
 
+/** @typedef {{ name: string, primary: boolean, x: number, y: number, width: number, height: number }} Screen A screen's device name and its work area (the screen less the taskbar). */
+
+/**
+ * Every screen of the machine with its work area, from one PowerShell call.
+ * @returns {Promise<Screen[]>}
+ */
+export async function screens() {
+  const out = await powershell(`
+Add-Type -AssemblyName System.Windows.Forms
+$all = @([System.Windows.Forms.Screen]::AllScreens | ForEach-Object { [pscustomobject]@{ name = $_.DeviceName; primary = $_.Primary; x = $_.WorkingArea.X; y = $_.WorkingArea.Y; width = $_.WorkingArea.Width; height = $_.WorkingArea.Height } })
+ConvertTo-Json -Compress -InputObject $all`);
+  return JSON.parse(out);
+}
+
+/**
+ * Where a `width` x `height` window goes: centred in the work area of the first screen that is not the main one, by
+ * device name, so every run uses the same screen and the person at the machine keeps the main one; at 40, 40 on the
+ * main screen when there is no other (CI). A work area smaller than the window gets it at its top left corner.
+ * shortcut: PowerShell's pixels equal Electron's at 100% scaling; at another scale the window may sit off centre
+ * (the app keeps it on the screen it overlaps most), take the scale from Electron if that matters.
+ * @param {Screen[]} all
+ * @returns {{ x: number, y: number, screen: Screen | null }}
+ */
+export function windowSpot(all, width = 1400, height = 900) {
+  const [other] = all.filter((s) => !s.primary).sort((p, q) => p.name.localeCompare(q.name));
+  if (!other) return { x: 40, y: 40, screen: null };
+  const centre = (
+    /** @type {number} */ start,
+    /** @type {number} */ room,
+    /** @type {number} */ size,
+  ) => start + Math.max(0, Math.round((room - size) / 2));
+  return {
+    x: centre(other.x, other.width, width),
+    y: centre(other.y, other.height, height),
+    screen: other,
+  };
+}
+
 /**
  * Size of the files under `dir`, in MB of 10^6 bytes to one decimal.
  * @param {string} dir

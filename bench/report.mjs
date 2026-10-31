@@ -12,9 +12,9 @@ const fmt = (/** @type {number | null} */ n) =>
   n === null ? "n/a" : String(Math.round(n * 10) / 10);
 
 /**
- * The table of `verdict`'s rows, under a header naming both builds and the machine. A release-mode table ends with
- * the `Result:` line that `scripts/check-pr.mjs` reads; a PR-mode one has none, because a PR measures only a subset
- * and nothing there fails on a number.
+ * The table of `verdict`'s rows, under a header naming both builds, the machine and the screen. A release-mode
+ * table ends with the `Result:` line that `scripts/check-pr.mjs` reads; a PR-mode one has none, because a PR
+ * measures only a subset and nothing there fails on a number.
  * @param {Report} report
  * @param {ReturnType<Judge>} verdict
  * @returns {string}
@@ -28,6 +28,7 @@ export function markdown(report, verdict) {
     `### Bench: ${b.label}${a ? ` against ${a.label}` : ""}`,
     "",
     `Machine: ${report.machine}`,
+    `Screen: ${report.screen}`,
     `Mode: ${report.mode}, median of ${rounds} round${rounds === 1 ? "" : "s"} after a warm-up`,
     `Machine load before the rounds: ${fmt(Math.min(...loads))}% to ${fmt(Math.max(...loads))}%`,
     "",
