@@ -16,7 +16,9 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run make` | Build the Windows zip in `out/make/zip/win32/x64/` |
 | `npm run screens:readme` | Package the app, then retake the README's screenshots in `docs/images/` |
 
-Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
+Never run `npm test` and `npm run e2e` at the same time: the e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)). Never run two e2e runs at once either, for the same reason.
+
+On a machine with more than one screen, every e2e window opens on a screen that is not the main one, out of the way of the person working: `launch()` in `e2e/helpers.ts` moves it there before it shows. Launch the app in a test only through `launch()`. Only `window.spec.ts` keeps its windows on the main screen (`primaryScreen`), since it tests where the app places them.
 
 ## Docs map
 
