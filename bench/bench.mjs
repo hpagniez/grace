@@ -7,6 +7,7 @@
 // B is the build under test (out/Grace-win32-x64/Grace.exe unless given), A the one it is compared with. Rounds run
 // after one warm-up per build and alternate between the builds. Release mode adds the fresh-profile start, the minimised
 // idle CPU and the 10,000-test project. A worse number never fails the bench; only a failure to measure does (exit 1).
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -66,16 +67,74 @@ const log = (/** @type {string} */ msg) =>
   console.error(`[bench ${new Date().toTimeString().slice(0, 8)}] ${msg}`);
 const round1 = (/** @type {number} */ n) => Math.round(n * 10) / 10;
 
-/** What is running that must not outlive the bench: apps and samplers, anything with a `stop`. */
+/**
+ * What is running that must not outlive the bench: apps and samplers (anything with a `stop` and a `pid`). An entry
+ * leaves only once its stop has settled, so a signal during a stop still finds it.
+ * @type {Set<{ pid: number | undefined, stop(...args: any[]): Promise<unknown> }>}
+ */
 const live = new Set();
+/** Pids of apps spawned whose start has not returned yet: nothing to `stop` yet, but a process to kill. */
+const starting = new Set();
 /** @type {string | null} */
 let workDir = null;
 
-/** Stops what is still running and removes the projects. Safe to call twice. */
+let dataCount = 0;
+/** A data folder for one start, inside the work folder: removing that one folder removes them all. */
+const freshDir = () => path.join(/** @type {string} */ (workDir), `data-${++dataCount}`);
+
+/** Kills the trees of `pids` and waits. Synchronous, for a process that is about to exit. */
+function killNow(/** @type {(number | undefined)[]} */ pids) {
+  const list = pids.filter((p) => p !== undefined);
+  if (!list.length) return;
+  try {
+    execFileSync("taskkill", ["/F", "/T", ...list.flatMap((p) => ["/PID", String(p)])], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  } catch {
+    // a process that is already gone
+  }
+}
+
+/** What an exit that skipped `cleanup` (a crash, `process.exit`) leaves; `taskkill` also needs the root alive, so this is the last resort. */
+const owned = () => [...starting, ...[...live].map((x) => x.pid)];
+
+/** Removes the folder of the projects and data; best effort, as Windows may still hold a file of a process just killed. */
+function removeWork() {
+  if (!workDir) return;
+  // Synchronous, so it works in an exit handler; rmSync's own retries do not wait, so wait here, up to 10 s.
+  for (let tries = 0; ; tries++) {
+    try {
+      return rmSync(workDir, { recursive: true, force: true });
+    } catch (e) {
+      if (tries === 40)
+        return console.error(`could not remove ${workDir}: ${/** @type {Error} */ (e).message}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+    }
+  }
+}
+
+/** Stops what is still running and removes the projects. Safe to call twice, and never rejects. */
 async function cleanup() {
-  await Promise.allSettled([...live].map((x) => x.stop()));
-  live.clear();
-  if (workDir) rmSync(workDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  killNow([...starting]); // an app still starting has no `stop` yet
+  await Promise.allSettled([...live].map((x) => x.stop().then(() => live.delete(x))));
+  removeWork();
+}
+
+// The last line of defence: whatever the bench still owns when the process exits is killed, whatever the reason.
+process.on("exit", () => {
+  killNow(owned());
+  removeWork();
+});
+
+/** An error nobody caught, or a signal: clean up, then exit with 1. Once only. */
+let dying = false;
+function die(/** @type {string} */ why) {
+  if (dying) return;
+  dying = true;
+  console.error(why);
+  process.exitCode = 1;
+  cleanup().finally(() => process.exit(1));
 }
 
 /** @returns {Promise<App>} */
@@ -83,25 +142,34 @@ async function launch(
   /** @type {string} */ exe,
   /** @type {Parameters<typeof startApp>[1]} */ opts,
 ) {
-  const app = await startApp(exe, opts);
-  live.add(app);
-  return app;
+  /** @type {number | undefined} */
+  let pid;
+  try {
+    const app = await startApp(exe, { ...opts, onSpawn: (p) => starting.add((pid = p)) });
+    live.add(app);
+    return app;
+  } finally {
+    // A failed start has stopped what it spawned before it rejected.
+    if (pid !== undefined) starting.delete(pid);
+  }
 }
 
 /** Stops `app`. A failure is reported and fails the bench at the end, but never hides the error that got us here. */
 async function halt(/** @type {App} */ app, /** @type {{ keepData?: boolean }} */ opts = {}) {
-  live.delete(app);
-  await app.stop(opts).catch((e) => {
-    console.error(`could not stop the app: ${e.message}`);
-    process.exitCode = 1;
-  });
+  await app.stop(opts).then(
+    () => live.delete(app), // only once it is gone: a signal during the stop must still find it
+    (e) => {
+      console.error(`could not stop the app: ${e.message}`);
+      process.exitCode = 1;
+    },
+  );
 }
 
 /** One start on `dataDir` (a fresh folder when not given): paint and tree times, null when the build shows no tree. */
 async function starts(
   /** @type {string} */ exe,
   /** @type {string} */ project,
-  dataDir = undefined,
+  dataDir = freshDir(),
 ) {
   const app = await launch(exe, { project, dataDir, cdp: true });
   try {
@@ -249,7 +317,7 @@ async function smoothProbes(page, { state, index, total }) {
  * @returns {Promise<Values>}
  */
 async function interactive(exe, { dir, tests }, tag) {
-  const app = await launch(exe, { project: dir, cdp: true });
+  const app = await launch(exe, { project: dir, dataDir: freshDir(), cdp: true });
   /** @type {Values} */
   const out = {};
   const put = (/** @type {string} */ id, /** @type {number | null} */ v) => (out[id + tag] = v);
@@ -293,8 +361,7 @@ async function interactive(exe, { dir, tests }, tag) {
     // The sampler ignores a root that exits mid-run and keeps its figures so far: that is not a measurement.
     if (!isAlive(app.pid)) throw new Error("the app exited during Run all");
 
-    live.delete(sampler);
-    const peaks = await sampler.stop();
+    const peaks = await sampler.stop().finally(() => live.delete(sampler));
     put("run.memory.app", peaks.appPeakMB);
     put("run.memory.java", peaks.javaPeakMB);
     put("run.cpu.app", peaks.appCpuMs);
@@ -307,7 +374,14 @@ async function interactive(exe, { dir, tests }, tag) {
     put("page.heap.run", after.heapMB);
     return out;
   } finally {
-    if (sampler && live.delete(sampler)) await sampler.stop().catch(() => {});
+    if (sampler && live.has(sampler))
+      await sampler
+        .stop()
+        .then(
+          () => {},
+          () => {},
+        )
+        .finally(() => live.delete(sampler));
     await halt(app);
   }
 }
@@ -478,7 +552,9 @@ async function main() {
 }
 
 for (const signal of ["SIGINT", "SIGTERM"])
-  process.once(signal, () => cleanup().finally(() => process.exit(1)));
+  process.on(signal, () => die(`bench stopped by ${signal}`));
+for (const event of ["uncaughtException", "unhandledRejection"])
+  process.on(event, (e) => die(`bench failed: ${/** @type {Error} */ (e)?.stack ?? e}`));
 
 try {
   await main();

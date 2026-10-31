@@ -220,6 +220,7 @@ describe("startSampler", () => {
       const child = await holder();
       try {
         const sampler = startSampler(child.pid!, 100);
+        expect(sampler.pid).toBeGreaterThan(0); // its PowerShell, for a caller that must kill it
         await sampler.ready;
         const peaks = await sampler.stop();
         expect(peaks.appCpuMs).toBeGreaterThanOrEqual(0);

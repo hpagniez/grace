@@ -150,12 +150,12 @@ export async function sample(rootPid) {
  * Samples the tree under `rootPid` every `everyMs` from one PowerShell loop. `ready` settles with the first sample: wait
  * for it before what is to be measured starts, or the PowerShell's slow start eats the beginning. `stop()` ends the
  * loop, waiting for the first sample if none came yet, and gives the peak private memory seen and the CPU time used
- * since the first sample (see `cpuMeter`). `ready` and `stop()` reject, rather than give figures that under-report,
+ * since the first sample (see `cpuMeter`); `pid` is its PowerShell's, for a caller that must kill it. `ready` and `stop()` reject, rather than give figures that under-report,
  * when `rootPid` was not running at the first sample, no sample came in a minute, or the sampler's PowerShell died
  * before `stop()`. A root that exits later just ends the samples: the figures so far stand.
  * @param {number} rootPid
  * @param {number} [everyMs]
- * @returns {{ ready: Promise<void>, stop(): Promise<{ appPeakMB: number, javaPeakMB: number, appCpuMs: number, javaCpuMs: number }> }}
+ * @returns {{ pid: number | undefined, ready: Promise<void>, stop(): Promise<{ appPeakMB: number, javaPeakMB: number, appCpuMs: number, javaCpuMs: number }> }}
  */
 export function startSampler(rootPid, everyMs = 500) {
   if (!Number.isInteger(everyMs) || everyMs < 1)
@@ -213,6 +213,7 @@ while ($true) {
   });
 
   return {
+    pid: ps.pid,
     ready: first.promise,
     async stop() {
       const died = ps.exitCode !== null || ps.signalCode !== null;
