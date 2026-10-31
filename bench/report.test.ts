@@ -44,8 +44,7 @@ describe("markdown", () => {
     const r = report("pr", all(1), all(1));
     const md = markdown(r, judge(r, limits()));
     const header = md.slice(0, md.indexOf("| Measure"));
-    expect(header).toContain("1.0.0-rc.6");
-    expect(header).toContain("this branch");
+    expect(md.split("\n")[0]).toBe("### Bench: this branch against 1.0.0-rc.6");
     expect(header).toContain("Windows 11 Pro, Ryzen 7 5800X, 32 GB");
   });
 

@@ -24,7 +24,8 @@ export function markdown(report, verdict) {
   const loads = report.rounds.map((r) => r.load);
   const rounds = report.rounds.filter((r) => r.build === "b" && !r.warmup).length;
   const lines = [
-    `## Bench: ${b.label}${a ? ` against ${a.label}` : ""}`,
+    // a level-3 heading, so the table pasted under a check record's `## Performance` nests there
+    `### Bench: ${b.label}${a ? ` against ${a.label}` : ""}`,
     "",
     `Machine: ${report.machine}`,
     `Mode: ${report.mode}, median of ${rounds} round${rounds === 1 ? "" : "s"} after a warm-up`,
