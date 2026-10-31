@@ -1,171 +1,171 @@
 {
-  "machine": "Windows 11 Pro, Ryzen 7 5800X, 32 GB",
+  "machine": "Windows 11 Pro, Ryzen 7 5800X, 32 GB, second screen 2560x1440 at 59 Hz",
   "commit": "e3cfe3b7",
   "measures": {
     "size.unpacked": {
       "unit": "MB",
-      "limit": 565.7,
-      "noise": 27,
+      "limit": 539.7,
+      "noise": 1,
       "machine": false
     },
     "size.zip": {
       "unit": "MB",
-      "limit": 229.7,
-      "noise": 11,
+      "limit": 219.7,
+      "noise": 1,
       "machine": false
     },
     "start.paint.fresh": {
       "unit": "ms",
-      "limit": 646,
-      "noise": 98,
+      "limit": 598,
+      "noise": 69,
       "machine": true
     },
     "start.tree.fresh": {
       "unit": "ms",
-      "limit": 2251,
-      "noise": 165,
+      "limit": 1963,
+      "noise": 181,
       "machine": true
     },
     "start.paint.reused": {
       "unit": "ms",
-      "limit": 748,
-      "noise": 130,
+      "limit": 612,
+      "noise": 59,
       "machine": true
     },
     "start.tree.reused": {
       "unit": "ms",
-      "limit": 2578,
-      "noise": 355,
+      "limit": 2389,
+      "noise": 339,
       "machine": true
     },
     "idle.memory": {
       "unit": "MB",
-      "limit": 162.7,
+      "limit": 163.3,
       "noise": 8,
       "machine": true
     },
     "idle.cpu.shown": {
       "unit": "ms",
-      "limit": 4719,
-      "noise": 1890,
+      "limit": 3343,
+      "noise": 1781,
       "machine": true
     },
     "idle.cpu.minimised": {
       "unit": "ms",
-      "limit": 484,
-      "noise": 172,
+      "limit": 125,
+      "noise": 63,
       "machine": true
     },
     "run.memory.app": {
       "unit": "MB",
-      "limit": 327.4,
-      "noise": 25,
+      "limit": 322.3,
+      "noise": 23,
       "machine": true
     },
     "run.memory.java": {
       "unit": "MB",
-      "limit": 397.8,
-      "noise": 82,
+      "limit": 356.4,
+      "noise": 49,
       "machine": true
     },
     "run.cpu.app": {
       "unit": "ms",
-      "limit": 7329,
-      "noise": 1766,
+      "limit": 5375,
+      "noise": 1281,
       "machine": true
     },
     "run.cpu.java": {
       "unit": "ms",
-      "limit": 25094,
-      "noise": 4219,
+      "limit": 21891,
+      "noise": 4453,
       "machine": true
     },
     "run.finishedLag": {
       "unit": "ms",
-      "limit": 209,
-      "noise": 31,
+      "limit": 159,
+      "noise": 27,
       "machine": true
     },
     "smooth.select.idle.paint": {
       "unit": "ms",
-      "limit": 13,
+      "limit": 12,
       "noise": 5,
       "aim": 100,
       "machine": true
     },
     "smooth.select.run.paint": {
       "unit": "ms",
-      "limit": 11,
+      "limit": 9,
       "noise": 5,
       "aim": 100,
       "machine": true
     },
     "smooth.expand.idle.paint": {
       "unit": "ms",
-      "limit": 36,
-      "noise": 9,
+      "limit": 33,
+      "noise": 8,
       "aim": 100,
       "machine": true
     },
     "smooth.expand.run.paint": {
       "unit": "ms",
-      "limit": 37,
-      "noise": 10,
+      "limit": 28,
+      "noise": 7,
       "aim": 100,
       "machine": true
     },
     "smooth.http.idle.paint": {
       "unit": "ms",
-      "limit": 29,
-      "noise": 15,
+      "limit": 25,
+      "noise": 8,
       "aim": 100,
       "machine": true
     },
     "smooth.http.run.paint": {
       "unit": "ms",
-      "limit": 25,
-      "noise": 10,
+      "limit": 32,
+      "noise": 12,
       "aim": 100,
       "machine": true
     },
     "smooth.select.idle.frame": {
       "unit": "ms",
-      "limit": 23,
-      "noise": 15,
+      "limit": 13,
+      "noise": 5,
       "aim": 50,
       "machine": true
     },
     "smooth.select.run.frame": {
       "unit": "ms",
-      "limit": 12,
+      "limit": 9,
       "noise": 5,
       "aim": 50,
       "machine": true
     },
     "smooth.expand.idle.frame": {
       "unit": "ms",
-      "limit": 32,
-      "noise": 8,
+      "limit": 31,
+      "noise": 15,
       "aim": 50,
       "machine": true
     },
     "smooth.expand.run.frame": {
-      "unit": "ms",
-      "limit": 25,
-      "noise": 8,
-      "aim": 50,
-      "machine": true
-    },
-    "smooth.http.idle.frame": {
       "unit": "ms",
       "limit": 26,
       "noise": 9,
       "aim": 50,
       "machine": true
     },
+    "smooth.http.idle.frame": {
+      "unit": "ms",
+      "limit": 13,
+      "noise": 5,
+      "aim": 50,
+      "machine": true
+    },
     "smooth.http.run.frame": {
       "unit": "ms",
-      "limit": 18,
+      "limit": 26,
       "noise": 9,
       "aim": 50,
       "machine": true
@@ -186,15 +186,15 @@
     },
     "smooth.run.fps": {
       "unit": "fps",
-      "limit": 113,
+      "limit": 112,
       "noise": 6,
       "better": "higher",
       "machine": true
     },
     "smooth.run.frame": {
       "unit": "ms",
-      "limit": 41,
-      "noise": 16,
+      "limit": 33,
+      "noise": 8,
       "aim": 50,
       "machine": true
     },
@@ -224,73 +224,73 @@
     },
     "run.memory.app@10k": {
       "unit": "MB",
-      "limit": 608,
+      "limit": 606.5,
       "noise": 29,
       "machine": true
     },
     "run.memory.java@10k": {
       "unit": "MB",
-      "limit": 516.4,
-      "noise": 25,
+      "limit": 529.2,
+      "noise": 34,
       "machine": true
     },
     "run.cpu.app@10k": {
       "unit": "ms",
-      "limit": 23156,
-      "noise": 4281,
+      "limit": 17671,
+      "noise": 2718,
       "machine": true
     },
     "run.cpu.java@10k": {
       "unit": "ms",
-      "limit": 54531,
-      "noise": 3422,
+      "limit": 48907,
+      "noise": 5391,
       "machine": true
     },
     "run.finishedLag@10k": {
       "unit": "ms",
-      "limit": 495,
-      "noise": 97,
+      "limit": 456,
+      "noise": 118,
       "machine": true
     },
     "smooth.select.idle.paint@10k": {
       "unit": "ms",
-      "limit": 15,
+      "limit": 14,
       "noise": 5,
       "aim": 100,
       "machine": true
     },
     "smooth.select.run.paint@10k": {
       "unit": "ms",
-      "limit": 13,
+      "limit": 10,
       "noise": 5,
       "aim": 100,
       "machine": true
     },
     "smooth.expand.idle.paint@10k": {
       "unit": "ms",
-      "limit": 75,
-      "noise": 19,
+      "limit": 53,
+      "noise": 5,
       "aim": 100,
       "machine": true
     },
     "smooth.expand.run.paint@10k": {
       "unit": "ms",
-      "limit": 115,
-      "noise": 32,
+      "limit": 80,
+      "noise": 23,
       "aim": 100,
       "machine": true
     },
     "smooth.http.idle.paint@10k": {
       "unit": "ms",
-      "limit": 46,
-      "noise": 20,
+      "limit": 32,
+      "noise": 11,
       "aim": 100,
       "machine": true
     },
     "smooth.http.run.paint@10k": {
       "unit": "ms",
-      "limit": 69,
-      "noise": 45,
+      "limit": 39,
+      "noise": 15,
       "aim": 100,
       "machine": true
     },
@@ -303,22 +303,22 @@
     },
     "smooth.select.run.frame@10k": {
       "unit": "ms",
-      "limit": 12,
+      "limit": 10,
       "noise": 5,
       "aim": 50,
       "machine": true
     },
     "smooth.expand.idle.frame@10k": {
       "unit": "ms",
-      "limit": 75,
-      "noise": 25,
+      "limit": 47,
+      "noise": 5,
       "aim": 50,
       "machine": true
     },
     "smooth.expand.run.frame@10k": {
       "unit": "ms",
-      "limit": 117,
-      "noise": 42,
+      "limit": 75,
+      "noise": 25,
       "aim": 50,
       "machine": true
     },
@@ -331,8 +331,8 @@
     },
     "smooth.http.run.frame@10k": {
       "unit": "ms",
-      "limit": 50,
-      "noise": 25,
+      "limit": 28,
+      "noise": 11,
       "aim": 50,
       "machine": true
     },
@@ -345,21 +345,21 @@
     },
     "smooth.scroll.run.frame@10k": {
       "unit": "ms",
-      "limit": 50,
-      "noise": 17,
+      "limit": 33,
+      "noise": 8,
       "aim": 50,
       "machine": true
     },
     "smooth.run.fps@10k": {
       "unit": "fps",
-      "limit": 93,
-      "noise": 5,
+      "limit": 94,
+      "noise": 13,
       "better": "higher",
       "machine": true
     },
     "smooth.run.frame@10k": {
       "unit": "ms",
-      "limit": 133,
+      "limit": 106,
       "noise": 25,
       "aim": 50,
       "machine": true

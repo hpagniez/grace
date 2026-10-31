@@ -56,8 +56,8 @@ import {
 /** @typedef {import("./app.mjs").App} App */
 /** @typedef {{ dir: string, tests: number }} Project */
 
-/** The machine the limits are measured on (docs/specs/2026-10-31-light-and-fast.md, R5.2). */
-const REFERENCE_MACHINE = "Windows 11 Pro, Ryzen 7 5800X, 32 GB";
+/** The machine the limits are measured on (docs/specs/2026-10-31-light-and-fast.md, R5.2), and the screen the bench uses there. */
+const REFERENCE_MACHINE = "Windows 11 Pro, Ryzen 7 5800X, 32 GB, second screen 2560x1440 at 59 Hz";
 
 /** Idle: settle for 20 s after the start, then take the CPU over 60 s. */
 const SETTLE_MS = 20_000;
