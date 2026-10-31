@@ -1,7 +1,10 @@
 import type { ElectronApplication } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { emptyProject, expect, launch, test } from "./helpers";
+import { emptyProject, expect, launch as launchAnywhere, test } from "./helpers";
+
+// These tests check where the app itself places its window: never move it to another screen.
+const launch = (userData?: string) => launchAnywhere(userData, {}, { primaryScreen: true });
 
 interface Rect {
   x: number;
