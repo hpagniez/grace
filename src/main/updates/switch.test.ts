@@ -505,7 +505,7 @@ setInterval(() => {}, 1 << 30);
   it("keeps a version installed when the old folder cannot be put back", T, async () => {
     write(path.join(staging, "app", "noStart.flag"));
     const old = `${install}.old`;
-    const done = run({ startTimeoutSec: 5, exitTimeoutSec: 2 });
+    const done = run({ startTimeoutSec: 5 });
     await until(() => existsSync(path.join(old, "resources", "app.asar")));
     await hold(path.join(old, "resources", "app.asar"));
     await done;
