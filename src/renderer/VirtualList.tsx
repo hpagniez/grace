@@ -205,7 +205,8 @@ export function VirtualList<T, S = undefined>(props: {
     <div
       ref={(e) => (scroller = e)}
       data-testid={props.scrollerTestid}
-      class="min-h-0 flex-1 overflow-auto"
+      // Chromium's own scroll anchoring off: the rows are anchored here (R4.6), once.
+      class="min-h-0 flex-1 overflow-auto [overflow-anchor:none]"
       onScroll={() => setScrollTop(scroller.scrollTop)}
     >
       <div
