@@ -146,7 +146,9 @@ export function makeLimits(report, meta) {
 }
 
 /**
- * The ids whose limit is looser in `head` than in `base`, or missing from `head`. Raising one needs a decision record.
+ * The ids whose limit is looser in `head` than in `base`: a higher limit (lower where higher is better), a wider
+ * noise (a worse move counts as no change), a flipped direction, or no entry at all. Raising one needs a
+ * decision record.
  * @param {Limits | null} base
  * @param {Limits | null} head
  * @returns {string[]}
@@ -154,9 +156,10 @@ export function makeLimits(report, meta) {
 export function raisedLimits(base, head) {
   if (!base) return [];
   return Object.entries(base.measures)
-    .filter(([id, { limit, better }]) => {
-      const now = head?.measures[id]?.limit;
-      return now === undefined || (better === "higher" ? now < limit : now > limit);
+    .filter(([id, { limit, noise, better }]) => {
+      const now = head?.measures[id];
+      if (!now || now.noise > noise || now.better !== better) return true;
+      return better === "higher" ? now.limit < limit : now.limit > limit;
     })
     .map(([id]) => id);
 }

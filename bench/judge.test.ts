@@ -404,6 +404,18 @@ describe("raisedLimits", () => {
     expect(raisedLimits(lim(60, "higher"), lim(65, "higher"))).toEqual([]);
   });
 
+  it("lists a wider noise, not a narrower one", () => {
+    const noisy = (noise: number) =>
+      limits({ "idle.memory": { unit: "MB", limit: 95, noise, machine: true } });
+    expect(raisedLimits(noisy(5), noisy(6))).toEqual(["idle.memory"]);
+    expect(raisedLimits(noisy(5), noisy(4))).toEqual([]);
+  });
+
+  it("lists a flipped direction, whatever the limit", () => {
+    expect(raisedLimits(lim(60, "higher"), lim(60))).toEqual(["idle.memory"]);
+    expect(raisedLimits(lim(95), lim(10, "higher"))).toEqual(["idle.memory"]);
+  });
+
   it("lists an id removed from head, or every id when head is gone", () => {
     expect(raisedLimits(lim(95), limits({}))).toEqual(["idle.memory"]);
     expect(raisedLimits(lim(95), null)).toEqual(["idle.memory"]);
