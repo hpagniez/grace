@@ -278,6 +278,23 @@ describe("makeLimits", () => {
     });
   });
 
+  it("rounds a limit to the unit: one decimal for MB, whole numbers for the rest", () => {
+    const r = {
+      ...report("release", {}),
+      rounds: [
+        ...rounds("idle.memory", "b", [96.43, 96.43, 96.43]),
+        ...rounds("start.tree.reused", "b", [612.4, 612.4, 612.4]),
+        ...rounds("smooth.run.fps", "b", [59.6, 59.6, 59.6]),
+        ...rounds("page.nodes.open", "b", [100.5, 100.5, 100.5]),
+      ],
+    };
+    const { measures } = makeLimits(r, meta);
+    expect(measures["idle.memory"]).toMatchObject({ noise: 5, limit: 101.4 });
+    expect(measures["start.tree.reused"]).toMatchObject({ noise: 31, limit: 643 });
+    expect(measures["smooth.run.fps"]).toMatchObject({ noise: 3, limit: 57 });
+    expect(measures["page.nodes.open"]).toMatchObject({ noise: 6, limit: 107 });
+  });
+
   it("ignores warm-up rounds, build a and values it did not get", () => {
     const r = {
       ...report("release", {}),
