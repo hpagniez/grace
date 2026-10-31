@@ -132,9 +132,9 @@ describe("limitRaiseError", () => {
 });
 
 /** A bench report in the shape bench/judge.mjs documents, with build b's idle memory at `memory` MB. */
-const bench = (memory: number) =>
+const bench = (memory: number, mode = "release") =>
   JSON.stringify({
-    mode: "release",
+    mode,
     machine: "test",
     builds: { a: null, b: { label: "b", exe: "b.exe" } },
     rounds: [],
@@ -200,6 +200,12 @@ describe("performanceError", () => {
 
   it("rejects Decision: no-go", () => {
     expect(check(performance(...missed, "", "Decision: no-go"), bench(120))).toContain("no-go");
+  });
+
+  it("rejects a PR-mode report, which judges no machine limit", () => {
+    expect(check(performance("Result: pass"), bench(999, "pr"))).toBe(
+      `${json} is a pr-mode report: run the bench with --release`,
+    );
   });
 
   it("names the bench JSON when it is not valid JSON", () => {

@@ -93,6 +93,9 @@ export function performanceError(head, base, files, read, limits) {
   } catch {
     return `${json} is not valid JSON`;
   }
+  // a PR-mode report judges no machine limit, so it would pass nearly whatever it measured
+  if (report?.mode !== "release")
+    return `${json} is a ${report?.mode}-mode report: run the bench with --release`;
   let limitsFile;
   try {
     limitsFile = JSON.parse(limits ?? '{"machine":"","commit":"","measures":{}}');
