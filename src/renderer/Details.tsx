@@ -1,5 +1,5 @@
 import { ChevronRight, CircleAlert, LoaderCircle, MousePointerClick } from "lucide";
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
@@ -162,12 +162,14 @@ function Group(props: { node: TestNode; state: AppState }) {
     }
     return Object.entries(out) as [Status, number][];
   };
+  // A memo: the badge reads it in several places, and each read would walk the whole group again.
+  const status = createMemo(() => deriveStatus(props.node, props.state.statuses));
   const location = () => props.node.file || "/";
   return (
     <>
       <h2 class="text-lg font-semibold break-words">{props.node.name}</h2>
       <p>
-        <StatusBadge status={deriveStatus(props.node, props.state.statuses)} />
+        <StatusBadge status={status()} />
       </p>
       <div class="flex text-xs text-muted">
         <Cut full={location()} testid="details-location" class="font-mono" wrap="max-w-full">

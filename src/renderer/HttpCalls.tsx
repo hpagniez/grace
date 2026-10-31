@@ -139,7 +139,8 @@ export function HttpCalls(props: {
   let list: VirtualListHandle | undefined;
   // A chip change the person made shows the selected call again (R4.7); new calls never scroll. The list
   // settles first (it keeps the rows in view still when rows leave above, R4.6): an effect on the chips would
-  // run before that and lose to it.
+  // run before that and lose to it. Not `revealSelectedOn`: the `<Show>` below remounts the list when the
+  // chips empty it and fill it again, and a fresh list skips it.
   const toggle = (group: HttpGroup | "all") => {
     props.toggleGroup(group);
     flush();

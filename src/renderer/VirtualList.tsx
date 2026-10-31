@@ -13,6 +13,8 @@ import {
 export interface VirtualListHandle {
   /** Scrolls the least to show the row with this key (R4.1); nothing when it is not in the list. */
   reveal(key: string): void;
+  /** Moves to the row with this key as an arrow key does: shown, focused from the keyboard, selected. */
+  moveTo(key: string): void;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface VirtualListHandle {
  * through every row, drawn or not, and select as they go (R3, R4). The focus row is the last focused one if
  * it is there, else the selected one, else the first. It alone has tabindex 0 and is always drawn.
  */
-export function VirtualList<T>(props: {
+export function VirtualList<T, S = undefined>(props: {
   items: readonly T[];
   keyOf(item: T): string;
   rowHeight: number;
@@ -36,14 +38,21 @@ export function VirtualList<T>(props: {
   scrollerTestid?: string;
   /** On every row element. */
   itemClass?: string;
+  /**
+   * Made once per drawn row, in the row's scope, and handed to `attrs` and `children`: memos both read are
+   * worked out once, and `attrs`, which runs again on every move of the focus or the selection, stays cheap.
+   */
+  shared?(item: () => T): S;
   /** Spread on the row element. */
-  attrs(item: T, index: number): Record<string, string | number | undefined>;
+  attrs(item: T, index: number, shared: S): Record<string, string | number | undefined>;
   selectedKey: string | null;
+  /** When this value changes, the selected row scrolls into view once the rows in view are kept still (R4.7). */
+  revealSelectedOn?: unknown;
   onSelect(item: T): void;
   /** The list's own keys; true when handled. */
   onKey?(e: KeyboardEvent, item: T, index: number): boolean;
   ref?(handle: VirtualListHandle): void;
-  children(item: T, index: number, keyboardFocused: () => boolean): JSX.Element;
+  children(item: T, index: number, keyboardFocused: () => boolean, shared: S): JSX.Element;
 }) {
   let scroller!: HTMLDivElement;
   let list!: HTMLDivElement;
@@ -92,6 +101,10 @@ export function VirtualList<T>(props: {
     scroller.scrollTop = top;
     setScrollTop(scroller.scrollTop); // as the browser clamped it
   };
+  const reveal = (key: string) => {
+    const i = keys().indexOf(key);
+    if (i >= 0) scrollTo(scrollToShow(i, view(scroller.scrollTop)));
+  };
 
   const moveTo = (index: number) => {
     const item = props.items[index];
@@ -106,7 +119,8 @@ export function VirtualList<T>(props: {
 
   const onKeyDown = (e: KeyboardEvent) => {
     const f = focusIndex();
-    if (f < 0) return;
+    // A key on a control in a row (focused by assistive technology) is that control's.
+    if (f < 0 || rowKey(e.target) === null) return;
     const last = keys().length - 1;
     const page = pageRows(view(scroller.scrollTop));
     const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -124,8 +138,12 @@ export function VirtualList<T>(props: {
       if (to >= 0 && to <= last && to !== f) moveTo(to);
     } else if (plain && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
+      reveal(keys()[f]); // a key that does not move still brings a scrolled-away row back (R4.2)
       props.onSelect(props.items[f]);
-    } else if (props.onKey?.(e, props.items[f], f)) e.preventDefault();
+    } else if (props.onKey?.(e, props.items[f], f)) {
+      e.preventDefault();
+      if (focusKey() === keys()[f]) reveal(keys()[f]); // moveTo scrolls when focus moved
+    }
   };
 
   // Rows added or removed above the view keep the rows in view still (R4.6). A focused row that left hands
@@ -136,20 +154,26 @@ export function VirtualList<T>(props: {
       keys: keys(),
       top: scroller?.scrollTop ?? 0,
       holds: !!list?.contains(document.activeElement),
+      cue: props.revealSelectedOn,
     }),
     (now, before) => {
+      refocus = null; // one an earlier flush left unused must not pull focus in later
       if (!before) return;
       const top = untrack(() => anchoredScrollTop(view(now.top), before.keys, now.keys));
       if (top !== now.top) scrollTo(top);
+      // Here, not in an effect of the owner's: that would run first, and the anchoring would undo it.
+      const selected = untrack(() => props.selectedKey);
+      if (now.cue !== before.cue && selected !== null) untrack(() => reveal(selected));
       const a = untrack(active);
       if (a === null || now.keys.includes(a)) return;
-      // An unfocused list falls back to the selected row, else the first (R3.1).
-      if (!now.holds) {
+      // An unfocused list falls back to the selected row while it is there (R3.1), else to the nearest row
+      // above, as a focused one does (R4.5): never to the first row while a row above is left.
+      if (!now.holds && selected !== null && now.keys.includes(selected)) {
         setActive(null);
         return;
       }
       const next = survivor(a, before.keys, now.keys);
-      refocus = next;
+      if (now.holds) refocus = next;
       setActive(next);
     },
   );
@@ -170,9 +194,10 @@ export function VirtualList<T>(props: {
   });
 
   props.ref?.({
-    reveal(key) {
+    reveal,
+    moveTo(key) {
       const i = keys().indexOf(key);
-      if (i >= 0) scrollTo(scrollToShow(i, view(scroller.scrollTop)));
+      if (i >= 0) moveTo(i);
     },
   });
 
@@ -180,7 +205,8 @@ export function VirtualList<T>(props: {
     <div
       ref={(e) => (scroller = e)}
       data-testid={props.scrollerTestid}
-      class="min-h-0 flex-1 overflow-auto"
+      // Chromium's own scroll anchoring off: the rows are anchored here (R4.6), once.
+      class="min-h-0 flex-1 overflow-auto [overflow-anchor:none]"
       onScroll={() => setScrollTop(scroller.scrollTop)}
     >
       <div
@@ -200,8 +226,8 @@ export function VirtualList<T>(props: {
           if (key === null) return;
           const moves = key !== focusKey();
           setActive(key);
-          // Focus that lands on another row first (a press, a screen reader): as the focus row it moves
-          // to the front, which drops its focus once.
+          // Focus that lands on another row first (assistive technology, a script): as the focus row it
+          // moves to the front, which drops its focus once.
           if (moves) {
             flush();
             if (document.activeElement !== row) row.focus({ preventScroll: true });
@@ -217,6 +243,7 @@ export function VirtualList<T>(props: {
             // Only a new item or place redraws the row's content, not every scroll.
             const index = createMemo(() => r().index);
             const item = createMemo(() => r().item);
+            const shared = props.shared?.(item) as S;
             return (
               <div
                 ref={(e) => (el = e)}
@@ -235,15 +262,17 @@ export function VirtualList<T>(props: {
                 // the focus row moves to the front. The click then focuses the row, from a button in it too,
                 // so the next key moves from it.
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
+                onClick={(e) => {
                   setActive(key);
                   flush(); // to the front first, then focus: a focused node that moves loses focus
                   // A script focus would match :focus-visible: a click is not keyboard focus.
                   el.focus({ preventScroll: true, focusVisible: false });
+                  // On the row itself: its indent, or a screen reader's or voice "activate".
+                  if (e.target === el) props.onSelect(item());
                 }}
-                {...props.attrs(item(), index())}
+                {...props.attrs(item(), index(), shared)}
               >
-                {props.children(item(), index(), () => keyboard() === key)}
+                {props.children(item(), index(), () => keyboard() === key, shared)}
               </div>
             );
           }}

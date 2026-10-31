@@ -14,6 +14,22 @@ import {
   test,
 } from "./helpers";
 
+/** The key of each drawn tree row's parent. The rows are not in DOM order (the focus row is first): sort by place. */
+async function parentsOfRows(win: Page): Promise<Record<string, string | null>> {
+  const rows = await win.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("[role=treeitem]")]
+      .sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top))
+      .map((el) => ({ key: el.dataset.key!, level: Number(el.getAttribute("aria-level")) })),
+  );
+  const parents: Record<string, string | null> = {};
+  rows.forEach((row, i) => {
+    let j = i - 1;
+    while (j >= 0 && rows[j].level >= row.level) j--;
+    parents[row.key] = j >= 0 ? rows[j].key : null;
+  });
+  return parents;
+}
+
 test("Open a project and see its tests", async () => {
   const dir = project("clean");
   const { app, win, userData } = await launch();
@@ -23,19 +39,23 @@ test("Open a project and see its tests", async () => {
   await openProject(app, dir);
   await expect(nodeByKey(win, "d:tests")).toBeVisible({ timeout: 2000 });
   await expect(nodeByKey(win, "d:tests")).toContainText("tests");
+  // The tree is a flat list: a row's parent is the nearest row above it with a lower level.
+  const parents = await parentsOfRows(win);
   for (const f of ["basic", "outline", "slow"]) {
-    const feature = win.locator(`li:has(> [data-key="d:tests"]) [data-key="f:tests/${f}.feature"]`);
+    const feature = nodeByKey(win, `f:tests/${f}.feature`);
     await expect(feature).toBeVisible();
     await expect(feature).toContainText(`${f}.feature`);
+    expect(parents[`f:tests/${f}.feature`]).toBe("d:tests");
     await expect(node(win, `${f}.feature`)).toHaveAttribute("data-key", `f:tests/${f}.feature`);
   }
   const outline = nodeByKey(win, "o:tests/outline.feature#1");
   await expect(outline).toContainText("add <a> and <b>");
-  await expect(
-    win.locator(
-      `li:has(> [data-key="o:tests/outline.feature#1"]) [data-testid=tree-node][data-kind=row]`,
-    ),
-  ).toHaveCount(3);
+  const outlineRows = Object.keys(parents).filter(
+    (k) => parents[k] === "o:tests/outline.feature#1",
+  );
+  expect(outlineRows).toHaveLength(3);
+  for (const key of outlineRows)
+    await expect(nodeByKey(win, key)).toHaveAttribute("data-kind", "row");
   await expect(win.locator('[data-testid=tree-node][data-key*="common/create-user"]')).toHaveCount(
     0,
   );

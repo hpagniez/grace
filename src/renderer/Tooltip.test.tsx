@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { flush } from "solid-js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal, flush } from "solid-js";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { Tooltip } from "./Tooltip";
 
 // Only the timers: a full fake would stop Solid's microtask flush.
@@ -303,6 +303,176 @@ describe("Tooltip", () => {
       // @ts-expect-error jsdom has none; put it back as it was
       delete HTMLElement.prototype.showPopover;
     }
+  });
+
+  describe("pinned", () => {
+    const TEXT = "Refresh the tree";
+
+    /** A tooltip that its owner opens: a row that has the keyboard focus and a cut label. */
+    function pin(initial: boolean, text: string | undefined) {
+      const [pinned, setPinned] = createSignal(initial);
+      const [label, setLabel] = createSignal(text);
+      render(() => (
+        <div data-testid="list">
+          <Tooltip text={label()} pinned={pinned()}>
+            <button type="button">Refresh</button>
+          </Tooltip>
+        </div>
+      ));
+      flush();
+      return {
+        wrapper: wrapperOf(screen.getByRole("button")),
+        set: (on: boolean) => {
+          setPinned(on);
+          flush();
+        },
+        setText: (t: string | undefined) => {
+          setLabel(t);
+          flush();
+        },
+      };
+    }
+
+    it("shows at once while true, with the text, and hides when it turns false", () => {
+      const { set } = pin(false, TEXT);
+      expect(tips()).toHaveLength(0);
+      set(true);
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+      set(false);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("shows from the start when it is true on mount", () => {
+      pin(true, TEXT);
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+    });
+
+    it("shows nothing without a text, and shows once the text comes", () => {
+      const { set, setText } = pin(false, undefined);
+      set(true);
+      expect(tips()).toHaveLength(0);
+      setText(TEXT);
+      expect(tips()).toHaveLength(1);
+      setText(undefined);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("opens with a ternary text, which the compiler reads through a new memo each time", () => {
+      const [on, setOn] = createSignal(false);
+      const [label] = createSignal(TEXT); // a dynamic branch: a static one gets no memo
+      render(() => (
+        <Tooltip text={on() ? label() : undefined} pinned={on()}>
+          <button type="button">Refresh</button>
+        </Tooltip>
+      ));
+      flush();
+      setOn(true);
+      flush();
+      expect(tips().map((t) => t.textContent)).toEqual([TEXT]);
+    });
+
+    it("leaves hover as it was: a pointer resting on the target opens it, leaving closes it", () => {
+      const { wrapper } = pin(false, TEXT);
+      hover(wrapper);
+      expect(tips()).toHaveLength(1);
+      leave(wrapper);
+      expect(tips()).toHaveLength(0);
+    });
+
+    it("hides at the cleanup of its owner", () => {
+      const { set } = pin(false, TEXT);
+      set(true);
+      cleanup();
+      expect(tips()).toHaveLength(0);
+    });
+
+    describe("placed", () => {
+      let target: DOMRect;
+      let box: DOMRect | undefined; // the scrolling box's own, when a test gives it one
+      let show: Mock<(this: HTMLElement) => void>;
+      beforeEach(() => {
+        target = DOMRect.fromRect({ x: 500, y: 300, width: 24, height: 24 });
+        box = undefined;
+        const tip = DOMRect.fromRect({ x: 0, y: 0, width: 24, height: 24 });
+        vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+          this: Element,
+        ) {
+          if (box && this.getAttribute("data-testid") === "list") return box;
+          return this.getAttribute("role") === "tooltip" ? tip : target;
+        });
+        show = vi.fn(function (this: HTMLElement) {
+          expect(this.isConnected).toBe(true);
+        });
+        HTMLElement.prototype.showPopover = show;
+      });
+      afterEach(() => {
+        // @ts-expect-error jsdom has none; put it back as it was
+        delete HTMLElement.prototype.showPopover;
+      });
+
+      it("shows the popover once and places it below the target when pinned turns true", () => {
+        const { set } = pin(false, TEXT);
+        set(true);
+        expect(show).toHaveBeenCalledTimes(1);
+        expect(tipOf()!.dataset.side).toBe("below");
+        expect(tipOf()!.style.top).toBe("330px");
+        expect(tipOf()!.style.left).toBe("500px");
+      });
+
+      it("does the same when pinned is true on mount", () => {
+        pin(true, TEXT);
+        expect(show).toHaveBeenCalledTimes(1);
+        expect(tipOf()!.dataset.side).toBe("below");
+        expect(tipOf()!.style.top).toBe("330px");
+      });
+
+      it("stays up and is placed again when a box that holds it scrolls, while pinned", () => {
+        const { set } = pin(true, TEXT);
+        target = DOMRect.fromRect({ x: 500, y: 400, width: 24, height: 24 }); // the scroll moved it
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tips()).toHaveLength(1);
+        expect(tipOf()!.style.top).toBe("430px");
+        expect(show).toHaveBeenCalledTimes(1); // placed again, not shown again
+
+        set(false); // the scroll listener did not outlive the close
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("hides, though pinned, once that scroll takes its target out of the box", () => {
+        box = DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 400 });
+        pin(true, TEXT);
+        target = DOMRect.fromRect({ x: 500, y: 350, width: 24, height: 24 }); // still in the box
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tipOf()!.style.top).toBe("380px");
+        target = DOMRect.fromRect({ x: 500, y: 400, width: 24, height: 24 }); // just below it
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("still hides on that scroll when it is not pinned", () => {
+        const { wrapper } = pin(false, TEXT);
+        hover(wrapper);
+        expect(tips()).toHaveLength(1);
+        fireEvent.scroll(screen.getByTestId("list"));
+        flush();
+        expect(tips()).toHaveLength(0);
+      });
+
+      it("hides on Escape and on a pointer leave even while pinned", () => {
+        const { wrapper } = pin(true, TEXT);
+        fireEvent.keyDown(wrapper, { key: "Escape" });
+        flush();
+        expect(tips()).toHaveLength(0);
+
+        cleanup();
+        const again = pin(true, TEXT);
+        leave(again.wrapper);
+        expect(tips()).toHaveLength(0);
+      });
+    });
   });
 
   describe("clicks on the tooltip", () => {

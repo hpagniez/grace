@@ -13,6 +13,7 @@ const at = (scrollTop: number) => ({ scrollTop, height: 0, rowHeight: 24, pad: 0
 function setup(n = 1000, selected: string | null = null) {
   const [items, setItems] = createSignal(keys(n));
   const [selectedKey, setSelectedKey] = createSignal(selected);
+  const [cue, setCue] = createSignal(0);
   const onSelect = vi.fn();
   const onKey = vi.fn((_e: KeyboardEvent, _item: string, _index: number) => false);
   const press = vi.fn();
@@ -31,6 +32,7 @@ function setup(n = 1000, selected: string | null = null) {
       selectedKey={selectedKey()}
       onSelect={onSelect}
       onKey={onKey}
+      revealSelectedOn={cue()}
       ref={(h) => (handle = h)}
     >
       {(k, _i, keyboardFocused) => (
@@ -68,6 +70,12 @@ function setup(n = 1000, selected: string | null = null) {
     setItems(next);
     flush();
   };
+  /** A change the person made, as a filter: the rows and the cue in one update. */
+  const filter = (next: string[]) => {
+    setItems(next);
+    setCue((c) => c + 1);
+    flush();
+  };
   return {
     scroller,
     list,
@@ -78,6 +86,7 @@ function setup(n = 1000, selected: string | null = null) {
     scrollTo,
     key,
     change,
+    filter,
     onSelect,
     onKey,
     press,
@@ -185,6 +194,26 @@ describe("VirtualList", () => {
     expect(onSelect).toHaveBeenLastCalledWith("r2");
   });
 
+  it("brings a scrolled-away focus row back before Enter selects it (R4.2)", () => {
+    const { focus, key, scrollTo, scroller, onSelect } = setup();
+    focus("r10");
+    scrollTo(20000);
+    key("Enter");
+    expect(onSelect).toHaveBeenLastCalledWith("r10");
+    expect(scroller.scrollTop).toBe(scrollToShow(10, at(20000)));
+    expect(scroller.scrollTop).toBe(240);
+  });
+
+  it("leaves a key on a control inside a row to that control", () => {
+    const { focus, row, onSelect } = setup();
+    focus("r3");
+    const e = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    row("r3")!.querySelector("button")!.dispatchEvent(e);
+    flush();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+  });
+
   it("passes other keys to onKey, and stops what it handled", () => {
     const { focus, key, onKey } = setup();
     focus("r0");
@@ -215,6 +244,19 @@ describe("VirtualList", () => {
     key(" ");
     expect(onSelect).toHaveBeenLastCalledWith("r3");
     expect(press).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects a row clicked on itself, as a screen reader's activate does, not through a click inside it", () => {
+    const { row, onSelect } = setup();
+    fireEvent.click(row("r3")!);
+    flush();
+    expect(document.activeElement).toBe(row("r3"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith("r3");
+    fireEvent.click(row("r4")!.querySelector("span")!);
+    flush();
+    expect(document.activeElement).toBe(row("r4"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a press on a row from taking focus, so its click arrives", () => {
@@ -265,6 +307,17 @@ describe("VirtualList", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it("falls back to the nearest row above when an unfocused active row leaves with the selected one", () => {
+    const { row, stops, change } = setup(1000, "r5");
+    fireEvent.click(row("r5")!);
+    flush();
+    row("r5")!.blur();
+    flush();
+    change(keys(1000).filter((k) => !["r3", "r4", "r5"].includes(k)));
+    expect(stops().map((r) => r.dataset.key)).toEqual(["r2"]);
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("draws rows after the list shrinks below the scroll position", () => {
     const { scrollTo, change, rows } = setup();
     scrollTo(20000);
@@ -283,6 +336,33 @@ describe("VirtualList", () => {
     expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
   });
 
+  it("reveals the selected row after keeping the rows in view still, when revealSelectedOn changes", () => {
+    const { scrollTo, change, filter, scroller } = setup(1000, "r900");
+    scrollTo(2400); // r100 is the top row, r900 far below
+    const rest = keys(1000).slice(50);
+    filter(rest); // 50 rows leave above the view: r100 stays on top (1200), then r900 comes into view
+    expect(scroller.scrollTop).toBe(scrollToShow(850, at(1200)));
+    expect(scroller.scrollTop).toBe(19824);
+    scrollTo(0);
+    change([...rest]); // rows that change without the cue never scroll to the selection
+    expect(scroller.scrollTop).toBe(0);
+  });
+
+  it("moves to a row by key from the handle, as an arrow key does", () => {
+    const { handle, row, rows, stops, scroller, onSelect } = setup();
+    handle().moveTo("r500");
+    flush();
+    expect(document.activeElement).toBe(row("r500"));
+    expect(stops()).toEqual([row("r500")]);
+    expect(onSelect).toHaveBeenLastCalledWith("r500");
+    expect(rows().filter((r) => r.querySelector("[data-keyboard=yes]"))).toEqual([row("r500")]);
+    expect(scroller.scrollTop).toBe(scrollToShow(500, at(0)));
+    handle().moveTo("nope");
+    flush();
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(row("r500"));
+  });
+
   it("tells a row when it has keyboard focus", () => {
     const { focus, row, rows, key } = setup();
     focus("r0");
@@ -299,5 +379,44 @@ describe("VirtualList", () => {
     flush();
     expect(row("r20")).toBe(r20);
     expect(r20?.getAttribute("aria-selected")).toBe("true");
+  });
+});
+
+describe("shared", () => {
+  it("is made once per drawn row for its attributes and content, not again as the focus moves", () => {
+    const shared = vi.fn((item: () => string) => ({ upper: () => item().toUpperCase() }));
+    const onSelect = vi.fn();
+    render(() => (
+      <VirtualList
+        items={keys(3)}
+        keyOf={(k) => k}
+        rowHeight={24}
+        role="listbox"
+        itemRole="option"
+        label="Rows"
+        testid="list"
+        shared={shared}
+        attrs={(_k, _i, s) => ({ "aria-label": s.upper() })}
+        selectedKey={null}
+        onSelect={onSelect}
+      >
+        {(_k, _i, _keyboard, s) => <span>{s.upper()}</span>}
+      </VirtualList>
+    ));
+    const rows = () => [
+      ...screen.getByTestId("list").querySelectorAll<HTMLElement>("[role=option]"),
+    ];
+    expect(rows().map((r) => [r.getAttribute("aria-label"), r.textContent])).toEqual([
+      ["R0", "R0"],
+      ["R1", "R1"],
+      ["R2", "R2"],
+    ]);
+    expect(shared).toHaveBeenCalledTimes(3);
+    rows()[0].focus();
+    flush();
+    rows()[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    flush();
+    expect(onSelect).toHaveBeenLastCalledWith("r1");
+    expect(shared).toHaveBeenCalledTimes(3);
   });
 });
