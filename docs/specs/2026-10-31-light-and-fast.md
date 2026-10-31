@@ -35,7 +35,7 @@ Nothing guards this today. The [big-project note](../research/2026-10-29-big-pro
 - Measure what people run: the packaged, minified app on Windows 11.
 - GitHub's Windows runners have 4 shared vCPUs, so timings swing from run to run. Two builds are compared on the same VM, in turns, as in the big-project note.
 - The packaged exe's `EnableNodeCliInspectArguments: false` fuse blocks Playwright's `_electron` (AGENTS.md). The Tauri spike drove the packaged exe over CDP instead (`--remote-debugging-port`) and opened a project through `GRACE_USER_DATA` and `settings.json`'s `lastProject` (`measure/measure.mjs`). That is the only way to measure a release zip the bench did not build.
-- Never run the bench at the same time as `npm test` or `npm run e2e`: the Java leak checks scan every `java.exe` under `vendor/jre`.
+- Never run the bench at the same time as `npm test` or `npm run e2e`: the bench needs a quiet machine, and it and e2e both package into `out/`. The leak checks do not see the packaged app's Java, which is not under `vendor/jre`.
 - The packaged app checks GitHub for updates at start, and `GRACE_UPDATE_FEED` works only unpackaged. The bench writes `updates.checkAtStartup: false` and the `window` size into the data folder's `settings.json`. CDP gives no access to the main process, so minimising the window takes a Win32 call.
 - The bench drives the app through test ids, data attributes and settings keys, and the no-backward-compatibility rule lets any PR rename them. A PR that renames one the bench uses updates the bench in the same PR.
 - Workflows use only GitHub-owned actions pinned to a full commit SHA. PRs from forks get a read-only token.
