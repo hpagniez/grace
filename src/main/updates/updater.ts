@@ -123,7 +123,11 @@ export class Updater {
     try {
       if (result) {
         this.store(settingsAfter(result, this.settings));
-        this.d.emit({ type: "notice", message: resultNotice(result, this.d.running) });
+        this.d.emit({
+          type: "notice",
+          message: resultNotice(result, this.d.running),
+          success: result.ok,
+        });
         this.send();
       }
       if (!this.settings.checkAtStartup) return;
