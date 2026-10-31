@@ -36,7 +36,7 @@ describe("scrollToShow", () => {
   it("scrolls the least to bring a row into view", () => {
     expect(scrollToShow(50, v(0))).toBe(624);
     expect(scrollToShow(10, v(624))).toBe(240);
-    expect(scrollToShow(0, v(100, 600, 24, 8))).toBe(8);
+    expect(scrollToShow(0, v(100, 600, 24, 8))).toBe(0);
   });
 
   it("does not scroll when the row is in view", () => {

@@ -1046,6 +1046,7 @@ describe("virtual tree", () => {
       press("Home");
       expect(focused()).toBe("d:tests");
       expectInView("d:tests");
+      expect(scroller().scrollTop).toBe(0); // its 8 px pad too: at the very top (R4.6)
     });
 
     it("runs the focused row with Ctrl+Enter, and not during a run", () => {

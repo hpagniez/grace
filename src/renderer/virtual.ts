@@ -25,8 +25,9 @@ export function drawnRange(count: number, v: View): { first: number; last: numbe
   return { first, last };
 }
 
-/** The scrollTop that shows row `index` with the least scroll (R4.1); v.scrollTop when it is in view. */
+/** The scrollTop that shows row `index` with the least scroll (R4.1); v.scrollTop when it is in view. Row 0 is 0, its pad shown too. */
 export function scrollToShow(index: number, v: View): number {
+  if (index === 0) return 0;
   const top = v.pad + index * v.rowHeight;
   const bottom = top + v.rowHeight;
   if (top < v.scrollTop) return top;
