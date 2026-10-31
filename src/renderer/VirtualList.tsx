@@ -157,6 +157,7 @@ export function VirtualList<T, S = undefined>(props: {
       cue: props.revealSelectedOn,
     }),
     (now, before) => {
+      refocus = null; // one an earlier flush left unused must not pull focus in later
       if (!before) return;
       const top = untrack(() => anchoredScrollTop(view(now.top), before.keys, now.keys));
       if (top !== now.top) scrollTo(top);
