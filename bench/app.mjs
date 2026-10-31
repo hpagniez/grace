@@ -29,6 +29,15 @@ const execFileAsync = promisify(execFile);
 const START_LIMIT_MS = 60_000;
 /** How long `stop` waits for the process tree to be gone. */
 const GONE_LIMIT_MS = 10_000;
+/**
+ * Chromium slows frames and timers of a window that is in the background or covered by another, and the probes read frames.
+ * Only a driven app (cdp) gets these: idle measures must see the app as a user's machine runs it.
+ */
+const UNTHROTTLED = [
+  "--disable-renderer-backgrounding",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-features=CalculateNativeWinOcclusion",
+];
 
 /** A port nothing listens on, so a leftover app of an earlier run is never the one the bench connects to. */
 const freePort = () =>
@@ -82,18 +91,38 @@ function alive(pid) {
  * @param {number} pid
  */
 async function killTree(pid) {
-  // A tree listed before the kill is the only way to know what to wait for. If the listing fails, the kill still runs.
+  // The listed pids are killed one by one, not just the root with /T: once the root is dead (the app crashed), taskkill
+  // cannot find it and so never reaches its children, which are still listed by their parent's pid. /T stays for what
+  // the root started after the listing. If the listing fails, the root alone is killed.
   const tree = await treePids(pid).catch(() => [pid]);
   // A failure here means a process already gone; the wait below is what proves the rest is.
-  await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }).catch(
-    () => {},
-  );
+  await execFileAsync("taskkill", ["/F", "/T", ...tree.flatMap((p) => ["/PID", String(p)])], {
+    windowsHide: true,
+  }).catch(() => {});
   const until = Date.now() + GONE_LIMIT_MS;
   for (;;) {
     const left = tree.filter(alive);
     if (!left.length) return;
     if (Date.now() > until) throw new Error(`still running after taskkill: ${left.join(", ")}`);
     await sleep(50);
+  }
+}
+
+/**
+ * Removes `dir`, retrying for 10 s: Windows keeps the files of a process just killed locked for a moment, and `rmSync`'s
+ * own retries do not wait on that. A folder that will not go is named and left, not an error: the measures are in.
+ * @param {string} dir
+ */
+async function removeDir(dir) {
+  for (let tries = 0; ; tries++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (tries === 40)
+        return console.warn(`could not remove ${dir}: ${/** @type {Error} */ (e).message}`);
+      await sleep(250);
+    }
   }
 }
 
@@ -118,10 +147,14 @@ export async function startApp(exe, { project, dataDir, cdp, port }) {
   );
   const debugPort = cdp ? (port ?? (await freePort())) : null;
   const t0 = Date.now();
-  const child = spawn(exe, debugPort ? [`--remote-debugging-port=${debugPort}`] : [], {
-    env: { ...process.env, GRACE_USER_DATA: dir },
-    stdio: "ignore",
-  });
+  const child = spawn(
+    exe,
+    debugPort ? [`--remote-debugging-port=${debugPort}`, ...UNTHROTTLED] : [],
+    {
+      env: { ...process.env, GRACE_USER_DATA: dir },
+      stdio: "ignore",
+    },
+  );
   /** @type {Error | undefined} */
   let childError;
   child.on("error", (e) => (childError = e));
@@ -139,8 +172,7 @@ export async function startApp(exe, { project, dataDir, cdp, port }) {
         if (child.pid) await killTree(child.pid);
         await browser?.close().catch(() => {});
       } finally {
-        if (!keepData)
-          rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+        if (!keepData) await removeDir(dir);
       }
     })());
 

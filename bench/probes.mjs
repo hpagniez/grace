@@ -149,17 +149,30 @@ export async function instrument(page) {
 
 /**
  * Times one click to paint: from the click until `done` holds and the next frame is on screen. Null when the target
- * is not found within 5 s, or `done` held before the click, or never came (30 s).
+ * is not found within 5 s, or `done` held before the click, or never came (30 s). The page's own waits run on its
+ * timers and frames, which a frozen renderer stops, so the same limits are kept here too: a page that never answers
+ * reads null instead of hanging the bench.
  * @param {Page} page
  * @param {Target} target
  * @param {Done} done
  * @returns {Promise<number | null>}
  */
-export function clickToPaint(page, target, done) {
-  return page.evaluate(
+export async function clickToPaint(page, target, done) {
+  const probe = page.evaluate(
     ([t, d]) => /** @type {any} */ (window).bench.clickToPaint(t, d),
     [target, done],
   );
+  probe.catch(() => {}); // if the cap wins, a late failure (the app stopped) is nobody's to handle
+  /** @type {NodeJS.Timeout | undefined} */
+  let timer;
+  const frozen = new Promise(
+    (resolve) => (timer = setTimeout(resolve, TARGET_MS + EFFECT_MS, null)),
+  );
+  try {
+    return await Promise.race([probe, frozen]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
