@@ -28,6 +28,7 @@ async function powershell(script) {
     const { stdout } = await execFileAsync("powershell.exe", [...PS_FLAGS, script], {
       encoding: "utf8",
       windowsHide: true,
+      timeout: 60_000, // a hung PowerShell must not hold the bench for ever
     });
     return stdout;
   } catch (e) {

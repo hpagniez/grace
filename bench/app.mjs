@@ -67,7 +67,7 @@ $ids = [System.Collections.Generic.HashSet[int]]::new(); [void]$ids.Add(${pid})
 do { $n = $ids.Count; foreach ($p in $all) { if ($ids.Contains([int]$p.ParentProcessId)) { [void]$ids.Add([int]$p.ProcessId) } } } while ($ids.Count -ne $n)
 $ids -join ','`,
     ],
-    { encoding: "utf8", windowsHide: true },
+    { encoding: "utf8", windowsHide: true, timeout: 60_000 }, // a hung PowerShell: kill the root alone
   );
   return stdout.trim().split(",").map(Number);
 }

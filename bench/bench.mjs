@@ -509,6 +509,8 @@ async function main() {
     return console.error(`wrote ${limitsFile}`);
   }
   const release = args.release === true;
+  if (release && !existsSync(limitsFile))
+    return usage(`${limitsFile} is missing: a release bench is judged against it`);
   const rounds = Number(args.rounds ?? (release ? 5 : 3));
   if (!Number.isInteger(rounds) || rounds < 1)
     return usage(`--rounds must be a whole number of 1 or more`);
@@ -593,17 +595,18 @@ async function main() {
     rounds: results,
     medians: { a: builds.a ? medians("a") : null, b: medians("b") },
   };
+  // written first: a limits file that cannot be read must not lose an hour of rounds
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(path.join(outDir, "bench.json"), JSON.stringify(report, null, 2) + "\n");
   const limits = existsSync(limitsFile)
     ? JSON.parse(readFileSync(limitsFile, "utf8"))
     : { machine: "", commit: "", measures: {} };
   const table = markdown(report, judge(report, limits));
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(path.join(outDir, "bench.json"), JSON.stringify(report, null, 2) + "\n");
   writeFileSync(path.join(outDir, "bench.md"), table);
   console.log(table);
 }
 
-for (const signal of ["SIGINT", "SIGTERM"])
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"])
   process.on(signal, () => die(`bench stopped by ${signal}`));
 for (const event of ["uncaughtException", "unhandledRejection"])
   process.on(event, (e) => die(`bench failed: ${/** @type {Error} */ (e)?.stack ?? e}`));
