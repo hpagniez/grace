@@ -579,13 +579,16 @@ async function main() {
       [...ids].map((id) => [id, median(rs.map((r) => r.values[id] ?? null))]),
     );
   };
+  // bench.json may be committed (a release's record): the home folder must not name the person
+  const shown = (/** @type {string} */ exe) =>
+    path.resolve(exe).replace(os.homedir(), "~").replaceAll("\\", "/");
   /** @type {Report} */
   const report = {
     mode: release ? "release" : "pr",
     machine: machine(),
     builds: {
-      a: builds.a && { label: builds.a.label, exe: builds.a.exe },
-      b: { label: builds.b.label, exe: builds.b.exe },
+      a: builds.a && { label: builds.a.label, exe: shown(builds.a.exe) },
+      b: { label: builds.b.label, exe: shown(builds.b.exe) },
     },
     rounds: results,
     medians: { a: builds.a ? medians("a") : null, b: medians("b") },
