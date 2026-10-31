@@ -58,7 +58,12 @@ export function publicDocsError(head, base, files, read) {
  * missing) without adding a record under docs/decisions/ (`added` lists the files the PR adds).
  */
 export function limitRaiseError(base, head, added) {
-  const ids = raisedLimits(base && JSON.parse(base), head && JSON.parse(head));
+  let ids;
+  try {
+    ids = raisedLimits(base && JSON.parse(base), head && JSON.parse(head));
+  } catch {
+    return "bench/limits.json is not valid JSON";
+  }
   if (!ids.length || added.some((f) => f.startsWith("docs/decisions/"))) return null;
   return `bench/limits.json raises ${ids.join(", ")} without a new docs/decisions/ record (AGENTS.md)`;
 }
@@ -82,10 +87,19 @@ export function performanceError(head, base, files, read, limits) {
   const said = /^Result: (pass|miss)\s*$/m.exec(text)?.[1];
   if (!said)
     return `${record} has no "Result: pass" or "Result: miss" line in its Performance section`;
-  const { result, rows } = judge(
-    JSON.parse(read(json)),
-    JSON.parse(limits ?? '{"machine":"","commit":"","measures":{}}'),
-  );
+  let report;
+  try {
+    report = JSON.parse(read(json));
+  } catch {
+    return `${json} is not valid JSON`;
+  }
+  let limitsFile;
+  try {
+    limitsFile = JSON.parse(limits ?? '{"machine":"","commit":"","measures":{}}');
+  } catch {
+    return "bench/limits.json is not valid JSON";
+  }
+  const { result, rows } = judge(report, limitsFile);
   if (said === "pass" && result === "miss") {
     const missed = rows.filter((r) => !["pass", "better", "n/a"].includes(r.verdict));
     return `${record} says "Result: pass" but ${json} misses: ${missed.map((r) => `${r.id} (${r.verdict})`).join(", ")}`;
@@ -115,11 +129,13 @@ function main() {
     .filter(Boolean);
   const read = (f) => git("show", `${HEAD_SHA}:${f}`);
   const limits = show(HEAD_SHA, "bench/limits.json");
-  const added = git("diff", "--name-only", "--diff-filter=A", BASE_SHA, HEAD_SHA).split("\n");
+  // a PR raises a limit only through its own changes: compare with where it left the base, not the base's tip
+  const fork = git("merge-base", BASE_SHA, HEAD_SHA).trim();
+  const added = git("diff", "--name-only", "--diff-filter=A", fork, HEAD_SHA).split("\n");
   for (const err of [
     publicDocsError(HEAD_REF, BASE_REF, checks, read),
     performanceError(HEAD_REF, BASE_REF, checks, read, limits),
-    limitRaiseError(show(BASE_SHA, "bench/limits.json"), limits, added),
+    limitRaiseError(show(fork, "bench/limits.json"), limits, added),
   ])
     if (err) errors.push(err);
   // Dependabot writes its own commit headers, often over 72 characters

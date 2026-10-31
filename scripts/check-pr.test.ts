@@ -125,6 +125,10 @@ describe("limitRaiseError", () => {
   it("accepts a missing base file", () => {
     expect(limitRaiseError(null, limits(120), [])).toBeNull();
   });
+
+  it("names the file when it is not valid JSON", () => {
+    expect(limitRaiseError(limits(95), "{", [])).toBe("bench/limits.json is not valid JSON");
+  });
 });
 
 /** A bench report in the shape bench/judge.mjs documents, with build b's idle memory at `memory` MB. */
@@ -198,6 +202,18 @@ describe("performanceError", () => {
     expect(check(performance(...missed, "", "Decision: no-go"), bench(120))).toContain("no-go");
   });
 
+  it("names the bench JSON when it is not valid JSON", () => {
+    expect(check(performance("Result: pass"), "{")).toBe(`${json} is not valid JSON`);
+  });
+
+  it("names the limits file when it is not valid JSON", () => {
+    const md = performance("Result: pass");
+    const read = (f: string) => (f === record ? md : bench(80));
+    expect(performanceError(release, "main", [record, json], read, "{")).toBe(
+      "bench/limits.json is not valid JSON",
+    );
+  });
+
   it("judges against no limits when the head has no limits file", () => {
     const md = performance("Result: pass");
     const read = (f: string) => (f === record ? md : bench(999));
@@ -267,6 +283,22 @@ describe("check-pr CLI", () => {
     expect(r.status).toBe(0);
   });
 
+  it("ignores a limit that develop lowered after the branch was cut", () => {
+    mkdirSync(join(repo, "bench"));
+    writeFileSync(join(repo, "bench", "limits.json"), limits(120));
+    git("add", ".");
+    git("commit", "-q", "-m", "build(bench): limit idle memory");
+    git("switch", "-q", "-c", "develop-lowered");
+    writeFileSync(join(repo, "bench", "limits.json"), limits(80));
+    git("commit", "-q", "-am", "build(bench): lower the idle memory limit");
+    const lowered = git("rev-parse", "HEAD");
+    git("switch", "-q", "release/v1.0.0-rc.1");
+    git("commit", "-q", "--allow-empty", "-m", "docs: note the limit");
+    const r = run(lowered);
+    expect(r.stdout).toBe("");
+    expect(r.status).toBe(0);
+  });
+
   it("still checks commits only on the PR branch", () => {
     git("commit", "-q", "--allow-empty", "-m", "Bad header");
     const r = run();
@@ -276,10 +308,8 @@ describe("check-pr CLI", () => {
   });
 
   it("fails a PR that raises a limit without a decision record", () => {
-    mkdirSync(join(repo, "bench"));
     writeFileSync(join(repo, "bench", "limits.json"), limits(95));
-    git("add", ".");
-    git("commit", "-q", "-m", "build(bench): limit idle memory");
+    git("commit", "-q", "-am", "build(bench): tighten the idle memory limit");
     const before = git("rev-parse", "HEAD");
     writeFileSync(join(repo, "bench", "limits.json"), limits(120));
     git("commit", "-q", "-am", "build(bench): raise the idle memory limit");
