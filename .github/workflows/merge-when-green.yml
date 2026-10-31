@@ -1,10 +1,10 @@
-# Merges a labelled PR into develop once checks and test are green on its head (ADR 0011, ADR 0017).
+# Merges a labelled PR into develop once checks, test and perf are green on its head (ADR 0011, ADR 0017, ADR 0023).
 # workflow_run and pull_request_target always run this file as it is on develop.
 name: merge-when-green
 
 on:
   workflow_run:
-    workflows: [checks, test]
+    workflows: [checks, test, perf]
     types: [completed]
   # a label added, or a draft marked ready, after CI finished
   pull_request_target:
@@ -77,6 +77,18 @@ jobs:
               e2e=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name == "e2e") | .conclusion] | length > 0 and all(. == "success")')
               [ "$e2e" = true ] || skip "e2e has not passed on $sha"
             fi
+          fi
+          run=$(latest perf.yml)
+          read -r id conclusion <<<"$run"
+          if [ "$id" = null ]; then
+            # perf.yml has the same paths-ignore as test.yml
+            files=$(gh api "repos/$GH_REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+            while read -r f; do
+              [[ $f == docs/* || $f == *.md ]] || skip "perf has not posted numbers on $sha"
+            done <<<"$files"
+          else
+            # a worse number never fails perf: success only means the numbers were posted
+            [ "$conclusion" = success ] || skip "perf has not posted numbers on $sha"
           fi
 
           # --match-head-commit refuses the merge if a push landed after these checks
