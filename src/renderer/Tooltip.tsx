@@ -32,7 +32,7 @@ const tipClass = [
 ].join(" ");
 
 /** Whether the focus that just arrived came from the keyboard. An engine that cannot say shows it. */
-function keyboardFocus(el: EventTarget | null) {
+export function keyboardFocus(el: EventTarget | null) {
   try {
     return (el as Element).matches(":focus-visible");
   } catch {

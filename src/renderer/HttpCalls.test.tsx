@@ -7,8 +7,9 @@ import type { HttpCall } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
-import { GROUP_TINT } from "./HttpCalls";
+import { callName, GROUP_TINT } from "./HttpCalls";
 import { TINT } from "./ui";
+import { scrollToShow } from "./virtual";
 import { drawn } from "../../test/drawn";
 
 afterEach(() => {
@@ -104,7 +105,13 @@ const click = (el: HTMLElement) => {
   flush();
 };
 const showHttp = () => click(screen.getByTestId("tab-http"));
-const rows = () => screen.queryAllByTestId("http-call");
+// The focus row is first in the DOM, wherever it sits in the list: read the rows by position, as a person does.
+const place = (el: HTMLElement) => Number(el.getAttribute("aria-posinset"));
+const rows = () => screen.queryAllByTestId("http-call").sort((a, b) => place(a) - place(b));
+/** The call at this 1-based position, when it is drawn. */
+const option = (n: number) => rows().find((r) => place(r) === n)!;
+/** What a row draws inside: a click on it selects the call. */
+const body = (i: number) => rows()[i].firstElementChild as HTMLElement;
 const text = (i: number, id: string) => within(rows()[i]).getByTestId(id).textContent;
 const chips = () => screen.getAllByTestId("http-group");
 const chip = (group: string) => chips().find((c) => c.dataset.group === group)!;
@@ -179,7 +186,7 @@ describe("HTTP tab", () => {
     showHttp();
     expect(rows()).toHaveLength(4);
     expect(rows().map((r) => r.dataset.status)).toEqual(["201", "404", "404", "none"]);
-    expect(rows().map((r) => r.tagName)).toEqual(["BUTTON", "BUTTON", "BUTTON", "BUTTON"]);
+    expect(rows().map((r) => r.getAttribute("role"))).toEqual(Array(4).fill("option"));
 
     expect(text(0, "http-call-status")).toBe("201");
     expect(text(0, "http-call-method")).toBe("POST");
@@ -397,24 +404,22 @@ describe("HTTP tab", () => {
     expect(chipTexts()[0]).toBe("All 3");
   });
 
-  it("selects a row and marks it pressed", () => {
+  it("selects a call and marks it selected", () => {
     setup();
     showHttp();
     const row = rows()[1];
-    expect(row.getAttribute("type")).toBe("button");
-    expect(row.getAttribute("aria-pressed")).toBe("false");
+    expect(row.getAttribute("aria-selected")).toBe("false");
     row.focus();
     expect(document.activeElement).toBe(row);
-    // a browser turns Enter and Space on a focused button into this click; jsdom does not
-    click(row);
-    expect(rows().map((r) => r.getAttribute("aria-pressed"))).toEqual([
+    click(body(1));
+    expect(rows().map((r) => r.getAttribute("aria-selected"))).toEqual([
       "false",
       "true",
       "false",
       "false",
     ]);
-    click(rows()[3]);
-    expect(rows().map((r) => r.getAttribute("aria-pressed"))).toEqual([
+    click(body(3));
+    expect(rows().map((r) => r.getAttribute("aria-selected"))).toEqual([
       "false",
       "false",
       "false",
@@ -443,17 +448,18 @@ describe("HTTP tab", () => {
   it("makes a row 28 px, with the selected one on the selected fill and the accent bar", () => {
     setup();
     showHttp();
-    for (const row of rows()) {
+    rows().forEach((row, i) => {
+      expect(row.style.height).toBe("28px");
       for (const c of ["h-7", "text-xs", "border-b", "border-line"])
-        expect(row.className).toContain(c);
-      expect(row.className).not.toContain("bg-selected");
-    }
-    expect(rows()[0].className).toContain("hover:bg-hover");
-    click(rows()[1]);
-    expect(rows()[1].className).toContain("bg-selected");
-    expect(rows()[1].className).toContain("shadow-[inset_2px_0_0_var(--color-accent)]");
-    expect(rows()[1].className).not.toContain("hover:bg-hover");
-    expect(rows()[0].className).not.toContain("shadow-[inset");
+        expect(body(i).className).toContain(c);
+      expect(body(i).className).not.toContain("bg-selected");
+    });
+    expect(body(0).className).toContain("hover:bg-hover");
+    click(body(1));
+    expect(body(1).className).toContain("bg-selected");
+    expect(body(1).className).toContain("shadow-[inset_2px_0_0_var(--color-accent)]");
+    expect(body(1).className).not.toContain("hover:bg-hover");
+    expect(body(0).className).not.toContain("shadow-[inset");
   });
 
   it("sets the method, URL and time in the mono and the rest in muted", () => {
@@ -469,6 +475,141 @@ describe("HTTP tab", () => {
     expect(part("http-call-test").className).toContain("text-muted");
     expect(part("http-call-via").className).toContain("text-muted");
     expect(within(rows()[1]).getByTestId("http-call-attempt").className).toContain("text-muted");
+  });
+
+  it("is a listbox of options named HTTP calls", () => {
+    setup({
+      "s:tests/users.feature#1": [
+        call({ startTime: 1 }),
+        call({ startTime: 2 }),
+        call({ startTime: 3 }),
+      ],
+    });
+    showHttp();
+    const list = screen.getByRole("listbox", { name: "HTTP calls" });
+    const options = within(list).getAllByRole("option");
+    expect(options).toHaveLength(3);
+    expect(options.every((o) => o.getAttribute("data-testid") === "http-call")).toBe(true);
+    expect(options.map((o) => o.getAttribute("aria-setsize"))).toEqual(["3", "3", "3"]);
+    expect(options.map(place).sort()).toEqual([1, 2, 3]);
+    expect(
+      screen.getAllByRole("option", { name: "200, GET, http://localhost/users, create user" }),
+    );
+  });
+
+  it("names a call by status, method, URL and test", () => {
+    const test = tree.children[0].children[1];
+    const listed = (over: Partial<HttpCall>) => ({
+      ref: { key: test.key, index: 0 },
+      call: call({ url: "http://localhost/x", ...over }),
+      test,
+    });
+    expect(callName(listed({ status: 404 }))).toBe("404, GET, http://localhost/x, list users");
+    expect(callName(listed({ status: null }))).toBe(
+      "no status, GET, http://localhost/x, list users",
+    );
+    expect(callName(listed({ status: null, url: null, error: "Refused\n  at java.net" }))).toBe(
+      "no status, GET, Refused, list users",
+    );
+  });
+
+  describe("keyboard", () => {
+    const press = (key: string) => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+      flush();
+    };
+
+    it("selects a call with the arrow keys and opens it", () => {
+      setup();
+      showHttp();
+      // one tab stop: the first call, with nothing selected
+      expect(rows().map((r) => r.getAttribute("tabindex"))).toEqual(["0", "-1", "-1", "-1"]);
+      rows()[0].focus();
+      press("ArrowDown");
+      expect(rows()[1].getAttribute("aria-selected")).toBe("true");
+      expect(rows()[0].getAttribute("aria-selected")).toBe("false");
+      expect(document.activeElement).toBe(rows()[1]);
+      expect(screen.getByTestId("call-url").textContent).toBe("http://localhost/users/9");
+      press("End");
+      expect(rows()[3].getAttribute("aria-selected")).toBe("true");
+    });
+
+    it("moves focus up when the focused call is cleared by a new run", () => {
+      const { send } = setup();
+      showHttp();
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      rows()[2].focus();
+      send({
+        type: "runStarted",
+        selection: "s:tests/users.feature#1",
+        runId: "20261025-150000-000",
+        keys: ["s:tests/users.feature#1"], // clears the three calls of the focused call's test
+        total: 1,
+        startedAt: 0,
+        env: null,
+      });
+      expect(rows()).toHaveLength(1);
+      expect(document.activeElement).toBe(rows()[0]);
+      expect(error).not.toHaveBeenCalled();
+      error.mockRestore();
+    });
+  });
+
+  describe("long lists", () => {
+    const many = (n: number, from = 0) =>
+      Array.from({ length: n }, (_, i) =>
+        call({ url: `http://localhost/${from + i}`, startTime: from + i }),
+      );
+    const scrollTo = (top: number) => {
+      const scroller = screen.getByTestId("http-calls");
+      scroller.scrollTop = top;
+      scroller.dispatchEvent(new Event("scroll"));
+      flush();
+      return scroller;
+    };
+    // jsdom has no layout: the list reads a 600 px view
+    const view = (scrollTop: number) => ({ scrollTop, height: 0, rowHeight: 28, pad: 0 });
+
+    it("scrolls to the selected call when the chips change", () => {
+      setup({ "s:tests/users.feature#1": many(200) });
+      showHttp();
+      scrollTo(4000);
+      click(option(150).firstElementChild as HTMLElement);
+      const scroller = scrollTo(0);
+      expect(option(150).getAttribute("aria-selected")).toBe("true"); // drawn though out of view
+      click(chip("2xx")); // every call is a 2xx: the same calls stay, the selected one out of view
+      expect(scroller.scrollTop).toBe(scrollToShow(149, view(0)));
+      expect(scroller.scrollTop).toBe(3600);
+    });
+
+    it("shows the selected call after the chips take rows away above the view", () => {
+      // every second call is a 404: the 4xx chip keeps the top row in view but moves it up the list
+      const odd = (i: number) => call({ startTime: i, status: i % 2 ? 404 : 200 });
+      setup({ "s:tests/users.feature#1": Array.from({ length: 100 }, (_, i) => odd(i)) });
+      showHttp();
+      scrollTo(4000);
+      click(option(100).firstElementChild as HTMLElement); // the 100th call, a 404
+      const scroller = scrollTo(28 * 51); // the 52nd call, a 404, is the top row
+      click(chip("4xx"));
+      expect(option(50).getAttribute("aria-selected")).toBe("true");
+      // the 52nd call is now the 26th: the list moved to keep it, then the selected call came into view
+      expect(scroller.scrollTop).toBe(scrollToShow(49, view(28 * 25)));
+      expect(scroller.scrollTop).toBe(800);
+    });
+
+    it("keeps the calls in view still when an earlier call arrives", () => {
+      const { send } = setup({ "s:tests/users.feature#1": many(60, 2) });
+      showHttp();
+      const scroller = scrollTo(28 * 3); // the call at 5 s is the top row
+      send({ type: "calls", key: "s:tests/users.feature#2", calls: [call({ startTime: 1 })] });
+      expect(scroller.scrollTop).toBe(28 * 3 + 28);
+      // the call at 5 s is still the top row, one place further down the list
+      expect(option(5).querySelector("[data-testid=http-call-url]")!.textContent).toBe(
+        "http://localhost/5",
+      );
+    });
   });
 
   describe("cut text", () => {

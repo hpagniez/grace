@@ -16,6 +16,9 @@ import {
 
 const tab = (win: Page) => win.getByTestId("tab-http");
 const rows = (win: Page) => win.getByTestId("http-call");
+// The focus row is first in the DOM, so `nth` is not the place in the list: ask for the place.
+const rowAt = (win: Page, n: number) =>
+  win.locator(`[data-testid=http-call][aria-posinset="${n + 1}"]`);
 const chip = (win: Page, group: string) =>
   win.locator(`[data-testid=http-group][data-group="${group}"]`);
 const details = (win: Page, id: string) => win.getByTestId(`call-${id}`);
@@ -92,7 +95,7 @@ test("Reading the calls of one Run all", async () => {
     await select(win, "xml");
     await expect(rows(win)).toHaveCount(1);
     await rows(win).click();
-    await expect(rows(win)).toHaveAttribute("aria-pressed", "true");
+    await expect(rows(win)).toHaveAttribute("aria-selected", "true");
     await expect(details(win, "method")).toHaveText("POST");
     await expect(details(win, "url")).toHaveText(/\/echo$/);
     await expect(details(win, "status")).toHaveText("200 · 2xx Success");
@@ -150,20 +153,20 @@ test("Reading the calls of one Run all", async () => {
       .click();
     await expect(rows(win)).toHaveCount(12);
     const shows = async (n: number) => {
-      const url = (await rows(win).nth(n).getByTestId("http-call-url").textContent())!;
-      await expect(rows(win).nth(n)).toHaveAttribute("aria-pressed", "true");
+      const url = (await rowAt(win, n).getByTestId("http-call-url").textContent())!;
+      await expect(rowAt(win, n)).toHaveAttribute("aria-selected", "true");
       await expect(win.getByTestId("call-details")).toBeVisible();
       await expect(details(win, "url")).toHaveText(url);
     };
 
-    await rows(win).nth(0).focus();
+    await rowAt(win, 0).focus();
     await win.keyboard.press("Enter");
     await shows(0);
 
-    await rows(win).nth(3).focus();
+    await rowAt(win, 3).focus();
     await win.keyboard.press("Space");
     await shows(3);
-    await expect(rows(win).nth(0)).toHaveAttribute("aria-pressed", "false");
+    await expect(rowAt(win, 0)).toHaveAttribute("aria-selected", "false");
   });
 });
 
