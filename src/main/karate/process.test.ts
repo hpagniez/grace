@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants, getPriority, tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { copyFixture } from "../../../test/fixtures/copy";
@@ -69,6 +69,11 @@ describe("spawnKarate", () => {
     expect(await p.exit).toBeNull();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("ENOENT");
+  });
+
+  it("runs java below normal priority (#148)", { timeout: 60_000 }, async () => {
+    const p = start(false, () => {}, "tests/slow.feature");
+    expect(getPriority(p.pid)).toBe(constants.priority.PRIORITY_BELOW_NORMAL);
   });
 
   it("kill leaves no java behind", { timeout: 60_000 }, async () => {
