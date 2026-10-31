@@ -112,8 +112,9 @@ function median(values) {
 
 /**
  * Limits from build b's rounds after the warm-up: each limit is the median plus a noise margin, the spread of
- * its rounds, at least 5% of the median and at least a floor (5 ms, else 1), in whole units. The limit is
- * rounded to the unit: one decimal for MB, a whole number for the rest.
+ * its rounds, at least 5% of the median and at least a floor (5 ms, else 1), in whole units. A size never
+ * varies, so its margin is its spread and at least 1 MB, with no 5%. The limit is rounded to the unit: one
+ * decimal for MB, a whole number for the rest.
  * @param {Report} report
  * @param {{ machine: string, commit: string }} meta
  * @returns {Limits}
@@ -127,7 +128,11 @@ export function makeLimits(report, meta) {
     if (!values.length) continue;
     const mid = median(values);
     const spread = Math.max(...values) - Math.min(...values);
-    const noise = Math.ceil(Math.max(spread, mid / 20, unit === "ms" ? 5 : 1));
+    const noise = Math.ceil(
+      id.startsWith("size.")
+        ? Math.max(spread, 1)
+        : Math.max(spread, mid / 20, unit === "ms" ? 5 : 1),
+    );
     const higher = unit === "fps";
     const scale = unit === "MB" ? 10 : 1;
     const aim = id.startsWith("smooth.")

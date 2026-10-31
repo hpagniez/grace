@@ -290,6 +290,24 @@ describe("makeLimits", () => {
     });
   });
 
+  it("gives a size its spread as noise, at least 1 MB, with no 5% of the median", () => {
+    const r = {
+      ...report("release", {}),
+      rounds: [
+        ...rounds("size.unpacked", "b", [538.7, 538.7, 538.7]),
+        ...rounds("size.zip", "b", [218.7, 220.2, 218.7]),
+      ],
+    };
+    const { measures } = makeLimits(r, meta);
+    expect(measures["size.unpacked"]).toEqual({
+      unit: "MB",
+      limit: 539.7,
+      noise: 1,
+      machine: false,
+    });
+    expect(measures["size.zip"]).toMatchObject({ noise: 2, limit: 220.7 });
+  });
+
   it("takes 5% of the median, or the floor for the unit, when the spread is smaller", () => {
     const r = {
       ...report("release", {}),
