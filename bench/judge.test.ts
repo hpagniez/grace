@@ -12,16 +12,22 @@ type Entry = {
   machine: boolean;
 };
 
-/** A report with build b's medians (and build a's, when given), and nothing else the judge reads. */
-function report(mode: "pr" | "release", b: Values, a: Values | null = null) {
+type Round = { build: "a" | "b"; warmup: boolean; load: number; values: Values };
+
+/** A report with build b's medians (and build a's, when given), its rounds when given, and nothing else the judge reads. */
+function report(mode: "pr" | "release", b: Values, a: Values | null = null, rounds: Round[] = []) {
   return {
     mode,
     machine: "test",
     builds: { a: a && { label: "a", exe: "a.exe" }, b: { label: "b", exe: "b.exe" } },
-    rounds: [],
+    rounds,
     medians: { a, b },
   };
 }
+
+/** Rounds of `build` after the warm-up, one per value of `id`. */
+const roundsOf = (id: string, build: "a" | "b", values: number[]): Round[] =>
+  values.map((v) => ({ build, warmup: false, load: 10, values: { [id]: v } }));
 
 function limits(measures: Record<string, Entry>) {
   return { machine: "test", commit: "abc", measures };
@@ -150,7 +156,7 @@ describe("judge", () => {
     expect(single.rows[0].verdict).toBe("over limit");
   });
 
-  it("misses a limited measure that was not measured, in release mode only", () => {
+  it("misses a limited measure that was not measured in release mode", () => {
     const l = limits({ "idle.memory": memory });
     const release = judge(report("release", { "idle.memory": null }, { "idle.memory": 90 }), l);
     expect(release.rows[0]).toMatchObject({
@@ -164,9 +170,74 @@ describe("judge", () => {
     const missing = judge(report("release", {}), l);
     expect(missing.rows[0]).toMatchObject({ id: "idle.memory", b: null, verdict: "not measured" });
     expect(missing.result).toBe("miss");
-    const pr = judge(report("pr", { "idle.memory": null }, { "idle.memory": 90 }), l);
-    expect(pr.rows[0].verdict).toBe("n/a");
+  });
+
+  it("calls a measure build a has and build b lacks not measured in PR mode, limit or not", () => {
+    const out = judge(
+      report("pr", { "idle.memory": null }, { "idle.memory": 90, "run.cpu.app": 5 }),
+      limits({ "idle.memory": memory }),
+    );
+    expect(out.rows.map((r) => [r.id, r.verdict])).toEqual([
+      ["idle.memory", "not measured"],
+      ["run.cpu.app", "not measured"],
+    ]);
+    expect(out.result).toBe("miss");
+  });
+
+  it("leaves out of a PR table a measure neither build has, but keeps it in release mode", () => {
+    const l = limits({ "idle.memory": memory, "start.paint.fresh": { ...memory, unit: "ms" } });
+    const medians = { "idle.memory": 90, "size.zip": null };
+    const pr = judge(report("pr", medians, { ...medians }), l);
+    expect(pr.rows.map((r) => r.id)).toEqual(["idle.memory"]);
     expect(pr.result).toBe("pass");
+    const release = judge(report("release", medians, { ...medians }), l);
+    expect(release.rows.map((r) => [r.id, r.verdict])).toEqual([
+      ["size.zip", "n/a"],
+      ["start.paint.fresh", "not measured"],
+      ["idle.memory", "pass"],
+    ]);
+  });
+
+  it("keeps a measure only build b has in a PR table, as n/a", () => {
+    const out = judge(report("pr", { "idle.memory": 90 }, { "idle.memory": null }), limits({}));
+    expect(out.rows).toEqual([
+      { id: "idle.memory", a: null, b: 90, change: null, limit: null, aim: null, verdict: "n/a" },
+    ]);
+  });
+
+  it.each(["pr", "release"] as const)(
+    "widens the noise to the spread of either build's rounds, in %s mode",
+    (mode) => {
+      const id = "smooth.select.idle.paint";
+      const l = limits({ [id]: { unit: "ms", limit: 999, noise: 5, aim: 100, machine: true } });
+      const a = roundsOf(id, "a", [10, 12, 16]); // median 12, spread 6
+      const judged = (b: number[]) => {
+        const r = report(mode, { [id]: b[1] }, { [id]: 12 }, [...a, ...roundsOf(id, "b", b)]);
+        return judge(r, l).rows[0];
+      };
+      // 18 against 12 is 6 ms: beyond the limit's noise of 5, within a's spread of 6
+      expect(judged([12, 18, 18])).toMatchObject({ change: 6, verdict: "pass" });
+      // b's own spread counts too: 7 ms is within b's 9
+      expect(judged([10, 19, 19])).toMatchObject({ change: 7, verdict: "pass" });
+      // beyond both spreads
+      expect(judged([19, 20, 22])).toMatchObject({ change: 8, verdict: "worse" });
+      expect(judged([3, 4, 5])).toMatchObject({ change: -8, verdict: "better" });
+    },
+  );
+
+  it("leaves warm-up rounds and missing values out of the spread", () => {
+    const id = "idle.memory";
+    const rounds: Round[] = [
+      { build: "a", warmup: true, load: 10, values: { [id]: 300 } },
+      { build: "b", warmup: false, load: 10, values: { [id]: null } },
+      ...roundsOf(id, "a", [80, 81]),
+      ...roundsOf(id, "b", [90]),
+    ];
+    const out = judge(
+      report("release", { [id]: 90 }, { [id]: 80 }, rounds),
+      limits({ [id]: { ...memory, limit: 200 } }),
+    );
+    expect(out.rows[0].verdict).toBe("worse");
   });
 
   it("compares a measure with no limit using a 5% noise", () => {

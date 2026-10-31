@@ -42,23 +42,39 @@ const MISSES = ["over limit", "worse", "not measured"];
 const inTableOrder = (ids) =>
   [...new Set([...Object.keys(MEASURES), ...ids])].filter((id) => ids.has(id));
 
+/** The spread (highest less lowest) of `build`'s rounds after the warm-up for `id`, 0 when it has none. */
+function range(
+  /** @type {Report} */ report,
+  /** @type {"a" | "b"} */ build,
+  /** @type {string} */ id,
+) {
+  const values = report.rounds
+    .filter((r) => r.build === build && !r.warmup)
+    .map((r) => r.values[id])
+    .filter((v) => typeof v === "number");
+  return values.length ? Math.max(...values) - Math.min(...values) : 0;
+}
+
 /**
  * Rows for every measure the report or the limits name, and `"miss"` when one is over its limit, worse than
- * build a beyond its noise, or has a limit but was not measured (release mode only: a PR measures a subset).
+ * build a beyond its noise, or was not measured: in release mode when it has a limit, in PR mode when build a
+ * measured it. The noise is the larger of the limit's (5% of build a's value when there is no limit) and the
+ * spread of either build's rounds, so a move within that day's spread is no change. A PR measures a subset, so
+ * its table leaves out a measure neither build has.
  * @param {Report} report
  * @param {Limits} limits
  * @returns {{ result: "pass" | "miss", rows: Row[] }}
  */
 export function judge(report, limits) {
   const { a: medianA, b: medianB } = report.medians;
+  const release = report.mode === "release";
   const ids = inTableOrder(
     new Set([
       ...Object.keys(limits.measures),
       ...Object.keys(medianA ?? {}),
       ...Object.keys(medianB),
     ]),
-  );
-  const release = report.mode === "release";
+  ).filter((id) => release || (medianA?.[id] ?? null) !== null || (medianB[id] ?? null) !== null);
   /** @type {Row[]} */
   const rows = ids.map((id) => {
     const entry = limits.measures[id];
@@ -69,11 +85,16 @@ export function judge(report, limits) {
     const change = a === null || b === null ? null : b - a;
     /** @type {Row["verdict"]} */
     let verdict;
-    if (b === null) verdict = entry && release ? "not measured" : "n/a";
+    // in PR mode, a has it here: the PR broke a probe that its base can take
+    if (b === null) verdict = entry || !release ? "not measured" : "n/a";
     else if (limit !== null && (higher ? b < limit : b > limit)) verdict = "over limit";
     else if (a === null) verdict = "n/a";
     else {
-      const noise = entry ? entry.noise : Math.abs(a) / 20;
+      const noise = Math.max(
+        entry ? entry.noise : Math.abs(a) / 20,
+        range(report, "a", id),
+        range(report, "b", id),
+      );
       const worse = higher ? a - b : b - a;
       verdict = worse > noise ? "worse" : worse < -noise ? "better" : "pass";
     }

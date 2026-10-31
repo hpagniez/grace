@@ -56,6 +56,20 @@ describe("markdown", () => {
     expect(ids).toEqual(Object.keys(MEASURES));
   });
 
+  it("leaves out of a PR table the measures neither build took", () => {
+    const pr: Values = { ...all(1), "size.zip": null, "start.paint.fresh": null };
+    const r = report("pr", pr, { ...pr });
+    const md = markdown(r, judge(r, limits({ "start.paint.fresh": memory })));
+    const ids = [...md.matchAll(/^\| `([^`]+)`/gm)].map((m) => m[1]);
+    expect(ids).toEqual(Object.keys(MEASURES).filter((id) => pr[id] !== null));
+  });
+
+  it("shows in bold a PR measure the base took and this build did not", () => {
+    const r = report("pr", { ...all(1), "run.cpu.app": null }, all(1));
+    const [, a, b, change, , result] = row(markdown(r, judge(r, limits())), "run.cpu.app");
+    expect([a, b, change, result]).toEqual(["1", "n/a", "n/a", "**not measured**"]);
+  });
+
   it("writes n/a for a measure with no number", () => {
     const r = report("pr", { ...all(1), "idle.memory": 90 }, { ...all(1), "idle.memory": null });
     const [, a, b, change, , result] = row(markdown(r, judge(r, limits())), "idle.memory");
