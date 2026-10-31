@@ -27,7 +27,7 @@ jobs:
         && contains(github.event.pull_request.labels.*.name, 'merge-when-green'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # checks and test finish close together; the second run sees the PR merged
+    # one run per PR at a time, so a run that starts after a merge sees the PR merged
     concurrency:
       group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
     env:
@@ -50,7 +50,7 @@ jobs:
           [ "$fork" = false ] || skip "it comes from a fork"
 
           # a release/* or hotfix/* merge back into develop runs no CI of its own (its runs are skipped):
-          # the same head must have passed checks and test, e2e included, on its PR into main
+          # the same head must have passed checks, test (e2e included) and perf on its PR into main
           back=false only=""
           case $head in release/* | hotfix/*) back=true only="&status=success" ;; esac
 
