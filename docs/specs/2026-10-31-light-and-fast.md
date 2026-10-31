@@ -99,7 +99,7 @@ Nothing guards this today. The [big-project note](../research/2026-10-29-big-pro
 
 1. A limits file in the repo gives each R2 measure a limit (a ceiling it must stay under) and, where one exists, an aim.
 2. The first limits are today's numbers: `develop` at `e3cfe3b7`, measured in release mode on the reference machine (R5.2). Every limit, Smooth ones included, is that median plus a noise margin, taken from the spread of its rounds and written next to it. A margin keeps a release measured within noise from missing half the time.
-3. The aims for the Smooth group: click to paint under 100 ms and no frame over 50 ms, the same idle and during a run. Today misses them in places (the longest frame of a 2,000-test Run all is about 100 ms; of a 10,000-test one, 333 to 350 ms). A limit is never capped at its aim; limits move toward the aims as fixes land, through ordinary commits (R3.4).
+3. The aims for the Smooth group: click to paint under 100 ms and no frame over 50 ms, the same idle and during a run. Today misses them in places (the [baseline check](../checks/2026-10-31-bench-baseline.md) records which, at 10,000 tests). A limit is never capped at its aim; limits move toward the aims as fixes land, through ordinary commits (R3.4).
 4. Lowering a limit is an ordinary commit. Raising one needs a new decision record: `scripts/check-pr.mjs` fails a PR that raises any limit without adding a file under `docs/decisions/`.
 5. Measures that depend on the machine (times, CPU, memory: Java's default heap scales with the machine's RAM) are judged against limits only on the reference machine. Measures that do not (sizes, DOM nodes, JS heap) are judged anywhere.
 
