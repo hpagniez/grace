@@ -9,13 +9,22 @@ import {
   LoaderCircle,
   MousePointerClick,
 } from "lucide";
-import { flush } from "solid-js";
+import { createStore, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
+import { deriveStatus } from "../shared/status";
 import { App } from "./App";
+import { Details } from "./Details";
+import { initialState, reduce } from "./reduce";
 import { drawn } from "../../test/drawn";
+
+// The real deriveStatus, counted: its own recursion is not, so each call is one walk of a subtree.
+vi.mock("../shared/status", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/status")>();
+  return { ...actual, deriveStatus: vi.fn(actual.deriveStatus) };
+});
 
 const node = (
   kind: TestNode["kind"],
@@ -304,6 +313,38 @@ describe("details: a group", () => {
     const failed = marks[1].parentElement!;
     expect(failed.textContent).toBe("1 Failed");
     expect(within(failed).getByText("1").className).toContain("tabular-nums");
+  });
+});
+
+describe("details: a group during a run", () => {
+  it("works out the group's status once per update, however many places show it", () => {
+    const [state, set] = createStore(initialState());
+    const send = (e: AppEvent) => {
+      set((draft) => reduce(draft, e));
+      flush();
+    };
+    render(() => <Details state={state} api={{} as Api} />);
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: tree(),
+      error: null,
+    });
+    set((draft) => void (draft.selected = "f:tests/x.feature"));
+    flush();
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261030-120000-000",
+      keys: [OK, BAD, WAIT],
+      total: 3,
+      startedAt: Date.now(),
+      env: null,
+    });
+    vi.mocked(deriveStatus).mockClear();
+    send({ type: "scenarios", updates: [{ key: BAD, status: "failed", error: "boom" }] });
+    expect(screen.getByTestId("details-status").textContent).toBe("Failed");
+    expect(vi.mocked(deriveStatus)).toHaveBeenCalledTimes(1);
   });
 });
 

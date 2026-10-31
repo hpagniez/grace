@@ -286,7 +286,7 @@ test("A row's tooltip leaves the next row's run button to the pointer", async ()
 
   await win.mouse.move(from.x, from.y);
   await win.waitForTimeout(600);
-  await expect(win.getByRole("tooltip")).toHaveText("Run passing hello");
+  await expect(win.getByRole("tooltip")).toHaveText("Run passing hello (Ctrl+Enter)");
   await win.mouse.move(to.x, to.y, { steps: 5 });
   await win.mouse.down();
   await win.mouse.up();
@@ -362,7 +362,8 @@ for (const scheme of ["light", "dark"] as const) {
       stops.push(now);
     }
     const ring = `2px solid ${THEME[scheme].focus}`;
-    expect(stops.length).toBeGreaterThan(30); // 51 at the time of writing: the whole page, not the first few
+    expect(stops.length).toBeGreaterThan(17); // 21 at the time of writing: the whole page, not the first few
+    expect(stops.filter((s) => s.area === "tree")).toHaveLength(1); // the tree is one tab stop (virtual lists R3.1)
     expect(stops.filter((s) => s.outline !== ring)).toEqual([]);
     expect(new Set(stops.map((s) => s.area))).toEqual(
       new Set(["toolbar", "filter-bar", "tree", "details", "bottom-panel", "status-bar"]),

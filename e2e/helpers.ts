@@ -15,6 +15,7 @@ import { createRunDir, writeRunRecord } from "../src/main/history";
 import type { RunRecord } from "../src/shared/history";
 import { NO_FILTER } from "../src/shared/tags";
 import { copyFixture } from "../test/fixtures/copy";
+import { writeBigProject } from "./big-project";
 
 const apps: ElectronApplication[] = [];
 const dirs: string[] = [];
@@ -47,6 +48,13 @@ export function project(
 ): string {
   const dir = copyFixture(name);
   dirs.push(dir);
+  return dir;
+}
+
+/** A generated project of 8 x 5 x `featuresPerModule` features (5: 2,000 tests), deleted after the test. */
+export function bigProject(featuresPerModule = 5): string {
+  const dir = tempDir("kk-big-");
+  writeBigProject(dir, featuresPerModule);
   return dir;
 }
 
@@ -116,6 +124,16 @@ export async function launchWithSettings(
 /** The parsed settings.json of an app data folder. */
 export const settingsOf = (userData: string): Record<string, unknown> =>
   JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8"));
+
+/** Sets the window to its default 1200 × 800, which Windows fits to a smaller screen (1024 × 768 on CI). */
+export async function defaultWindow(app: ElectronApplication, win: Page): Promise<void> {
+  const inner = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(1200, 800);
+    return w.getContentSize();
+  });
+  await expect.poll(() => win.evaluate(() => [innerWidth, innerHeight])).toEqual(inner);
+}
 
 /** Makes the folder picker return `dir`, then clicks Open. */
 export async function openProject(app: ElectronApplication, dir: string): Promise<void> {

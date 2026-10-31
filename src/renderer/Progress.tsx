@@ -64,6 +64,26 @@ export function Progress(props: { state: AppState }) {
   // the run view's total is 0 until a run starts: the line counts the tests of the tree
   const tests = () => (props.state.tree ? leaves(props.state.tree).length : 0);
   const fill = "flex-none transition-[width] duration-300 ease-out motion-reduce:transition-none";
+  // A width transition replaced before it has started never moves. Chromium holds one that starts in the same
+  // frame as a compositor animation (a status mark that starts spinning) until the compositor starts it, so in
+  // a big run the green part, given a new width at nearly every update, could stay at zero while red grew. The
+  // segments take new widths once none of their transitions is waiting to start; until then, at each frame.
+  const segments: HTMLDivElement[] = [];
+  const [widths, setWidths] = createSignal<readonly number[]>([0, 0, 0]);
+  let next = widths();
+  let held = false;
+  const take = () => {
+    held = segments.some((s) => s.getAnimations?.().some((a) => a.startTime === null));
+    if (held) requestAnimationFrame(take);
+    else setWidths(next);
+  };
+  createEffect(
+    () => [pct(run().passed), pct(run().failed), pct(run().interrupted)],
+    (w) => {
+      next = w;
+      if (!held) take();
+    },
+  );
 
   return (
     <section class="border-b border-line px-3 py-2">
@@ -78,9 +98,21 @@ export function Progress(props: { state: AppState }) {
         aria-valuenow={value(run().done)}
         class="relative flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-line"
       >
-        <div class={`${fill} bg-passed`} style={`width:${pct(run().passed)}%`} />
-        <div class={`${fill} bg-failed`} style={`width:${pct(run().failed)}%`} />
-        <div class={`${fill} bg-cancelled`} style={`width:${pct(run().interrupted)}%`} />
+        <div
+          ref={(e) => (segments[0] = e)}
+          class={`${fill} bg-passed`}
+          style={`width:${widths()[0]}%`}
+        />
+        <div
+          ref={(e) => (segments[1] = e)}
+          class={`${fill} bg-failed`}
+          style={`width:${widths()[1]}%`}
+        />
+        <div
+          ref={(e) => (segments[2] = e)}
+          class={`${fill} bg-cancelled`}
+          style={`width:${widths()[2]}%`}
+        />
         {/* over the segments: during a Refresh they still show the last run, often a full bar */}
         <Show when={waiting()}>
           <div

@@ -125,10 +125,9 @@ test("the window cannot get too short for the layout", async () => {
     ),
   ).toBe(true);
   await app.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows()[0].webContents.send("app:event", {
-      type: "notice",
-      message: "Something to say",
-    }),
+    BrowserWindow.getAllWindows()[0].webContents.send("app:event", [
+      { type: "notice", message: "Something to say" },
+    ]),
   );
   await expect(win.getByTestId("notice")).toBeVisible();
   await expectStatusBarShown(win);
@@ -212,7 +211,7 @@ test("focus cannot scroll the toolbar out of a cut-off layout", async () => {
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0];
     w.setSize(520, 480);
-    w.webContents.send("app:event", { type: "notice", message: "a long notice ".repeat(300) });
+    w.webContents.send("app:event", [{ type: "notice", message: "a long notice ".repeat(300) }]);
   });
   const root = win.getByTestId("view");
   const sheet = win.getByTestId("sheet");

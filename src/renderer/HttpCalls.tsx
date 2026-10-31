@@ -1,14 +1,7 @@
 import { Check, Globe } from "lucide";
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, flush, For, Show } from "solid-js";
 import { HTTP_GROUPS, httpGroup, type HttpGroup } from "../shared/http";
-import {
-  groupCounts,
-  narrowedCalls,
-  shownCalls,
-  totalCalls,
-  type CallRef,
-  type ListedCall,
-} from "./http";
+import { groupCounts, shownCalls, totalCalls, type CallRef, type ListedCall } from "./http";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
@@ -16,11 +9,21 @@ import { findNode, formatMillis, nodeName } from "./nodes";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
 import { badge, chip, chipPressed, TINT } from "./ui";
+import { VirtualList, type VirtualListHandle } from "./VirtualList";
 
 const CHIPS: readonly { group: HttpGroup | "all"; label: string }[] = [
   { group: "all", label: "All" },
   ...HTTP_GROUPS,
 ];
+
+/** A call's accessible name: what its row reads, status first (R5.4). */
+export const callName = (l: ListedCall): string =>
+  [
+    l.call.status ?? "no status",
+    l.call.method,
+    l.call.url ?? l.call.error?.split("\n")[0] ?? "",
+    nodeName(l.test),
+  ].join(", ");
 
 /** The tint of each status group's badge: the colour that group has everywhere else (R1.3, R7.2). */
 export const GROUP_TINT: Record<HttpGroup, keyof typeof TINT> = {
@@ -47,24 +50,22 @@ export const groupLabel = (status: number | null): string => {
 // A badge is the code in tabular mono on its group's solid tint, never white on a fill. A fixed width keeps the
 // methods in line down the list.
 const BADGE = `${badge} w-11 shrink-0 justify-center font-mono tabular-nums`;
-// The rows scroll, so a focus ring goes inside them (R10.1). A row's tooltips stay on the row: beside the
-// badge, over the cut text.
+// A row's tooltips stay on the row: beside the badge, over the cut text.
 const ROW =
-  "flex h-7 w-full items-center gap-3 border-b border-line px-3 text-left text-xs transition-colors duration-(--duration-fast) ease-standard focus-visible:-outline-offset-2";
+  "flex h-7 items-center gap-3 border-b border-line px-3 text-xs transition-colors duration-(--duration-fast) ease-standard";
+// The rows scroll, so a focus ring goes inside them (R10.1).
+const ITEM = "focus-visible:-outline-offset-2";
 const SELECTED = "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]";
 
+// A place, not an object: a row (and the focus on it) outlives the list being rebuilt.
+const callKey = ({ key, index }: CallRef) => `${key}\n${index}`;
+
+/** What a row draws; the list around it makes it an option, and a key on the row selects it too. */
 function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
   const call = () => props.item.call;
   const time = () => (call().millis === null ? "—" : formatMillis(call().millis!));
   return (
-    <button
-      type="button"
-      data-testid="http-call"
-      data-status={call().status ?? "none"}
-      aria-pressed={props.selected ? "true" : "false"}
-      class={`${ROW} ${props.selected ? SELECTED : "hover:bg-hover"}`}
-      onClick={props.onSelect}
-    >
+    <div class={`${ROW} ${props.selected ? SELECTED : "hover:bg-hover"}`} onClick={props.onSelect}>
       <Tooltip text={groupLabel(call().status)} describe class="shrink-0" side="right">
         <span data-testid="http-call-status" class={`${BADGE} ${TINT[statusTint(call().status)]}`}>
           {call().status ?? "—"}
@@ -114,23 +115,38 @@ function Row(props: { item: ListedCall; selected: boolean; onSelect(): void }) {
       <span data-testid="http-call-time" class="w-16 shrink-0 text-right font-mono tabular-nums">
         {time()}
       </span>
-    </button>
+    </div>
   );
 }
 
 /** The HTTP tab: status-group chips over one row per call of the tests under the tree selection. */
 export function HttpCalls(props: {
   state: AppState;
+  /** The calls of the tests under the tree selection, from the panel, which counts them too. */
+  narrowed: ListedCall[];
   selectCall(ref: CallRef): void;
   toggleGroup(g: HttpGroup | "all"): void;
 }) {
-  const narrowed = createMemo(() => narrowedCalls(props.state));
+  const narrowed = () => props.narrowed;
   const counts = createMemo(() => groupCounts(narrowed()));
   const shown = createMemo(() => shownCalls(narrowed(), props.state.httpGroups));
   const pressed = (g: HttpGroup | "all") =>
     g === "all" ? props.state.httpGroups.length === 0 : props.state.httpGroups.includes(g);
-  const isSelected = ({ key, index }: CallRef) =>
-    props.state.selectedCall?.key === key && props.state.selectedCall.index === index;
+  const selectedKey = () => {
+    const c = props.state.selectedCall;
+    return c ? callKey(c) : null;
+  };
+  let list: VirtualListHandle | undefined;
+  // A chip change the person made shows the selected call again (R4.7); new calls never scroll. The list
+  // settles first (it keeps the rows in view still when rows leave above, R4.6): an effect on the chips would
+  // run before that and lose to it. Not `revealSelectedOn`: the `<Show>` below remounts the list when the
+  // chips empty it and fill it again, and a fresh list skips it.
+  const toggle = (group: HttpGroup | "all") => {
+    props.toggleGroup(group);
+    flush();
+    const key = selectedKey();
+    if (key !== null) list?.reveal(key);
+  };
   const empty = () => {
     if (totalCalls(props.state.calls) === 0)
       return "No HTTP calls yet. Calls appear when a feature finishes.";
@@ -150,7 +166,7 @@ export function HttpCalls(props: {
               data-group={group}
               aria-pressed={pressed(group) ? "true" : "false"}
               class={`${pressed(group) ? chipPressed : chip} tabular-nums`}
-              onClick={() => props.toggleGroup(group)}
+              onClick={() => toggle(group)}
             >
               {/* the check shows a pressed chip by shape, not only by fill (R7) */}
               <Show when={pressed(group)}>
@@ -161,23 +177,45 @@ export function HttpCalls(props: {
           )}
         </For>
       </div>
-      <div data-testid="http-calls" class="min-h-0 flex-1 overflow-auto">
-        <Show
-          when={shown().length > 0}
-          fallback={<EmptyState icon={Globe} text={empty()} testid="http-empty" />}
+      <Show
+        when={shown().length > 0}
+        fallback={
+          <div data-testid="http-calls" class="min-h-0 flex-1 overflow-auto">
+            <EmptyState icon={Globe} text={empty()} testid="http-empty" />
+          </div>
+        }
+      >
+        <VirtualList
+          items={shown()}
+          keyOf={(l) => callKey(l.ref)}
+          rowHeight={28}
+          role="listbox"
+          itemRole="option"
+          label="HTTP calls"
+          scrollerTestid="http-calls"
+          testid="http-list"
+          itemClass={ITEM}
+          attrs={(l, i) => ({
+            "data-testid": "http-call",
+            "data-status": l.call.status ?? "none",
+            "aria-selected": callKey(l.ref) === selectedKey() ? "true" : "false",
+            "aria-label": callName(l),
+            "aria-setsize": shown().length,
+            "aria-posinset": i + 1,
+          })}
+          selectedKey={selectedKey()}
+          onSelect={(l) => props.selectCall(l.ref)}
+          ref={(h) => (list = h)}
         >
-          {/* keyed by place, not object: rows (and the focus on one) outlive the list being rebuilt */}
-          <For each={shown()} keyed={(l) => `${l.ref.key}\n${l.ref.index}`}>
-            {(l) => (
-              <Row
-                item={l()}
-                selected={isSelected(l().ref)}
-                onSelect={() => props.selectCall(l().ref)}
-              />
-            )}
-          </For>
-        </Show>
-      </div>
+          {(l) => (
+            <Row
+              item={l}
+              selected={callKey(l.ref) === selectedKey()}
+              onSelect={() => props.selectCall(l.ref)}
+            />
+          )}
+        </VirtualList>
+      </Show>
     </div>
   );
 }

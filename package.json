@@ -1,6 +1,6 @@
 {
   "name": "grace",
-  "version": "1.0.0-rc.6",
+  "version": "1.0.0-rc.7",
   "private": true,
   "description": "Free desktop test-suite runner for Karate",
   "keywords": [],
@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "npm run package && npx electron --version && playwright test",
-    "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts",
+    "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts screens.shots",
+    "screens:readme": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts readme.shots",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",
     "fixtures": "node scripts/capture-fixtures.mjs",

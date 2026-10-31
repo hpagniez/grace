@@ -32,7 +32,7 @@ const tipClass = [
 ].join(" ");
 
 /** Whether the focus that just arrived came from the keyboard. An engine that cannot say shows it. */
-function keyboardFocus(el: EventTarget | null) {
+export function keyboardFocus(el: EventTarget | null) {
   try {
     return (el as Element).matches(":focus-visible");
   } catch {
@@ -54,6 +54,7 @@ const within = (r: DOMRect, e: MouseEvent) =>
  * `class` goes on the wrapper, after `inline-flex`: a row that truncates needs `min-w-0` there.
  * `describe` adds the tooltip to the target's `aria-describedby`: leave it off when the text is the
  * target's name. `side` is where it goes (`placeTip`): in a row, beside its target or over its cut text.
+ * `pinned` lets the owner open it (true) and close it (false) at once, besides hover and focus.
  */
 export function Tooltip(props: {
   text: string | undefined;
@@ -61,6 +62,7 @@ export function Tooltip(props: {
   describe?: boolean;
   class?: string;
   side?: Side;
+  pinned?: boolean;
 }) {
   const id = createUniqueId();
   const [open, setOpen] = createSignal(false);
@@ -79,9 +81,19 @@ export function Tooltip(props: {
   };
 
   // Only a scroll that moves the target hides the tooltip: the page, or a box that holds it. A console
-  // following its tail leaves the tooltip of a disabled button alone, as a run goes on.
+  // following its tail leaves the tooltip of a disabled button alone, as a run goes on. A pinned one
+  // is the owner's to keep: it follows its target instead (a key press that scrolls the list), until
+  // the box no longer shows the target (a wheel that scrolls the focused row away).
   const onScroll = (e: Event) => {
-    if (e.target instanceof Node && e.target.contains(wrap)) hide();
+    if (!(e.target instanceof Node && e.target.contains(wrap))) return;
+    if (props.pinned && shows(e.target)) place();
+    else hide();
+  };
+  const shows = (box: Node) => {
+    if (!(box instanceof Element)) return true; // the page
+    const b = box.getBoundingClientRect();
+    const t = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
+    return t.bottom > b.top && t.top < b.bottom && t.right > b.left && t.left < b.right;
   };
 
   // A click inside closes it, rather than being lost on it. One `over` its target lies on it: a click
@@ -108,25 +120,36 @@ export function Tooltip(props: {
     setOpen(false);
   };
 
-  const show = () => {
+  // `text` read anew, not kept in a memo: a cut is measured when the tooltip would show (Cut, the tree).
+  const show = (text = props.text) => {
     clearTimeout(timer);
-    if (shown || !props.text) return;
+    if (shown || !text) return;
     openTip?.();
     openTip = hide;
     shown = true;
     setOpen(true);
-    flush(); // the tooltip must exist to be shown and measured
-    tip!.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
-    const target = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
-    const { width, height } = tip!.getBoundingClientRect();
-    const view = { width: innerWidth, height: innerHeight };
-    const at = placeTip(target, { width, height }, view, props.side);
-    tip!.style.top = `${at.top}px`;
-    tip!.style.left = `${at.left}px`;
-    tip!.dataset.side = at.side;
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("scroll", onScroll, true);
+    flush(); // runs the placing effect below at once; inside an effect it is a no-op, the effect runs next
   };
+
+  const place = () => {
+    if (!tip) return;
+    const target = (wrap.firstElementChild ?? wrap).getBoundingClientRect();
+    const { width, height } = tip.getBoundingClientRect();
+    const view = { width: innerWidth, height: innerHeight };
+    const at = placeTip(target, { width, height }, view, props.side);
+    tip.style.top = `${at.top}px`;
+    tip.style.left = `${at.left}px`;
+    tip.dataset.side = at.side;
+  };
+
+  // Once the tooltip exists: shown, then measured and placed.
+  createEffect(open, (on) => {
+    if (!on || !tip) return;
+    tip.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
+    place();
+  });
 
   // Added to the target's ids, not set over them: an input may already point at its error message.
   createEffect(
@@ -146,6 +169,13 @@ export function Tooltip(props: {
     },
   );
   onCleanup(hide);
+
+  // The owner opens it: a virtual row keeps the focus itself, so the target never gets a focusin. The
+  // text is read in the compute: a ternary `text` makes a memo, which the callback may not create.
+  createEffect(
+    () => (props.pinned ? props.text : undefined),
+    (text) => (text ? show(text) : hide()),
+  );
 
   return (
     <span

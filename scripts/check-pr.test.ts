@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { branchError, commitError } from "./check-pr.mjs";
+import { branchError, commitError, publicDocsError } from "./check-pr.mjs";
 
 describe("commitError", () => {
   it.each([
@@ -58,6 +58,44 @@ describe("branchError", () => {
   });
 });
 
+describe("publicDocsError", () => {
+  const record = "docs/checks/2026-10-30-release-1.0.0-rc.7-packaged.md";
+  const docs = "# Check\n\n## Public docs\n\nREADME.md: install steps updated.\n";
+  const read = (text: string) => () => text;
+
+  it("accepts a release record with a Public docs section", () => {
+    expect(publicDocsError("release/v1.0.0-rc.7", "main", [record], read(docs))).toBeNull();
+  });
+
+  it("accepts a hotfix record, with Windows line endings", () => {
+    const hotfix = "docs/checks/2026-10-31-hotfix-1.0.0-rc.8-packaged.md";
+    const crlf = docs.replaceAll("\n", "\r\n");
+    expect(publicDocsError("hotfix/v1.0.0-rc.8", "main", [hotfix], read(crlf))).toBeNull();
+  });
+
+  it.each([
+    ["feature/x", "develop"],
+    ["release/v1.0.0-rc.7", "develop"],
+    ["hotfix/v1.0.0-rc.7", "develop"],
+  ])("skips %s into %s", (head, base) => {
+    expect(publicDocsError(head, base, [], read(""))).toBeNull();
+  });
+
+  it("rejects a release without its record", () => {
+    const older = "docs/checks/2026-10-29-release-1.0.0-rc.6-packaged.md";
+    expect(publicDocsError("release/v1.0.0-rc.7", "main", [older], read(docs))).toContain(
+      "-1.0.0-rc.7-packaged.md",
+    );
+  });
+
+  it("rejects a record without the section", () => {
+    const text = "# Check\n\nPublic docs were fine.\n### Public docs\n";
+    expect(publicDocsError("release/v1.0.0-rc.7", "main", [record], read(text))).toContain(
+      '"## Public docs"',
+    );
+  });
+});
+
 describe("check-pr CLI", () => {
   // main: init; develop: a bad header that already landed; release branch: its own commits
   const repo = mkdtempSync(join(tmpdir(), "kk-check-pr-"));
@@ -73,6 +111,11 @@ describe("check-pr CLI", () => {
   git("update-ref", "refs/remotes/origin/develop", "HEAD");
   git("switch", "-q", "-c", "release/v1.0.0-rc.1");
   git("commit", "-q", "--allow-empty", "-m", "build: bump version to 1.0.0-rc.1");
+  mkdirSync(join(repo, "docs", "checks"), { recursive: true });
+  const record = "docs/checks/2026-10-30-release-1.0.0-rc.1-packaged.md";
+  writeFileSync(join(repo, record), "# Check\n");
+  git("add", ".");
+  git("commit", "-q", "-m", "docs: record the 1.0.0-rc.1 packaged-app check");
 
   const run = () =>
     spawnSync(process.execPath, [join(__dirname, "check-pr.mjs")], {
@@ -87,7 +130,15 @@ describe("check-pr CLI", () => {
       },
     });
 
+  it("fails a release into main whose check record has no Public docs section", () => {
+    const r = run();
+    expect(r.stdout).toContain(`${record} has no "## Public docs" section`);
+    expect(r.status).toBe(1);
+  });
+
   it("skips commits already on develop", () => {
+    writeFileSync(join(repo, record), "# Check\n\n## Public docs\n\nREADME.md: unchanged.\n");
+    git("commit", "-q", "-am", "docs: record the public docs check");
     const r = run();
     expect(r.stdout).toBe("");
     expect(r.status).toBe(0);
