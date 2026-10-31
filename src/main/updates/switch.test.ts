@@ -47,7 +47,8 @@ describe.runIf(process.platform === "win32")("switch script", () => {
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        "Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($env:UNDER, 'OrdinalIgnoreCase') } | ForEach-Object { $_.Id }",
+        // Path is read once: see "Get-Grace" below (#160)
+        "Get-Process | Where-Object { $p = $_.Path; $p -and $p.StartsWith($env:UNDER, 'OrdinalIgnoreCase') } | ForEach-Object { $_.Id }",
       ],
       { env: { ...process.env, UNDER: folder + path.sep }, encoding: "utf8", windowsHide: true },
     )
@@ -553,4 +554,36 @@ setInterval(() => {}, 1 << 30);
       expect(existsSync(path.join(data, "backups", "1.0.0-rc.2", "backup.json"))).toBe(false);
     },
   );
+});
+
+describe.runIf(process.platform === "win32")("Get-Grace", () => {
+  // A process's Path is a script property that asks the process on each read: one that exits as
+  // Get-Grace lists it has no path at a second read, and a method called on it throws (#160).
+  it("reads each process's path once", () => {
+    const getGrace = /^function Get-Grace \{[\s\S]*?^\}/m.exec(script)![0];
+    const out = execFileSync(
+      POWERSHELL,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2
+$install = 'C:\\grace'
+$script:reads = 0
+function Get-Process {
+  $p = New-Object PSObject
+  $p | Add-Member -MemberType ScriptProperty -Name Path -Value {
+    $script:reads++
+    if ($script:reads -eq 1) { 'C:\\grace\\Grace.exe' }
+  }
+  $p
+}
+${getGrace}
+@(Get-Grace).Count`,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    expect(out.trim()).toBe("1");
+  });
 });
