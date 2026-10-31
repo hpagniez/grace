@@ -26,7 +26,7 @@ import { parseArgs } from "node:util";
 import { writeBigProject } from "../e2e/big-project.ts";
 import { startApp, startTimes } from "./app.mjs";
 import { judge, makeLimits } from "./judge.mjs";
-import { MEASURES } from "./measures.mjs";
+import { MEASURES, RUN_PHASE } from "./measures.mjs";
 import {
   clickToPaint,
   finishedLagMs,
@@ -59,6 +59,8 @@ const MINIMISE_SETTLE_MS = 2_000;
 const TREE_LOAD_MS = 120_000;
 /** Run all gets 30 minutes, the probes included; a run that takes longer cannot be measured. */
 const RUN_LIMIT_MS = 30 * 60_000;
+/** A run that has not started a minute after the click never will: the build cannot be driven. */
+const RUN_START_MS = 60_000;
 
 const NODE = "[data-testid=tree-node]";
 const TEST_ROWS = `${NODE}[data-kind=scenario], ${NODE}[data-kind=row]`;
@@ -242,6 +244,30 @@ const waitForOutcome = (
   );
 
 /**
+ * Clicks Run all and waits until the run has started: null once it has, else why not (no button to click in 30 s, or no
+ * run a minute after the click). Any other error, such as a page that crashed, is the caller's failure to measure.
+ * @param {Page} page
+ * @returns {Promise<string | null>}
+ */
+async function startRun(page) {
+  const timedOut = (/** @type {any} */ e, /** @type {string} */ why) => {
+    if (e?.name !== "TimeoutError") throw e;
+    return why;
+  };
+  try {
+    await page.getByTestId("run-all-button").click({ timeout: 30_000 });
+  } catch (e) {
+    return timedOut(e, "no Run all button to click in 30 s");
+  }
+  try {
+    await waitForOutcome(page, /^(Running|Finished|Cancelled|Run failed)/, RUN_START_MS);
+    return null;
+  } catch (e) {
+    return timedOut(e, `Run all did not start in ${RUN_START_MS / 1000} s`);
+  }
+}
+
+/**
  * Waits for the tree to hold the project's tests and gives its row count. A build whose tree never does (it reads
  * differently) gives the rows it has after 2 minutes, and the probes read null rather than the bench waits for ever.
  */
@@ -316,7 +342,8 @@ async function smoothProbes(page, { state, index, total }) {
 
 /**
  * The Run group, the Smooth group and the Page group on one project: start with CDP, probe idle, Run all with the
- * sampler on and the same probes during it. `tag` suffixes every id (`@10k`).
+ * sampler on and the same probes during it. A Run all that cannot be started reads null for every run figure (the
+ * idle ones stand). `tag` suffixes every id (`@10k`).
  * @param {string} exe
  * @param {Project} project
  * @param {string} tag
@@ -348,8 +375,13 @@ async function interactive(exe, { dir, tests }, tag) {
     const clickedAt = Date.now();
     const left = () => Math.max(1, RUN_LIMIT_MS - (Date.now() - clickedAt)); // a timeout of 0 is none
     const over = /^(Finished|Cancelled|Run failed)/;
-    await page.getByTestId("run-all-button").click({ timeout: 30_000 });
-    await waitForOutcome(page, /^(Running|Finished|Cancelled|Run failed)/, left());
+    // A build the bench cannot drive (an older base, a renamed test id) gives no run figures, not a failed bench.
+    const notStarted = await startRun(page);
+    if (notStarted) {
+      log(`${notStarted}: every run figure${tag && ` ${tag}`} reads null this round`);
+      for (const id of RUN_PHASE) put(id, null);
+      return out;
+    }
     // The same probes as idle, now while Karate runs; each one that cannot start before the run ends reads null.
     const probeAndWait = async () => {
       for (const [id, v] of Object.entries(

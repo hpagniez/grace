@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { judge, makeLimits, raisedLimits } from "./judge.mjs";
-import { MEASURES } from "./measures.mjs";
+import { MEASURES, RUN_PHASE } from "./measures.mjs";
 
 type Values = Record<string, number | null>;
 type Entry = {
@@ -77,6 +77,27 @@ describe("MEASURES", () => {
     }
     expect(Object.keys(MEASURES).filter((id) => id.endsWith("@10k"))).toHaveLength(base.length);
     expect(MEASURES["idle.memory@10k"]).toBeUndefined();
+  });
+
+  it("names the ids taken during Run all, untagged", () => {
+    expect(RUN_PHASE).toEqual([
+      "run.memory.app",
+      "run.memory.java",
+      "run.cpu.app",
+      "run.cpu.java",
+      "run.finishedLag",
+      "smooth.select.run.paint",
+      "smooth.expand.run.paint",
+      "smooth.http.run.paint",
+      "smooth.select.run.frame",
+      "smooth.expand.run.frame",
+      "smooth.http.run.frame",
+      "smooth.scroll.run.frame",
+      "smooth.run.fps",
+      "smooth.run.frame",
+      "page.nodes.run",
+      "page.heap.run",
+    ]);
   });
 });
 

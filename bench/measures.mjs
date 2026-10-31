@@ -42,3 +42,6 @@ Object.assign(BIG, {
 export const MEASURES = { ...BASE, ...BIG };
 for (const [id, measure] of Object.entries(BIG))
   MEASURES[`${id}@10k`] = { ...measure, release: true };
+
+/** The ids taken during Run all, untagged: a build whose run cannot be started reads null for each. */
+export const RUN_PHASE = Object.keys(BIG).filter((id) => /^run\.|\.run(\.|$)/.test(id));
