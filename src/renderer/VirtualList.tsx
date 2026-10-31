@@ -226,8 +226,8 @@ export function VirtualList<T, S = undefined>(props: {
           if (key === null) return;
           const moves = key !== focusKey();
           setActive(key);
-          // Focus that lands on another row first (a press, a screen reader): as the focus row it moves
-          // to the front, which drops its focus once.
+          // Focus that lands on another row first (assistive technology, a script): as the focus row it
+          // moves to the front, which drops its focus once.
           if (moves) {
             flush();
             if (document.activeElement !== row) row.focus({ preventScroll: true });
