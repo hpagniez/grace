@@ -41,7 +41,7 @@ Karate Labs sells its GUI runners. The Karate engine is open source, and its com
 <td width="50%" valign="top">
 
 **Test tree**<br>
-Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven, Gradle and standalone layouts.
+Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven, Gradle and standalone layouts. Arrow keys move through it, and it stays fast with 10,000 tests.
 
 </td>
 <td width="50%" valign="top">
@@ -173,8 +173,8 @@ Next on the list:
 
 - **Project setup** for Maven, Gradle, a standalone jar and the Karate CLI ([#64](https://github.com/hpagniez/grace/issues/64)).
 - **Step debugger**: breakpoints on steps, step over, inspect variables ([#65](https://github.com/hpagniez/grace/issues/65)).
-- **Big projects**: smooth runs with thousands of tests ([#123](https://github.com/hpagniez/grace/issues/123), [#124](https://github.com/hpagniez/grace/issues/124), [#125](https://github.com/hpagniez/grace/issues/125)).
-- **Keyboard navigation** in the test tree and the HTTP list ([#91](https://github.com/hpagniez/grace/issues/91)).
+- **Lighter runs**: Java at below-normal priority, with a memory cap ([#148](https://github.com/hpagniez/grace/issues/148), [#149](https://github.com/hpagniez/grace/issues/149)).
+- **A toolbar that stays readable** with a long project path ([#81](https://github.com/hpagniez/grace/issues/81)).
 
 The full backlog is one [issue](https://github.com/hpagniez/grace/issues) per feature, on the [Grace project](https://github.com/users/hpagniez/projects/2) board.
 
