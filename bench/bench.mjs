@@ -3,10 +3,12 @@
 //
 //   node bench/bench.mjs [--b <exe>] [--a <exe>] [--a-zip <zip>] [--b-zip <zip>] [--label-a <text>] [--label-b <text>]
 //                        [--release] [--rounds <n>] [--out <dir>]
+//   node bench/bench.mjs --limits-from <bench.json> --commit <sha>
 //
 // B is the build under test (out/Grace-win32-x64/Grace.exe unless given), A the one it is compared with. Rounds run
 // after one warm-up per build and alternate between the builds. Release mode adds the fresh-profile start, the minimised
 // idle CPU and the 10,000-test project. A worse number never fails the bench; only a failure to measure does (exit 1).
+// `--limits-from` measures nothing: it turns the rounds of a release-mode bench.json of build B into bench/limits.json.
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -23,7 +25,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { writeBigProject } from "../e2e/big-project.ts";
 import { startApp, startTimes } from "./app.mjs";
-import { judge } from "./judge.mjs";
+import { judge, makeLimits } from "./judge.mjs";
+import { MEASURES } from "./measures.mjs";
 import {
   clickToPaint,
   finishedLagMs,
@@ -43,6 +46,9 @@ import { folderMB, minimise, sample, startSampler, waitForQuiet } from "./system
 /** @typedef {import("@playwright/test").Page} Page */
 /** @typedef {import("./app.mjs").App} App */
 /** @typedef {{ dir: string, tests: number }} Project */
+
+/** The machine the limits are measured on (docs/specs/2026-10-31-light-and-fast.md, R5.2). */
+const REFERENCE_MACHINE = "Windows 11 Pro, Ryzen 7 5800X, 32 GB";
 
 /** Idle: settle for 20 s after the start, then take the CPU over 60 s. */
 const SETTLE_MS = 20_000;
@@ -453,10 +459,22 @@ async function main() {
         release: { type: "boolean" },
         rounds: { type: "string" },
         out: { type: "string" },
+        "limits-from": { type: "string" },
+        commit: { type: "string" },
       },
     }));
   } catch (e) {
     return usage(/** @type {Error} */ (e).message);
+  }
+  const limitsFile = path.join(import.meta.dirname, "limits.json");
+  if (args["limits-from"]) {
+    if (!args.commit) return usage("--limits-from needs --commit");
+    const report = JSON.parse(readFileSync(args["limits-from"], "utf8"));
+    const limits = makeLimits(report, { machine: REFERENCE_MACHINE, commit: args.commit });
+    const missing = Object.keys(MEASURES).filter((id) => !limits.measures[id]);
+    if (missing.length) console.error(`no value for ${missing.join(", ")}: they get no limit`);
+    writeFileSync(limitsFile, JSON.stringify(limits, null, 2) + "\n");
+    return console.error(`wrote ${limitsFile}`);
   }
   const release = args.release === true;
   const rounds = Number(args.rounds ?? (release ? 5 : 3));
@@ -540,7 +558,6 @@ async function main() {
     rounds: results,
     medians: { a: builds.a ? medians("a") : null, b: medians("b") },
   };
-  const limitsFile = path.join(import.meta.dirname, "limits.json");
   const limits = existsSync(limitsFile)
     ? JSON.parse(readFileSync(limitsFile, "utf8"))
     : { machine: "", commit: "", measures: {} };
