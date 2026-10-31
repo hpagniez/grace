@@ -204,6 +204,16 @@ describe("VirtualList", () => {
     expect(scroller.scrollTop).toBe(240);
   });
 
+  it("leaves a key on a control inside a row to that control", () => {
+    const { focus, row, onSelect } = setup();
+    focus("r3");
+    const e = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    row("r3")!.querySelector("button")!.dispatchEvent(e);
+    flush();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+  });
+
   it("passes other keys to onKey, and stops what it handled", () => {
     const { focus, key, onKey } = setup();
     focus("r0");

@@ -119,7 +119,8 @@ export function VirtualList<T, S = undefined>(props: {
 
   const onKeyDown = (e: KeyboardEvent) => {
     const f = focusIndex();
-    if (f < 0) return;
+    // A key on a control in a row (focused by assistive technology) is that control's.
+    if (f < 0 || rowKey(e.target) === null) return;
     const last = keys().length - 1;
     const page = pageRows(view(scroller.scrollTop));
     const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
