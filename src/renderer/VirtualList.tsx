@@ -254,11 +254,13 @@ export function VirtualList<T, S = undefined>(props: {
                 // the focus row moves to the front. The click then focuses the row, from a button in it too,
                 // so the next key moves from it.
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
+                onClick={(e) => {
                   setActive(key);
                   flush(); // to the front first, then focus: a focused node that moves loses focus
                   // A script focus would match :focus-visible: a click is not keyboard focus.
                   el.focus({ preventScroll: true, focusVisible: false });
+                  // On the row itself: its indent, or a screen reader's or voice "activate".
+                  if (e.target === el) props.onSelect(item());
                 }}
                 {...props.attrs(item(), index(), shared)}
               >

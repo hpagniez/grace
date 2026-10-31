@@ -226,6 +226,19 @@ describe("VirtualList", () => {
     expect(press).toHaveBeenCalledTimes(1);
   });
 
+  it("selects a row clicked on itself, as a screen reader's activate does, not through a click inside it", () => {
+    const { row, onSelect } = setup();
+    fireEvent.click(row("r3")!);
+    flush();
+    expect(document.activeElement).toBe(row("r3"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith("r3");
+    fireEvent.click(row("r4")!.querySelector("span")!);
+    flush();
+    expect(document.activeElement).toBe(row("r4"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a press on a row from taking focus, so its click arrives", () => {
     const { row, stops, press } = setup();
     const button = row("r3")!.querySelector("button")!;
