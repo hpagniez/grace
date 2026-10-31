@@ -36,7 +36,8 @@ export interface AppState {
   calls: Record<string, HttpCall[]>;
   console: string[];
   run: RunView;
-  notice: string | null;
+  /** The last notice from main; `success` reports something done, not a problem. */
+  notice: { text: string; success: boolean } | null;
   selected: string | null;
   /** The open project's tag filter, as main holds it; changes only when main says so. */
   filter: FilterState;
@@ -261,7 +262,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.busy = e.busy;
       break;
     case "notice":
-      s.notice = e.message;
+      s.notice = { text: e.message, success: e.success ?? false };
       break;
     case "opening":
       s.opening = e.root;
