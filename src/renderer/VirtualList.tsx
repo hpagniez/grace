@@ -165,13 +165,14 @@ export function VirtualList<T, S = undefined>(props: {
       if (now.cue !== before.cue && selected !== null) untrack(() => reveal(selected));
       const a = untrack(active);
       if (a === null || now.keys.includes(a)) return;
-      // An unfocused list falls back to the selected row, else the first (R3.1).
-      if (!now.holds) {
+      // An unfocused list falls back to the selected row while it is there (R3.1), else to the nearest row
+      // above, as a focused one does (R4.5): never to the first row while a row above is left.
+      if (!now.holds && selected !== null && now.keys.includes(selected)) {
         setActive(null);
         return;
       }
       const next = survivor(a, before.keys, now.keys);
-      refocus = next;
+      if (now.holds) refocus = next;
       setActive(next);
     },
   );

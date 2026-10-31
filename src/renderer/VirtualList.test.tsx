@@ -307,6 +307,17 @@ describe("VirtualList", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it("falls back to the nearest row above when an unfocused active row leaves with the selected one", () => {
+    const { row, stops, change } = setup(1000, "r5");
+    fireEvent.click(row("r5")!);
+    flush();
+    row("r5")!.blur();
+    flush();
+    change(keys(1000).filter((k) => !["r3", "r4", "r5"].includes(k)));
+    expect(stops().map((r) => r.dataset.key)).toEqual(["r2"]);
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("draws rows after the list shrinks below the scroll position", () => {
     const { scrollTo, change, rows } = setup();
     scrollTo(20000);
