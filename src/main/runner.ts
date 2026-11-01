@@ -36,7 +36,15 @@ import {
   type ListedRun,
 } from "./history";
 import { writeArgFile, writeTargetFile } from "./karate/argfile";
-import { buildArgs, detectLayout, lineTargets, selectionTargets, tagArgs } from "./karate/command";
+import {
+  buildArgs,
+  detectLayout,
+  lineTargets,
+  OUT_OF_MEMORY,
+  outOfMemory,
+  selectionTargets,
+  tagArgs,
+} from "./karate/command";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
@@ -83,6 +91,7 @@ const isDir = (p: string) => {
 
 /** Karate's own words for a failed dry run: lines naming an exception or a feature, else the tail. */
 function dryRunError(lines: string[]): string {
+  if (outOfMemory(lines)) return OUT_OF_MEMORY;
   const hits = lines.filter((l) => l.includes("Exception") || l.includes("feature"));
   return (hits.length ? hits : lines.slice(-20)).join("\n");
 }
@@ -931,6 +940,7 @@ export class Runner {
     const { id, dir: outDir } = createRunDir(projectDir, created);
     let startedAt = created.getTime(); // the time of runStarted; the folder's if the run never starts
     let ended = false; // the run reached its end events, so it gets a run.json
+    let oom = false; // Java printed an OutOfMemoryError
     try {
       if (argFile) writeArgFile(argFile, props.rows);
       if (targetFile) writeTargetFile(targetFile, o.targets); // if it cannot be written, nothing runs
@@ -999,7 +1009,10 @@ export class Runner {
         false,
         targetFile ? [`@${targetFile}`] : o.targets,
         env,
-        (lines) => emit({ type: "console", lines }),
+        (lines) => {
+          oom ||= outOfMemory(lines);
+          emit({ type: "console", lines });
+        },
         argFile,
         filter,
         threads,
@@ -1053,6 +1066,7 @@ export class Runner {
       const done = end(fatal ? null : code, cancelled);
       store(done, before === after ? before : null, exitedAt);
       if (fatal) emit({ type: "notice", message: fatal.message });
+      else if (oom) emit({ type: "notice", message: OUT_OF_MEMORY });
     } finally {
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
       // 24.15 does not, so the unit tests cover only the notice). A failure must not replace the run's outcome.
