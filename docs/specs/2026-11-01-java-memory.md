@@ -25,7 +25,7 @@ Measured on the reference machine (Windows 11 Pro, Ryzen 7 5800X, 32 GB), Karate
   Java's CPU stayed within the rounds' spread in every case. Going below 256 MB saved nothing more and cost more CPU in garbage collection (10,000 tests: 48 s at 128 MB against 31 to 37 s). On 2,000 tests on one thread the peak barely moves, because the JIT and the code dominate it. On 16 and 32 threads (one run each) the 256 MB ceiling peaked at 494 and 433 MB, the 2 GB one at 571 and 535 MB; the heap left after a collection stayed under 100 MB.
 - **The serial collector does not help.** `-XX:+UseSerialGC` gave the same peaks as G1 (10,000 tests: 439 MB with no ceiling, 345 MB at 256 MB) and slower runs on 2,000 tests.
 - **Class-data sharing speeds the start but costs memory.** With an archive Java makes itself on the first run (`-XX:SharedArchiveFile=… -XX:+AutoCreateSharedArchive`, 9.8 MB, accepted with the project's folders on the classpath), the dry run of 2,000 tests took 1,333 ms instead of 1,539 and peaked at 187 MB instead of 168 (median of 4). Memory comes before start time, so it is not part of this spec.
-- **The JIT costs more CPU than the run.** With only the C1 compiler (`-XX:TieredStopAtLevel=1`), the 10,000-test run used 16 s of Java CPU instead of 41 s in about the same time, and peaked about 60 MB lower. This is not a memory limit and changes how fast long suites run, so it is a follow-up, not part of this spec.
+- **The JIT costs more CPU than the run.** With only the C1 compiler (`-XX:TieredStopAtLevel=1`), the 10,000-test run used 16 s of Java CPU instead of 41 s in about the same time, and peaked about 60 MB lower. This is not a memory limit and changes how fast long suites run, so it is a follow-up ([#179](https://github.com/hpagniez/grace/issues/179)), not part of this spec.
 
 ## Who and what success looks like
 
@@ -42,7 +42,7 @@ Success:
 
 **Non-goals:**
 - A setting to raise or lower the limit (see Approaches).
-- Tuning the JIT (`-XX:TieredStopAtLevel=1`, fewer compiler threads). Follow-up.
+- Tuning the JIT (`-XX:TieredStopAtLevel=1`, fewer compiler threads), and class-data sharing. Follow-up #179.
 - Choosing another garbage collector.
 - Limiting memory outside the heap (`-XX:MaxMetaspaceSize`, `-XX:ReservedCodeCacheSize`, direct memory).
 - Reading JVM options from the project or the environment. Grace already strips `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS`.
@@ -112,7 +112,7 @@ Mine, open to correction:
 - 2 GB as the ceiling: today's ceiling on an 8 GB machine.
 - 64 MB as the starting heap: about the largest live heap measured on 10,000 tests on one thread; G1 grows it from there.
 - Exit at the first `OutOfMemoryError` rather than let Karate carry on.
-- The JIT finding goes to a follow-up issue.
+- The JIT and class-data sharing findings go to a follow-up issue (#179).
 
 ## Left to the builder
 
@@ -121,7 +121,7 @@ Mine, open to correction:
 
 ## Follow-ups
 
-- The JIT: measure `-XX:TieredStopAtLevel=1` and fewer compiler threads with the bench, for Java's CPU and the peak outside the heap (`ISSUE`).
+- [#179](https://github.com/hpagniez/grace/issues/179): the JIT. Measure `-XX:TieredStopAtLevel=1` and fewer compiler threads with the bench, for Java's CPU and the peak outside the heap; class-data sharing with start time.
 
 ## Acceptance criteria
 
