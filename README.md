@@ -152,7 +152,7 @@ Grace runs on Windows 11 (x64). The app is not code-signed yet (see the [code si
 
 Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). Signing starts once SignPath Foundation accepts Grace; until then, releases are unsigned.
 
-- **What is signed:** `Grace.exe` in the release zip, built from this repository by the [`release` workflow](.github/workflows/release.yml). The bundled Java runtime keeps the Eclipse Foundation's signature; Electron's DLLs ship as Electron publishes them ([ADR 0023](docs/decisions/0023-sign-grace-exe-with-signpath-foundation.md)).
+- **What is signed:** `Grace.exe` in the release zip, built from this repository by the [`release` workflow](.github/workflows/release.yml). The bundled Java runtime keeps the Eclipse Foundation's signature; Electron's DLLs ship as Electron publishes them ([ADR 0024](docs/decisions/0024-sign-grace-exe-with-signpath-foundation.md)).
 - **Committers and reviewers:** [hpagniez](https://github.com/hpagniez). Changes from anyone else come as pull requests they review.
 - **Approvers:** [hpagniez](https://github.com/hpagniez) approves every release signing by hand.
 

@@ -1,4 +1,4 @@
-# Builds the Windows zip for a version tag, has SignPath sign Grace.exe, and attaches the zip to a GitHub Release (ADRs 0007, 0023).
+# Builds the Windows zip for a version tag, has SignPath sign Grace.exe, and attaches the zip to a GitHub Release (ADRs 0007, 0024).
 # No tests here: the release or hotfix PR into main ran them.
 # Every release is a release candidate until a stable release is decided (ADR 0015): a plain vX.Y.Z tag builds nothing.
 # By hand: build and sign with SignPath's test certificate, publish nothing.
