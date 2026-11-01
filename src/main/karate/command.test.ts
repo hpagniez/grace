@@ -9,6 +9,8 @@ import {
   childEnv,
   detectLayout,
   lineTargets,
+  OUT_OF_MEMORY,
+  outOfMemory,
   selectionTargets,
   tagArgs,
 } from "./command";
@@ -153,6 +155,9 @@ describe("buildArgs", () => {
     threads: 1,
   };
   const base = [
+    "-Xms64m",
+    "-Xmx2g",
+    "-XX:+ExitOnOutOfMemoryError",
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
     "-cp",
@@ -204,6 +209,24 @@ describe("buildArgs", () => {
   });
   it("without env or argFile is unchanged", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
+  });
+});
+
+describe("outOfMemory", () => {
+  it("finds Java's out-of-memory line among the others", () => {
+    expect(
+      outOfMemory(["a", "Terminating due to java.lang.OutOfMemoryError: Java heap space"]),
+    ).toBe(true);
+    expect(outOfMemory(["Terminating due to java.lang.OutOfMemoryError: Metaspace"])).toBe(true);
+    // a response body that names the error is the test's, not Java's
+    expect(outOfMemory(['  "error": "java.lang.OutOfMemoryError: Java heap space"'])).toBe(false);
+    expect(outOfMemory(["scenario failed", "OutOfMemory in a test name"])).toBe(false);
+    expect(outOfMemory([])).toBe(false);
+  });
+  it("says what happened and what to do", () => {
+    expect(OUT_OF_MEMORY).toBe(
+      "Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.",
+    );
   });
 });
 

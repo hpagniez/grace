@@ -71,6 +71,16 @@ export function lineTargets(nodes: TestNode[], root: string): string[] {
   return [...byFile].map(([abs, lines]) => `${abs}:${lines.sort((a, b) => a - b).join(":")}`);
 }
 
+/** A heap that starts small and stops at 2 GB, and an exit at the first OutOfMemoryError (docs/specs/2026-11-01-java-memory.md). */
+const HEAP = ["-Xms64m", "-Xmx2g", "-XX:+ExitOnOutOfMemoryError"];
+
+export const OUT_OF_MEMORY =
+  "Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.";
+
+/** The JVM's own line, not a test's output: a logged response body can name the error too. */
+export const outOfMemory = (lines: string[]) =>
+  lines.some((l) => l.startsWith("Terminating due to java.lang.OutOfMemoryError"));
+
 export function buildArgs(o: {
   jar: string;
   classpath: string[];
@@ -87,6 +97,7 @@ export function buildArgs(o: {
   return [
     // The launcher expands `@file` only before the main class, so it goes first.
     ...(o.argFile ? [`@${o.argFile}`] : []),
+    ...HEAP,
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
     "-cp",
