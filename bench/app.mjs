@@ -12,6 +12,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { chromium } from "@playwright/test";
 import { TREE } from "./probes.mjs";
+import { SELECT_TREE } from "./system.mjs";
 
 /** @typedef {import("@playwright/test").Page} Page */
 /** @typedef {import("@playwright/test").CDPSession} CDPSession */
@@ -51,21 +52,21 @@ const freePort = () =>
 
 /**
  * Pids of `pid` and everything under it, from one PowerShell call (the parent links vanish once the root is dead).
+ * `started` (ms since the epoch) is no later than the root's start, for when the root is gone.
  * @param {number} pid
+ * @param {number} started
  * @returns {Promise<number[]>}
  */
-async function treePids(pid) {
+async function treePids(pid, started) {
   const { stdout } = await execFileAsync(
     "powershell.exe",
     [
       "-NoProfile",
       "-NonInteractive",
       "-Command",
-      `
-$all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId
-$ids = [System.Collections.Generic.HashSet[int]]::new(); [void]$ids.Add(${pid})
-do { $n = $ids.Count; foreach ($p in $all) { if ($ids.Contains([int]$p.ParentProcessId)) { [void]$ids.Add([int]$p.ProcessId) } } } while ($ids.Count -ne $n)
-$ids -join ','`,
+      `${SELECT_TREE}
+$all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate
+(Select-Tree $all ${pid} ([DateTimeOffset]::FromUnixTimeMilliseconds(${started}).LocalDateTime)) -join ','`,
     ],
     { encoding: "utf8", windowsHide: true, timeout: 60_000 }, // a hung PowerShell: kill the root alone
   );
@@ -89,12 +90,13 @@ function alive(pid) {
  * Kills `pid` and its whole tree, then waits until none of the tree is left. `child.kill()` would leave Electron's
  * helpers and Java running. Rejects, naming them, when a process outlives the wait.
  * @param {number} pid
+ * @param {number} started see `treePids`
  */
-async function killTree(pid) {
+async function killTree(pid, started) {
   // The listed pids are killed one by one, not just the root with /T: once the root is dead (the app crashed), taskkill
   // cannot find it and so never reaches its children, which are still listed by their parent's pid. /T stays for what
   // the root started after the listing. If the listing fails, the root alone is killed.
-  const tree = await treePids(pid).catch(() => [pid]);
+  const tree = await treePids(pid, started).catch(() => [pid]);
   // A failure here means a process already gone; the wait below is what proves the rest is.
   await execFileAsync("taskkill", ["/F", "/T", ...tree.flatMap((p) => ["/PID", String(p)])], {
     windowsHide: true,
@@ -172,7 +174,7 @@ export async function startApp(exe, { project, dataDir, cdp, port, at, onSpawn }
   const stop = ({ keepData = false } = {}) =>
     (stopping ??= (async () => {
       try {
-        if (child.pid) await killTree(child.pid);
+        if (child.pid) await killTree(child.pid, t0);
         await browser?.close().catch(() => {});
       } finally {
         if (!keepData) await removeDir(dir);
