@@ -36,14 +36,28 @@ async function powershell(script) {
   }
 }
 
+/**
+ * PowerShell that defines `Select-Tree $all $rootPid [$rootStarted]`: the ids of `rootPid` and everything under it, from
+ * `$all` (Win32_Process with ProcessId, ParentProcessId and CreationDate). A process joins only when it started after the
+ * parent it names: Windows keeps a dead parent's id in ParentProcessId and reuses ids, so an older process can name one of
+ * the tree's ids without being its child. `$rootStarted` stands in for the root's start once the root is gone.
+ */
+export const SELECT_TREE = `
+function Select-Tree($all, [int]$rootPid, $rootStarted) {
+  $started = @{ $rootPid = $rootStarted }; foreach ($p in $all) { $started[[int]$p.ProcessId] = $p.CreationDate }
+  $ids = [System.Collections.Generic.HashSet[int]]::new(); [void]$ids.Add($rootPid)
+  do { $n = $ids.Count; foreach ($p in $all) { $parent = [int]$p.ParentProcessId; if ($ids.Contains($parent) -and $p.CreationDate -ge $started[$parent]) { [void]$ids.Add([int]$p.ProcessId) } } } while ($ids.Count -ne $n)
+  ,$ids
+}
+`;
+
 /** PowerShell that defines `Measure-Tree`: one JSON line, the processes of the tree under `rootPid` (a `Proc` each). */
 function treeScript(rootPid) {
   if (!Number.isInteger(rootPid)) throw new TypeError(`not a process id: ${rootPid}`);
-  return `
+  return `${SELECT_TREE}
 function Measure-Tree {
-  $all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name, KernelModeTime, UserModeTime
-  $ids = [System.Collections.Generic.HashSet[int]]::new(); [void]$ids.Add(${rootPid})
-  do { $n = $ids.Count; foreach ($p in $all) { if ($ids.Contains([int]$p.ParentProcessId)) { [void]$ids.Add([int]$p.ProcessId) } } } while ($ids.Count -ne $n)
+  $all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name, KernelModeTime, UserModeTime
+  $ids = Select-Tree $all ${rootPid}
   # The raw class holds the same WorkingSetPrivate as the formatted one (Task Manager's Memory column) for a fifth of the cost.
   $private = @{}
   Get-CimInstance Win32_PerfRawData_PerfProc_Process -Filter (($ids | ForEach-Object { "IDProcess=$_" }) -join ' OR ') -Property IDProcess, WorkingSetPrivate |

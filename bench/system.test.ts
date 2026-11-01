@@ -12,6 +12,7 @@ import {
   minimise,
   sample,
   screens,
+  SELECT_TREE,
   splitTree,
   startSampler,
   waitForQuiet,
@@ -78,7 +79,7 @@ function killSampler(rootPid: number) {
       "-NonInteractive",
       "-Command",
       `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -Property ProcessId, CommandLine |
-  Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*ids.Add(${rootPid})*' } |
+  Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*Select-Tree $all ${rootPid}*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`,
     ],
     { stdio: "ignore" },
@@ -91,6 +92,73 @@ function fakeConhost(dir: string) {
   copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "ping.exe"), exe);
   return exe;
 }
+
+describe("SELECT_TREE", () => {
+  const at = (minutes: number | null) =>
+    minutes === null ? "$null" : `(([datetime]'2026-11-01 12:00').AddMinutes(${minutes}))`;
+
+  /** The ids `Select-Tree` keeps from made-up processes, each [id, parent, start in minutes after noon or null]. */
+  function selectTree(
+    procs: [number, number, number | null][],
+    root: number,
+    rootStarted?: number,
+  ) {
+    const all = procs
+      .map(
+        ([id, parent, start]) =>
+          `[pscustomobject]@{ ProcessId = ${id}; ParentProcessId = ${parent}; CreationDate = ${at(start)} }`,
+      )
+      .join(", ");
+    const out = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `${SELECT_TREE}\n(Select-Tree @(${all}) ${root} ${at(rootStarted ?? null)}) -join ','`,
+      ],
+      { encoding: "utf8" },
+    );
+    return out
+      .trim()
+      .split(",")
+      .map(Number)
+      .sort((a, b) => a - b);
+  }
+
+  it(
+    "keeps a process only when it started after the parent it names, which a reused id breaks",
+    { timeout: SLOW },
+    () => {
+      const kept = selectTree(
+        [
+          [10, 1, 5], // the root
+          [11, 10, 6],
+          [12, 11, 7],
+          [20, 10, 1], // its parent died before the root took the id
+          [21, 20, 2], // under that older one
+          [22, 11, 3], // older than 11 too
+          [40, 10, null], // no start time, as for System
+          [30, 1, 0],
+        ],
+        10,
+      );
+      expect(kept).toEqual([10, 11, 12]);
+    },
+  );
+
+  it("takes the root's start from the caller once the root is gone", { timeout: SLOW }, () => {
+    const kept = selectTree(
+      [
+        [11, 10, 6],
+        [20, 10, 1],
+      ],
+      10,
+      5,
+    );
+    expect(kept).toEqual([10, 11]);
+  });
+});
 
 describe("splitTree", () => {
   const MB = 1e6;
