@@ -1,7 +1,7 @@
 # Bench: Java's memory limit (#149)
 
 Date: 2026-11-01
-Builds: A = `develop` at `73849d53` (merge of #172), B = `feature/java-memory` at `fc0dabe4` (A plus `-Xms64m -Xmx2g -XX:+ExitOnOutOfMemoryError` on every Java Grace starts, and the out-of-memory notice). Both packaged with `npm run package` from their own checkouts; B was the build `npm run e2e` packaged.
+Builds: A = `develop` at `73849d53` (merge of #172), B = `feature/java-memory` at `9b11bd60`, labelled `fc0dabe4` in the bench output: the same code, before one commit message on the branch was shortened (A plus `-Xms64m -Xmx2g -XX:+ExitOnOutOfMemoryError` on every Java Grace starts, and the out-of-memory notice). Both packaged with `npm run package` from their own checkouts; B was the build `npm run e2e` packaged.
 Machine: the reference machine of the [baseline](2026-10-31-bench-baseline.md) (Windows 11 Pro, Ryzen 7 5800X, 32 GB). The bench logged `windows open at 3140, 246 on DISPLAY1, not the main screen (work area 2560 x 1392 at 2560, 0)`: the same right-hand screen, under the name Windows gave it this time.
 Spec: [docs/specs/2026-11-01-java-memory.md](../specs/2026-11-01-java-memory.md).
 
