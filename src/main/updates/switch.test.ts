@@ -193,7 +193,10 @@ setInterval(() => { try { process.kill(${process.pid}, 0); } catch { process.exi
     write(path.join(data, "Local Storage", "y"));
   }, HOOK);
 
-  afterEach(async () => {
+  afterEach(async ({ task }) => {
+    // the switch's own error: an assertion on part of the result does not show it (#145)
+    if (task.result?.state === "fail" && existsSync(path.join(data, "update-result.json")))
+      console.error(`update-result.json: ${read(data, "update-result.json")}`);
     for (const c of children.splice(0)) {
       c.stdin?.end();
       c.kill();
