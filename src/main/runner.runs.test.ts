@@ -11,11 +11,42 @@ import {
   until,
   hashTree,
   javaCommandLines,
+  printed,
 } from "../../test/runner";
+import { OUT_OF_MEMORY } from "./karate/command";
 
 afterEach(cleanUp);
 
 describe("Runner runs", () => {
+  it("says so when Java runs out of memory, and the next run does not", T, async () => {
+    const { runner, events, all, last } = setup();
+    const root = fixture("clean");
+    // One array over the 2 GB ceiling: Java refuses it at once, without using the memory.
+    writeFileSync(
+      path.join(root, "tests", "big.feature"),
+      [
+        "Feature: big",
+        "",
+        "Scenario: asks for more than the limit",
+        "  * def bytes = Java.type('java.lang.reflect.Array').newInstance(Java.type('java.lang.Byte').TYPE, 2147483000)",
+        "",
+        "Scenario: after it",
+        "  * print 'after it ran'",
+        "",
+      ].join("\n"),
+    );
+    await runner.open(root);
+    await runner.run("f:tests/big.feature");
+    expect(last("runFinished")).toMatchObject({ outcome: "failed", exitCode: 3 });
+    expect(printed(events).some((l) => l.includes("java.lang.OutOfMemoryError"))).toBe(true);
+    expect(printed(events).some((l) => l.includes("after it ran"))).toBe(false);
+    expect(last("notice").message).toBe(OUT_OF_MEMORY);
+    const notices = all("notice").length;
+    await runner.run(byName(last("project").tree!, "after it").key);
+    expect(last("runFinished").outcome).toBe("finished");
+    expect(all("notice")).toHaveLength(notices);
+  });
+
   it("runs all with live progress", T, async () => {
     const { runner, events, last } = setup();
     await runner.open(fixture("clean"));

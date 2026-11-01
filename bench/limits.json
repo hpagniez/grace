@@ -230,8 +230,8 @@
     },
     "run.memory.java@10k": {
       "unit": "MB",
-      "limit": 529.2,
-      "noise": 34,
+      "limit": 341.1,
+      "noise": 22,
       "machine": true
     },
     "run.cpu.app@10k": {

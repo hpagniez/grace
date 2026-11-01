@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanUp, temps, T, setup, fixture, leaves } from "../../test/runner";
 import { NO_FILTER } from "../shared/tags";
+import { OUT_OF_MEMORY } from "./karate/command";
+import { dryRunError } from "./runner";
 
 afterEach(cleanUp);
 
@@ -35,6 +37,13 @@ describe("Runner discovery", () => {
     const p = last("project");
     expect(p.tree).toBeNull();
     expect(p.error).toContain("syntax.feature");
+  });
+
+  it("a dry run that ran out of heap says so; one that only names the error does not", () => {
+    const heap = "Terminating due to java.lang.OutOfMemoryError: Java heap space";
+    expect(dryRunError(["parsing tests/a.feature", heap])).toBe(OUT_OF_MEMORY);
+    const named = '  "error": "java.lang.OutOfMemoryError: Java heap space" in tests/a.feature';
+    expect(dryRunError(["start", named])).toBe(named);
   });
 
   it("opens an empty folder", T, async () => {
