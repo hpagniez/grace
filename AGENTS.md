@@ -102,6 +102,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 
 - `develop` is the default branch, so new PRs target it. Pick `main` for `release/*` and `hotfix/*` PRs.
 - Open PRs as drafts while working. Mark ready for review when done.
+- Copilot reviews each PR into `develop` or `main` once, when it is opened or marked ready for review: not drafts, not new pushes ([#175](https://github.com/hpagniez/grace/issues/175)). Fix or answer its comments like any review.
 - Every PR links an issue, whatever its type (fixes, tests, CI, docs and releases too): `Closes #N` when it finishes the issue, `Part of #N` when it does not. If no issue fits, open one first: a bug with the `bug` label and the sections of `.github/ISSUE_TEMPLATE/bug.yml`, other work like a feature issue. A fix found while working on another PR gets its own issue, and that PR names it too. For a bot PR (Dependabot, `vendor-updates`), whoever takes it opens the issue and adds the line to its body before it merges.
 - CI runs no e2e on PRs into `develop`. Before marking one ready, run `npm run e2e` locally if it changes more than `docs/**` and `*.md`, and paste the summary in the PR. PRs into `main` run e2e on CI once ready.
 - Merge only when `checks` and `test` are green and `perf` has finished with success. Nothing enforces it.
