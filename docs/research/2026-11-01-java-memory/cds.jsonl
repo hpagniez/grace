@@ -1,0 +1,9 @@
+{"label":"cds-create","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1937,"javaPeakMB":195.8,"javaCpuMs":5688,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1619,"javaPeakMB":168.5,"javaCpuMs":3500,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b-cds","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1317,"javaPeakMB":191.7,"javaCpuMs":3328,"gcs":6,"maxAfterGcMB":12,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1602,"javaPeakMB":149.6,"javaCpuMs":3531,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b-cds","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":2028,"javaPeakMB":127.8,"javaCpuMs":2328,"gcs":6,"maxAfterGcMB":13,"maxCommittedMB":64,"scenarios":null}
+{"label":"dry-b","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1475,"javaPeakMB":167.7,"javaCpuMs":3484,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b-cds","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1312,"javaPeakMB":182.8,"javaCpuMs":3516,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1392,"javaPeakMB":178.4,"javaCpuMs":3516,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
+{"label":"dry-b-cds","size":"2k","threads":1,"dry":true,"exit":0,"oom":false,"wallMs":1348,"javaPeakMB":191.7,"javaCpuMs":2938,"gcs":6,"maxAfterGcMB":11,"maxCommittedMB":77,"scenarios":null}
