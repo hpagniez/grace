@@ -94,9 +94,9 @@ Success:
 
 ## Cost
 
-- Memory: lower during a run and while Grace lists the tests (see the table above; the bench's figures are in `docs/checks/2026-11-01-java-memory.md`). Idle: nothing changes; no Java runs while idle.
-- CPU: no change beyond the bench's noise (`CPU_RESULT`). More frequent young collections on a small heap are offset by touching less memory.
-- Start time: no change; the dry run that builds the tree uses the same flags (`DRY_RESULT`).
+- Memory: lower during a run and while Grace lists the tests. The bench put Java's peak on the 10,000-test project at 319 MB instead of 482, and on the 2,000-test one at 297 instead of 308 ([check record](../checks/2026-11-01-java-memory.md)). Idle: nothing changes; no Java runs while idle.
+- CPU: about 5 % more of Java's CPU on 10,000 tests (36.3 s against 34.6 s, Java alone, 5 rounds), from more young collections on the smaller heap; inside the rounds' spread, and the run takes the same time. A 128 MB start would cost 2 % and give back 26 MB of the saving.
+- Start time: no change. `start.tree.reused` read 1,943 ms against 1,946, and the 10,000-test dry run took 5.8 s against 6.2 s.
 - Size: none. Three arguments on a command line; no file, no dependency.
 - Idle stays at zero: the change adds no timer, poll or process.
 

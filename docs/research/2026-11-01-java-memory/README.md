@@ -2,13 +2,13 @@
 
 Checked on 2026-11-01 on the reference desktop (Windows 11 Pro, Ryzen 7 5800X, 16 threads, 32 GB), with the bundled Temurin 21.0.12.1 and Karate 2.1.4, for [#149](https://github.com/hpagniez/grace/issues/149). Spec: [docs/specs/2026-11-01-java-memory.md](../../specs/2026-11-01-java-memory.md).
 
-**Bottom line:** the suites need little heap (under 120 MB left after a collection, on 10,000 tests and up to 32 threads). Most of Java's peak is young-generation space that the default 512 MB starting heap lets G1 fill before it collects, plus the JIT's working memory. `-Xms64m -Xmx2g` cuts the 10,000-test peak from 455 to 318 MB and the dry run's from 471 to 238 MB, with no extra CPU and no new risk of running out of memory on any machine with 8 GB or more. The serial collector does not help. Class-data sharing starts Java about 200 ms sooner but costs about 19 MB. C1 alone halves Java's CPU: a follow-up.
+**Bottom line:** the suites need little heap (under 120 MB left after a collection, on 10,000 tests and up to 32 threads). Most of Java's peak is young-generation space that the default 512 MB starting heap lets G1 fill before it collects, plus the JIT's working memory. `-Xms64m -Xmx2g` cuts the 10,000-test peak from 455 to 318 MB and the dry run's from 471 to 238 MB, for about 5 % more of Java's CPU and no new risk of running out of memory on any machine with 8 GB or more. The serial collector does not help. Class-data sharing starts Java about 200 ms sooner but costs about 19 MB. C1 alone halves Java's CPU: a follow-up.
 
 ## Method
 
 `measure.mjs` starts Java as `buildArgs` does (same flags, `-f html,karate:jsonl`, the project as the classpath, the option variables removed), plus the flags under test and `-Xlog:gc` to a file. It samples Java's private working set every 250 ms with `bench/system.mjs`' sampler, the measure `npm run bench` reports as `run.memory.java`, and reads Java's CPU time the same way. From the GC log it takes the largest heap left after a collection (about the live data) and the largest committed heap. The projects are the bench's, from `writeBigProject` (5 features per module: 2,000 tests; 25: 10,000), each run on one or more threads (`-T`), or as a dry run (`-D`). No app runs: these are Java's own figures.
 
-`explore.jsonl` holds the first single runs; `rounds.jsonl` the three candidates in 3 interleaved rounds (2 for the dry run) and one run each on 16 and 32 threads; `cds.jsonl` the class-data sharing check. `summary.mjs <file>` prints the medians.
+`explore.jsonl` holds the first single runs; `rounds.jsonl` the three candidates in 3 interleaved rounds (2 for the dry run) and one run each on 16 and 32 threads; `cpu.jsonl` 5 rounds on Java's CPU; `cds.jsonl` the class-data sharing check. `summary.mjs <file>` prints the medians.
 
 ```bash
 node --no-warnings measure.mjs <repo> 10k 1 b -- -Xms64m -Xmx2g
@@ -60,6 +60,10 @@ Other flags, single runs on 10,000 tests, 1 thread (no flag: 434 to 471 MB, 29 t
 | `-XX:TieredStopAtLevel=1` (C1 only) | 382 | 16.4 |
 
 Below 256 MB the peak stops falling and garbage collection costs more CPU. `-Xmx512m` and `-Xmx1g` change nothing on this machine: the starting heap is already 512 MB.
+
+## Java's CPU, a second look
+
+The release bench read more of Java's CPU on 10,000 tests with the flags, on a busier machine. Java alone on a quiet machine, 10,000 tests, one thread, 5 interleaved rounds (`cpu.jsonl`): no flag 34.6 s (465 MB, 21 to 27 collections), `-Xms64m -Xmx2g` 36.3 s (318 MB, 36 to 50), `-Xms128m -Xmx2g` 35.3 s (344 MB, 25 to 33). The smaller start costs about 5 % of Java's CPU in extra young collections, inside the rounds' spread; the wall time did not change.
 
 ## Class-data sharing
 
