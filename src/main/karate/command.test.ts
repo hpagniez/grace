@@ -217,7 +217,13 @@ describe("outOfMemory", () => {
     expect(
       outOfMemory(["a", "Terminating due to java.lang.OutOfMemoryError: Java heap space"]),
     ).toBe(true);
-    expect(outOfMemory(["Terminating due to java.lang.OutOfMemoryError: Metaspace"])).toBe(true);
+    // other out-of-memory errors are not the heap's ceiling: Java's own line is enough there
+    expect(outOfMemory(["Terminating due to java.lang.OutOfMemoryError: Metaspace"])).toBe(false);
+    expect(
+      outOfMemory([
+        "Terminating due to java.lang.OutOfMemoryError: unable to create native thread: possibly out of memory",
+      ]),
+    ).toBe(false);
     // a response body that names the error is the test's, not Java's
     expect(outOfMemory(['  "error": "java.lang.OutOfMemoryError: Java heap space"'])).toBe(false);
     expect(outOfMemory(["scenario failed", "OutOfMemory in a test name"])).toBe(false);

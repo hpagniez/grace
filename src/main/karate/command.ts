@@ -77,9 +77,12 @@ const HEAP = ["-Xms64m", "-Xmx2g", "-XX:+ExitOnOutOfMemoryError"];
 export const OUT_OF_MEMORY =
   "Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.";
 
-/** The JVM's own line, not a test's output: a logged response body can name the error too. */
+/**
+ * The JVM's own line for a full heap, not a test's output (a logged response body can name the error too), nor
+ * another OutOfMemoryError (Metaspace, native threads) that the 2 GB ceiling did not cause.
+ */
 export const outOfMemory = (lines: string[]) =>
-  lines.some((l) => l.startsWith("Terminating due to java.lang.OutOfMemoryError"));
+  lines.some((l) => l.startsWith("Terminating due to java.lang.OutOfMemoryError: Java heap space"));
 
 export function buildArgs(o: {
   jar: string;

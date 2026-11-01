@@ -14,7 +14,7 @@
 
 - Flags, exactly: `-Xms64m -Xmx2g -XX:+ExitOnOutOfMemoryError`, in that order.
 - They go after `@<argFile>` when there is one, and before `-Dstdout.encoding=UTF-8`; on dry runs and runs alike.
-- The marker is a line that starts with `Terminating due to java.lang.OutOfMemoryError`: what Java prints, with `-XX:+ExitOnOutOfMemoryError`, before it exits with code 3. A test's own output (a logged response body) may name the error anywhere else in a line.
+- The marker is a line that starts with `Terminating due to java.lang.OutOfMemoryError: Java heap space`: what Java prints for a full heap, with `-XX:+ExitOnOutOfMemoryError`, before it exits with code 3. Another `OutOfMemoryError` (Metaspace, native threads) gets no notice. A test's own output (a logged response body) may name the error anywhere else in a line.
 - The sentence, exactly: `Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.`
 - No setting, no environment variable, no project file feeds these values.
 - Never run `npm test` and `npm run e2e` or `npm run bench` at the same time.
@@ -37,7 +37,7 @@
 - Test: `src/main/karate/command.test.ts`
 
 **Interfaces:**
-- Produces: `export const OUT_OF_MEMORY: string` (the sentence) and `export function outOfMemory(lines: string[]): boolean` (true when a line starts with `Terminating due to java.lang.OutOfMemoryError`).
+- Produces: `export const OUT_OF_MEMORY: string` (the sentence) and `export function outOfMemory(lines: string[]): boolean` (true when a line starts with `Terminating due to java.lang.OutOfMemoryError: Java heap space`).
 
 - [ ] **Step 1: Write the failing tests**
 

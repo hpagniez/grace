@@ -90,7 +90,7 @@ const isDir = (p: string) => {
 };
 
 /** Karate's own words for a failed dry run: lines naming an exception or a feature, else the tail. */
-function dryRunError(lines: string[]): string {
+export function dryRunError(lines: string[]): string {
   if (outOfMemory(lines)) return OUT_OF_MEMORY;
   const hits = lines.filter((l) => l.includes("Exception") || l.includes("feature"));
   return (hits.length ? hits : lines.slice(-20)).join("\n");
