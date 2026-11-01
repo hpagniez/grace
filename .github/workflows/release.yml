@@ -81,6 +81,7 @@ jobs:
             version: "${{ needs.build.outputs.version }}"
           # a person approves each release signing in SignPath
           wait-for-completion-timeout-in-seconds: 3600
+          # the workflow artifact is a zip around Forge's zip: extracting it leaves the signed Forge zip in signed/
           output-artifact-directory: signed
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -91,6 +92,7 @@ jobs:
   release:
     needs: [build, sign]
     # Publishes the signed zip, or the unsigned one while signing is not set up; never after a failed signing.
+    # !cancelled() is a status check, so a skipped sign does not skip this job.
     if: github.event_name == 'push' && !cancelled() && needs.build.result == 'success' && (needs.sign.result == 'success' || needs.sign.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
