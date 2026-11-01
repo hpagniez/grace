@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What SignPath signs for the release workflow (ADR 0024). Paste it into the SignPath project's artifact configuration. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <!-- the GitHub workflow artifact, around Forge's zip -->
+  <zip-file>
+    <zip-file path="Grace-win32-x64-${version}.zip">
+      <pe-file path="Grace.exe" product-name="Grace" product-version="${version}">
+        <authenticode-sign />
+      </pe-file>
+    </zip-file>
+  </zip-file>
+</artifact-configuration>
