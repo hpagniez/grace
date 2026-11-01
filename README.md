@@ -143,10 +143,25 @@ A home screen with your recent folders, light and dark themes that follow Window
 2. Unzip it anywhere and start `Grace.exe`.
 3. Click **Open folder…** and pick a folder that holds Karate `.feature` files.
 
-Grace runs on Windows 11 (x64). The app is not code-signed yet, so Windows SmartScreen can stop the first start: click **More info**, then **Run anyway**.
+Grace runs on Windows 11 (x64). The app is not code-signed yet (see the [code signing policy](#code-signing-policy)), so Windows SmartScreen can stop the first start: click **More info**, then **Run anyway**.
 
 > [!NOTE]
 > Every version is a release candidate of 1.0.0 for now. From 1.0.0-rc.6, Grace updates itself: click **Update** in the status bar, or open **Settings › Updates**. On 1.0.0-rc.5 or older, download the new zip instead. Settings and run history from an older release candidate may not carry over.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). Signing starts once SignPath Foundation accepts Grace; until then, releases are unsigned.
+
+- **What is signed:** `Grace.exe` in the release zip, built from this repository by the [`release` workflow](.github/workflows/release.yml). The bundled Java runtime keeps the Eclipse Foundation's signature; Electron's DLLs ship as Electron publishes them ([ADR 0024](docs/decisions/0024-sign-grace-exe-with-signpath-foundation.md)).
+- **Committers and reviewers:** [hpagniez](https://github.com/hpagniez). Changes from anyone else come as pull requests they review.
+- **Approvers:** [hpagniez](https://github.com/hpagniez) approves every release signing by hand.
+
+### Privacy policy
+
+Grace sends no data about you or your projects to anyone. It connects to other systems only:
+
+- to check GitHub for a new version at startup (turn it off in **Settings › Updates**) or when you click **Check for updates**, and to download the version you choose;
+- when your Karate tests call the systems they test.
 
 ## How it works
 
