@@ -48,7 +48,7 @@ Success:
 - Reading JVM options from the project or the environment. Grace already strips `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS`.
 
 **Anti-goals** (failure even if everything else works):
-- A suite that passes today fails because of the limit, on a machine with 8 GB or more.
+- A suite that needs no more than 2 GB of heap, the ceiling an 8 GB machine gives Java today, fails because of the limit. A suite that needs more did pass on machines with more than 8 GB, and now stops with the notice of R2: that is the change #149 asks for (see Approaches, B).
 - A run slows down noticeably, or Java's CPU goes up beyond the bench's noise.
 - A run that ran out of memory looks like an ordinary test failure.
 
@@ -70,7 +70,9 @@ Success:
 ## Approaches considered
 
 - **A. A tight fixed ceiling (`-Xmx256m`), with a setting to raise it.** The biggest cut at 2,000 tests on many threads (about 150 MB). But 256 MB is only twice the largest heap measured, and real suites carry bigger payloads than the bench's, so some would run out of memory and need the setting: a new Settings section, a stored value, and a choice the person has to understand.
-- **B. A small starting heap and a generous fixed ceiling (`-Xms64m -Xmx2g`), no setting (chosen).** The heap starts small and grows only when the garbage collector needs room, so a run takes about what its suite needs. It cut as much as A or more at 10,000 tests and on the dry run, and 40 to 50 MB less than A at 2,000 tests and above 8 threads. 2 GB is the ceiling an 8 GB machine already gives Java today, so a suite that fits there still fits; on the reference machine the ceiling falls from 8 GB to 2 GB. No setting, because a suite that needs more than 2 GB of heap already fails on an 8 GB machine.
+- **B. A small starting heap and a generous fixed ceiling (`-Xms64m -Xmx2g`), no setting (chosen).** The heap starts small and grows only when the garbage collector needs room, so a run takes about what its suite needs. It cut more than A at 10,000 tests on 1 and 8 threads (318 against 333 MB, 466 against 504) and on the dry run (238 against 309). A cut more at 2,000 tests (244 against 291 MB on 1 thread, 223 against 263 on 8) and at 10,000 tests on 16 and 32 threads (494 against 571 MB, 433 against 535; one run each). 2 GB is the ceiling an 8 GB machine already gives Java today, so a suite that fits there still fits. No setting, because a suite that needs more than 2 GB of heap already fails on an 8 GB machine.
+
+  Accepted change: the ceiling is the same on every machine. Above 8 GB of RAM it is lower than today (8 GB to 2 GB on the reference machine), so a suite that needs more than 2 GB of heap, which passed there, now stops with the notice of R2. Below 8 GB it is higher than today (1 GB to 2 GB on a 4 GB machine); the small starting heap still keeps an ordinary run small, and only a suite that needs it grows that far. One ceiling everywhere means a suite that passes on one machine passes on every machine, and the notice can name the limit.
 - **C. A share of the RAM (`-XX:MaxRAMPercentage`).** Rejected: a suite's needs do not grow with the machine's RAM, and the smallest machines, where memory matters most, would get the smallest ceiling.
 - **D. The serial collector, with A or B.** Measured, no gain (see above).
 
@@ -84,7 +86,7 @@ Success:
 ### R2. Out of memory
 
 1. `-XX:+ExitOnOutOfMemoryError` makes Java exit at its first `OutOfMemoryError`, so a run never keeps going with some tests failing for lack of memory and the rest slowed by garbage collection.
-2. Java then prints a line that starts with `Terminating due to java.lang.OutOfMemoryError` and exits with code 3. When a run's output has that line, Grace emits a notice once the run has ended: `Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.` The run is shown as failed, as for any exit code 3, and Java's line stays in the console. Only the start of a line counts: a test's own output, such as a logged response body, may name the error too.
+2. Java then prints a line that starts with `Terminating due to java.lang.OutOfMemoryError` and exits with code 3. When a run's output has that line for a full heap (`Terminating due to java.lang.OutOfMemoryError: Java heap space`), Grace emits a notice once the run has ended: `Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.` The run is shown as failed, as for any exit code 3, and Java's line stays in the console. Only the start of a line counts: a test's own output, such as a logged response body, may name the error too. Another `OutOfMemoryError` (Metaspace, native threads) also stops Java, but the 2 GB ceiling did not cause it and fewer tests may not help, so it gets no notice: the run shows as failed with Java's line in the console.
 3. When a dry run's output has that line, the project's error is that same sentence instead of `dryRunError`'s pick of lines. A dry run does not run `karate-config.js` or any step, so only a project too big to list could get there.
 
 ### R3. The bench
@@ -95,8 +97,8 @@ Success:
 ## Cost
 
 - Memory: lower during a run and while Grace lists the tests. The bench put Java's peak on the 10,000-test project at 319 MB instead of 482, and on the 2,000-test one at 297 instead of 308 ([check record](../checks/2026-11-01-java-memory.md)). Idle: nothing changes; no Java runs while idle.
-- CPU: about 5 % more of Java's CPU on 10,000 tests (36.3 s against 34.6 s, Java alone, 5 rounds), from more young collections on the smaller heap; inside the rounds' spread, and the run takes the same time. A 128 MB start would cost 2 % and give back 26 MB of the saving.
-- Start time: no change. `start.tree.reused` read 1,943 ms against 1,946, and the 10,000-test dry run took 5.8 s against 6.2 s.
+- CPU: more of Java's CPU on 10,000 tests. The release bench read `run.cpu.java@10k` at 47.1 s against 40.8 s, 6.4 s more against a noise of 5.4 s, with B's rounds on a busier machine (load before them 4.5 % to 28.9 %, against 1.1 % to 7.9 %); `run.cpu.java` at 2,000 tests read 18.1 s against 17.0 s, inside its noise. Java alone on a quiet machine, 5 interleaved rounds: 36.3 s against 34.6 s, about 5 %, with overlapping ranges, from more young collections on the smaller heap. The run takes the same time. A 128 MB start would cost 2 % and give back 26 MB of the saving.
+- Start time: the release bench read `start.tree.fresh` at 2,058 ms against 1,788, over its limit, with B's first two rounds slow (2,408 and 2,388 ms) and the last three like A's; `start.tree.reused`, the same dry run in a used profile, read 1,943 ms against 1,946. Java alone ran the 10,000-test dry run in 5.8 s against 6.2 s. The fresh-start difference is not checked with Java alone.
 - Size: none. Three arguments on a command line; no file, no dependency.
 - Idle stays at zero: the change adds no timer, poll or process.
 
@@ -108,7 +110,8 @@ The brief's (#149):
 - The serial collector and class-data sharing are measured, not assumed.
 
 Mine, open to correction:
-- Approach B over A: no setting, at the cost of a smaller cut on many threads.
+- Approach B over A: no setting, at the cost of a smaller cut at 2,000 tests and above 8 threads.
+- One ceiling on every machine, lower than today above 8 GB of RAM and higher below it (Approaches, B).
 - 2 GB as the ceiling: today's ceiling on an 8 GB machine.
 - 64 MB as the starting heap: about the largest live heap measured on 10,000 tests on one thread; G1 grows it from there.
 - Exit at the first `OutOfMemoryError` rather than let Karate carry on.
@@ -145,6 +148,12 @@ Feature: Java memory
     Given Java ran out of memory while Grace listed a project's tests
     When the dry run ends
     Then the project's error is "Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once."
+
+  Scenario: Another out-of-memory error gets no notice
+    Given Java stops with "Terminating due to java.lang.OutOfMemoryError: Metaspace"
+    When the run ends
+    Then the run is shown as failed with Java's line in the console
+    And no notice says Java ran out of memory
 
   Scenario: A test's output that names the error is not Java running out of memory
     Given a test logs a response body with "java.lang.OutOfMemoryError" in it
