@@ -46,8 +46,8 @@
     },
     "idle.cpu.shown": {
       "unit": "ms",
-      "limit": 3343,
-      "noise": 1781,
+      "limit": 1453,
+      "noise": 1375,
       "machine": true
     },
     "idle.cpu.minimised": {
