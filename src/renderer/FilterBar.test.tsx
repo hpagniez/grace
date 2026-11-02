@@ -28,6 +28,7 @@ function setup() {
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
@@ -274,6 +275,7 @@ describe("filter bar", () => {
       total: 2,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     expect(controls().every((c) => c.disabled)).toBe(true);
   });

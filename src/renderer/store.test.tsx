@@ -69,6 +69,7 @@ describe("createAppStore", () => {
       total: 2,
       startedAt: 1,
       env: null,
+      debug: false,
     });
     for (const [from, to] of [
       [0, 4000],

@@ -12,7 +12,7 @@ import {
   type RowEdit,
   type RowView,
 } from "../shared/env";
-import type { AppEvent, Project } from "../shared/events";
+import type { AppEvent, Breakpoint, DebugCommand, FileStep, Project } from "../shared/events";
 import { toEntry, type RunRecord, type StoredTest } from "../shared/history";
 import type { TestNode } from "../shared/model";
 import {
@@ -46,19 +46,23 @@ import {
   selectionTargets,
   tagArgs,
 } from "./karate/command";
+import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import { spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
+import { fileSteps } from "./karate/steps";
 import {
   buildTree,
   findNode,
+  leafIndex,
+  parentOf,
   parseRefId,
   resolveNode,
   resolveTests,
   rowLines,
 } from "./karate/tree";
-import { makeMasker, maskEvent } from "./mask";
+import { makeMasker, maskCutEnd, maskEvent } from "./mask";
 import { recentSender } from "./recent";
 import type { SecretBox } from "./secrets";
 import {
@@ -159,6 +163,12 @@ export class Runner {
   /** Set by `dispose` alone (`cancel` leaves it): the app is quitting, so a run skips its second walk. */
   private disposing = false;
   private report: string | null = null;
+  /** The open project's breakpoints, in memory only (step debugger R3.1). */
+  private breakpoints: Breakpoint[] = [];
+  /** The debug run's socket, while one runs. */
+  private session: DebugSession | null = null;
+  /** Sends `debugResumed` and tails the run again; set only while a debug run is paused. */
+  private resume: (() => void) | null = null;
   private readonly pidFile: string;
   /** Checks the saved recent list and emits it as a `recent` event; main calls it after the `ready` replay. */
   readonly sendRecent: () => Promise<void>;
@@ -210,6 +220,7 @@ export class Runner {
         );
         if (!opened) this.report = report;
         else {
+          this.sendBreakpoints([]); // another project's lines mean nothing here
           const notice = [
             skipped.length
               ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
@@ -271,6 +282,7 @@ export class Runner {
     this.overlays = [];
     this.tagEnvs = [];
     this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
+    this.sendBreakpoints([]);
     try {
       forgetLastProject(this.o.dataDir);
     } catch (err) {
@@ -402,7 +414,7 @@ export class Runner {
     return true;
   }
 
-  async run(key: string): Promise<void> {
+  async run(key: string, debug = false): Promise<void> {
     if (this.project)
       await this.guarded(() =>
         this.runTarget(
@@ -412,8 +424,54 @@ export class Runner {
             gone: "This test changed; the tree was refreshed",
           },
           this.filter,
+          debug,
         ),
       );
+  }
+
+  /** A run on one thread with the step debugger's listener (docs/specs/2026-11-02-step-debugger.md, R2). */
+  async debug(key: string): Promise<void> {
+    await this.run(key, true);
+  }
+
+  /** Pause asks the listener; the others resume a paused debug run. Ignored without a debug run. */
+  debugCommand(c: DebugCommand): void {
+    if (!this.session) return;
+    if (c === "pause") return this.session.command(c);
+    const resume = this.resume;
+    if (!resume) return;
+    this.resume = null;
+    this.session.command(c);
+    resume();
+  }
+
+  /** Adds or removes a breakpoint on a line of a feature of the tree (R3). Allowed while busy: a debug run takes it at once. */
+  toggleBreakpoint(file: string, line: number): void {
+    if (!this.tree || !findNode(this.tree, `f:${file}`) || !Number.isInteger(line) || line < 1) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    const at = (b: Breakpoint) => b.file === file && b.line === line;
+    this.sendBreakpoints(
+      this.breakpoints.some(at)
+        ? this.breakpoints.filter((b) => !at(b))
+        : [...this.breakpoints, { file, line }],
+    );
+  }
+
+  /** A scenario's or row's steps as its feature file has them (R4.1); null for any other node or an unreadable file. */
+  steps(key: string): FileStep[] | null {
+    const node = this.tree && findNode(this.tree, key);
+    if (!node || (node.kind !== "scenario" && node.kind !== "row")) return null;
+    const section = node.kind === "row" ? parentOf(this.tree!, key) : node; // a row runs its outline's steps
+    if (!section || section.line === null) return null;
+    const { root } = this.project!;
+    try {
+      const file = locate([root, ...detectLayout(root).classpath], node.file);
+      return fileSteps(readFileSync(file, "utf8"), section.line);
+    } catch {
+      return null;
+    }
   }
 
   /** Re-run (R5): the run's selection on its environment and filter; a Re-run failed run's tests, all of them. */
@@ -477,6 +535,7 @@ export class Runner {
           { type: "threads", count: this.threads },
           this.envEvent(),
           ...this.historyEvents(),
+          { type: "breakpoints", breakpoints: this.breakpoints },
           opening,
           busy,
         ]
@@ -490,6 +549,12 @@ export class Runner {
     // The kill ends the run's process; the run then writes its record before `running` settles.
     await within(Promise.allSettled([this.proc?.kill(), this.running]), 10_000);
     rmSync(this.pidFile, { force: true });
+  }
+
+  private sendBreakpoints(b: Breakpoint[]) {
+    this.breakpoints = b;
+    this.session?.setBreakpoints(b);
+    this.o.emit({ type: "breakpoints", breakpoints: b });
   }
 
   private publish(e: Extract<AppEvent, { type: "project" }>) {
@@ -701,9 +766,10 @@ export class Runner {
     argFile: string | null,
     filter: FilterState, // required: a run that forgot it would run unfiltered
     threads: number, // required: a run that forgot it would run on one thread
+    debug: { port: number; token: string } | null = null,
   ) {
     const { root } = this.project!;
-    const { java, jar } = this.o.vendor;
+    const { java, jar, listener } = this.o.vendor;
     const { classpath, configDir } = detectLayout(root);
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
@@ -719,6 +785,7 @@ export class Runner {
       argFile,
       threads,
       configDir,
+      debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
@@ -830,7 +897,7 @@ export class Runner {
    * The pre-run checks of a target after the pre-run discovery, then its run. `filter` is the one
    * saved, not pruned: a vanished included tag shrinks the run, never widens it.
    */
-  private async runTarget(target: RunTarget, filter: FilterState): Promise<void> {
+  private async runTarget(target: RunTarget, filter: FilterState, debug = false): Promise<void> {
     const runCancelled = () => {
       if (this.cancelled) this.o.emit({ type: "notice", message: "Run cancelled" });
       return this.cancelled;
@@ -848,7 +915,7 @@ export class Runner {
     const { root } = this.project!;
     const { classpath, featureRoots } = detectLayout(root);
     const bases = [root, ...classpath];
-    const run = { tree, filter, threads: this.threads, env, props };
+    const run = { tree, filter, threads: debug ? 1 : this.threads, env, props, debug };
 
     if ("tests" in target) {
       // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
@@ -925,8 +992,10 @@ export class Runner {
     props: { rows: PlainRow[]; secrets: string[] };
     selection: TestNode | null;
     failedOf: number | null;
+    /** A debug run: `threads` is then 1. */
+    debug: boolean;
   }): Promise<void> {
-    const { tree, leaves, filter, threads, env, props, selection, failedOf } = o;
+    const { tree, leaves, filter, threads, env, props, selection, failedOf, debug } = o;
     const { root } = this.project!;
     const walk = this.o.fingerprint ?? projectFingerprint;
     // A file saved while Java runs could be what made a test flip: the run keeps its fingerprint
@@ -984,6 +1053,7 @@ export class Runner {
             outcome: done.outcome,
             exitCode: done.outcome === "cancelled" ? null : done.exitCode, // a kill's code is not Karate's
             tests: storedTests(leaves, state.results()),
+            ...(debug ? { debug: true as const } : {}),
           };
           writeRunRecord(outDir, record);
           pruneHistory(projectDir);
@@ -1011,6 +1081,25 @@ export class Runner {
         return done!;
       };
       const tail = new JsonlTail(path.join(outDir, "karate-json", "karate-events.jsonl"));
+      // `poll`, `startPoll` and `stopPoll` exist before the listener can connect: socket events come after this task
+      const index = leafIndex(tree);
+      const onPause = ({ test, vars, ...at }: ListenerPause) => {
+        stopPoll(); // nothing runs while paused (R2.4)
+        poll();
+        this.resume = () => {
+          emit({ type: "debugResumed" });
+          startPoll();
+        };
+        const cutMasked = vars.map((v) =>
+          v.cut ? { ...v, value: maskCutEnd(v.value, props.secrets) } : v,
+        );
+        const key = index.get(`${test.file}|${test.refId}`)?.key ?? null;
+        emit({ type: "debugPaused", paused: { ...at, key, vars: cutMasked } });
+      };
+      // a socket that ends while paused leaves Java running unpaused: tail it again
+      const onEnd = () => this.debugCommand("continue");
+      const session = debug ? await DebugSession.open(this.breakpoints, onPause, onEnd) : null;
+      this.session = session;
       const proc = this.spawn(
         outDir,
         false,
@@ -1023,6 +1112,7 @@ export class Runner {
         argFile,
         filter,
         threads,
+        session,
       );
       try {
         if (proc.pid !== -1) writeFileSync(this.pidFile, String(proc.pid));
@@ -1043,6 +1133,7 @@ export class Runner {
         total: state.keys.length,
         startedAt,
         env,
+        debug,
       });
 
       // A bad event line or malformed data is fatal: the run's status can no longer be trusted.
@@ -1056,10 +1147,17 @@ export class Runner {
           void proc.kill();
         }
       };
-      const timer = setInterval(poll, this.o.pollMs ?? 100);
+      let timer: NodeJS.Timeout | undefined;
+      const startPoll = () => (timer ??= setInterval(poll, this.o.pollMs ?? 100));
+      const stopPoll = () => {
+        clearInterval(timer);
+        timer = undefined;
+      };
+      startPoll();
       const code = await proc.exit;
       const exitedAt = Date.now(); // the run's end: the walk below is not part of its duration
-      clearInterval(timer);
+      stopPoll();
+      this.resume = null;
       poll();
       this.proc = null;
       rmSync(this.pidFile, { force: true });
@@ -1075,6 +1173,9 @@ export class Runner {
       if (fatal) emit({ type: "notice", message: fatal.message });
       else if (oom) emit({ type: "notice", message: OUT_OF_MEMORY });
     } finally {
+      this.session?.close();
+      this.session = null;
+      this.resume = null;
       // An antivirus or an indexer can hold it a moment (Electron's Node 24.22 retries a file; Node
       // 24.15 does not, so the unit tests cover only the notice). A failure must not replace the run's outcome.
       for (const file of [argFile, targetFile]) {

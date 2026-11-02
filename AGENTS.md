@@ -4,7 +4,7 @@ Grace is a free, open-source desktop test-suite runner for [Karate](https://docs
 
 ## Commands
 
-Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads the bundled JRE and Karate jar into `vendor/`).
+Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads the bundled JRE and Karate jar into `vendor/`, and compiles the debug listener in `listener/` into `vendor/listener.jar`; run it again after changing the listener).
 
 | Command | What it does |
 |---|---|
@@ -118,7 +118,7 @@ Decided in [ADR 0007](docs/decisions/0007-github-actions-ci-cd-on-the-free-priva
 | `release` | Push of a `vX.Y.Z-rc.N` tag (a plain `vX.Y.Z` tag runs nothing); by hand | Tag must match `package.json`; `npm run make`; SignPath signs `Grace.exe` once a person approves, when the `SIGNPATH_ORGANIZATION_ID` variable is set ([ADR 0024](docs/decisions/0024-sign-grace-exe-with-signpath-foundation.md)); GitHub pre-release with the zip. By hand: build and test-sign, publish nothing |
 | `vendor-updates` | Weekly, and by hand | Draft PR per newer Temurin 21 JRE or Karate 2.x (pins in `scripts/vendor.json`, [ADR 0012](docs/decisions/0012-weekly-draft-prs-for-the-bundled-jre-and-karate.md)); a Karate bump re-records the event fixtures. Mark it ready for review to run CI (unit tests, no e2e) |
 
-Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not see the JRE and Karate pins in `scripts/vendor.json`: `vendor-updates` bumps them (`npm run vendor:bump -- <jre|karate>` by hand).
+Dependabot opens grouped update PRs into `develop` monthly, plus security PRs when an alert appears. It does not see the JRE and Karate pins in `scripts/vendor.json`: `vendor-updates` bumps them (`npm run vendor:bump -- <jre|karate>` by hand). The ECJ pin there, a build tool only, is bumped by hand ([ADR 0025](docs/decisions/0025-compile-the-debug-listener-with-ecj-on-the-bundled-jre.md)).
 
 ## Subagents
 
@@ -183,4 +183,5 @@ Full detail: [docs/inventory/karate-core.md §19](docs/inventory/karate-core.md#
 - Exit codes: `0` pass, `1` test failures (also after `taskkill`), `2` usage error, `3` parse or runtime error (one broken feature aborts the whole run). A missing path, unknown `-e` or unmatched `-n` exit `0` silently: preflight with a dry run and warn on 0 scenarios.
 - On Windows, cancel with `taskkill /PID <pid> /T /F` and record "cancelled" in the app. `child.kill()` leaves the JVM running when spawned through a shell or launcher.
 - HTTP request/response detail exists only as text in step logs inside `FEATURE_EXIT`. OSS Karate v2 has no debug server. Live step and HTTP events need our own Java `RunListener` passed with `--listener`.
+- The step debugger is that listener: `listener/grace/DebugListener.java`, on the classpath and passed with `--listener grace.DebugListener` only in a debug run, on one thread. It talks to the main process over a loopback socket (spec `docs/specs/2026-11-02-step-debugger.md`). It may use only Karate's public listener interface, never `karate.debug.port` or the paid `io.karatelabs.debug` classes.
 - The HTTP inspector (F11) parses that step-log text in `src/main/karate/http.ts`; the text is Karate's, not a contract. After any Karate version change, run `npm run fixtures` to re-record `test/fixtures/events/` (including `run-http*.jsonl`), check the recordings still hold the http sample project's calls (spec `docs/specs/2026-10-25-http-inspector.md`, Acceptance criteria), and keep `src/main/karate/http.test.ts` green. The `vendor-updates` bump PR re-records them on its own.

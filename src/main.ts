@@ -22,6 +22,7 @@ import { parseVersion } from "./shared/version";
 import { batched } from "./main/batch";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
+import { isDebugCommand } from "./main/karate/debug";
 import { killOrphan } from "./main/karate/process";
 import { checkRecent } from "./main/recent";
 import { Runner } from "./main/runner";
@@ -264,13 +265,30 @@ app.whenReady().then(async () => {
   handlePath(CH.removeRecent, (root) => runner.removeRecent(root));
   handle(CH.close, () => runner.close());
   handle(CH.refresh, () => runner.refresh());
+  const nodeKey = (key: unknown): key is string =>
+    typeof key === "string" && key.length <= 1000 && /^[dfos]:/.test(key);
   handle(CH.run, async (key) => {
-    if (typeof key !== "string" || key.length > 1000 || !/^[dfos]:/.test(key)) {
+    if (!nodeKey(key)) {
       emit({ type: "notice", message: "Invalid request" });
       return;
     }
     await runner.run(key);
   });
+  handle(CH.debug, async (key) => {
+    if (!nodeKey(key)) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await runner.debug(key);
+  });
+  handle(CH.debugCommand, (c) => {
+    if (isDebugCommand(c)) runner.debugCommand(c);
+  });
+  handle(CH.breakpoint, (file, line) => {
+    // the Runner checks the file is a feature of the tree and the line an integer
+    if (typeof file === "string" && typeof line === "number") runner.toggleBreakpoint(file, line);
+  });
+  handle(CH.steps, (key) => (nodeKey(key) ? runner.steps(key) : null));
   handle(CH.filter, (f) => {
     const filter = parseFilterState(f);
     if (!filter) {

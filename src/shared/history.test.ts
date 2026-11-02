@@ -102,6 +102,14 @@ describe("parseRunRecord", () => {
     expect(parseRunRecord(r)).toEqual(r);
   });
 
+  it("keeps a debug run's flag and refuses any other value", () => {
+    expect(parseRunRecord({ ...specExample(), debug: true })).toEqual({
+      ...specExample(),
+      debug: true,
+    });
+    expect(parseRunRecord({ ...specExample(), debug: false })).toBeNull();
+  });
+
   it("reads a record stored before F12 as no thread count", () => {
     const { threads: _threads, ...old } = specExample();
     expect(parseRunRecord(old)).toEqual({ ...specExample(), threads: null });

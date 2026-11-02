@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AppEvent } from "../shared/events";
-import { makeMasker, maskEvent, secretForms } from "./mask";
+import { makeMasker, maskCutEnd, maskEvent, secretForms } from "./mask";
 
 describe("secretForms", () => {
-  it("lists the value, its URL-encoded form and its JSON-escaped form", () => {
-    expect(secretForms('a b"c')).toEqual(['a b"c', "a%20b%22c", 'a b\\"c']);
+  it("lists the value, its URL-encoded, JSON-escaped and XML-escaped forms", () => {
+    expect(secretForms('a b"c')).toEqual(['a b"c', "a%20b%22c", 'a b\\"c', "a b&quot;c"]);
+    expect(secretForms("a&<b>'")).toContain("a&amp;&lt;b&gt;&apos;");
   });
 
   it("drops forms equal to one already listed", () => {
@@ -13,6 +14,19 @@ describe("secretForms", () => {
 
   it("has no forms for an empty value", () => {
     expect(secretForms("")).toEqual([]);
+  });
+});
+
+describe("maskCutEnd", () => {
+  it("masks an end that starts a secret, longest first", () => {
+    expect(maskCutEnd("value tok", ["token"])).toBe("value ****");
+    expect(maskCutEnd("ab", ["abc", "b"])).toBe("****");
+  });
+
+  it("leaves an end that starts no secret, and a whole secret for the masker", () => {
+    expect(maskCutEnd("value x", ["token"])).toBe("value x");
+    expect(maskCutEnd("token", ["token"])).toBe("token");
+    expect(maskCutEnd("abc", [])).toBe("abc");
   });
 });
 
@@ -164,6 +178,7 @@ describe("maskEvent", () => {
       total: 2,
       startedAt: 5,
       env: "qa",
+      debug: false,
     };
     expect(maskEvent(started, m)).toEqual(started);
     const updates: AppEvent = { type: "scenarios", updates: [{ key: "s:a#1", status: "passed" }] };

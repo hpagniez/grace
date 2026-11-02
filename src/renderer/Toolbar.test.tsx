@@ -66,6 +66,7 @@ function setup(root = ROOT) {
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     rerunFailed: vi.fn(async () => {}),
+    debugCommand: vi.fn(async () => {}),
   };
   render(() => <Toolbar state={state} api={api as unknown as Api} />);
   const send = (...events: AppEvent[]) => {
@@ -497,5 +498,70 @@ describe("the boxes", () => {
         expect(cls, id).toContain(c);
       expect(cls).not.toMatch(/zinc|dark:/);
     }
+  });
+});
+
+describe("toolbar: step debugger", () => {
+  const started = (debug: boolean): AppEvent => ({
+    type: "runStarted",
+    selection: "s:a#1",
+    runId: "20261102-120000-000",
+    keys: ["s:a#1"],
+    total: 1,
+    startedAt: Date.now(),
+    env: null,
+    debug,
+  });
+  const paused: AppEvent = {
+    type: "debugPaused",
+    paused: {
+      key: "s:a#1",
+      file: "a.feature",
+      line: 2,
+      depth: 0,
+      prefix: "*",
+      keyword: "def",
+      text: "x = 1",
+      vars: [],
+    },
+  };
+  const ids = () =>
+    [...header().querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid"));
+
+  it("a normal run keeps Run all; a debug run shows Pause until it pauses", () => {
+    const { api, send } = setup();
+    send(started(false));
+    expect(ids()).toContain("run-all-button");
+    expect(ids()).not.toContain("debug-pause");
+    send(started(true));
+    expect(ids()).not.toContain("run-all-button");
+    expect(ids()).toContain("cancel-button");
+    fireEvent.click(button("debug-pause"));
+    expect(api.debugCommand).toHaveBeenCalledWith("pause");
+  });
+
+  it("paused: Continue, Step over and Step into, by click and by F5, F10 and F11", () => {
+    const { api, send } = setup();
+    send(started(true), paused);
+    expect(ids().filter((id) => id?.startsWith("debug-"))).toEqual([
+      "debug-continue",
+      "debug-over",
+      "debug-into",
+    ]);
+    fireEvent.click(button("debug-over"));
+    expect(api.debugCommand).toHaveBeenLastCalledWith("over");
+    for (const [key, command] of [
+      ["F5", "continue"],
+      ["F10", "over"],
+      ["F11", "into"],
+    ]) {
+      fireEvent.keyDown(window, { key });
+      expect(api.debugCommand).toHaveBeenLastCalledWith(command);
+    }
+    send({ type: "debugResumed" });
+    api.debugCommand.mockClear();
+    fireEvent.keyDown(window, { key: "F5" });
+    expect(api.debugCommand).not.toHaveBeenCalled();
+    expect(ids()).toContain("debug-pause");
   });
 });

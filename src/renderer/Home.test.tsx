@@ -24,6 +24,7 @@ function setup() {
   let emit: (e: AppEvent) => void = () => {};
   const api = {
     ready: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     openProject: vi.fn(async () => {}),
     openRecent: vi.fn(async () => {}),
     removeRecent: vi.fn(async () => {}),

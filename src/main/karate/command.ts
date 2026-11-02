@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Layout, TestNode } from "../../shared/model";
 import { filterOn, matchingLeaves, NO_FILTER, type TagFilter } from "../../shared/tags";
+import { DEBUG_LISTENER } from "./debug";
 import { readPom } from "./pom";
 
 export interface ProjectLayout {
@@ -177,7 +178,10 @@ export function buildArgs(o: {
   threads: number;
   /** Karate's `-g`, as written in karate-pom.json. */
   configDir: string | null;
+  /** A debug run's listener jar and socket (docs/specs/2026-11-02-step-debugger.md, R2.1). */
+  debug?: { jar: string; port: number; token: string } | null;
 }): string[] {
+  const { debug } = o;
   return [
     // The launcher expands `@file` only before the main class, so it goes first.
     ...(o.argFile ? [`@${o.argFile}`] : []),
@@ -185,8 +189,9 @@ export function buildArgs(o: {
     o.dryRun ? JIT.dry : JIT.run,
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
+    ...(debug ? [`-Dgrace.debug.port=${debug.port}`, `-Dgrace.debug.token=${debug.token}`] : []),
     "-cp",
-    [o.jar, ...o.classpath].join(";"),
+    [o.jar, ...(debug ? [debug.jar] : []), ...o.classpath].join(";"),
     "io.karatelabs.Main",
     "run",
     "--no-color",
@@ -199,6 +204,7 @@ export function buildArgs(o: {
     "false",
     "-f",
     "html,karate:jsonl",
+    ...(debug ? ["--listener", DEBUG_LISTENER] : []),
     ...(o.env ? ["-e", o.env] : []),
     ...(o.configDir ? ["-g", o.configDir] : []),
     ...(o.dryRun ? ["-D", "-T", "1"] : ["-T", String(o.threads)]),

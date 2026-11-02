@@ -14,9 +14,9 @@ const drawn = (status: MarkStatus) => {
 };
 
 describe("StatusMark", () => {
-  it("covers every status plus skipped and cancelled", () => {
+  it("covers every status plus skipped, cancelled and paused", () => {
     expect(KEYS.sort()).toEqual(
-      [...Object.keys(STATUS_LABEL), "skipped", "cancelled"].sort() as MarkStatus[],
+      [...Object.keys(STATUS_LABEL), "skipped", "cancelled", "paused"].sort() as MarkStatus[],
     );
   });
 
@@ -30,7 +30,7 @@ describe("StatusMark", () => {
 
   it("names the words", () => {
     expect(KEYS.map((k) => MARK[k].label).sort()).toEqual(
-      [...Object.values(STATUS_LABEL), "Skipped", "Cancelled"].sort(),
+      [...Object.values(STATUS_LABEL), "Skipped", "Cancelled", "Paused"].sort(),
     );
     expect(MARK.passed.label).toBe("Passed");
     expect(MARK.notRun.label).toBe("Not run");

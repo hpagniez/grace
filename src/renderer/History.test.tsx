@@ -57,6 +57,7 @@ function setup() {
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
@@ -108,6 +109,7 @@ const started = (): AppEvent => ({
   total: 0,
   startedAt: at(25, 15, 0),
   env: null,
+  debug: false,
 });
 // the toolbar Report is enabled after a finished run whose report exists
 const finished = (): AppEvent => ({
@@ -164,6 +166,7 @@ describe("bottom panel tabs", () => {
       total: 0,
       startedAt: at(25, 15, 0),
       env: null,
+      debug: false,
     });
     expect(screen.getByTestId("tab-history").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("history")).toBeTruthy();

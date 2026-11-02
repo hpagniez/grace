@@ -54,6 +54,8 @@ export interface RunRecord {
   outcome: RunOutcome;
   exitCode: number | null;
   tests: StoredTest[];
+  /** A step debugger run; absent for any other. Flaky detection leaves it out (step debugger R2.7). */
+  debug?: true;
 }
 
 /** A listed run as the window gets it: the record without `tests`, with counts and its folder id. */
@@ -126,7 +128,9 @@ export function parseRunRecord(x: unknown): RunRecord | null {
   if (!Array.isArray(tests)) return null;
   const parsed = Array.from(tests, parseTest); // not tests.map: it skips holes in a sparse array
   if (!parsed.every((t) => t !== null)) return null;
+  if (x.debug !== undefined && x.debug !== true) return null;
   return {
+    ...(x.debug ? { debug: true as const } : {}),
     version: 1,
     startedAt,
     durationMillis,
