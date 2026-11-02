@@ -1,0 +1,3 @@
+{"label":"today","size":"js","threads":1,"dry":false,"exit":0,"oom":false,"wallMs":7155,"javaPeakMB":302,"javaCpuMs":10703,"gcs":42,"maxAfterGcMB":22,"maxCommittedMB":208,"scenarios":null,"note":"200 scenarios, churn 100000: calibration only"}
+{"label":"today","size":"js","threads":1,"dry":false,"exit":0,"oom":false,"wallMs":67726,"javaPeakMB":355.6,"javaCpuMs":73375,"gcs":353,"maxAfterGcMB":27,"maxCommittedMB":201,"scenarios":null}
+{"label":"c1","size":"js","threads":1,"dry":false,"exit":0,"oom":false,"wallMs":292752,"javaPeakMB":187.4,"javaCpuMs":294781,"gcs":698,"maxAfterGcMB":73,"maxCommittedMB":135,"scenarios":null}

@@ -74,6 +74,12 @@ export function lineTargets(nodes: TestNode[], root: string): string[] {
 /** A heap that starts small and stops at 2 GB, and an exit at the first OutOfMemoryError (docs/specs/2026-11-01-java-memory.md). */
 const HEAP = ["-Xms64m", "-Xmx2g", "-XX:+ExitOnOutOfMemoryError"];
 
+/**
+ * A dry run runs no step, so C1 alone lists the tests for a quarter of the CPU. A run keeps C2, which a suite of
+ * heavy JavaScript needs, with one compiler thread of each kind instead of 12 on 16 cores (docs/specs/2026-11-02-java-jit.md).
+ */
+const JIT = { dry: "-XX:TieredStopAtLevel=1", run: "-XX:CICompilerCount=2" };
+
 export const OUT_OF_MEMORY =
   "Java ran out of memory: Grace lets it use 2 GB. Run fewer tests or fewer threads at once.";
 
@@ -101,6 +107,7 @@ export function buildArgs(o: {
     // The launcher expands `@file` only before the main class, so it goes first.
     ...(o.argFile ? [`@${o.argFile}`] : []),
     ...HEAP,
+    o.dryRun ? JIT.dry : JIT.run,
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
     "-cp",

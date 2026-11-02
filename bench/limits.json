@@ -64,7 +64,7 @@
     },
     "run.memory.java": {
       "unit": "MB",
-      "limit": 356.4,
+      "limit": 249.9,
       "noise": 49,
       "machine": true
     },
@@ -76,8 +76,8 @@
     },
     "run.cpu.java": {
       "unit": "ms",
-      "limit": 21891,
-      "noise": 4453,
+      "limit": 14875,
+      "noise": 2375,
       "machine": true
     },
     "run.finishedLag": {
@@ -230,8 +230,8 @@
     },
     "run.memory.java@10k": {
       "unit": "MB",
-      "limit": 341.1,
-      "noise": 22,
+      "limit": 281.3,
+      "noise": 21,
       "machine": true
     },
     "run.cpu.app@10k": {
@@ -242,7 +242,7 @@
     },
     "run.cpu.java@10k": {
       "unit": "ms",
-      "limit": 48907,
+      "limit": 45702,
       "noise": 5391,
       "machine": true
     },
