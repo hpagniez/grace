@@ -157,6 +157,7 @@ describe("Runner tag filter", () => {
       second.last("environment"),
       second.last("history"),
       second.last("flaky"),
+      { type: "breakpoints", breakpoints: [] },
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);

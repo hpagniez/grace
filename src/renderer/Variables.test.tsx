@@ -68,10 +68,12 @@ describe("the Variables tab (step debugger R7.4, R7.5)", () => {
     const { send } = setup();
     send(paused);
     fireEvent.click(row("user").querySelector("[data-testid=variable-toggle]")!);
+    flush();
     expect(row("user").querySelector("pre")!.textContent).toBe(
       JSON.stringify({ id: 7, tags: ["a"] }, null, 2),
     );
     fireEvent.click(row("doc").querySelector("[data-testid=variable-toggle]")!);
+    flush();
     expect(row("doc").querySelector("pre")!.textContent).toBe("<root><item>x</item></root>");
   });
 
