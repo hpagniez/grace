@@ -2,14 +2,44 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Layout, TestNode } from "../../shared/model";
 import { filterOn, matchingLeaves, NO_FILTER, type TagFilter } from "../../shared/tags";
+import { readPom } from "./pom";
 
 export interface ProjectLayout {
   layout: Layout;
+  /** The source folders, then the build's compiled output folders that exist. */
   classpath: string[];
+  /** The karate-pom.json `paths` kept, or the source folders. */
   featureRoots: string[];
+  /** Karate's `-g`, from karate-pom.json, as written. */
+  configDir: string | null;
+  /** Where `karate-config-<env>.js` files are read from; never a compiled folder, whose copies may be stale. */
+  configDirs: string[];
+  /** What the open notice says about karate-pom.json; null when there is nothing to say. */
+  pomNotice: string | null;
 }
 
-/** All paths absolute. Maven/Gradle: whichever of src/test/java and src/test/resources exist. */
+const SOURCE = ["src/test/java", "src/test/resources"];
+const COMPILED: Record<Layout, string[]> = {
+  maven: ["target/test-classes", "target/classes"],
+  gradle: [
+    "build/classes/java/test",
+    "build/resources/test",
+    "build/classes/java/main",
+    "build/resources/main",
+  ],
+  standalone: [],
+};
+
+/** True for the project folder and anything under it; a folder named `..data` is under it. */
+const inside = (root: string, abs: string) => {
+  const rel = path.relative(root, abs);
+  return rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+};
+
+/**
+ * All paths absolute. Maven/Gradle: whichever of src/test/java and src/test/resources exist. The project's
+ * karate-pom.json gives the feature roots and the config folder (docs/specs/2026-11-02-project-setup.md).
+ */
 export function detectLayout(root: string): ProjectLayout {
   const has = (f: string) => existsSync(path.join(root, f));
   const layout: Layout = has("pom.xml")
@@ -17,11 +47,45 @@ export function detectLayout(root: string): ProjectLayout {
     : has("build.gradle") || has("build.gradle.kts")
       ? "gradle"
       : "standalone";
-  if (layout === "standalone") return { layout, classpath: [root], featureRoots: [root] };
-  const dirs = [path.join("src", "test", "java"), path.join("src", "test", "resources")]
-    .map((d) => path.join(root, d))
-    .filter((d) => existsSync(d));
-  return { layout, classpath: dirs, featureRoots: dirs };
+  const existing = (dirs: string[]) => dirs.map((d) => path.join(root, d)).filter(existsSync);
+  const source = layout === "standalone" ? [root] : existing(SOURCE);
+  const pom = readPom(root);
+  const kept = (pom.paths ?? []).filter(
+    (p) =>
+      !p.startsWith("classpath:") &&
+      existsSync(path.resolve(root, p)) &&
+      inside(root, path.resolve(root, p)),
+  );
+  const leftOut = (pom.paths ?? []).filter((p) => !kept.includes(p));
+  const { configDir } = pom;
+  const notice = pom.error
+    ? [`karate-pom.json could not be read: ${pom.error}. Grace uses the default folders.`]
+    : [
+        ...(pom.unused.length
+          ? [`Grace does not use these karate-pom.json settings: ${pom.unused.join(", ")}.`]
+          : []),
+        ...(leftOut.length
+          ? [
+              `These karate-pom.json paths are not folders or files in the project: ${leftOut.join(", ")}.`,
+            ]
+          : []),
+      ];
+  return {
+    layout,
+    classpath: [...source, ...existing(COMPILED[layout])],
+    featureRoots: pom.paths ? kept.map((p) => path.resolve(root, p)) : source,
+    configDir,
+    configDirs:
+      configDir === null
+        ? [...new Set([root, ...source])]
+        : [
+            ...(configDir.startsWith("classpath:")
+              ? source.map((s) => path.join(s, configDir.slice("classpath:".length)))
+              : [path.resolve(root, configDir)]),
+            root,
+          ],
+    pomNotice: notice.length ? notice.join(" ") : null,
+  };
 }
 
 /**
@@ -100,8 +164,10 @@ export function buildArgs(o: {
   targets: string[];
   env: string | null;
   argFile: string | null;
-  /** Karate's `-T`. A dry run always gets 1: a `threads` in karate-pom.json would interleave its events. */
+  /** Karate's `-T`. A dry run always gets 1: more threads would interleave its events. */
   threads: number;
+  /** Karate's `-g`, as written in karate-pom.json. */
+  configDir: string | null;
 }): string[] {
   return [
     // The launcher expands `@file` only before the main class, so it goes first.
@@ -115,6 +181,7 @@ export function buildArgs(o: {
     "io.karatelabs.Main",
     "run",
     "--no-color",
+    "--no-pom", // Grace reads karate-pom.json itself: Karate would apply its env, tags or dryRun unseen
     "-w",
     o.root,
     "-o",
@@ -124,6 +191,7 @@ export function buildArgs(o: {
     "-f",
     "html,karate:jsonl",
     ...(o.env ? ["-e", o.env] : []),
+    ...(o.configDir ? ["-g", o.configDir] : []),
     ...(o.dryRun ? ["-D", "-T", "1"] : ["-T", String(o.threads)]),
     ...o.tags,
     ...o.targets,

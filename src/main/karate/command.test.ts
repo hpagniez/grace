@@ -27,11 +27,25 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+const pom = (root: string, json: object | string) =>
+  writeFileSync(
+    path.join(root, "karate-pom.json"),
+    typeof json === "string" ? json : JSON.stringify(json),
+  );
+
 describe("detectLayout", () => {
+  const at = (root: string, ...dirs: string[]) => dirs.map((d) => path.join(root, d));
   it("maven with both test folders", () => {
     const root = project(["pom.xml"], ["src/test/java", "src/test/resources"]);
-    const both = [path.join(root, "src/test/java"), path.join(root, "src/test/resources")];
-    expect(detectLayout(root)).toEqual({ layout: "maven", classpath: both, featureRoots: both });
+    const both = at(root, "src/test/java", "src/test/resources");
+    expect(detectLayout(root)).toEqual({
+      layout: "maven",
+      classpath: both,
+      featureRoots: both,
+      configDir: null,
+      configDirs: [root, ...both],
+      pomNotice: null,
+    });
   });
   it("gradle", () => {
     const root = project(["build.gradle.kts"], ["src/test/resources"]);
@@ -39,7 +53,7 @@ describe("detectLayout", () => {
   });
   it("only existing folders", () => {
     const root = project(["pom.xml"], ["src/test/java"]);
-    const only = [path.join(root, "src/test/java")];
+    const only = at(root, "src/test/java");
     expect(detectLayout(root)).toMatchObject({ classpath: only, featureRoots: only });
   });
   it("standalone", () => {
@@ -48,6 +62,112 @@ describe("detectLayout", () => {
       layout: "standalone",
       classpath: [root],
       featureRoots: [root],
+      configDir: null,
+      configDirs: [root],
+      pomNotice: null,
+    });
+  });
+
+  describe("compiled output", () => {
+    it("maven: after the source folders, never a feature root or a config folder", () => {
+      const root = project(
+        ["pom.xml"],
+        ["src/test/java", "src/test/resources", "target/test-classes", "target/classes"],
+      );
+      const source = at(root, "src/test/java", "src/test/resources");
+      expect(detectLayout(root)).toMatchObject({
+        classpath: [...source, ...at(root, "target/test-classes", "target/classes")],
+        featureRoots: source,
+        configDirs: [root, ...source],
+      });
+    });
+    it("gradle: in its order", () => {
+      const root = project(
+        ["build.gradle"],
+        [
+          "src/test/java",
+          "build/resources/main",
+          "build/resources/test",
+          "build/classes/java/test",
+        ],
+      );
+      expect(detectLayout(root).classpath).toEqual(
+        at(
+          root,
+          "src/test/java",
+          "build/classes/java/test",
+          "build/resources/test",
+          "build/resources/main",
+        ),
+      );
+    });
+    it("standalone: unchanged", () => {
+      const root = project([], ["target/test-classes"]);
+      expect(detectLayout(root).classpath).toEqual([root]);
+    });
+  });
+
+  describe("karate-pom.json", () => {
+    it("keeps the paths inside the project and names the others", () => {
+      const root = project([], ["tests/a"]);
+      pom(root, { paths: ["tests/a", "missing", "..", "classpath:x", "."] });
+      expect(detectLayout(root)).toMatchObject({
+        featureRoots: [path.join(root, "tests/a"), root],
+        pomNotice:
+          "These karate-pom.json paths are not folders or files in the project: missing, .., classpath:x.",
+      });
+    });
+    it("keeps a folder whose name starts with ..", () => {
+      const root = project([], ["..data"]);
+      pom(root, { paths: ["..data"] });
+      expect(detectLayout(root)).toMatchObject({
+        featureRoots: [path.join(root, "..data")],
+        pomNotice: null,
+      });
+    });
+    it("keeps the default feature roots without paths", () => {
+      const root = project(["pom.xml"], ["src/test/java"]);
+      pom(root, { paths: [] });
+      expect(detectLayout(root)).toMatchObject({
+        featureRoots: at(root, "src/test/java"),
+        pomNotice: null,
+      });
+    });
+    it("passes configDir as written and reads environments there and in the project", () => {
+      const root = project([]);
+      pom(root, { configDir: "conf", env: "qa" });
+      expect(detectLayout(root)).toMatchObject({
+        configDir: "conf",
+        configDirs: [path.join(root, "conf"), root],
+        pomNotice: "Grace does not use these karate-pom.json settings: env.",
+      });
+    });
+    it("resolves a classpath: configDir under each source folder", () => {
+      const root = project(["pom.xml"], ["src/test/java", "src/test/resources", "target/classes"]);
+      pom(root, { configDir: "classpath:conf" });
+      expect(detectLayout(root).configDirs).toEqual([
+        ...at(root, "src/test/java/conf", "src/test/resources/conf"),
+        root,
+      ]);
+    });
+    it("says both, settings first", () => {
+      const root = project([]);
+      pom(root, { threads: 3, paths: ["gone"], tags: ["@a"] });
+      expect(detectLayout(root).pomNotice).toBe(
+        "Grace does not use these karate-pom.json settings: threads, tags. " +
+          "These karate-pom.json paths are not folders or files in the project: gone.",
+      );
+    });
+    it("uses nothing from a file it cannot read", () => {
+      const root = project(["pom.xml"], ["src/test/java"]);
+      pom(root, '{"paths":"x","configDir":"conf"}');
+      expect(detectLayout(root)).toMatchObject({
+        featureRoots: at(root, "src/test/java"),
+        configDir: null,
+        configDirs: [root, ...at(root, "src/test/java")],
+        pomNotice:
+          "karate-pom.json could not be read: paths is not a list of strings. Grace uses the default folders.",
+      });
     });
   });
 });
@@ -153,6 +273,7 @@ describe("buildArgs", () => {
     env: null,
     argFile: null,
     threads: 1,
+    configDir: null,
   };
   const base = [
     "-Xms64m",
@@ -166,6 +287,7 @@ describe("buildArgs", () => {
     "io.karatelabs.Main",
     "run",
     "--no-color",
+    "--no-pom",
     "-w",
     "R",
     "-o",
@@ -205,6 +327,18 @@ describe("buildArgs", () => {
       ...base,
       "-e",
       "qa",
+      "-T",
+      "1",
+      "t1",
+    ]);
+  });
+  it("puts -g after -f and -e", () => {
+    expect(buildArgs({ ...o, dryRun: false, env: "qa", configDir: "conf" })).toEqual([
+      ...base,
+      "-e",
+      "qa",
+      "-g",
+      "conf",
       "-T",
       "1",
       "t1",

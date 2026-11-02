@@ -29,7 +29,7 @@ async function featureFiles(dir: string): Promise<string[]> {
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return dir.endsWith(".feature") ? [dir] : []; // a karate-pom.json path may be a file
   }
   const files = await Promise.all(
     entries.map((e) =>

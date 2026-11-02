@@ -209,11 +209,16 @@ export class Runner {
         );
         if (!opened) this.report = report;
         else {
-          if (skipped.length)
-            this.o.emit({
-              type: "notice",
-              message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
-            });
+          const notice = [
+            ...(skipped.length
+              ? [
+                  `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
+                ]
+              : []),
+            ...(detectLayout(root).pomNotice ?? []),
+          ];
+          // the properties text has no full stop of its own
+          if (notice.length) this.o.emit({ type: "notice", message: notice.join(". ") });
           try {
             saveOpenedProject(this.o.dataDir, root);
           } catch (err) {
@@ -638,8 +643,8 @@ export class Runner {
         this.storeFilter(pruned);
       this.sendFilter();
       this.sendThreads();
-      const { classpath, featureRoots } = detectLayout(project.root);
-      this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
+      const { configDirs, featureRoots } = detectLayout(project.root);
+      this.overlays = overlayEnvs(configDirs);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
       this.sendHistory();
@@ -700,7 +705,7 @@ export class Runner {
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
-    const { classpath } = detectLayout(root);
+    const { classpath, configDir } = detectLayout(root);
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
     const args = buildArgs({
@@ -714,6 +719,7 @@ export class Runner {
       env,
       argFile,
       threads,
+      configDir,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
