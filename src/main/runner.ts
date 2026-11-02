@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import {
   editErrors,
@@ -39,6 +40,7 @@ import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import {
   buildArgs,
   detectLayout,
+  extensionJars,
   lineTargets,
   locate,
   OUT_OF_MEMORY,
@@ -182,6 +184,8 @@ export class Runner {
       pollMs?: number;
       /** A test seam; the default is `projectFingerprint`. */
       fingerprint?: (root: string) => Promise<string | null>;
+      /** Where `~/.karate/ext` is; a test seam, the default is the person's home folder. */
+      home?: string;
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
@@ -771,11 +775,12 @@ export class Runner {
     const { root } = this.project!;
     const { java, jar, listener } = this.o.vendor;
     const { classpath, configDir } = detectLayout(root);
+    const home = this.o.home ?? homedir();
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
     const args = buildArgs({
       jar,
-      classpath,
+      classpath: [...classpath, ...extensionJars(home, root)],
       root,
       outDir,
       dryRun,

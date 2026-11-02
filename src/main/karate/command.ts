@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import type { Layout, TestNode } from "../../shared/model";
 import { filterOn, matchingLeaves, NO_FILTER, type TagFilter } from "../../shared/tags";
@@ -87,6 +87,24 @@ export function detectLayout(root: string): ProjectLayout {
           ],
     pomNotice: notice.length ? notice.join(" ") : null,
   };
+}
+
+/**
+ * The Karate CLI's extension folders that exist, home first, each as a `<folder>\*` classpath entry: its launcher
+ * puts every jar of `~/.karate/ext` and `.karate/ext` on the classpath (docs/specs/2026-11-02-project-libraries.md R1).
+ */
+export function extensionJars(home: string, root: string): string[] {
+  const isDir = (d: string) => {
+    try {
+      return statSync(d).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  return [home, root]
+    .map((d) => path.join(d, ".karate", "ext"))
+    .filter(isDir)
+    .map((d) => path.join(d, "*"));
 }
 
 /**

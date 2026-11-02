@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { byName, cleanUp, T, setup, fixture, temps } from "../../test/runner";
+import { byName, cleanUp, T, setup, fixture, makeJar, temps } from "../../test/runner";
 import { leafKeys } from "./karate/tree";
 
 afterEach(cleanUp);
@@ -97,5 +97,29 @@ describe("Runner project setup", () => {
     expect(last("notice").message).toMatch(
       /^karate-pom\.json could not be read: .+\. Grace uses the default folders\.$/,
     );
+  });
+
+  /** Passes only when a jar holding data.json is on the classpath. */
+  const EXT_PROJECT = {
+    "t.feature": "Feature: t\nScenario: ext\n  * match read('classpath:data.json').ext == true\n",
+  };
+
+  it("puts the jars of the project's .karate/ext on the classpath", T, async () => {
+    const { runner, last } = setup();
+    const root = write(EXT_PROJECT);
+    makeJar(path.join(root, ".karate", "ext"), { "data.json": '{ "ext": true }' });
+    await runner.open(root);
+    await runner.run("d:");
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
+  it("puts the jars of the home .karate/ext on the classpath", T, async () => {
+    const home = mkdtempSync(path.join(tmpdir(), "kk-home-"));
+    temps.push(home);
+    makeJar(path.join(home, ".karate", "ext"), { "data.json": '{ "ext": true }' });
+    const { runner, last } = setup(undefined, undefined, undefined, undefined, { home });
+    await runner.open(write(EXT_PROJECT));
+    await runner.run("d:");
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
   });
 });
