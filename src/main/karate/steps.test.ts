@@ -43,8 +43,18 @@ describe("fileSteps", () => {
   it("lists the background's steps, then the test's own, as written", () => {
     const steps = fileSteps(debug, 6);
     expect(steps.map((s) => s.line)).toEqual([4, 7, 8, 9, 10]);
-    expect(steps[0]).toEqual({ keyword: "*", text: "def base = 'from background'", line: 4, background: true });
-    expect(steps[1]).toEqual({ keyword: "*", text: "def name = 'grace'", line: 7, background: false });
+    expect(steps[0]).toEqual({
+      keyword: "*",
+      text: "def base = 'from background'",
+      line: 4,
+      background: true,
+    });
+    expect(steps[1]).toEqual({
+      keyword: "*",
+      text: "def name = 'grace'",
+      line: 7,
+      background: false,
+    });
     expect(fileSteps(debug, 12).map((s) => s.line)).toEqual([4, 13]);
   });
 

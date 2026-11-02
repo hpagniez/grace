@@ -62,7 +62,8 @@ export function Progress(props: { state: AppState }) {
           : null;
   // finding tests, or a run whose first test has not finished: nothing in the bar moves otherwise
   const waiting = () =>
-    (props.state.busy && !run().active) || (run().active && run().done === 0 && !props.state.paused);
+    (props.state.busy && !run().active) ||
+    (run().active && run().done === 0 && !props.state.paused);
   const value = (n: number) => (waiting() ? undefined : n);
   // No run in this view yet (the reducer starts a view with none on a new project or environment)
   const idle = () => !run().active && run().runId === null && run().outcome === null;

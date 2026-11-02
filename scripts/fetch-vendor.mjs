@@ -102,7 +102,7 @@ async function copyDir(from, to) {
 }
 
 /** The zip of the listener's classes (`-a` would not take `.jar` for zip); a jar on the classpath needs no manifest. */
-const zipArgs =(jar, classes) => ["--format", "zip", "-c", "-f", jar, "-C", classes, "grace"];
+const zipArgs = (jar, classes) => ["--format", "zip", "-c", "-f", jar, "-C", classes, "grace"];
 
 // Recompiled on every run, under a second: a changed source or a new Karate jar is always picked up.
 async function compileListener(jar) {

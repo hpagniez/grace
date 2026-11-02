@@ -366,6 +366,7 @@ describe("progress", () => {
         total: 1,
         startedAt: 1,
         env,
+        debug: false,
       });
     start("qa");
     expect(runEnv()).toBe("qa");

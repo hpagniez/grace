@@ -1,12 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleSlash,
-  LoaderCircle,
-  Pause,
-  type IconNode,
-} from "lucide";
+import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, Pause, type IconNode } from "lucide";
 import { createStore, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";

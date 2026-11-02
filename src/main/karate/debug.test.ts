@@ -74,7 +74,9 @@ describe("DebugSession", () => {
     await until(() => c.lines.length === 1);
     const late = connect(s.port, "127.0.0.1");
     sockets.push(late);
-    const code = await new Promise((r) => late.on("error", (e: NodeJS.ErrnoException) => r(e.code)));
+    const code = await new Promise((r) =>
+      late.on("error", (e: NodeJS.ErrnoException) => r(e.code)),
+    );
     expect(code).toBe("ECONNREFUSED");
   });
 
@@ -109,7 +111,11 @@ describe("DebugSession", () => {
 
   it("survives the listener resetting the connection, and says it ended", async () => {
     let ended = 0;
-    const s = await DebugSession.open([], () => {}, () => ended++);
+    const s = await DebugSession.open(
+      [],
+      () => {},
+      () => ended++,
+    );
     sessions.push(s);
     const c = client(s.port);
     c.send(s.token);

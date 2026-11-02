@@ -32,7 +32,15 @@ export interface Breakpoint {
   line: number;
 }
 export type DebugCommand = "continue" | "over" | "into" | "pause";
-export type VarKind = "string" | "number" | "boolean" | "null" | "json" | "xml" | "function" | "other";
+export type VarKind =
+  | "string"
+  | "number"
+  | "boolean"
+  | "null"
+  | "json"
+  | "xml"
+  | "function"
+  | "other";
 export interface DebugVar {
   name: string;
   kind: VarKind;

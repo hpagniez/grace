@@ -9,9 +9,7 @@ import type { AppEvent } from "../shared/events";
 export function secretForms(value: string): string[] {
   if (value === "") return [];
   const xml = value.replace(/[&<>"']/g, (c) => `&${XML_ENTITY[c]};`); // a debugger `xml` variable's text
-  return [
-    ...new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1), xml]),
-  ];
+  return [...new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1), xml])];
 }
 
 const XML_ENTITY: Record<string, string> = {

@@ -1379,7 +1379,9 @@ describe("tree: step debugger (R5, R7)", () => {
       env: null,
       debug: true,
     });
-    expect((screen.getByRole("button", { name: "Debug passing hello" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Debug passing hello" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("marks the feature and the scenario holding a breakpoint", () => {

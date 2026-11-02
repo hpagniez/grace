@@ -34,7 +34,13 @@ const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?
 export const NAME_TAIL = 12;
 
 /** The step debugger's controls while paused, in order, with their keys (step debugger R6.3). */
-const STEPS: { command: DebugCommand; label: string; icon: IconNode; key: string; testid: string }[] = [
+const STEPS: {
+  command: DebugCommand;
+  label: string;
+  icon: IconNode;
+  key: string;
+  testid: string;
+}[] = [
   { command: "continue", label: "Continue", icon: Play, key: "F5", testid: "debug-continue" },
   { command: "over", label: "Step over", icon: RedoDot, key: "F10", testid: "debug-over" },
   { command: "into", label: "Step into", icon: ArrowDownToDot, key: "F11", testid: "debug-into" },
@@ -200,7 +206,10 @@ export function Toolbar(props: { state: AppState; api: Api }) {
                   class={`${s.command === "continue" ? primary : btn} ${narrowIcon}`}
                   onClick={() => void props.api.debugCommand(s.command)}
                 >
-                  <Icon icon={s.icon} class={s.command === "continue" ? "text-on-primary" : undefined} />
+                  <Icon
+                    icon={s.icon}
+                    class={s.command === "continue" ? "text-on-primary" : undefined}
+                  />
                   <span class={narrowLabel}>{s.label}</span>
                 </button>
               </Tooltip>
