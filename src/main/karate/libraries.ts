@@ -24,7 +24,12 @@ const ON_PATH: Record<BuildLayout, string[]> = {
   gradle: ["gradle.bat"],
 };
 
-const folders = (searchPath: string) => searchPath.split(";").filter(Boolean);
+// cmd.exe and Node read a quoted entry ("C:\Program Files\…\bin") as the folder inside the quotes
+const folders = (searchPath: string) =>
+  searchPath
+    .split(";")
+    .map((d) => d.replace(/"/g, ""))
+    .filter(Boolean);
 
 /** R2: the project's wrapper, else the first launcher in a `searchPath` folder; null if none. */
 export function findTool(root: string, layout: BuildLayout, searchPath: string): string | null {
@@ -157,12 +162,13 @@ export function parseLibraries(text: string, classpath: string[]): string[] {
  */
 export function failureReason(lines: string[]): string {
   const said = lines.map((l) => l.trim());
-  const error = said.find((l) => l.startsWith("[ERROR]") || l.startsWith("ERROR:"));
+  // Maven may stack its prefixes: `[ERROR] [ERROR] Some problems were encountered while processing the POMs:`
+  const prefix = /^((\[ERROR\]|\[FATAL\]|ERROR:)\s*)+/;
+  const errors = said.filter((l) => prefix.test(l)).map((l) => l.replace(prefix, ""));
+  // a line ending with ":" announces the cause on the next one
+  const error = errors.find((l, i) => !(l.endsWith(":") && errors[i + 1])) ?? errors[0];
   const reason =
-    error?.replace(/^(\[ERROR\]|ERROR:)\s*/, "") ??
-    gradleCause(said) ??
-    said.filter(Boolean).at(-1) ??
-    "it stopped with no message";
+    error ?? gradleCause(said) ?? said.filter(Boolean).at(-1) ?? "it stopped with no message";
   return reason.replace(/\.+$/, "").slice(0, 300);
 }
 

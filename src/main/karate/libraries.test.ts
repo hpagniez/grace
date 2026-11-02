@@ -50,6 +50,12 @@ describe("findTool", () => {
     expect(findTool(root, "gradle", bin)).toBe(path.join(root, "gradlew.bat"));
     expect(findTool(folder(), "gradle", bin)).toBe(path.join(bin, "gradle.bat"));
   });
+  it("reads a quoted PATH entry as cmd.exe does", () => {
+    const bin = folder({ "mvn.cmd": "", "java.exe": "" });
+    expect(findTool(folder(), "maven", `"${bin}"`)).toBe(path.join(bin, "mvn.cmd"));
+    const o = { tool: "t", file: "f", initScript: "i", searchPath: `"${bin}"`, jreDir: "jre" };
+    expect(toolEnv({}, o).JAVA_HOME).toBeUndefined();
+  });
   it("finds nothing", () => {
     expect(findTool(folder(), "maven", "")).toBeNull();
     expect(findTool(folder({ "mvnw.cmd": "" }), "gradle", "")).toBeNull();
@@ -163,6 +169,36 @@ describe("failureReason", () => {
     expect(
       failureReason(["[INFO] x", "[ERROR] Could not resolve dependencies", "[ERROR] other"]),
     ).toBe("Could not resolve dependencies");
+  });
+  // recorded from Maven 3.9.16 on three broken poms, paths shortened
+  it("takes the cause under Maven's POM problems line", () => {
+    expect(
+      failureReason([
+        "[ERROR] [ERROR] Some problems were encountered while processing the POMs:",
+        "[FATAL] Non-readable POM C:\\p\\pom.xml: no more data available - expected end tags </modelVersion></project> to close start tag <modelVersion> from line 1 and start tag <project> from line 1, parser stopped on TEXT seen ...<modelVersion>4.0.0</modelVersion\\r\\n... @2:1 @ ",
+        " @ ",
+        "[ERROR] The build could not read 1 project -> [Help 1]",
+      ]),
+    ).toMatch(/^Non-readable POM C:\\p\\pom\.xml: no more data available/);
+    expect(
+      failureReason([
+        "[ERROR] [ERROR] Some problems were encountered while processing the POMs:",
+        "[ERROR] 'dependencies.dependency.version' for org.xerial:sqlite-jdbc:jar is missing. @ line 1, column 136",
+        " @ ",
+        "[ERROR] The build could not read 1 project -> [Help 1]",
+      ]),
+    ).toBe(
+      "'dependencies.dependency.version' for org.xerial:sqlite-jdbc:jar is missing. @ line 1, column 136",
+    );
+    expect(
+      failureReason([
+        "[ERROR] Failed to execute goal on project y: Could not resolve dependencies for project x:y:jar:1",
+        "[ERROR] dependency: org.acme:nope:jar:9.9 (compile)",
+        "[ERROR] -> [Help 1]",
+      ]),
+    ).toBe(
+      "Failed to execute goal on project y: Could not resolve dependencies for project x:y:jar:1",
+    );
   });
   it("takes what Gradle says went wrong", () => {
     expect(

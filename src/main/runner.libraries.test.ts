@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -132,6 +132,39 @@ describe("Runner project libraries", () => {
     expect(last("notice").message).toBe(
       "Grace could not list the project's libraries with Maven: Could not resolve dependencies. Tests that use them will fail.",
     );
+  });
+
+  // R5.1: the project's folders, the home .karate/ext, the project's .karate/ext, then the build's libraries
+  it("puts the classpath in its order", T, async () => {
+    const home = mkdtempSync(path.join(tmpdir(), "kk-home-"));
+    temps.push(home);
+    const { runner, last } = setup(undefined, undefined, undefined, undefined, { home });
+    const root = project();
+    const from = (where: string) => ({ "data.json": JSON.stringify({ from: where }) });
+    const own = path.join(root, "src", "test", "java", "data.json");
+    writeFileSync(own, JSON.stringify({ from: "project" }));
+    const homeJar = makeJar(path.join(home, ".karate", "ext"), from("home"));
+    const extJar = makeJar(path.join(root, ".karate", "ext"), from("ext"));
+    const built = mkdtempSync(path.join(tmpdir(), "kk-libjar-"));
+    temps.push(built);
+    stubTool(root, "mvnw.cmd", lists(makeJar(built, from("build"))));
+    await runner.open(root);
+    const expects = (where: string) =>
+      writeFileSync(
+        path.join(root, "src", "test", "java", "t.feature"),
+        `Feature: t\nScenario: lib\n  * match read('classpath:data.json').from == '${where}'\n`,
+      );
+    for (const [where, next] of [
+      ["project", own],
+      ["home", homeJar],
+      ["ext", extJar],
+      ["build", null],
+    ] as const) {
+      expects(where);
+      await runner.run("d:");
+      passed(last);
+      if (next) rmSync(next);
+    }
   });
 
   it("joins the open notice", T, async () => {
