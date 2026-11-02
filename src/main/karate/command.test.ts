@@ -158,6 +158,7 @@ describe("buildArgs", () => {
     "-Xms64m",
     "-Xmx2g",
     "-XX:+ExitOnOutOfMemoryError",
+    "-XX:CICompilerCount=2",
     "-Dstdout.encoding=UTF-8",
     "-Dstderr.encoding=UTF-8",
     "-cp",
@@ -174,9 +175,11 @@ describe("buildArgs", () => {
     "-f",
     "html,karate:jsonl",
   ];
+  // A dry run compiles with C1 only; a run keeps C2 on fewer threads.
+  const dryBase = base.with(3, "-XX:TieredStopAtLevel=1");
   it("builds the exact command line", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
-    expect(buildArgs({ ...o, dryRun: true })).toEqual([...base, "-D", "-T", "1", "t1"]);
+    expect(buildArgs({ ...o, dryRun: true })).toEqual([...dryBase, "-D", "-T", "1", "t1"]);
   });
   it("passes the count on runs and -T 1 on dry runs", () => {
     const run = buildArgs({ ...o, threads: 8, dryRun: false });
@@ -187,7 +190,7 @@ describe("buildArgs", () => {
   it("puts the tag arguments just before the targets", () => {
     const tags = ["-t=@smoke"];
     expect(buildArgs({ ...o, dryRun: true, tags })).toEqual([
-      ...base,
+      ...dryBase,
       "-D",
       "-T",
       "1",
