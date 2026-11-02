@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanUp, T, setup, fixture, temps } from "../../test/runner";
+import { byName, cleanUp, T, setup, fixture, temps } from "../../test/runner";
 import { leafKeys } from "./karate/tree";
 
 afterEach(cleanUp);
@@ -64,11 +64,12 @@ describe("Runner project setup", () => {
       fixture("maven"),
     );
     await runner.open(root);
-    await runner.run("s:examples/built.feature#1");
+    // the key depends on how Karate names the file: find it by name
+    await runner.run(byName(last("project").tree!, "reads compiled output").key);
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
   });
 
-  // Karate names the files relative to src/test/java, which holds karate-config.js (#208)
+  // Karate may name the files relative to src/test/java, which holds karate-config.js (#208)
   it("runs one row of a Maven outline", T, async () => {
     const { runner, last } = setup();
     const root = write(
@@ -80,8 +81,9 @@ describe("Runner project setup", () => {
     );
     await runner.open(root);
     expect(last("project").error).toBeNull();
-    await runner.run("s:examples/rows.feature#1.2");
-    expect(last("runStarted")).toMatchObject({ keys: ["s:examples/rows.feature#1.2"], total: 1 });
+    const row = byName(last("project").tree!, "row 2").key;
+    await runner.run(row);
+    expect(last("runStarted")).toMatchObject({ keys: [row], total: 1 });
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
   });
 
