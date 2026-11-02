@@ -1,6 +1,6 @@
 // Shared by main, preload and renderer: keep this file free of Node imports.
 import type { PropertiesEdit } from "./env";
-import type { AppEvent } from "./events";
+import type { AppEvent, DebugCommand, FileStep } from "./events";
 import type { FilterState } from "./tags";
 import type { Theme } from "./theme";
 import type { Channel } from "./updates";
@@ -10,6 +10,10 @@ export const CH = {
   open: "project:open",
   refresh: "project:refresh",
   run: "run:start",
+  debug: "run:debug",
+  debugCommand: "debug:command",
+  breakpoint: "debug:breakpoint",
+  steps: "steps:get",
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
@@ -39,6 +43,13 @@ export interface Api {
   openProject(): Promise<void>;
   refresh(): Promise<void>;
   run(key: string): Promise<void>;
+  /** A run on one thread with the step debugger (docs/specs/2026-11-02-step-debugger.md). */
+  debug(key: string): Promise<void>;
+  debugCommand(c: DebugCommand): Promise<void>;
+  /** Adds the breakpoint, or removes it if set; main sends the new set as a `breakpoints` event. */
+  toggleBreakpoint(file: string, line: number): Promise<void>;
+  /** A scenario's or row's steps as its feature file has them; null for any other key. */
+  steps(key: string): Promise<FileStep[] | null>;
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;

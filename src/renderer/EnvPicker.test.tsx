@@ -344,6 +344,7 @@ describe("environment combo", () => {
       total: 1,
       startedAt: Date.now(),
       env: "qa",
+      debug: false,
     });
     expect(input().disabled).toBe(true);
   });

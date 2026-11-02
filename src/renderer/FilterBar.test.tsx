@@ -274,6 +274,7 @@ describe("filter bar", () => {
       total: 2,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     expect(controls().every((c) => c.disabled)).toBe(true);
   });

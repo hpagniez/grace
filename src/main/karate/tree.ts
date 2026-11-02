@@ -138,6 +138,15 @@ export function rowLines(featureText: string, examplesLine: number): number[] {
   return rows;
 }
 
+export function parentOf(tree: TestNode, key: string): TestNode | null {
+  for (const child of tree.children) {
+    if (child.key === key) return tree;
+    const hit = parentOf(child, key);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export function findNode(tree: TestNode, key: string): TestNode | null {
   if (tree.key === key) return tree;
   for (const child of tree.children) {

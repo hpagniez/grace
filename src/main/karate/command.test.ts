@@ -316,6 +316,24 @@ describe("buildArgs", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
     expect(buildArgs({ ...o, dryRun: true })).toEqual([...dryBase, "-D", "-T", "1", "t1"]);
   });
+  it("adds the debug listener and its socket to a debug run only", () => {
+    const debug = { jar: "listener.jar", port: 5005, token: "t" };
+    const args = buildArgs({ ...o, dryRun: false, debug });
+    expect(args).toEqual([
+      ...base.slice(0, 6),
+      "-Dgrace.debug.port=5005",
+      "-Dgrace.debug.token=t",
+      "-cp",
+      "k.jar;listener.jar;c1;c2",
+      ...base.slice(8),
+      "--listener",
+      "grace.DebugListener",
+      "-T",
+      "1",
+      "t1",
+    ]);
+    expect(buildArgs({ ...o, dryRun: false, debug: null })).toEqual([...base, "-T", "1", "t1"]);
+  });
   it("passes the count on runs and -T 1 on dry runs", () => {
     const run = buildArgs({ ...o, threads: 8, dryRun: false });
     expect(run.slice(-3)).toEqual(["-T", "8", "t1"]);

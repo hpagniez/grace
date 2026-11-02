@@ -142,7 +142,7 @@ Feature: Step debugger
     Then the run pauses at debug.feature line 8, depth 0
     And the variables are base "from background" (string) and name "grace" (string)
     When I continue
-    Then the run finishes and both scenarios passed
+    Then the run finishes and "variables" passed
 
   Scenario: Step over stays at the same depth
     Given a breakpoint on debug.feature line 9

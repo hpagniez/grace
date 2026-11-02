@@ -29,6 +29,7 @@ const started = (ks: string[] = keys, env: string | null = null): AppEvent => ({
   total: ks.length,
   startedAt: 1000,
   env,
+  debug: false,
 });
 const apply = (s: ReturnType<typeof initialState>, ...es: AppEvent[]) =>
   es.forEach((e) => reduce(s, e));

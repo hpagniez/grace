@@ -20,9 +20,11 @@ const projects = join(__dirname, "projects");
  * `flaky` = a `karate-config-qa.js` overlay and `tests/coin.feature`: `coin` passes when `coin.json` next to the
  * project folder holds `{ "heads": true }`, `steady` always passes. Unlike the others it is copied into
  * `<temp dir>/project`, so a `coin.json` can sit next to it, outside the project and its fingerprint.
+ * `debug` = the step debugger spec's `debug.feature` and `called.feature` (line numbers matter), and `big.feature`:
+ * a 102,400-character variable, then `token` from the `token` property.
  */
 export function copyFixture(
-  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "http" | "flaky",
+  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "http" | "flaky" | "debug",
 ): string {
   const temp = mkdtempSync(join(tmpdir(), `kk-${name}-`));
   const dest = name === "flaky" ? join(temp, "project") : temp;

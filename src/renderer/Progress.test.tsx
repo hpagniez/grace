@@ -59,6 +59,7 @@ const started = (total: number, env: string | null = null): AppEvent => ({
   total,
   startedAt: Date.now(),
   env,
+  debug: false,
 });
 const result = (n: number, status: "passed" | "failed" | "interrupted"): AppEvent => ({
   type: "scenarios",

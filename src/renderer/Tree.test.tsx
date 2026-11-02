@@ -125,6 +125,7 @@ describe("main screen", () => {
       total: 2,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     send({
       type: "scenarios",
@@ -162,6 +163,7 @@ describe("main screen", () => {
       total: 2,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     send({
       type: "scenarios",
@@ -368,6 +370,7 @@ describe("main screen", () => {
       total: 4,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     for (const id of ["run-all-button", "open-button", "refresh-button"])
       expect(button(id).disabled).toBe(true);
@@ -407,6 +410,7 @@ describe("main screen", () => {
       total: 4,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
 
   it("keeps the stripe until the first result, then reports progress", () => {
@@ -581,6 +585,7 @@ describe("main screen", () => {
       total: 4,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     send({
       type: "scenarios",
@@ -824,6 +829,7 @@ describe("virtual tree", () => {
       total: 4,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
 
   const items = () => [
@@ -945,6 +951,7 @@ describe("virtual tree", () => {
         total: tests.length,
         startedAt: Date.now(),
         env: null,
+        debug: false,
       });
       send({ type: "scenarios", updates: tests.map((key) => ({ key, status: "passed" })) });
       expect(rowByKey("s:tests/f100.feature#1").dataset.status).toBe("passed");

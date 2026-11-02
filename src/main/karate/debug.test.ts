@@ -107,13 +107,15 @@ describe("DebugSession", () => {
     expect(() => s.command("continue")).not.toThrow();
   });
 
-  it("survives the listener resetting the connection", async () => {
-    const s = await open();
+  it("survives the listener resetting the connection, and says it ended", async () => {
+    let ended = 0;
+    const s = await DebugSession.open([], () => {}, () => ended++);
+    sessions.push(s);
     const c = client(s.port);
     c.send(s.token);
     await until(() => c.lines.length === 1);
     c.socket.resetAndDestroy();
-    await c.closed;
+    await until(() => ended === 1);
     expect(() => s.setBreakpoints([])).not.toThrow();
   });
 });

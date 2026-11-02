@@ -703,6 +703,7 @@ describe("properties dialog", () => {
       total: 1,
       startedAt: 1,
       env: null,
+      debug: false,
     });
     expect(button().disabled).toBe(true);
   });

@@ -108,6 +108,7 @@ function setup() {
       total: 3,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     send({
       type: "scenarios",
@@ -279,6 +280,7 @@ describe("details: a test", () => {
       total: 3,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     const spinner = within(details())
       .getByText("Steps are available when the feature finishes")
@@ -340,6 +342,7 @@ describe("details: a group during a run", () => {
       total: 3,
       startedAt: Date.now(),
       env: null,
+      debug: false,
     });
     vi.mocked(deriveStatus).mockClear();
     send({ type: "scenarios", updates: [{ key: BAD, status: "failed", error: "boom" }] });

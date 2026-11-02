@@ -86,11 +86,14 @@ export class DebugSession {
     readonly token: string,
     private breakpoints: Breakpoint[],
     private readonly onPause: (p: ListenerPause) => void,
+    private readonly onEnd: () => void,
   ) {}
 
+  /** `onEnd` runs when the listener's connection closes, for whatever reason: nothing pauses after it. */
   static open(
     breakpoints: Breakpoint[],
     onPause: (p: ListenerPause) => void,
+    onEnd: () => void = () => {},
   ): Promise<DebugSession> {
     const token = randomBytes(16).toString("hex");
     const server = createServer();
@@ -98,7 +101,7 @@ export class DebugSession {
       server.once("error", reject);
       server.listen(0, "127.0.0.1", () => {
         const { port } = server.address() as AddressInfo;
-        const session = new DebugSession(server, port, token, breakpoints, onPause);
+        const session = new DebugSession(server, port, token, breakpoints, onPause, onEnd);
         server.on("connection", (s) => session.accept(s));
         resolve(session);
       });
@@ -116,6 +119,7 @@ export class DebugSession {
         first = false;
         if (line !== this.token || this.socket || this.closed) return void s.destroy();
         this.socket = s;
+        s.on("close", () => this.onEnd());
         this.server.close();
         this.write({ breakpoints: this.breakpoints, pause: this.pauseFirst });
         return;

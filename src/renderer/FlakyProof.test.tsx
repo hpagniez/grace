@@ -135,6 +135,7 @@ describe("flaky proof in the details pane", () => {
       total: 1,
       startedAt: at(25, 15, 0),
       env: "qa",
+      debug: false,
     });
     send({ type: "scenarios", updates: [{ key: COIN, status: "failed", error: "boom" }] });
     send({
@@ -226,6 +227,7 @@ describe("flaky proof in the details pane", () => {
       total: 1,
       startedAt: at(25, 15, 0),
       env: "qa",
+      debug: false,
     });
     expect(reports().map((b) => b.disabled)).toEqual([true, true]); // a run in progress locks them
     send({
