@@ -90,6 +90,7 @@ describe("Runner discovery", () => {
       last("environment"),
       last("history"),
       last("flaky"),
+      { type: "breakpoints", breakpoints: [] },
       { type: "opening", root: null },
       { type: "busy", busy: false },
     ]);

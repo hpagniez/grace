@@ -1,8 +1,11 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { validEnvName } from "../shared/env";
 import type { Api } from "../shared/ipc";
+import { narrowLabel } from "./buttons";
 import { FieldMessage } from "./FieldMessage";
+import { createNarrow } from "./narrow";
 import type { AppState } from "./reduce";
+import { Tooltip } from "./Tooltip";
 import { input } from "./ui";
 
 const NONE = "(none)";
@@ -16,6 +19,7 @@ export const INVALID_ENV =
 export function EnvPicker(props: { state: AppState; api: Api }) {
   const view = () => props.state.env; // the reducer keeps it null with no project
   const locked = () => props.state.run.active || props.state.busy;
+  const narrow = createNarrow(); // the word Env is hidden then: the box's tooltip says it
   // No environment is an empty box with a placeholder: Chromium narrows the datalist popup to the
   // options that match the text in the box, so "(none)" as a value would hide every suggestion.
   // For the same reason focus empties the box, with the environment as its placeholder.
@@ -67,39 +71,42 @@ export function EnvPicker(props: { state: AppState; api: Api }) {
   return (
     <div class="flex flex-col">
       <label class="flex items-center gap-2 text-sm text-muted">
-        Env
-        <input
-          type="text"
-          data-testid="env-input"
-          list="env-suggestions"
-          class={`${input} w-28`}
-          autocomplete="off"
-          spellcheck={false}
-          disabled={locked() || !view()}
-          placeholder={view() ? shown() || NONE : undefined}
-          value={text()}
-          aria-invalid={error() ? "true" : undefined}
-          aria-describedby={error() ? "env-error" : hint() ? "env-hint" : undefined}
-          onFocus={() => {
-            typed = false;
-            setText("");
-            setError(null);
-          }}
-          onInput={(e) => {
-            typed = true;
-            setText(e.currentTarget.value);
-            setError(null);
-            // A pick from the list arrives as a replacement, or in Electron 45 as a plain Event;
-            // typing (an InputEvent) alone changes nothing.
-            if (!(e instanceof InputEvent) || e.inputType === "insertReplacementText")
-              commit(e.currentTarget.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") leave(e.currentTarget.value);
-            else if (e.key === "Escape") restore();
-          }}
-          onBlur={(e) => leave(e.currentTarget.value)}
-        />
+        <span class={narrowLabel}>Env</span>
+        {/* beside the box, where the word was: below it are the suggestions */}
+        <Tooltip text={narrow() ? "Env" : undefined} side="left">
+          <input
+            type="text"
+            data-testid="env-input"
+            list="env-suggestions"
+            class={`${input} w-28`}
+            autocomplete="off"
+            spellcheck={false}
+            disabled={locked() || !view()}
+            placeholder={view() ? shown() || NONE : undefined}
+            value={text()}
+            aria-invalid={error() ? "true" : undefined}
+            aria-describedby={error() ? "env-error" : hint() ? "env-hint" : undefined}
+            onFocus={() => {
+              typed = false;
+              setText("");
+              setError(null);
+            }}
+            onInput={(e) => {
+              typed = true;
+              setText(e.currentTarget.value);
+              setError(null);
+              // A pick from the list arrives as a replacement, or in Electron 45 as a plain Event;
+              // typing (an InputEvent) alone changes nothing.
+              if (!(e instanceof InputEvent) || e.inputType === "insertReplacementText")
+                commit(e.currentTarget.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") leave(e.currentTarget.value);
+              else if (e.key === "Escape") restore();
+            }}
+            onBlur={(e) => leave(e.currentTarget.value)}
+          />
+        </Tooltip>
       </label>
       <datalist id="env-suggestions">
         <option value={NONE} />

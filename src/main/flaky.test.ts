@@ -125,6 +125,11 @@ describe("findFlaky", () => {
     expect(findFlaky([run(2, "failed", none), run(1, "passed")], tree())).toEqual([]);
   });
 
+  it("a debug run proves nothing: a long pause can fail a test", () => {
+    const debug = { debug: true as const };
+    expect(findFlaky([run(2, "failed", debug), run(1, "passed")], tree())).toEqual([]);
+  });
+
   it("different fingerprints are not compared", () => {
     expect(findFlaky([run(2, "failed", { fingerprint: B }), run(1, "passed")], tree())).toEqual([]);
   });

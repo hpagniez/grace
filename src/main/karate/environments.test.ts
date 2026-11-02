@@ -120,6 +120,7 @@ describe("featureTagEnvs", () => {
     put(b, { "y.feature": "@env=b\nFeature: y" });
     expect(await featureTagEnvs([a, path.join(a, "missing"), b])).toEqual(["a", "b"]);
     expect(await featureTagEnvs([])).toEqual([]);
+    expect(await featureTagEnvs([path.join(a, "x.feature")])).toEqual(["a"]);
   });
 
   it("skips target, build, node_modules and .git", async () => {

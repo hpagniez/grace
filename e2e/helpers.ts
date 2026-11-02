@@ -44,7 +44,7 @@ export { expect };
 
 /** A fresh copy of a fixture project, deleted after the test. */
 export function project(
-  name: "clean" | "broken" | "maven" | "tags" | "env" | "history" | "http",
+  name: "clean" | "broken" | "maven" | "tags" | "env" | "history" | "http" | "debug",
 ): string {
   const dir = copyFixture(name);
   dirs.push(dir);

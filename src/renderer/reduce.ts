@@ -1,5 +1,15 @@
 import type { EnvView } from "../shared/env";
-import type { AppEvent, Project, RecentEntry, RunOutcome, Step, Summary } from "../shared/events";
+import type {
+  AppEvent,
+  Breakpoint,
+  DebugVar,
+  Paused,
+  Project,
+  RecentEntry,
+  RunOutcome,
+  Step,
+  Summary,
+} from "../shared/events";
 import type { FlakyEnv } from "../shared/flaky";
 import type { HistoryEntry } from "../shared/history";
 import type { HttpCall, HttpGroup } from "../shared/http";
@@ -24,6 +34,10 @@ export interface RunView {
   runId: string | null;
   /** The environment the run in progress, or the last run, used. */
   env: string | null;
+  /** A step debugger run (docs/specs/2026-11-02-step-debugger.md). */
+  debug: boolean;
+  /** The debug run's pauses so far: the tree scrolls to the paused test on each. */
+  pauses: number;
 }
 export interface AppState {
   project: Project | null;
@@ -59,7 +73,13 @@ export interface AppState {
   /** The call shown in the details pane in place of the node; null shows the node. */
   selectedCall: CallRef | null;
   /** The tab shown in the bottom panel. */
-  panel: "console" | "history" | "http";
+  panel: "console" | "history" | "http" | "variables";
+  /** The open project's breakpoints, as main holds them. */
+  breakpoints: Breakpoint[];
+  /** Where the debug run waits; null while it runs or with no debug run. */
+  paused: Paused | null;
+  /** The last pause's variables, kept while the run goes on; null before a debug run's first pause. */
+  vars: DebugVar[] | null;
   /** The folder main is opening, or null. */
   opening: string | null;
   /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
@@ -92,6 +112,8 @@ const idleRun = (): RunView => ({
   reportAvailable: false,
   runId: null,
   env: null,
+  debug: false,
+  pauses: 0,
 });
 
 export function initialState(): AppState {
@@ -116,6 +138,9 @@ export function initialState(): AppState {
     httpGroups: [],
     selectedCall: null,
     panel: "console",
+    breakpoints: [],
+    paused: null,
+    vars: null,
     opening: null,
     loaded: false,
     recent: null,
@@ -150,6 +175,9 @@ export function reduce(s: AppState, e: AppEvent): void {
           threads: null, // main's `threads` event follows
           history: [], // main's `history` follows a project that opens
           flaky: {}, // and its `flaky` follows the tree
+          paused: null,
+          vars: null,
+          panel: s.panel === "variables" ? "console" : s.panel,
         });
         if (!e.project) s.console = []; // a closed project leaves no console behind
       }
@@ -183,7 +211,10 @@ export function reduce(s: AppState, e: AppEvent): void {
         startedAt: e.startedAt,
         runId: e.runId,
         env: e.env,
+        debug: e.debug,
       };
+      s.paused = null;
+      s.vars = null;
       // the bottom tab stays as it is, so the HTTP tab can be watched filling during the run
       if (s.selectedCall && e.keys.includes(s.selectedCall.key)) s.selectedCall = null;
       for (const key of e.keys) {
@@ -226,6 +257,24 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.run.summary = e.summary;
       s.run.reportAvailable = e.reportAvailable;
       s.busy = false; // nothing follows a run; avoids "Finding tests…" until the busy event arrives
+      s.paused = null;
+      if (s.panel === "variables") s.panel = "console"; // the tab shows only during a debug run
+      break;
+    case "breakpoints":
+      s.breakpoints = e.breakpoints;
+      break;
+    case "debugPaused":
+      if (s.vars === null) s.panel = "variables"; // the first pause only: later the user's tab stays
+      s.paused = e.paused;
+      s.vars = e.paused.vars;
+      s.run.pauses++;
+      if (e.paused.key) {
+        s.selected = e.paused.key;
+        s.selectedCall = null;
+      }
+      break;
+    case "debugResumed":
+      s.paused = null;
       break;
     case "filter":
       s.filter = e.filter;

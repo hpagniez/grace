@@ -16,6 +16,7 @@ function setup() {
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
@@ -344,6 +345,7 @@ describe("environment combo", () => {
       total: 1,
       startedAt: Date.now(),
       env: "qa",
+      debug: false,
     });
     expect(input().disabled).toBe(true);
   });
@@ -364,6 +366,7 @@ describe("progress", () => {
         total: 1,
         startedAt: 1,
         env,
+        debug: false,
       });
     start("qa");
     expect(runEnv()).toBe("qa");

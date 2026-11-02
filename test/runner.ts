@@ -59,7 +59,7 @@ export function setup(
 }
 
 export function fixture(
-  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history",
+  name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "debug",
 ): string {
   const d = copyFixture(name);
   temps.push(d);

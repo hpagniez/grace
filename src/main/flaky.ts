@@ -16,7 +16,7 @@ export function findFlaky(runs: ListedRun[], tree: TestNode | null): FlakyTest[]
   if (!tree) return [];
   const groups = new Map<string, ListedRun[]>();
   for (const r of runs) {
-    if (r.record.fingerprint === null) continue;
+    if (r.record.fingerprint === null || r.record.debug) continue;
     const group = JSON.stringify([r.record.fingerprint, r.record.env]);
     groups.set(group, [...(groups.get(group) ?? []), r]);
   }

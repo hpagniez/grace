@@ -64,39 +64,6 @@ test("Open a project and see its tests", async () => {
   await expect(win.getByTestId("project-layout")).toHaveText("Standalone");
 });
 
-test("The toolbar cuts a long path from its start and keeps its characters in order", async () => {
-  // a folder name that ends in a neutral character: right-to-left text would move it to the front
-  const dir = path.join(emptyProject(), "final copy!");
-  mkdirSync(dir);
-  const { app, win } = await launch();
-  await openProject(app, dir);
-  const full = path.resolve(dir);
-  const box = win.getByTestId("project-path");
-  await expect(box).toHaveText(full);
-  // pin its width, so that the path is longer than the box on every machine
-  await box.evaluate((el) => void ((el.parentElement as HTMLElement).style.flex = "0 0 160px"));
-  const seen = await box.evaluate((el) => {
-    const text = el.firstElementChild!.firstChild as Text;
-    const at = (i: number) => {
-      const r = document.createRange();
-      r.setStart(text, i);
-      r.setEnd(text, i + 1);
-      return r.getBoundingClientRect();
-    };
-    const view = el.getBoundingClientRect();
-    const last = text.length - 1;
-    const probes = [0, 1, 2, last - 2, last - 1, last];
-    return {
-      startCut: at(0).right <= view.left + 0.5,
-      endShown: at(last).left >= view.left && at(last).right <= view.right + 0.5,
-      leftToRight: probes.every((i, k) => k === 0 || at(i).left > at(probes[k - 1]).left),
-    };
-  });
-  expect(seen).toEqual({ startCut: true, endShown: true, leftToRight: true });
-  await box.hover();
-  await expect(win.getByRole("tooltip")).toHaveText(full);
-});
-
 const TOOLBAR_BUTTONS = {
   "home-button": "Home",
   "properties-button": "Properties…",
@@ -250,6 +217,103 @@ test("A narrow window keeps every toolbar button on screen, with its name", asyn
     await expect(hasTooltip(win)).toHaveCount(0);
     await win.mouse.move(5, 400);
   }
+});
+
+/** Which parts of a line cut in the middle (`Middle`) are cut. */
+const cutParts = (line: Locator) =>
+  line.evaluate((el) => [...el.children].map((c) => c.scrollWidth > c.clientWidth));
+
+/** Whether the word before a toolbar box is in sight: below 1280 px it is only spoken. */
+const wordShown = (win: Page, id: string) =>
+  win
+    .locator("label", { has: win.getByTestId(id) })
+    .evaluate((label) => label.querySelector("span")!.getBoundingClientRect().width > 1);
+
+test("A long project path stays readable at the minimum width", async () => {
+  // where a project often lives: more than 150 characters, the project folder last
+  const dir = path.join(
+    emptyProject(),
+    "OneDrive - Acme Corporation",
+    "Documents",
+    "source",
+    "repos",
+    "platform",
+    "services",
+    "payments-gateway",
+    "integration-tests",
+    "payments-gateway-contract-tests",
+  );
+  mkdirSync(dir, { recursive: true });
+  const full = path.resolve(dir);
+  expect(full.length).toBeGreaterThan(150);
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const name = win.getByTestId("project-name");
+  const where = win.getByTestId("project-path");
+  await expect(name).toHaveText("payments-gateway-contract-tests");
+  await expect(where).toHaveText(full);
+  await expect(win.locator("header").getByText(full)).toHaveCount(0); // the path left the toolbar
+
+  // the default window: the whole name, the whole chip
+  await defaultWindow(app, win);
+  expect(await cutParts(name)).toEqual([false, false]);
+  await expectChipShown(win);
+
+  // the minimum width
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(1, 700),
+  );
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds().width),
+    )
+    .toBe(760);
+  await expectToolbarFits(win);
+
+  // the name keeps its last 12 characters in sight, before the Env box
+  const [headCut, tailCut] = await cutParts(name);
+  expect(tailCut).toBe(false);
+  const tail = (await name.locator(":scope > span").nth(1).boundingBox())!;
+  expect(tail.width).toBeGreaterThan(40);
+  const env = (await win.getByTestId("env-input").boundingBox())!;
+  expect(tail.x + tail.width).toBeLessThanOrEqual(env.x);
+  // the chip is whole in sight, or out of sight on the hidden second line; never once the name is cut
+  const row = (await win.getByTestId("project-layout").locator("..").boundingBox())!;
+  const chip = (await win.getByTestId("project-layout").boundingBox())!;
+  const chipHidden = chip.y >= row.y + row.height;
+  if (headCut) expect(chipHidden, "the chip goes before the name is cut").toBe(true);
+  if (!chipHidden) await expectChipShown(win);
+
+  // the words Env and Threads are only spoken, and said beside their box
+  for (const [id, word, role] of [
+    ["env-input", "Env", "combobox"],
+    ["threads-input", "Threads", "spinbutton"],
+  ] as const) {
+    expect(await wordShown(win, id), id).toBe(false);
+    await expect(win.getByRole(role, { name: word })).toHaveAttribute("data-testid", id);
+  }
+  const threads = win.getByTestId("threads-input");
+  await threads.hover();
+  await expect(win.getByRole("tooltip")).toHaveText("Threads");
+  const tip = (await win.getByRole("tooltip").boundingBox())!;
+  expect(tip.x + tip.width).toBeLessThanOrEqual((await threads.boundingBox())!.x);
+  await win.mouse.move(5, 400);
+
+  // the status bar: the path's start and the whole project folder, before the version
+  expect(await cutParts(where)).toEqual([true, false]);
+  await expect(win.getByTestId("status-version")).toBeVisible();
+  const line = (await where.boundingBox())!;
+  const version = (await win.getByTestId("status-version").boundingBox())!;
+  expect(line.x).toBeGreaterThanOrEqual(0);
+  expect(line.x + line.width).toBeLessThanOrEqual(version.x);
+  await where.hover();
+  await expect(win.getByRole("tooltip")).toHaveText(full);
+  await win.mouse.move(5, 400);
+
+  // from 1280 px the words show again
+  await contentWidth(app, win, 1281);
+  for (const id of ["env-input", "threads-input"])
+    await expect.poll(() => wordShown(win, id), id).toBe(true);
 });
 
 /** The box shows its whole value: no text scrolls out of sight. */

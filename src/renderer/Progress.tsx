@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, type IconNode } from "lucide";
+import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, Pause, type IconNode } from "lucide";
 import { createEffect, createSignal, Show } from "solid-js";
 import { Icon } from "./Icon";
 import { leaves } from "./nodes";
@@ -16,6 +16,8 @@ interface Outcome {
 const WORKING = { icon: LoaderCircle, tone: "text-running", turning: true } as const;
 const RUNNING: Outcome = { text: "Running…", ...WORKING };
 const FINDING: Outcome = { text: "Finding tests…", ...WORKING };
+// a debug run waiting on the user: nothing turns (step debugger R7.2)
+const PAUSED: Outcome = { text: "Paused", icon: Pause, tone: "text-running" };
 const OUTCOME = {
   finished: { text: "Finished", icon: CircleCheck, tone: "text-muted" },
   cancelled: { text: "Cancelled", icon: CircleSlash, tone: "text-cancelled" },
@@ -33,11 +35,13 @@ export function Progress(props: { state: AppState }) {
   const [tickedMillis, setTickedMillis] = createSignal(0);
 
   createEffect(
-    () => (run().active ? run().startedAt : null),
-    (startedAt) => {
-      if (startedAt === null) return;
+    () => (run().active ? { startedAt: run().startedAt, paused: !!props.state.paused } : null),
+    (r) => {
+      if (r === null || r.startedAt === null) return;
+      const { startedAt } = r;
       const tick = () => setTickedMillis(Math.max(0, Date.now() - startedAt));
       tick();
+      if (r.paused) return; // the time at the pause stays; resuming counts from the start again
       const id = setInterval(tick, 1000);
       return () => clearInterval(id);
     },
@@ -48,14 +52,18 @@ export function Progress(props: { state: AppState }) {
   const pct = (n: number) => (run().total > 0 ? Math.min(100, (n / run().total) * 100) : 0);
   const outcome = (): Outcome | null =>
     run().active
-      ? RUNNING
+      ? props.state.paused
+        ? PAUSED
+        : RUNNING
       : props.state.busy
         ? FINDING
         : run().outcome
           ? OUTCOME[run().outcome!]
           : null;
   // finding tests, or a run whose first test has not finished: nothing in the bar moves otherwise
-  const waiting = () => (props.state.busy && !run().active) || (run().active && run().done === 0);
+  const waiting = () =>
+    (props.state.busy && !run().active) ||
+    (run().active && run().done === 0 && !props.state.paused);
   const value = (n: number) => (waiting() ? undefined : n);
   // No run in this view yet (the reducer starts a view with none on a new project or environment)
   const idle = () => !run().active && run().runId === null && run().outcome === null;

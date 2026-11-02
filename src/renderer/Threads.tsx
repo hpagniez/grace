@@ -1,7 +1,10 @@
 import { createEffect } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { MAX_THREADS } from "../shared/threads";
+import { narrowLabel } from "./buttons";
+import { createNarrow } from "./narrow";
 import type { AppState } from "./reduce";
+import { Tooltip } from "./Tooltip";
 import { input } from "./ui";
 
 /**
@@ -10,6 +13,7 @@ import { input } from "./ui";
  */
 export function Threads(props: { state: AppState; api: Api }) {
   const locked = () => props.state.run.active || props.state.busy;
+  const narrow = createNarrow(); // the word Threads is hidden then: the box's tooltip says it
   let box!: HTMLInputElement;
 
   // Every new view resets the box, so a refused count never stays in it. Set by hand: a `value=`
@@ -24,19 +28,21 @@ export function Threads(props: { state: AppState; api: Api }) {
 
   return (
     <label class="flex items-center gap-2 text-sm text-muted">
-      Threads
-      <input
-        type="number"
-        data-testid="threads-input"
-        ref={(e) => (box = e)}
-        class={`${input} w-14`}
-        min="1"
-        max={MAX_THREADS}
-        step="1"
-        disabled={locked() || !props.state.threads}
-        // NaN for an empty box: main checks every value
-        onChange={(e) => void props.api.setThreads(e.currentTarget.valueAsNumber)}
-      />
+      <span class={narrowLabel}>Threads</span>
+      <Tooltip text={narrow() ? "Threads" : undefined} side="left">
+        <input
+          type="number"
+          data-testid="threads-input"
+          ref={(e) => (box = e)}
+          class={`${input} w-14`}
+          min="1"
+          max={MAX_THREADS}
+          step="1"
+          disabled={locked() || !props.state.threads}
+          // NaN for an empty box: main checks every value
+          onChange={(e) => void props.api.setThreads(e.currentTarget.valueAsNumber)}
+        />
+      </Tooltip>
     </label>
   );
 }

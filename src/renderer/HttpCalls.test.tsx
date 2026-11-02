@@ -88,6 +88,7 @@ function setup(calls: Record<string, HttpCall[]> = ALL) {
   let emit: (e: AppEvent) => void = () => {};
   const api = {
     ready: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -143,6 +144,7 @@ describe("HTTP tab", () => {
       total: 0,
       startedAt: 0,
       env: null,
+      debug: false,
     });
     expect(screen.getByTestId("tab-http").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("http-calls")).toBeTruthy();
@@ -549,6 +551,7 @@ describe("HTTP tab", () => {
         total: 1,
         startedAt: 0,
         env: null,
+        debug: false,
       });
       expect(rows()).toHaveLength(1);
       expect(document.activeElement).toBe(rows()[0]);

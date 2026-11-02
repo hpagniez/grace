@@ -5,7 +5,7 @@ import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { btn, btnIcon, ghost, NARROW_QUERY, narrowIcon, narrowLabel, primary } from "./buttons";
 import { initialState, reduce } from "./reduce";
-import { Toolbar } from "./Toolbar";
+import { NAME_TAIL, Toolbar } from "./Toolbar";
 import { countPill } from "./ui";
 
 afterEach(() => {
@@ -66,6 +66,7 @@ function setup(root = ROOT) {
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     rerunFailed: vi.fn(async () => {}),
+    debugCommand: vi.fn(async () => {}),
   };
   render(() => <Toolbar state={state} api={api as unknown as Api} />);
   const send = (...events: AppEvent[]) => {
@@ -126,7 +127,6 @@ describe("order and shape (R13.1)", () => {
       "home-button",
       "project-name",
       "project-layout",
-      "project-path",
       "env-input",
       "threads-input",
       "properties-button",
@@ -269,11 +269,45 @@ describe("a narrow window", () => {
     m.change(false);
     hover(button("open-button"));
     expect(document.querySelector('[role="tooltip"]')).toBeNull();
-    // the toolbar and the Properties button each listen
-    expect(m.listeners.size).toBe(2);
+    // the toolbar, the Properties button and the Env and Threads boxes each listen
+    expect(m.listeners.size).toBe(4);
     cleanup();
     expect(m.listeners.size).toBe(0);
-    expect(m.query.removeEventListener).toHaveBeenCalledTimes(2);
+    expect(m.query.removeEventListener).toHaveBeenCalledTimes(4);
+  });
+
+  const BOXES = [
+    ["env-input", "Env", "combobox"],
+    ["threads-input", "Threads", "spinbutton"],
+  ] as const;
+
+  it("below 1280 px hides the words Env and Threads from sight but not from their boxes' names", () => {
+    setup();
+    for (const [id, word, role] of BOXES) {
+      const label = screen.getByTestId(id).closest("label")!;
+      const spoken = label.querySelector(`.${CSS.escape(narrowLabel)}`)!;
+      expect(spoken.tagName, id).toBe("SPAN");
+      expect(spoken.textContent, id).toBe(word);
+      expect(screen.getByRole(role, { name: word })).toBe(screen.getByTestId(id));
+    }
+  });
+
+  it("then says Env and Threads in a tooltip beside the box, and nothing while the words show", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const m = media(true);
+    setup();
+    for (const [id, word] of BOXES) {
+      hover(screen.getByTestId(id));
+      expect(tip().textContent, id).toBe(word); // left of the box: checked in e2e, jsdom has no layout
+      fireEvent.pointerLeave(wrapperOf(screen.getByTestId(id)));
+      flush();
+    }
+    m.change(false);
+    for (const [id] of BOXES) {
+      hover(screen.getByTestId(id));
+      expect(document.querySelector('[role="tooltip"]'), id).toBeNull();
+      fireEvent.pointerLeave(wrapperOf(screen.getByTestId(id)));
+    }
   });
 });
 
@@ -317,15 +351,13 @@ describe("Home and Refresh, the icon-only buttons", () => {
 });
 
 describe("the project", () => {
-  it("shows the folder name, the layout and the full path", () => {
+  it("shows the folder name and the layout, and leaves the path to the status bar (spec R1.1)", () => {
     setup();
     expect(screen.getByTestId("project-name").textContent).toBe("petstore-api");
     expect(screen.getByTestId("project-name").className).toContain("font-medium");
     expect(screen.getByTestId("project-layout").textContent).toBe("Maven");
-    const path = screen.getByTestId("project-path");
-    expect(path.textContent).toBe(ROOT);
-    expect(path.className).toContain("font-mono");
-    expect(path.className).toContain("text-muted");
+    expect(screen.queryByTestId("project-path")).toBeNull();
+    expect(header().textContent).not.toContain(ROOT);
   });
 
   it("names a folder opened with forward slashes too, and one with a trailing separator", () => {
@@ -333,44 +365,53 @@ describe("the project", () => {
     expect(screen.getByTestId("project-name").textContent).toBe("storefront");
   });
 
-  it("truncates the path from its start but keeps its characters in order", () => {
-    setup("D:\\" + "folder\\".repeat(30));
-    const path = screen.getByTestId("project-path");
-    expect(path.getAttribute("style")).toMatch(/direction:\s*rtl/);
-    expect(path.getAttribute("style")).toMatch(/text-align:\s*left/);
-    expect(path.className).toContain("truncate");
-    const inner = path.querySelector("span")!;
-    expect(inner.getAttribute("dir")).toBe("ltr");
-    expect(inner.textContent).toBe("D:\\" + "folder\\".repeat(30)); // ends with a backslash, unreordered
-    expect(path.childElementCount).toBe(1);
+  const parts = () => [...screen.getByTestId("project-name").children].map((c) => c.textContent);
+
+  it("cuts a long name in the middle: its start gives way first, its last 12 characters stay (R1.2)", () => {
+    setup("D:\\work\\payments-gateway-contract-tests");
+    expect(NAME_TAIL).toBe(12);
+    expect(parts()).toEqual(["payments-gateway-co", "ntract-tests"]);
+    const name = screen.getByTestId("project-name");
+    expect(name.textContent).toBe("payments-gateway-contract-tests");
+    expect(name.className).toContain("flex");
+    const [head, tail] = name.children;
+    expect(head!.className).toContain("shrink-100000");
+    for (const el of [head!, tail!])
+      for (const c of ["min-w-0", "truncate"]) expect(el.className).toContain(c);
   });
 
-  it("shows the full path in a tooltip", () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  it("keeps a name of 12 characters or fewer in its end part", () => {
     setup();
-    hover(screen.getByTestId("project-path"));
-    expect(tip().textContent).toBe(ROOT);
+    expect(parts()).toEqual(["", "petstore-api"]);
   });
 
-  it("keeps the layout chip in sight above 1280 px: it truncates last, and only below 1280 px may it hide", () => {
+  it("explains a cut name in a tooltip, and says nothing while it fits (R1.3)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    setup("D:\\work\\payments-gateway-contract-tests");
+    const name = screen.getByTestId("project-name");
+    hover(name);
+    expect(document.querySelector('[role="tooltip"]')).toBeNull();
+    fireEvent.pointerLeave(wrapperOf(name));
+    flush();
+    // jsdom has no layout: make the start look cut
+    Object.defineProperty(name.firstElementChild!, "scrollWidth", { value: 300 });
+    Object.defineProperty(name.firstElementChild!, "clientWidth", { value: 100 });
+    hover(name);
+    expect(tip().textContent).toBe("payments-gateway-contract-tests");
+  });
+
+  it("lets the chip go, whole, before the name is cut (R1.2)", () => {
     setup();
     const chip = screen.getByTestId("project-layout");
-    expect(chip.className).toContain("max-[1280px]:@max-[160px]:hidden");
-    expect(chip.className).not.toMatch(/(^| )@max-\[160px\]:hidden/); // never by the container alone
-    expect(chip.parentElement!.className).toContain("@container");
-    // squeezed, the path gives way first, then the name, then the chip
-    const shrink = (el: HTMLElement) =>
-      Number(/shrink-\[?([\d.]+)\]?/.exec(el.className)?.[1] ?? 1);
-    const path = wrapperOf(screen.getByTestId("project-path"));
-    const name = wrapperOf(screen.getByTestId("project-name"));
-    expect(shrink(path)).toBeGreaterThan(shrink(name));
-    expect(shrink(name)).toBeGreaterThan(shrink(chip));
-    for (const c of ["min-w-0", "truncate"]) expect(chip.className).toContain(c);
-  });
-
-  it("the path's tooltip lets the row shrink", () => {
-    setup();
-    expect(wrapperOf(screen.getByTestId("project-path")).className).toContain("min-w-0");
+    // one 20 px line that wraps and hides the second: the chip that no longer fits goes there
+    const row = chip.parentElement!;
+    for (const c of ["flex", "flex-wrap", "h-5", "overflow-hidden", "min-w-0", "flex-1"])
+      expect(row.className, c).toContain(c);
+    expect(wrapperOf(screen.getByTestId("project-name")).parentElement).toBe(row);
+    // the chip is never cut; the name can shrink
+    expect(chip.className).toContain("shrink-0");
+    expect(chip.className).not.toContain("truncate");
+    expect(wrapperOf(screen.getByTestId("project-name")).className).toContain("min-w-0");
   });
 
   it("has no title attribute left", () => {
@@ -457,5 +498,70 @@ describe("the boxes", () => {
         expect(cls, id).toContain(c);
       expect(cls).not.toMatch(/zinc|dark:/);
     }
+  });
+});
+
+describe("toolbar: step debugger", () => {
+  const started = (debug: boolean): AppEvent => ({
+    type: "runStarted",
+    selection: "s:a#1",
+    runId: "20261102-120000-000",
+    keys: ["s:a#1"],
+    total: 1,
+    startedAt: Date.now(),
+    env: null,
+    debug,
+  });
+  const paused: AppEvent = {
+    type: "debugPaused",
+    paused: {
+      key: "s:a#1",
+      file: "a.feature",
+      line: 2,
+      depth: 0,
+      prefix: "*",
+      keyword: "def",
+      text: "x = 1",
+      vars: [],
+    },
+  };
+  const ids = () =>
+    [...header().querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid"));
+
+  it("a normal run keeps Run all; a debug run shows Pause until it pauses", () => {
+    const { api, send } = setup();
+    send(started(false));
+    expect(ids()).toContain("run-all-button");
+    expect(ids()).not.toContain("debug-pause");
+    send(started(true));
+    expect(ids()).not.toContain("run-all-button");
+    expect(ids()).toContain("cancel-button");
+    fireEvent.click(button("debug-pause"));
+    expect(api.debugCommand).toHaveBeenCalledWith("pause");
+  });
+
+  it("paused: Continue, Step over and Step into, by click and by F5, F10 and F11", () => {
+    const { api, send } = setup();
+    send(started(true), paused);
+    expect(ids().filter((id) => id?.startsWith("debug-"))).toEqual([
+      "debug-continue",
+      "debug-over",
+      "debug-into",
+    ]);
+    fireEvent.click(button("debug-over"));
+    expect(api.debugCommand).toHaveBeenLastCalledWith("over");
+    for (const [key, command] of [
+      ["F5", "continue"],
+      ["F10", "over"],
+      ["F11", "into"],
+    ]) {
+      fireEvent.keyDown(window, { key });
+      expect(api.debugCommand).toHaveBeenLastCalledWith(command);
+    }
+    send({ type: "debugResumed" });
+    api.debugCommand.mockClear();
+    fireEvent.keyDown(window, { key: "F5" });
+    expect(api.debugCommand).not.toHaveBeenCalled();
+    expect(ids()).toContain("debug-pause");
   });
 });

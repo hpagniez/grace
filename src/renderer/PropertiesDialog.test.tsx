@@ -44,6 +44,7 @@ function setup() {
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
@@ -703,6 +704,7 @@ describe("properties dialog", () => {
       total: 1,
       startedAt: 1,
       env: null,
+      debug: false,
     });
     expect(button().disabled).toBe(true);
   });

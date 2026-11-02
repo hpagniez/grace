@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, type IconNode } from "lucide";
+import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, Pause, type IconNode } from "lucide";
 import { createStore, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -59,6 +59,7 @@ const started = (total: number, env: string | null = null): AppEvent => ({
   total,
   startedAt: Date.now(),
   env,
+  debug: false,
 });
 const result = (n: number, status: "passed" | "failed" | "interrupted"): AppEvent => ({
   type: "scenarios",
@@ -308,5 +309,41 @@ describe("the bar (R14.1)", () => {
     send(loaded(2), started(2), result(1, "passed"));
     const all = [...document.querySelectorAll("*")].map((e) => e.getAttribute("class") ?? "");
     expect(all.join(" ")).not.toMatch(/\b(zinc|red|green|sky|amber)-\d|dark:/);
+  });
+});
+
+describe("a paused debug run (step debugger R7.2)", () => {
+  it("says Paused, turns nothing and holds its time until the run goes on", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(100_000);
+    const { send } = setup();
+    send(loaded(2), { ...(started(2) as Extract<AppEvent, { type: "runStarted" }>), debug: true });
+    vi.advanceTimersByTime(3000);
+    flush();
+    expect(text("progress-elapsed")).toBe("00:03");
+    send({
+      type: "debugPaused",
+      paused: {
+        key: leaf(1).key,
+        file: "tests/x.feature",
+        line: 2,
+        depth: 0,
+        prefix: "*",
+        keyword: "def",
+        text: "a = 1",
+        vars: [],
+      },
+    });
+    expect(text("run-outcome")).toContain("Paused");
+    expect(outcomeIcon()!.innerHTML).toBe(shapeOf(Pause));
+    expect(outcomeIcon()!.getAttribute("class") ?? "").not.toContain("animate-spin");
+    expect(screen.queryByTestId("progress-stripe")).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10_000);
+    flush();
+    expect(text("progress-elapsed")).toBe("00:03");
+    send({ type: "debugResumed" });
+    expect(text("progress-elapsed")).toBe("00:13");
+    expect(text("run-outcome")).toContain("Running…");
   });
 });

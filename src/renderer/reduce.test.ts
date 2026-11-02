@@ -29,6 +29,7 @@ const started = (ks: string[] = keys, env: string | null = null): AppEvent => ({
   total: ks.length,
   startedAt: 1000,
   env,
+  debug: false,
 });
 const apply = (s: ReturnType<typeof initialState>, ...es: AppEvent[]) =>
   es.forEach((e) => reduce(s, e));
@@ -561,5 +562,71 @@ describe("reduce", () => {
       apply(s, { type: "updateProgress", progress: null });
       expect(s.updateProgress).toBeNull();
     });
+  });
+});
+
+describe("the step debugger", () => {
+  const paused = (key: string | null, line = 8): AppEvent => ({
+    type: "debugPaused",
+    paused: {
+      key,
+      file: "debug.feature",
+      line,
+      depth: 0,
+      prefix: "*",
+      keyword: "def",
+      text: "x = 1",
+      vars: [{ name: "x", kind: "number", value: String(line) }],
+    },
+  });
+  const debugStarted = (): AppEvent => ({
+    ...(started() as Extract<AppEvent, { type: "runStarted" }>),
+    debug: true,
+  });
+  const finished: AppEvent = {
+    type: "runFinished",
+    outcome: "finished",
+    exitCode: 0,
+    summary: null,
+    reportAvailable: false,
+  };
+
+  it("the first pause shows the variables tab and selects the paused test; later ones keep the tab", () => {
+    const s = initialState();
+    apply(s, project(), debugStarted());
+    expect(s.run.debug).toBe(true);
+    apply(s, paused(keys[1]));
+    expect(s).toMatchObject({ panel: "variables", selected: keys[1] });
+    expect(s.paused?.line).toBe(8);
+    apply(s, { type: "debugResumed" });
+    expect(s.paused).toBeNull();
+    expect(s.vars).toEqual([{ name: "x", kind: "number", value: "8" }]);
+    s.panel = "console";
+    apply(s, paused(keys[1], 9));
+    expect(s.panel).toBe("console");
+    expect(s.vars![0].value).toBe("9");
+  });
+
+  it("the end of the run clears the pause and leaves the variables tab", () => {
+    const s = initialState();
+    apply(s, project(), debugStarted(), paused(keys[0]), finished);
+    expect(s.paused).toBeNull();
+    expect(s.panel).toBe("console");
+    apply(s, debugStarted());
+    expect(s.vars).toBeNull();
+  });
+
+  it("a pause outside the tree keeps the selection", () => {
+    const s = initialState();
+    apply(s, project(), debugStarted());
+    s.selected = keys[2];
+    apply(s, paused(null));
+    expect(s.selected).toBe(keys[2]);
+  });
+
+  it("takes main's breakpoints", () => {
+    const s = initialState();
+    apply(s, project(), { type: "breakpoints", breakpoints: [{ file: "a.feature", line: 3 }] });
+    expect(s.breakpoints).toEqual([{ file: "a.feature", line: 3 }]);
   });
 });
