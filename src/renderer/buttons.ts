@@ -26,8 +26,9 @@ export const btnIcon = `${base} size-7 ${quiet}`;
 export const btnIconSmall = `${base} size-6 ${quiet}`;
 
 /**
- * The toolbar below 1280 px: a button's label is only spoken (put narrowLabel on a span around it)
- * and the button shrinks to its icon, so the toolbar fits down to the window's 760 px minimum.
+ * The toolbar below 1280 px: a button's label, and the words Env and Threads, are only spoken (put
+ * narrowLabel on a span around them) and the button shrinks to its icon, so the toolbar fits down to
+ * the window's 760 px minimum with room for the project's name.
  */
 export const narrowIcon = "max-[1280px]:w-7 max-[1280px]:px-0";
 export const narrowLabel = "max-[1280px]:sr-only";
