@@ -8,7 +8,30 @@ import type { AppEvent } from "../shared/events";
  */
 export function secretForms(value: string): string[] {
   if (value === "") return [];
-  return [...new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1)])];
+  const xml = value.replace(/[&<>"']/g, (c) => `&${XML_ENTITY[c]};`); // a debugger `xml` variable's text
+  return [
+    ...new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1), xml]),
+  ];
+}
+
+const XML_ENTITY: Record<string, string> = {
+  "&": "amp",
+  "<": "lt",
+  ">": "gt",
+  '"': "quot",
+  "'": "apos",
+};
+
+/**
+ * `text` with its end masked when that end is the start of a secret's form: a debugger value cut at 64 KB can end
+ * part-way through a secret, which the whole-form masker does not see.
+ */
+export function maskCutEnd(text: string, values: string[]): string {
+  let cut = 0;
+  for (const form of values.flatMap(secretForms))
+    for (let n = Math.min(form.length - 1, text.length); n > cut; n--)
+      if (text.endsWith(form.slice(0, n))) cut = n;
+  return cut ? `${text.slice(0, -cut)}****` : text;
 }
 
 /** A function that replaces every form of every value with `****`, longest form first, matching literally. */
