@@ -17,7 +17,7 @@ Each Karate 1.x sample has a `karate-config.js` that uses Java interop and a fea
 | `samples/db-helper` | Karate's [database testing](https://docs.karatelabs.io/advanced/database-testing/) shape on Karate 2.1.4 (`io.karatelabs:karate-junit6`): a helper `com.example.qa.DbHelper` in `src/test/java` (plain JDBC, constants for the connection, parameterised queries, a transaction), loaded with `Java.type`, and H2 2.2.224 in memory as a `test`-scoped dependency |
 | `samples/db-helper-karate1` | The same on Karate 1.5.2 (`io.karatelabs:karate-junit5`) |
 
-`db-helper` runs three times: compiled with `mvn test-compile` first; never compiled, as in a fresh clone, where both scenarios must fail with Karate's `Java.type: class not found`; and changed since its last build (a new method, not compiled), where the scenario that uses it must fail with `… is not a function`. Grace never compiles the project; those two cases record what a person sees.
+`db-helper` runs three times: compiled with `mvn test-compile` first; never compiled, as in a fresh clone, where both scenarios must fail with Karate's `Java.type: class not found`; and changed since its last build (a new method, not compiled), where the scenario that uses it must fail with `… is not a function`. Grace never compiles the project; in those two cases it must say so on open (spec R8), and the check reads that notice.
 
 The check also runs `work-suite` without its `.mvn/maven.config`: the profile is then given only on a command line (`mvn test -Pwork`), which Grace never sees, and the scenario must fail. That case shows the limit, not a bug.
 

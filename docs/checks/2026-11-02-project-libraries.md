@@ -74,7 +74,14 @@ The `db-helper` samples follow that shape, with a helper written for them (`com.
 | 2. Helper changed since its last build (a new method, not compiled) | the two old scenarios passed; the new one failed with `Error: TypeError: .countOrders is not a function (called on DbHelper)`; no notice | misleading: it names the method, not the stale build |
 | 3. `test`-scoped driver in the list | `libraries.json` holds `h2-2.2.224.jar` (30 jars, Karate 2.1.4) | as expected: `dependency:build-classpath` without `includeScope` lists the test scope |
 
-**Case 2 and the spec.** Grace never compiles: it runs what the project's build compiled. So a helper that is missing or stale fails with Karate's own words, which never say "build the project first". A person who ran `mvn test` before opening Grace never sees it; one who opens a fresh clone does. The spec now names compiling as a non-goal. A notice for both situations is proposed in [#215](https://github.com/hpagniez/grace/pull/215) and not built.
+**Case 2 and the spec.** Grace never compiles: it runs what the project's build compiled. So a helper that is missing or stale fails with Karate's own words, which never say "build the project first". A person who ran `mvn test` before opening Grace never sees it; one who opens a fresh clone does. The owner chose a notice, now built (spec R8).
+
+**Case 2 again, with the notice** (`feature/project-libraries` at `e4ace800`, packaged by `npm run e2e`, the same tools; all 9 cases of the check passed):
+- **Never compiled:** opening the project shows `The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.` The run still fails with Karate's `Java.type: class not found`.
+- **Changed since its last build:** opening shows `The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.`
+- **Compiled:** no notice, on Karate 2.1.4 and 1.5.2 alike.
+
+The same build passed `npm test` (105 files, 1645 tests) and `npm run e2e` (175 passed, 9.7 m).
 
 ## Needs the owner
 
