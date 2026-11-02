@@ -1367,6 +1367,7 @@ describe("tree: step debugger (R5, R7)", () => {
     const debug = screen.getByRole("button", { name: "Debug passing hello" });
     const run = screen.getByRole("button", { name: "Run passing hello" });
     expect(debug.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(debug.querySelectorAll("svg > *")).toHaveLength(1); // one path per row (page.nodes)
     fireEvent.click(debug);
     expect(api.debug).toHaveBeenCalledWith("s:tests/basic.feature#1");
     send({

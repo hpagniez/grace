@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   Play,
   Shuffle,
+  type IconNode,
 } from "lucide";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { FLAKY_TITLE } from "../shared/flaky";
@@ -44,6 +45,11 @@ const FLAKY = `${badge} ${TINT.cancelled} shrink-0`;
 // 24 x 24 (R10.3). Muted until its row is hovered, focused or selected (the row sets `group`).
 const RUN = `inline-flex size-6 shrink-0 items-center justify-center rounded-sm transition-colors duration-(--duration-fast) ease-standard enabled:group-hover:text-passed enabled:group-focus-within:text-passed disabled:cursor-not-allowed disabled:opacity-40 ${INSET}`;
 const DEBUG = RUN.replaceAll("text-passed", "text-running");
+// Bug's 11 strokes drawn as one path, the same lines: 10 fewer nodes on every row (page.nodes). Its one
+// path that starts with a relative moveto gets it absolute, with the pairs after it still relative.
+const BUG: IconNode = [
+  ["path", { d: Bug.map(([, a]) => String(a.d).replace(/^m(\S+ \S+) /, "M$1 l")).join(" ") }],
+];
 
 const isTest = (n: TestNode) => n.kind === "scenario" || n.kind === "row";
 // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
@@ -183,7 +189,7 @@ function Row(props: {
             disabled={props.ctx.state.run.active || props.ctx.state.busy}
             onClick={() => void props.ctx.api.debug(props.node.key)}
           >
-            <Icon icon={Bug} size={14} />
+            <Icon icon={BUG} size={14} />
           </button>
         </Tooltip>
         <Tooltip text={`Run ${label()} (Ctrl+Enter)`} class="shrink-0" side="left">
