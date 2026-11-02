@@ -14,6 +14,10 @@ Each Karate 1.x sample has a `karate-config.js` that uses Java interop and a fea
 | `samples/karate15-maven` | Maven, `io.karatelabs:karate-junit5:1.5.2`: 93 jars, Graal JS 24.0, Netty 4.2.6, Jackson 2.19, logback 1.5 |
 | `samples/karate1-gradle` | Gradle, `com.intuit.karate:karate-junit5:1.4.1` |
 | `samples/work-suite` | A stand-in for the owner's work suite: one Maven project on Karate 1.5.2, a company library (`com.acme:acme-db`, source in `samples/acme-db`) served by its own repository, a helper class in `src/test/java` that the build compiles and the config loads with `Java.type`, a JUnit runner class, and the SQLite driver in a `work` profile that `.mvn/maven.config` switches on |
+| `samples/db-helper` | Karate's [database testing](https://docs.karatelabs.io/advanced/database-testing/) shape on Karate 2.1.4 (`io.karatelabs:karate-junit6`): a helper `com.example.qa.DbHelper` in `src/test/java` (plain JDBC, constants for the connection, parameterised queries, a transaction), loaded with `Java.type`, and H2 2.2.224 in memory as a `test`-scoped dependency |
+| `samples/db-helper-karate1` | The same on Karate 1.5.2 (`io.karatelabs:karate-junit5`) |
+
+`db-helper` runs three times: compiled with `mvn test-compile` first; never compiled, as in a fresh clone, where both scenarios must fail with Karate's `Java.type: class not found`; and changed since its last build (a new method, not compiled), where the scenario that uses it must fail with `… is not a function`. Grace never compiles the project; those two cases record what a person sees.
 
 The check also runs `work-suite` without its `.mvn/maven.config`: the profile is then given only on a command line (`mvn test -Pwork`), which Grace never sees, and the scenario must fail. That case shows the limit, not a bug.
 
@@ -29,7 +33,7 @@ npm run package
 CHECK_MAVEN_HOME=<maven folder> CHECK_GRADLE_HOME=<gradle folder> CHECK_JDK=<jdk folder> npx playwright test --config docs/research/2026-11-02-project-libraries/playwright.config.ts
 ```
 
-- `CHECK_JDK` must hold `bin\javac.exe`: the check compiles the company library and runs `mvn test-compile` in a copy of `work-suite`, as the person's own build would have. Gradle needs a JDK too.
+- `CHECK_JDK` must hold `bin\javac.exe`: the check compiles the company library and runs `mvn test-compile` in copies of `work-suite` and `db-helper`, as the person's own build would have. Gradle needs a JDK too.
 - Set `MAVEN_OPTS=-Dmaven.repo.local=<folder>` and `GRADLE_USER_HOME=<folder>` to keep the downloads out of your own `~/.m2` and `~/.gradle`.
 - Each case copies its sample to a temp folder, so the samples here never get a `target/`, a `test.db` or a `company-repo/`.
 - The machine rules of `AGENTS.md` hold: never at the same time as `npm test`, `npm run e2e` or `npm run bench`.

@@ -8,6 +8,8 @@ A Karate project's Java code often calls outside libraries: a SQL driver, a comp
 
 Opening such a project in Grace should run it with its libraries, on its own, with nothing to copy or list by hand.
 
+This is the shape Karate's own guide to [database testing](https://docs.karatelabs.io/advanced/database-testing/) teaches: a helper class in `src/test/java` that the build compiles, using plain JDBC through `DriverManager`, loaded in a feature with `Java.type`, and the JDBC drivers (H2, MySQL) as `test`-scoped Maven dependencies. The guide says nothing about compiling the helper or about the standalone jar: it assumes the project's own build.
+
 The owner's rule, recorded in [ADR 0026](../decisions/0026-follow-the-karate-cli-first.md): Grace first does what the Karate CLI does, and builds its own way only where the CLI has none.
 - The CLI has a way to add libraries: its launcher puts every jar of `~/.karate/ext/` and of the project's `.karate/ext/` on the classpath ([CLI.md, Classpath Construction](https://github.com/karatelabs/karate/blob/main/docs/CLI.md#classpath-construction)). Grace does the same (R1).
 - The CLI has no way to get a Maven or Gradle project's libraries: the person copies them, and Karate's docs send Java teams to their build. Grace asks the project's own build for them (R2 to R6), recorded in [ADR 0027](../decisions/0027-list-project-libraries-with-its-own-build-tool.md).
@@ -32,6 +34,7 @@ Success:
 - Copying jars into `.karate/ext/` for the person, or writing anything into the project.
 - The launcher's `--cp` flag: it is given per call, so there is nothing in the project to read.
 - A setting to add or remove jars by hand, or a view listing them.
+- Compiling the project's Java code. Grace runs what the build already compiled (`target/test-classes`, first slice). A helper never compiled fails with Karate's `Java.type: class not found`, and one edited since its last build with `… is not a function` (Checks). A notice for both is proposed in [#215](https://github.com/hpagniez/grace/pull/215), not built.
 
 **Anti-goals:**
 - A project that runs with `karate run` but not in Grace because of the classpath.

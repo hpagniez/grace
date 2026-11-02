@@ -57,6 +57,25 @@ The open times are rounded up by the check's polling; the listing alone is in th
 - **How they run it:** the command they use and any option only that command carries.
 - **Their run in the packaged `Grace.exe`,** started from Explorer with their own PATH and `JAVA_HOME`.
 
+## Karate's database testing guide, followed
+
+Added the same day: the samples above call `java.sql.DriverManager` from the scenario, but Karate's guide to [database testing](https://docs.karatelabs.io/advanced/database-testing/) uses a different shape:
+- a helper class in `src/test/java` that the build compiles, using plain JDBC, with the connection settings as constants in the class;
+- the helper loaded in a feature with `Java.type`;
+- the drivers as `test`-scoped dependencies (H2 2.2.224, MySQL 8.2.0).
+
+The `db-helper` samples follow that shape, with a helper written for them (`com.example.qa.DbHelper`). It covers parameterised queries through `PreparedStatement`, updates, and a transaction that rolls back. The database is H2 2.2.224 in memory, a `test`-scoped dependency. The samples come on Karate 2.1.4 (`io.karatelabs:karate-junit6`) and on Karate 1.5.2 (`io.karatelabs:karate-junit5`). Same build and tools as above; times in the same form.
+
+| Case | What happened | Result |
+|---|---|---|
+| 1. Helper compiled (`mvn test-compile` before opening), Karate 2.1.4 | listed in about 5.4 s; both scenarios passed | as expected |
+| 1. Same on Karate 1.5.2 | about 6.4 s; both passed | as expected |
+| 2. Helper never compiled (a fresh clone) | both scenarios failed; the console says `Error: TypeError: Java.type: class not found: com.example.qa.DbHelper`; no notice | a clear message from Karate, but not why |
+| 2. Helper changed since its last build (a new method, not compiled) | the two old scenarios passed; the new one failed with `Error: TypeError: .countOrders is not a function (called on DbHelper)`; no notice | misleading: it names the method, not the stale build |
+| 3. `test`-scoped driver in the list | `libraries.json` holds `h2-2.2.224.jar` (30 jars, Karate 2.1.4) | as expected: `dependency:build-classpath` without `includeScope` lists the test scope |
+
+**Case 2 and the spec.** Grace never compiles: it runs what the project's build compiled. So a helper that is missing or stale fails with Karate's own words, which never say "build the project first". A person who ran `mvn test` before opening Grace never sees it; one who opens a fresh clone does. The spec now names compiling as a non-goal. A notice for both situations is proposed in [#215](https://github.com/hpagniez/grace/pull/215) and not built.
+
 ## Needs the owner
 
 Their work suite, opened and run in a packaged build, for the points just above.
