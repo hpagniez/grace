@@ -80,6 +80,27 @@ export function makeJar(dir: string, files: Record<string, string>): string {
   return jar;
 }
 
+/**
+ * Writes a stand-in build tool `name` into `root`: it logs its arguments to `<root>/calls.log`, then runs `body`
+ * (batch lines joined by CRLF). Returns the log's path.
+ */
+export function stubTool(root: string, name: "mvnw.cmd" | "gradlew.bat", body: string): string {
+  writeFileSync(
+    path.join(root, name),
+    ["@echo off", 'echo %*>>"%~dp0calls.log"', body, ""].join("\r\n"),
+  );
+  return path.join(root, "calls.log");
+}
+
+/** The lines of a stub's log; none before its first call. */
+export function calls(log: string): string[] {
+  try {
+    return readFileSync(log, "utf8").split(/\r?\n/).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export function fixture(
   name: "clean" | "broken" | "maven" | "edge" | "tags" | "env" | "history" | "debug",
 ): string {

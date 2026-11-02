@@ -20,6 +20,8 @@ const run = (file: string, args: string[]) =>
 const system32 = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
 const TASKKILL = path.join(system32, "taskkill.exe");
 const POWERSHELL = path.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe");
+/** Runs a project's build tool: its wrappers are batch files, which only cmd.exe runs. */
+export const CMD = path.join(system32, "cmd.exe");
 
 const taskkill = (pid: number) => run(TASKKILL, ["/PID", String(pid), "/T", "/F"]);
 
@@ -44,12 +46,15 @@ export function spawnKarate(
   cwd: string,
   onLines: (lines: string[]) => void,
   killWaitMs = 5000,
+  /** A build tool's own environment, and its command line as written (`cmd.exe /c "…"`). */
+  extra: { env?: NodeJS.ProcessEnv; windowsVerbatimArguments?: boolean } = {},
 ): KarateProcess {
   const child = spawn(java, args, {
     cwd,
-    env: childEnv(process.env),
+    env: extra.env ?? childEnv(process.env),
     shell: false,
     windowsHide: true,
+    windowsVerbatimArguments: extra.windowsVerbatimArguments,
   });
   // Java gets only the CPU time nothing else wants: a run never makes the IDE stutter (#148)
   if (child.pid !== undefined) {

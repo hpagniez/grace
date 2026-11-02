@@ -127,6 +127,8 @@ export type AppEvent =
   | { type: "flaky"; tests: FlakyTest[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
   | { type: "busy"; busy: boolean }
+  /** The build tool Grace is running to list the project's libraries, or null when it is done. */
+  | { type: "listing"; tool: "Maven" | "Gradle" | null }
   /** The folder main is opening, or null. Sent around each open and in every replay. */
   | { type: "opening"; root: string | null }
   /** The saved recent folders, newest first, each checked for existence. */
