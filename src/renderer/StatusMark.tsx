@@ -6,14 +6,18 @@ import {
   CircleSlash,
   CircleX,
   LoaderCircle,
+  Pause,
   type IconNode,
 } from "lucide";
 import type { Status } from "../shared/model";
 import { Icon } from "./Icon";
 import { STATUS_LABEL } from "./nodes";
 
-/** What a test is, plus the two outcomes that are not a test's status (spec R4.4). */
-export type MarkStatus = Status | "skipped" | "cancelled";
+/**
+ * What a test is, plus the two outcomes that are not a test's status (spec R4.4), and the test a debug run is
+ * paused in (step debugger R7.2), which keeps its `running` status.
+ */
+export type MarkStatus = Status | "skipped" | "cancelled" | "paused";
 
 export const MARK: Record<MarkStatus, { icon: IconNode; text: string; label: string }> = {
   notRun: { icon: Circle, text: "text-skipped", label: STATUS_LABEL.notRun },
@@ -24,6 +28,7 @@ export const MARK: Record<MarkStatus, { icon: IconNode; text: string; label: str
   interrupted: { icon: CircleSlash, text: "text-cancelled", label: STATUS_LABEL.interrupted },
   cancelled: { icon: CircleSlash, text: "text-cancelled", label: "Cancelled" },
   skipped: { icon: CircleMinus, text: "text-skipped", label: "Skipped" },
+  paused: { icon: Pause, text: "text-running", label: "Paused" },
 };
 
 /**

@@ -1,4 +1,5 @@
 import {
+  Bug,
   ChevronDown,
   ChevronRight,
   FileSearch,
@@ -9,7 +10,7 @@ import {
   Play,
   Shuffle,
 } from "lucide";
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { FLAKY_TITLE } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
@@ -17,7 +18,7 @@ import { deriveStatus } from "../shared/status";
 import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
-import { leaves, nodeName, STATUS_LABEL } from "./nodes";
+import { ancestors, breakpointKeys, leaves, nodeName, STATUS_LABEL } from "./nodes";
 import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
 import { StatusMark } from "./StatusMark";
@@ -42,6 +43,7 @@ const TAG = `${tagChip} shrink-0`;
 const FLAKY = `${badge} ${TINT.cancelled} shrink-0`;
 // 24 x 24 (R10.3). Muted until its row is hovered, focused or selected (the row sets `group`).
 const RUN = `inline-flex size-6 shrink-0 items-center justify-center rounded-sm transition-colors duration-(--duration-fast) ease-standard enabled:group-hover:text-passed enabled:group-focus-within:text-passed disabled:cursor-not-allowed disabled:opacity-40 ${INSET}`;
+const DEBUG = RUN.replaceAll("text-passed", "text-running");
 
 const isTest = (n: TestNode) => n.kind === "scenario" || n.kind === "row";
 // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
@@ -62,10 +64,14 @@ function Row(props: {
   keyboardFocused: boolean;
   status: Status;
   flaky: string | null;
+  /** A breakpoint is set on one of its lines (step debugger R5.2). */
+  breakpoint: boolean;
   ctx: Ctx;
 }) {
   const hasKids = () => props.node.children.length > 0;
   const status = () => props.status;
+  // the test a debug run waits in shows the pause mark, still `running` underneath (R7.2)
+  const mark = () => (props.ctx.state.paused?.key === props.node.key ? "paused" : status());
   const selected = () => props.ctx.state.selected === props.node.key;
   const isFeature = () => props.node.kind === "feature";
   const match = createMemo(() => matches(props.node, props.ctx.state.filter));
@@ -108,8 +114,8 @@ function Row(props: {
         {/* A swap, not a rotate: a transform on every open row makes each hit test undo it. */}
         <Icon icon={props.open ? ChevronDown : ChevronRight} size={14} />
       </button>
-      <Tooltip text={STATUS_LABEL[status()]} side="right">
-        <StatusMark status={status()} />
+      <Tooltip text={mark() === "paused" ? "Paused" : STATUS_LABEL[status()]} side="right">
+        <StatusMark status={mark()} />
       </Tooltip>
       <Show when={kindIcon()}>
         <Icon icon={kindIcon()!} size={14} class="text-muted" />
@@ -134,6 +140,14 @@ function Row(props: {
           </Show>
         </button>
       </Tooltip>
+      <Show when={props.breakpoint}>
+        <span
+          data-testid="breakpoint-dot"
+          role="img"
+          aria-label="Has breakpoints"
+          class="size-2 shrink-0 rounded-full bg-failed"
+        />
+      </Show>
       <For each={props.node.tags}>{(tag) => <span class={TAG}>{tag}</span>}</For>
       <Show when={flaky()}>
         <Show
@@ -159,6 +173,19 @@ function Row(props: {
         </Show>
       </Show>
       <Show when={match()}>
+        <Tooltip text={`Debug ${label()} (Ctrl+Shift+Enter)`} class="shrink-0" side="left">
+          <button
+            type="button"
+            tabindex={-1}
+            data-testid="debug-node"
+            aria-label={`Debug ${label()}`}
+            class={`${DEBUG} ${selected() ? "text-running" : "text-muted"}`}
+            disabled={props.ctx.state.run.active || props.ctx.state.busy}
+            onClick={() => void props.ctx.api.debug(props.node.key)}
+          >
+            <Icon icon={Bug} size={14} />
+          </button>
+        </Tooltip>
         <Tooltip text={`Run ${label()} (Ctrl+Enter)`} class="shrink-0" side="left">
           <button
             type="button"
@@ -196,14 +223,29 @@ export function Tree(props: Ctx) {
     props.state.tree ? treeRows(props.state.tree, closed(), props.state.filter) : [],
   );
   let list: VirtualListHandle | undefined;
+  const withBreakpoints = createMemo(() =>
+    breakpointKeys(props.state.tree, props.state.breakpoints),
+  );
+  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1)
+  createEffect(
+    () => props.state.paused?.key ?? null,
+    (key) => {
+      const tree = props.state.tree;
+      if (key === null || !tree) return;
+      const above = ancestors(tree, key);
+      if (above.some((a) => closed().has(a)))
+        setClosed((c) => new Set([...c].filter((k) => !above.includes(k))));
+    },
+  );
 
   // Right and Left move to a child or the parent as the arrows move (R3.3).
   const onKey = (e: KeyboardEvent, row: TreeRow, index: number) => {
     const { key } = row.node;
     if (e.ctrlKey && e.key === "Enter") {
-      // as the run button does: nothing where it is missing or disabled (R3.3)
+      // as the run and debug buttons do: nothing where they are missing or disabled (R3.3)
       const busy = props.state.run.active || props.state.busy;
-      if (!busy && matches(row.node, props.state.filter)) void props.api.run(key);
+      if (!busy && matches(row.node, props.state.filter))
+        void (e.shiftKey ? props.api.debug(key) : props.api.run(key));
       return true;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
@@ -248,14 +290,14 @@ export function Tree(props: Ctx) {
                 n.children.length > 0 ? (closed().has(n.key) ? "false" : "true") : undefined,
               "aria-selected": props.state.selected === n.key ? "true" : "false",
               "aria-label": rowName(labelOf(n), row.status(), row.flaky(), n.tags),
-              "aria-keyshortcuts": "Control+Enter",
+              "aria-keyshortcuts": "Control+Enter Control+Shift+Enter",
             };
           }}
           selectedKey={props.state.selected}
           onSelect={(r) => props.select(r.node.key)}
           onKey={onKey}
           // By value: main sends the filter in force again after every refresh, which must not scroll (R4.7).
-          revealSelectedOn={JSON.stringify(props.state.filter)}
+          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${props.state.run.pauses}`}
           ref={(h) => (list = h)}
         >
           {(r, _index, keyboardFocused, row) => (
@@ -266,6 +308,7 @@ export function Tree(props: Ctx) {
               keyboardFocused={keyboardFocused()}
               status={row.status()}
               flaky={row.flaky()}
+              breakpoint={withBreakpoints().has(r.node.key)}
               ctx={props}
             />
           )}

@@ -264,3 +264,8 @@
     }
   }
 }
+
+/* A paused debug run turns nothing (step debugger R7.2). Unlayered: `animate-spin`'s shorthand would reset it. */
+[data-paused] .animate-spin {
+  animation-play-state: paused;
+}

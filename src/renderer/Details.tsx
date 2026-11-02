@@ -1,6 +1,6 @@
 import { ChevronRight, CircleAlert, LoaderCircle, MousePointerClick } from "lucide";
-import { createMemo, createSignal, For, Show } from "solid-js";
-import type { Step } from "../shared/events";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import type { FileStep, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
@@ -41,15 +41,41 @@ function StatusBadge(props: { status: Status }) {
 const stepMark = (status: string): MarkStatus =>
   Object.hasOwn(MARK, status) ? (status as MarkStatus) : "interrupted";
 
-function StepRow(props: { step: Step }) {
+/** A step of the run, or one read from the feature file before any run (no status, time or log). */
+type ShownStep = FileStep & Partial<Pick<Step, "status" | "millis" | "log">>;
+
+function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paused: boolean }) {
   const [open, setOpen] = createSignal(false);
-  const mark = () => stepMark(props.step.status);
+  const breakpoint = () => `${props.on ? "Remove" : "Add"} breakpoint at line ${props.step.line}`;
   return (
-    <li data-testid="step" data-status={props.step.status} class="py-1">
+    <li
+      data-testid="step"
+      data-status={props.step.status}
+      data-paused={props.paused ? "" : undefined}
+      class={props.paused ? `-mx-2 rounded-md px-2 py-1 ${TINT.running}` : "py-1"}
+    >
       <div class="flex min-h-6 items-center gap-2 text-sm">
-        <Tooltip text={MARK[mark()].label}>
-          <StatusMark status={mark()} />
+        <Tooltip text={breakpoint()} side="right">
+          <button
+            type="button"
+            data-testid="breakpoint"
+            aria-label={breakpoint()}
+            class="group flex size-4 shrink-0 items-center justify-center rounded-full"
+            onClick={() => props.toggle()}
+          >
+            <span
+              aria-hidden="true"
+              class={`size-2.5 rounded-full border border-failed ${props.on ? "bg-failed" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}
+            />
+          </button>
         </Tooltip>
+        <Show when={props.step.status}>
+          {(status) => (
+            <Tooltip text={MARK[stepMark(status())].label}>
+              <StatusMark status={stepMark(status())} />
+            </Tooltip>
+          )}
+        </Show>
         <Show when={props.step.background}>
           <span class={`${tagChip} shrink-0`}>Background</span>
         </Show>
@@ -57,9 +83,14 @@ function StepRow(props: { step: Step }) {
           <span class="font-medium">{props.step.keyword}</span>{" "}
           <span class="font-mono text-xs">{props.step.text}</span>
         </Cut>
-        <span class="shrink-0 font-mono text-xs text-muted tabular-nums">
-          {formatMillis(props.step.millis)}
-        </span>
+        <Show when={props.step.millis !== undefined}>
+          <span class="shrink-0 font-mono text-xs text-muted tabular-nums">
+            {formatMillis(props.step.millis!)}
+          </span>
+        </Show>
+        <Show when={props.paused}>
+          <span class="shrink-0 text-xs font-medium">Paused</span>
+        </Show>
         <Show when={props.step.log}>
           <button
             type="button"
@@ -90,7 +121,29 @@ function StepRow(props: { step: Step }) {
 function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
   const result = () => props.state.results[props.node.key];
-  const steps = () => props.state.steps[props.node.key];
+  const runSteps = () => props.state.steps[props.node.key];
+  // Before its feature finishes, a test shows its steps as the file has them, to set breakpoints on (R4.1)
+  const [fileSteps, setFileSteps] = createSignal<FileStep[] | null>(null);
+  createEffect(
+    () => (runSteps() ? null : props.node.key),
+    (key) => {
+      setFileSteps(null);
+      if (key === null) return;
+      let live = true;
+      void props.api.steps(key).then((s) => live && setFileSteps(s));
+      return () => {
+        live = false;
+      };
+    },
+  );
+  const steps = (): ShownStep[] | null => runSteps() ?? fileSteps();
+  const paused = () => (props.state.paused?.key === props.node.key ? props.state.paused : null);
+  const pausedAt = (s: ShownStep) => {
+    const p = paused();
+    return !!p && p.depth === 0 && p.file === props.node.file && p.line === s.line;
+  };
+  const on = (line: number) =>
+    props.state.breakpoints.some((b) => b.file === props.node.file && b.line === line);
   const location = () =>
     props.node.line === null ? props.node.file : `${props.node.file}:${props.node.line}`;
   return (
@@ -146,8 +199,22 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
         }
       >
         <ul class="divide-y divide-line">
-          <For each={steps()!}>{(step) => <StepRow step={step} />}</For>
+          <For each={steps()!}>
+            {(step) => (
+              <StepRow
+                step={step}
+                on={on(step.line)}
+                toggle={() => void props.api.toggleBreakpoint(props.node.file, step.line)}
+                paused={pausedAt(step)}
+              />
+            )}
+          </For>
         </ul>
+        <Show when={paused()?.depth}>
+          <p data-testid="paused-in" class={`rounded-md px-2 py-1 text-sm ${TINT.running}`}>
+            {`Paused in ${paused()!.file}:${paused()!.line}`}
+          </p>
+        </Show>
       </Show>
     </>
   );

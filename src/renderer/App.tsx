@@ -48,7 +48,9 @@ export function App(props: { api: Api }) {
     <Show when={state.loaded}>
       <div
         data-testid="app"
-        class={`flex h-screen flex-col overflow-clip bg-ground text-ink ${dragging() ? "cursor-row-resize select-none" : state.busy || state.run.active ? "cursor-progress" : ""}`}
+        // every spinner stops while a debug run is paused (index.css, step debugger R7.2)
+        data-paused={state.paused ? "" : undefined}
+        class={`flex h-screen flex-col overflow-clip bg-ground text-ink ${dragging() ? "cursor-row-resize select-none" : (state.busy || state.run.active) && !state.paused ? "cursor-progress" : ""}`}
       >
         {/* the view cuts off at the status bar, so a short window never hides the bar */}
         <div data-testid="view" class="relative flex min-h-0 flex-1 flex-col overflow-clip">

@@ -1,5 +1,17 @@
-import { FileText, FolderOpen, Play, RefreshCw, RotateCcw, Square } from "lucide";
-import { Show } from "solid-js";
+import {
+  ArrowDownToDot,
+  FileText,
+  FolderOpen,
+  Pause,
+  Play,
+  RedoDot,
+  RefreshCw,
+  RotateCcw,
+  Square,
+  type IconNode,
+} from "lucide";
+import { createEffect, For, Show } from "solid-js";
+import type { DebugCommand } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { AppState } from "./reduce";
 import { matchingLeaves } from "../shared/tags";
@@ -21,6 +33,13 @@ const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?
 /** A cut name keeps this many characters of its end in sight; they fit the 760 px window. */
 export const NAME_TAIL = 12;
 
+/** The step debugger's controls while paused, in order, with their keys (step debugger R6.3). */
+const STEPS: { command: DebugCommand; label: string; icon: IconNode; key: string; testid: string }[] = [
+  { command: "continue", label: "Continue", icon: Play, key: "F5", testid: "debug-continue" },
+  { command: "over", label: "Step over", icon: RedoDot, key: "F10", testid: "debug-over" },
+  { command: "into", label: "Step into", icon: ArrowDownToDot, key: "F11", testid: "debug-into" },
+];
+
 /** Between the groups of buttons (spec R13.1). */
 const Divider = () => <span aria-hidden="true" class="h-5 w-px shrink-0 bg-line" />;
 
@@ -37,6 +56,22 @@ export function Toolbar(props: { state: AppState; api: Api }) {
   // a button whose label is hidden gets its label as a tooltip; a visible label needs none
   const narrow = createNarrow();
   const spoken = (label: string) => (narrow() ? label : undefined);
+  const debugging = () => active() && props.state.run.debug;
+  // F5, F10 and F11 anywhere in the window, only while paused: no listener otherwise
+  createEffect(
+    () => !!props.state.paused,
+    (paused) => {
+      if (!paused) return;
+      const onKey = (e: KeyboardEvent) => {
+        const step = STEPS.find((s) => s.key === e.key);
+        if (!step) return;
+        e.preventDefault();
+        void props.api.debugCommand(step.command);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    },
+  );
   return (
     <header class="flex min-h-11 items-center gap-2 bg-ground px-3">
       <Tooltip text="Home">
@@ -127,15 +162,52 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <span class={narrowLabel}>Cancel</span>
         </button>
       </Tooltip>
-      <button
-        data-testid="run-all-button"
-        class={primary}
-        disabled={!canRunAll()}
-        onClick={() => void props.api.run(props.state.tree!.key)}
+      <Show
+        when={debugging()}
+        fallback={
+          <button
+            data-testid="run-all-button"
+            class={primary}
+            disabled={!canRunAll()}
+            onClick={() => void props.api.run(props.state.tree!.key)}
+          >
+            <Icon icon={Play} class="text-on-primary" />
+            Run all
+          </button>
+        }
       >
-        <Icon icon={Play} class="text-on-primary" />
-        Run all
-      </button>
+        <Show
+          when={props.state.paused}
+          fallback={
+            <Tooltip text={spoken("Pause")}>
+              <button
+                data-testid="debug-pause"
+                class={`${btn} ${narrowIcon}`}
+                onClick={() => void props.api.debugCommand("pause")}
+              >
+                <Icon icon={Pause} />
+                <span class={narrowLabel}>Pause</span>
+              </button>
+            </Tooltip>
+          }
+        >
+          <For each={STEPS}>
+            {(s) => (
+              <Tooltip text={spoken(s.label)}>
+                <button
+                  data-testid={s.testid}
+                  aria-keyshortcuts={s.key}
+                  class={`${s.command === "continue" ? primary : btn} ${narrowIcon}`}
+                  onClick={() => void props.api.debugCommand(s.command)}
+                >
+                  <Icon icon={s.icon} class={s.command === "continue" ? "text-on-primary" : undefined} />
+                  <span class={narrowLabel}>{s.label}</span>
+                </button>
+              </Tooltip>
+            )}
+          </For>
+        </Show>
+      </Show>
     </header>
   );
 }

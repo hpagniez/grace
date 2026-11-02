@@ -88,6 +88,7 @@ function setup(calls: Record<string, HttpCall[]> = ALL) {
   let emit: (e: AppEvent) => void = () => {};
   const api = {
     ready: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);

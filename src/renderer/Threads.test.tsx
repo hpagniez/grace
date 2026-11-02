@@ -12,6 +12,7 @@ function setup() {
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
+    steps: vi.fn(async () => null),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),

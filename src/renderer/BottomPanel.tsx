@@ -1,4 +1,4 @@
-import { Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
+import { Braces, Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
 import { createMemo, Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 import { Splitter } from "./Splitter";
 import type { AppState } from "./reduce";
 import { countPill, tab, tabOn } from "./ui";
+import { Variables } from "./Variables";
 
 type Panel = AppState["panel"];
 
@@ -50,7 +51,10 @@ function PanelTab(props: {
   );
 }
 
-/** The Console, History and HTTP tabs under the tree and details. The panel keeps one height for all. */
+/**
+ * The Console, History and HTTP tabs under the tree and details, and Variables during a debug run. The panel
+ * keeps one height for all.
+ */
 export function BottomPanel(props: {
   state: AppState;
   api: Api;
@@ -112,6 +116,15 @@ export function BottomPanel(props: {
             active={panel() === "http"}
             show={() => props.showPanel("http")}
           />
+          <Show when={props.state.run.active && props.state.run.debug}>
+            <PanelTab
+              id="variables"
+              icon={Braces}
+              label="Variables"
+              active={panel() === "variables"}
+              show={() => props.showPanel("variables")}
+            />
+          </Show>
         </div>
         <Show when={panel() === "history"}>
           <div class="ml-auto">
@@ -128,6 +141,9 @@ export function BottomPanel(props: {
           </Match>
           <Match when={panel() === "history"}>
             <History state={props.state} api={props.api} />
+          </Match>
+          <Match when={panel() === "variables"}>
+            <Variables state={props.state} />
           </Match>
           <Match when={panel() === "http"}>
             <HttpCalls
