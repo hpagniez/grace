@@ -210,13 +210,11 @@ export class Runner {
         if (!opened) this.report = report;
         else {
           const notice = [
-            ...(skipped.length
-              ? [
-                  `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
-                ]
-              : []),
-            ...(detectLayout(root).pomNotice ?? []),
-          ];
+            skipped.length
+              ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
+              : null,
+            detectLayout(root).pomNotice,
+          ].filter((n) => n !== null);
           // the properties text has no full stop of its own
           if (notice.length) this.o.emit({ type: "notice", message: notice.join(". ") });
           try {
