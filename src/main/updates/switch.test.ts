@@ -5,7 +5,9 @@ import {
   linkSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { rm } from "node:fs/promises";
@@ -47,7 +49,8 @@ describe.runIf(process.platform === "win32")("switch script", () => {
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        "Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($env:UNDER, 'OrdinalIgnoreCase') } | ForEach-Object { $_.Id }",
+        // Path is read once: see "Get-Grace" below (#160)
+        "Get-Process | Where-Object { $p = $_.Path; $p -and $p.StartsWith($env:UNDER, 'OrdinalIgnoreCase') } | ForEach-Object { $_.Id }",
       ],
       { env: { ...process.env, UNDER: folder + path.sep }, encoding: "utf8", windowsHide: true },
     )
@@ -146,7 +149,14 @@ describe.runIf(process.platform === "win32")("switch script", () => {
     throw new Error("timed out");
   }
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    // a run stopped during a test leaves its folder behind: remove those of runs over an hour old
+    for (const name of readdirSync(tmpdir()).filter((n) => n.startsWith("grace-switch-"))) {
+      const dir = path.join(tmpdir(), name);
+      const stat = statSync(dir, { throwIfNoEntry: false });
+      if (stat && Date.now() - stat.mtimeMs > 3_600_000)
+        await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
     root = mkdtempSync(path.join(tmpdir(), "grace-switch-"));
     // node.exe cannot be hard-linked from Program Files: copy it once, link each Grace.exe to it
     template = path.join(root, "node.exe");
@@ -159,7 +169,8 @@ const dir = path.dirname(process.execPath);
 if (fs.existsSync(path.join(dir, "die.flag"))) process.exit(1);
 if (!fs.existsSync(path.join(dir, "noStart.flag"))) fs.writeFileSync(dir + ".update/started", "");
 if (process.env.GRACE_LIFE_MS) setTimeout(() => process.exit(0), Number(process.env.GRACE_LIFE_MS));
-setInterval(() => {}, 1 << 30);
+// quits once the test process is gone: a switch outlives a stopped test run and starts a Grace
+setInterval(() => { try { process.kill(${process.pid}, 0); } catch { process.exit(0); } }, 500);
 `,
     );
     // NODE_OPTIONS reads backslashes in quotes as escapes
@@ -182,7 +193,10 @@ setInterval(() => {}, 1 << 30);
     write(path.join(data, "Local Storage", "y"));
   }, HOOK);
 
-  afterEach(async () => {
+  afterEach(async ({ task }) => {
+    // the switch's own error: an assertion on part of the result does not show it (#145)
+    if (task.result?.state === "fail" && existsSync(path.join(data, "update-result.json")))
+      console.error(`update-result.json: ${read(data, "update-result.json")}`);
     for (const c of children.splice(0)) {
       c.stdin?.end();
       c.kill();
@@ -504,7 +518,7 @@ setInterval(() => {}, 1 << 30);
   it("keeps a version installed when the old folder cannot be put back", T, async () => {
     write(path.join(staging, "app", "noStart.flag"));
     const old = `${install}.old`;
-    const done = run({ startTimeoutSec: 5, exitTimeoutSec: 2 });
+    const done = run({ startTimeoutSec: 5 });
     await until(() => existsSync(path.join(old, "resources", "app.asar")));
     await hold(path.join(old, "resources", "app.asar"));
     await done;
@@ -553,4 +567,36 @@ setInterval(() => {}, 1 << 30);
       expect(existsSync(path.join(data, "backups", "1.0.0-rc.2", "backup.json"))).toBe(false);
     },
   );
+});
+
+describe.runIf(process.platform === "win32")("Get-Grace", () => {
+  // A process's Path is a script property that asks the process on each read: one that exits as
+  // Get-Grace lists it has no path at a second read, and a method called on it throws (#160).
+  it("reads each process's path once", () => {
+    const getGrace = /^function Get-Grace \{[\s\S]*?^\}/m.exec(script)![0];
+    const out = execFileSync(
+      POWERSHELL,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2
+$install = 'C:\\grace'
+$script:reads = 0
+function Get-Process {
+  $p = New-Object PSObject
+  $p | Add-Member -MemberType ScriptProperty -Name Path -Value {
+    $script:reads++
+    if ($script:reads -eq 1) { 'C:\\grace\\Grace.exe' }
+  }
+  $p
+}
+${getGrace}
+@(Get-Grace).Count`,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    expect(out.trim()).toBe("1");
+  });
 });

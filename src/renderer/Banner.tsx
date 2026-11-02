@@ -38,10 +38,11 @@ export function Banner(props: { state: AppState }) {
                 <span class="text-passed">Ready.</span> Press Run all, or ▶ on a test.
               </Match>
             </Switch>
+            {/* Blinks only while Grace works: idle costs nothing, and a blink redraws the window 5 times a second. */}
             <span
               data-testid="console-cursor"
               aria-hidden="true"
-              class="ml-1 inline-block h-3 w-[0.6em] translate-y-0.5 animate-blink bg-ink motion-reduce:animate-none"
+              class={`ml-1 inline-block h-3 w-[0.6em] translate-y-0.5 bg-ink ${s() === "finding" || s() === "starting" ? "animate-blink motion-reduce:animate-none" : ""}`}
             />
           </div>
         )}

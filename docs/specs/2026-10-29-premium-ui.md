@@ -288,7 +288,7 @@ A and D take their colours from the logo (ADR 0013: green is a passing test, off
 
 ### R20. Notices and inline messages
 
-1. One `Notice` component for the app-wide notice bar and the tree's error: a tinted box (`cancelled` for warnings, `failed` for errors) with its icon (`triangle-alert`, `circle-alert`) and the text, `role="status"` (warning) or `role="alert"` (error). It keeps `data-testid="notice"`.
+1. One `Notice` component for the app-wide notice bar and the tree's error: a tinted box (`passed` for a success, `cancelled` for warnings, `failed` for errors) with its icon (`circle-check`, `triangle-alert`, `circle-alert`) and the text, `role="status"` (success, warning) or `role="alert"` (error). It keeps `data-testid="notice"`. A notice from main is a warning unless main marks it a success, as the updater does for `Updated to …` and `Rolled back to …` (#158).
 2. Inline field messages (environment hint and error, property errors, add-environment error): 12 px, the icon, `muted` for hints, `failed` for errors, linked with `aria-describedby` as today.
 
 ### R21. Status bar and Settings (from app-updates)

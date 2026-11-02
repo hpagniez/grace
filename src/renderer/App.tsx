@@ -29,12 +29,13 @@ export function App(props: { api: Api }) {
   );
   const home = () => !state.project && !state.opening;
   // "Folder not found" and the like arrive as an error with no project: home shows it as a notice
-  const notice = () => state.notice ?? (home() ? state.error : null);
+  const notice = () =>
+    state.notice ?? (home() && state.error ? { text: state.error, success: false } : null);
   const noticeBox = () => (
     <Show when={notice()}>
-      {(text) => (
+      {(n) => (
         <div class="px-3 py-2">
-          <Notice kind="warning" text={text()} testid="notice" />
+          <Notice kind={n().success ? "success" : "warning"} text={n().text} testid="notice" />
         </div>
       )}
     </Show>

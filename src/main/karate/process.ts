@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
+import { constants, setPriority } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { childEnv } from "./command";
@@ -50,6 +51,14 @@ export function spawnKarate(
     shell: false,
     windowsHide: true,
   });
+  // Java gets only the CPU time nothing else wants: a run never makes the IDE stutter (#148)
+  if (child.pid !== undefined) {
+    try {
+      setPriority(child.pid, constants.priority.PRIORITY_BELOW_NORMAL);
+    } catch {
+      // already gone: its exit says why
+    }
+  }
   let buffer: string[] = [];
   const flush = () => {
     if (buffer.length === 0) return;

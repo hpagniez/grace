@@ -21,4 +21,4 @@ Say which Grace version you used, how to reproduce the problem and what an attac
 
 Bugs in Karate, the Eclipse Temurin Java runtime, Electron or Chromium themselves. Report them to [Karate](https://github.com/karatelabs/karate/security), [Adoptium](https://adoptium.net/support/) or [Electron](https://github.com/electron/electron/security). Grace ships their fixes by updating the bundled versions.
 
-The zip is not code-signed yet, so Windows SmartScreen warns on first start. That is known.
+The zip is not code-signed yet, so Windows SmartScreen warns on first start. That is known: see the [code signing policy](README.md#code-signing-policy).

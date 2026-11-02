@@ -64,7 +64,7 @@ export type AppEvent =
       summary: Summary | null;
       reportAvailable: boolean;
     }
-  | { type: "notice"; message: string }
+  | { type: "notice"; message: string; success?: boolean }
   /** The open project's tag filter, as main holds and applies it. */
   | { type: "filter"; filter: FilterState }
   /** The open project's thread count, as main holds it and passes to every run. */

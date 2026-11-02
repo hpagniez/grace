@@ -25,6 +25,14 @@ describe("Notice", () => {
     expect(box.hasAttribute("data-testid")).toBe(false);
   });
 
+  it("a success is a status, tinted passed", () => {
+    render(() => <Notice kind="success" text="Updated to 1.0.0-rc.8." />);
+    const box = screen.getByRole("status");
+    expect(box.textContent).toBe("Updated to 1.0.0-rc.8.");
+    expect(box.className).toContain("bg-passed-tint");
+    expect(box.className).toContain("text-passed");
+  });
+
   it("lets a long path wrap instead of overflowing", () => {
     render(() => <Notice kind="warning" text={"D:\\" + "folder\\".repeat(50)} />);
     const text = screen.getByRole("status").querySelector("span")!;
@@ -33,12 +41,12 @@ describe("Notice", () => {
   });
 
   it("draws a different icon per kind", () => {
-    const shape = (kind: "warning" | "error") => {
+    const shape = (kind: "success" | "warning" | "error") => {
       const { container } = render(() => <Notice kind={kind} text="x" />);
       const html = container.querySelector("svg")!.innerHTML;
       cleanup();
       return html;
     };
-    expect(shape("warning")).not.toBe(shape("error"));
+    expect(new Set([shape("success"), shape("warning"), shape("error")]).size).toBe(3);
   });
 });

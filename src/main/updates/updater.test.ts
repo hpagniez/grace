@@ -130,6 +130,7 @@ describe("startup", () => {
       "updatePrompt",
     ]);
     expect(notices()).toEqual(["Updated to 1.0.0-rc.5."]);
+    expect(ofType("notice")[0].success).toBe(true);
     expect(ofType("updatePrompt")[0].release.version).toBe("1.0.0-rc.6");
     expect(u.view().releases).toEqual(RELEASES);
     expect(download).not.toHaveBeenCalled();
@@ -209,6 +210,7 @@ describe("startup", () => {
     expect(notices()).toEqual([
       "Couldn't switch to 1.0.0-rc.6: Grace did not exit within 60 s. You are still on 1.0.0-rc.5.",
     ]);
+    expect(ofType("notice")[0].success).toBe(false);
   });
 
   it("saves the result's settings: a rollback holds (R10.7)", async () => {

@@ -76,6 +76,7 @@ test("the last switch's result shows as a notice once the window is ready (R10.7
   const { userData, result } = updatedTo(pkg.version);
   const { win } = await launch(userData);
   await expect(win.getByTestId("notice")).toHaveText(`Updated to ${pkg.version}.`);
+  await expect(win.getByTestId("notice")).toHaveClass(/bg-passed-tint/); // a success, not a warning
   expect(existsSync(result)).toBe(false);
 });
 

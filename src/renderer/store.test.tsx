@@ -25,7 +25,7 @@ describe("createAppStore", () => {
     expect(calls).toEqual(["onEvent", "ready"]);
     cb({ type: "notice", message: "hi" });
     flush();
-    expect(store.state.notice).toBe("hi");
+    expect(store.state.notice?.text).toBe("hi");
     cb({ type: "project", project: null, tree: null, error: "boom" });
     flush();
     expect(store.state.notice).toBeNull();

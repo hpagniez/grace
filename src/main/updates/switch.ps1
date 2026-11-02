@@ -101,9 +101,10 @@ function Write-Result($ok, $err, $reverted) {
 }
 
 # Grace, its helpers (renderer, GPU, crash handler) and the bundled Java all run from the install
-# folder. StartsWith, not -like: a [ in a folder name is a wildcard.
+# folder. StartsWith, not -like: a [ in a folder name is a wildcard. Path asks the process on each
+# read, so it is read once: a process that exits in between has none the second time.
 function Get-Grace {
-  Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase) }
+  Get-Process | Where-Object { $p = $_.Path; $p -and $p.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase) }
 }
 
 function Start-Grace { Start-Program (Join-Path $install 'Grace.exe') '' $install }

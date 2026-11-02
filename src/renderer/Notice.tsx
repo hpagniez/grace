@@ -1,13 +1,18 @@
-import { CircleAlert, TriangleAlert } from "lucide";
+import { CircleAlert, CircleCheck, TriangleAlert } from "lucide";
 import { Icon } from "./Icon";
 
 const KIND = {
+  success: { tone: "bg-passed-tint text-passed", icon: CircleCheck, role: "status" },
   warning: { tone: "bg-cancelled-tint text-cancelled", icon: TriangleAlert, role: "status" },
   error: { tone: "bg-failed-tint text-failed", icon: CircleAlert, role: "alert" },
 } as const;
 
-/** A tinted message with its icon: a warning is a status, an error an alert (spec R20.1). */
-export function Notice(props: { kind: "warning" | "error"; text: string; testid?: string }) {
+/** A tinted message with its icon: a success or a warning is a status, an error an alert (spec R20.1). */
+export function Notice(props: {
+  kind: "success" | "warning" | "error";
+  text: string;
+  testid?: string;
+}) {
   const kind = () => KIND[props.kind];
   return (
     <div
