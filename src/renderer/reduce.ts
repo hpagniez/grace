@@ -82,6 +82,8 @@ export interface AppState {
   vars: DebugVar[] | null;
   /** The folder main is opening, or null. */
   opening: string | null;
+  /** The build tool main runs to list the project's libraries, or null. */
+  listing: "Maven" | "Gradle" | null;
   /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
   loaded: boolean;
   /** The saved recent folders, newest first; null until main sends them. */
@@ -142,6 +144,7 @@ export function initialState(): AppState {
     paused: null,
     vars: null,
     opening: null,
+    listing: null,
     loaded: false,
     recent: null,
     updates: null,
@@ -309,6 +312,9 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "busy":
       s.busy = e.busy;
+      break;
+    case "listing":
+      s.listing = e.tool;
       break;
     case "notice":
       s.notice = { text: e.message, success: e.success ?? false };

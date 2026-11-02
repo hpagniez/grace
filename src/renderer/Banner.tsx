@@ -1,5 +1,5 @@
 import { Match, Show, Switch } from "solid-js";
-import { bannerState, testsText } from "./bannerText";
+import { bannerState, findingText, testsText } from "./bannerText";
 import type { AppState } from "./reduce";
 
 const v = __KK_VERSIONS__;
@@ -32,7 +32,7 @@ export function Banner(props: { state: AppState }) {
           <div data-testid="console-state" class="text-muted">
             <Switch>
               <Match when={s() === "none"}>Open a Karate project folder</Match>
-              <Match when={s() === "finding"}>Finding tests…</Match>
+              <Match when={s() === "finding"}>{findingText(props.state)}</Match>
               <Match when={s() === "starting"}>Starting Karate…</Match>
               <Match when={s() === "ready"}>
                 <span class="text-passed">Ready.</span> Press Run all, or ▶ on a test.

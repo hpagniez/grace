@@ -11,6 +11,10 @@ const features = (n: TestNode): number =>
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+/** What Grace says while it discovers: the build tool listing the libraries first, if any. */
+export const findingText = (s: AppState) =>
+  s.listing ? `Listing the project's libraries with ${s.listing}…` : "Finding tests…";
+
 /** The banner's tests line, null for no line. Counts the whole tree, not the tag filter. */
 export function testsText(s: AppState): string | null {
   if (!s.project) return null;
