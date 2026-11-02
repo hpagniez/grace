@@ -139,6 +139,7 @@ describe("argument file through Java", () => {
       env: null,
       argFile,
       threads: 1,
+      configDir: null,
     });
     const lines: string[] = [];
     expect(await spawnKarate(vendor.java, args, root, (l) => lines.push(...l)).exit).toBe(0);
@@ -184,6 +185,7 @@ describe("target file through Java", () => {
         env: null,
         argFile: null,
         threads: 1,
+        configDir: null,
       });
       expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
       const ran = readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl"))

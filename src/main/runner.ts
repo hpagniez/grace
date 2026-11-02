@@ -40,6 +40,7 @@ import {
   buildArgs,
   detectLayout,
   lineTargets,
+  locate,
   OUT_OF_MEMORY,
   outOfMemory,
   selectionTargets,
@@ -100,12 +101,12 @@ export function dryRunError(lines: string[]): string {
  * Sets each row's line from its feature file; null when the table has no such row (dynamic
  * Examples), since running a guessed line could run another row or nothing.
  */
-function setRowLines(tree: TestNode, root: string): void {
+function setRowLines(tree: TestNode, bases: string[]): void {
   const texts = new Map<string, string>();
   const walk = (n: TestNode) => {
     if (n.kind === "row") {
       const { example, line } = parseRefId(n.refId!);
-      if (!texts.has(n.file)) texts.set(n.file, readFileSync(path.join(root, n.file), "utf8"));
+      if (!texts.has(n.file)) texts.set(n.file, readFileSync(locate(bases, n.file), "utf8"));
       n.line = rowLines(texts.get(n.file)!, line)[example! - 1] ?? null;
     }
     n.children.forEach(walk);
@@ -209,11 +210,14 @@ export class Runner {
         );
         if (!opened) this.report = report;
         else {
-          if (skipped.length)
-            this.o.emit({
-              type: "notice",
-              message: `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`,
-            });
+          const notice = [
+            skipped.length
+              ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
+              : null,
+            detectLayout(root).pomNotice,
+          ].filter((n) => n !== null);
+          // the properties text has no full stop of its own
+          if (notice.length) this.o.emit({ type: "notice", message: notice.join(". ") });
           try {
             saveOpenedProject(this.o.dataDir, root);
           } catch (err) {
@@ -638,8 +642,8 @@ export class Runner {
         this.storeFilter(pruned);
       this.sendFilter();
       this.sendThreads();
-      const { classpath, featureRoots } = detectLayout(project.root);
-      this.overlays = overlayEnvs([...new Set([project.root, ...classpath])]);
+      const { configDirs, featureRoots } = detectLayout(project.root);
+      this.overlays = overlayEnvs(configDirs);
       this.tagEnvs = await featureTagEnvs(featureRoots); // from the files: the tree lacks other envs' tests
       this.o.emit(this.envEvent());
       this.sendHistory();
@@ -700,7 +704,7 @@ export class Runner {
   ) {
     const { root } = this.project!;
     const { java, jar } = this.o.vendor;
-    const { classpath } = detectLayout(root);
+    const { classpath, configDir } = detectLayout(root);
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
     const args = buildArgs({
@@ -714,6 +718,7 @@ export class Runner {
       env,
       argFile,
       threads,
+      configDir,
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
@@ -721,7 +726,7 @@ export class Runner {
   /** Dry run on all feature roots with `env`; emits and returns the new tree, or null on error. */
   private async discover(env: string | null): Promise<TestNode | null> {
     const project = this.project!;
-    const { featureRoots } = detectLayout(project.root);
+    const { featureRoots, classpath } = detectLayout(project.root);
     const rootName = path.basename(project.root);
     let tree: TestNode | null = null;
     let error: string | null = null;
@@ -751,7 +756,7 @@ export class Runner {
             readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")),
             rootName,
           );
-          setRowLines(tree, project.root);
+          setRowLines(tree, [project.root, ...classpath]);
         } catch (err) {
           error = (err as Error).message;
         }
@@ -841,6 +846,8 @@ export class Runner {
     if (!tree) return;
     const notice = (message: string) => this.o.emit({ type: "notice", message });
     const { root } = this.project!;
+    const { classpath, featureRoots } = detectLayout(root);
+    const bases = [root, ...classpath];
     const run = { tree, filter, threads: this.threads, env, props };
 
     if ("tests" in target) {
@@ -861,7 +868,7 @@ export class Runner {
       await this.runBody({
         ...run,
         leaves: found,
-        targets: lineTargets(found, root),
+        targets: lineTargets(found, bases),
         targetFile: true,
         selection: null,
         failedOf: target.failedOf,
@@ -887,7 +894,7 @@ export class Runner {
       notice("Nothing to run");
       return;
     }
-    const targets = selectionTargets(node, root, detectLayout(root).featureRoots, filter);
+    const targets = selectionTargets(node, bases, featureRoots, filter);
     if (!targets) {
       // a matching row of a partly matching outline has no line (dynamic Examples)
       notice("Clear the filter to run this outline");
