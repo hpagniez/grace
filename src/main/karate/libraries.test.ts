@@ -142,6 +142,9 @@ describe("the command", () => {
     const bin = folder({ "java.exe": "" });
     expect(toolEnv({}, { ...o, searchPath: bin }).JAVA_HOME).toBeUndefined();
   });
+  it("lends nothing without a Java to lend (Gradle needs a JDK)", () => {
+    expect(toolEnv({}, { ...o, jreDir: null })).not.toHaveProperty("JAVA_HOME");
+  });
 });
 
 describe("parseLibraries", () => {
@@ -169,7 +172,31 @@ describe("failureReason", () => {
         "* What went wrong:",
         "Task 'graceClasspath' not found in root project 'x'.",
       ]),
-    ).toBe("Task 'graceClasspath' not found in root project 'x'.");
+    ).toBe("Task 'graceClasspath' not found in root project 'x'");
+  });
+  it("takes the deepest cause Gradle gives", () => {
+    expect(
+      failureReason([
+        "* What went wrong:",
+        "Execution failed for task ':graceClasspath' (registered in initialization script 'x').",
+        "> Could not resolve all dependencies for configuration ':testRuntimeClasspath'.",
+        "   > Could not find org.acme:client:1.0.",
+        "",
+        "* Try:",
+        "> Run with --stacktrace option to get the stack trace.",
+      ]),
+    ).toBe("Could not find org.acme:client:1.0");
+  });
+  it("takes a launcher's ERROR line", () => {
+    expect(
+      failureReason([
+        "",
+        "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.",
+        "",
+        "Please set the JAVA_HOME variable in your environment to match the",
+        "location of your Java installation.",
+      ]),
+    ).toBe("JAVA_HOME is not set and no 'java' command could be found in your PATH");
   });
   it("else the last line, cut to 300 characters", () => {
     expect(failureReason(["a", "b", ""])).toBe("b");

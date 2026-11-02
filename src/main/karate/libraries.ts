@@ -117,16 +117,21 @@ export const TOOL_COMMAND: Record<BuildLayout, string> = {
     '"%GRACE_TOOL%" -q --no-daemon --console=plain --no-configuration-cache --init-script "%GRACE_INIT_SCRIPT%" graceClasspath',
 };
 
-/** R2.4: the person's environment as is, Grace's variables, and the bundled Java only when there is no other. */
+/**
+ * R2.4: the person's environment as is, Grace's variables, and `jreDir` only when there is no other Java. Gradle gets
+ * none (`jreDir` null): it needs a JDK to resolve a Java project's classpath, which the bundled Java is not.
+ */
 export function toolEnv(
   base: NodeJS.ProcessEnv,
-  o: { tool: string; file: string; initScript: string; searchPath: string; jreDir: string },
+  o: { tool: string; file: string; initScript: string; searchPath: string; jreDir: string | null },
 ): NodeJS.ProcessEnv {
-  const noJava =
-    !base.JAVA_HOME && !folders(o.searchPath).some((d) => existsSync(path.join(d, "java.exe")));
+  const lend =
+    o.jreDir !== null &&
+    !base.JAVA_HOME &&
+    !folders(o.searchPath).some((d) => existsSync(path.join(d, "java.exe")));
   return {
     ...base,
-    ...(noJava ? { JAVA_HOME: o.jreDir } : {}),
+    ...(lend ? { JAVA_HOME: o.jreDir! } : {}),
     GRACE_TOOL: o.tool,
     GRACE_CLASSPATH_FILE: o.file,
     GRACE_INIT_SCRIPT: o.initScript,
@@ -146,17 +151,28 @@ export function parseLibraries(text: string, classpath: string[]): string[] {
   return out;
 }
 
-/** R6.3: Maven's first `[ERROR]`, else what Gradle says went wrong, else the last line; 300 characters at most. */
+/**
+ * R6.3: Maven's first `[ERROR]`, else a launcher's `ERROR:` (no Java), else the deepest cause Gradle says went wrong,
+ * else the last line; without its full stop, which the notice adds, and 300 characters at most.
+ */
 export function failureReason(lines: string[]): string {
   const said = lines.map((l) => l.trim());
-  const error = said.find((l) => l.startsWith("[ERROR]"));
-  const wrong = said.indexOf("* What went wrong:");
+  const error = said.find((l) => l.startsWith("[ERROR]") || l.startsWith("ERROR:"));
   const reason =
-    error?.replace(/^\[ERROR\]\s*/, "") ??
-    (wrong >= 0 ? said.slice(wrong + 1).find(Boolean) : undefined) ??
+    error?.replace(/^(\[ERROR\]|ERROR:)\s*/, "") ??
+    gradleCause(said) ??
     said.filter(Boolean).at(-1) ??
     "it stopped with no message";
-  return reason.slice(0, 300);
+  return reason.replace(/\.+$/, "").slice(0, 300);
+}
+
+/** The last `> ` cause under Gradle's `* What went wrong:`, else its first line; the first names only the task. */
+function gradleCause(said: string[]): string | undefined {
+  const start = said.indexOf("* What went wrong:");
+  if (start < 0) return undefined;
+  const end = said.indexOf("", start + 1);
+  const block = said.slice(start + 1, end < 0 ? undefined : end);
+  return block.findLast((l) => l.startsWith(">"))?.replace(/^>\s*/, "") ?? block[0];
 }
 
 /** R3.2: adds `graceClasspath` to the root project; it writes the test runtime classpath to GRACE_CLASSPATH_FILE. */

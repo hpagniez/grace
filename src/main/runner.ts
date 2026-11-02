@@ -827,7 +827,7 @@ export class Runner {
             file,
             initScript,
             searchPath,
-            jreDir: this.o.vendor.jreDir,
+            jreDir: layout === "maven" ? this.o.vendor.jreDir : null,
           }),
           windowsVerbatimArguments: true,
         },

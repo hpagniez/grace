@@ -78,7 +78,7 @@ Tried on a Maven project with `org.xerial:sqlite-jdbc` 3.54.1.0 and a scenario t
 1. Maven projects (layout `maven`): `mvnw.cmd` in the project folder if it exists, else `mvn.cmd` or `mvn.bat` found on PATH.
 2. Gradle projects (layout `gradle`): `gradlew.bat` in the project folder if it exists, else `gradle.bat` found on PATH.
 3. Standalone projects: no tool runs.
-4. The tool runs in the project folder with the person's environment, unchanged, so their proxy, `MAVEN_OPTS` and company repository settings apply. Only when `JAVA_HOME` is not set and no `java` is on PATH does Grace set `JAVA_HOME` to its bundled Java.
+4. The tool runs in the project folder with the person's environment, unchanged, so their proxy, `MAVEN_OPTS` and company repository settings apply. Only for Maven, and only when `JAVA_HOME` is not set and no `java` is on PATH, does Grace set `JAVA_HOME` to its bundled Java. Gradle gets none: it needs a JDK to resolve a Java project's classpath (found by the Checks: on the bundled Java it fails with `does not provide the required capabilities: [JAVA_COMPILER]`), and without one its own launcher says `JAVA_HOME is not set`.
 
 ### R3. The commands
 
@@ -105,7 +105,7 @@ Tried on a Maven project with `org.xerial:sqlite-jdbc` 3.54.1.0 and a scenario t
 
 1. A failure is: no tool found, the tool exits with a code other than 0, or it exits with 0 and wrote no file. An empty file is an empty list, not a failure.
 2. The kept list is left as it was, so the next open or Refresh tries again and, failing again, says so again. Runs use the kept list if there is one, else none.
-3. A notice says `Grace could not list the project's libraries with <Maven|Gradle>: <reason>.` then `Grace uses the libraries it listed before.` if it kept a list, else `Tests that use them will fail.` The reason is `the project has no mvnw.cmd and mvn is not on PATH` (or `no gradlew.bat and gradle is not on PATH`), else the first line of the tool's output starting with `[ERROR]` (prefix removed), else the line after Gradle's `* What went wrong:`, else the last non-empty line, cut to 300 characters.
+3. A notice says `Grace could not list the project's libraries with <Maven|Gradle>: <reason>.` then `Grace uses the libraries it listed before.` if it kept a list, else `Tests that use them will fail.` The reason is `the project has no mvnw.cmd and mvn is not on PATH` (or `no gradlew.bat and gradle is not on PATH`), else the first line of the tool's output starting with `[ERROR]` or `ERROR:` (prefix removed), else the deepest `>` cause under Gradle's `* What went wrong:` (its first line names only the task), else the last non-empty line; without its own full stop, cut to 300 characters.
 4. On open this notice joins the open notice, after the skipped-properties and `karate-pom.json` texts. On Refresh it shows alone.
 5. The dry run and the tree go ahead either way.
 

@@ -124,6 +124,16 @@ describe("Runner project libraries", () => {
     passed(last);
   });
 
+  it("ends the notice with one full stop", T, async () => {
+    const { runner, last } = setup();
+    const root = project();
+    stubTool(root, "mvnw.cmd", "echo [ERROR] Could not resolve dependencies.\r\nexit /b 1");
+    await runner.open(root);
+    expect(last("notice").message).toBe(
+      "Grace could not list the project's libraries with Maven: Could not resolve dependencies. Tests that use them will fail.",
+    );
+  });
+
   it("joins the open notice", T, async () => {
     const { runner, last } = setup();
     const root = project();
