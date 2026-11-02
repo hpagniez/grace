@@ -4,13 +4,13 @@
   "measures": {
     "size.unpacked": {
       "unit": "MB",
-      "limit": 539.7,
+      "limit": 489.1,
       "noise": 1,
       "machine": false
     },
     "size.zip": {
       "unit": "MB",
-      "limit": 219.7,
+      "limit": 207.2,
       "noise": 1,
       "machine": false
     },
