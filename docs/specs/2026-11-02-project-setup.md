@@ -1,6 +1,6 @@
 # Project setup
 
-Date 2026-11-02. Status: draft. Part of [#64](https://github.com/hpagniez/grace/issues/64) (first slice).
+Date 2026-11-02. Status: approved. Part of [#64](https://github.com/hpagniez/grace/issues/64) (first slice).
 
 ## Intent
 
