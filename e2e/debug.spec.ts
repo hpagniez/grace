@@ -26,7 +26,7 @@ test("Debugging from the tree: paused, stepping, finished", async () => {
   await expect(win.getByTestId("debug-into")).toBeVisible();
   await expect(win.getByTestId("cancel-button")).toBeEnabled();
   await expect(win.getByTestId("run-all-button")).toHaveCount(0);
-  await expect(node(win, "variables")).toHaveAttribute("aria-selected", "true");
+  await expect(node(win, "variables")).toHaveClass(/bg-selected/); // the paused test is selected
   await expect(pausedStep(win)).toContainText("def user = { id: 7 }");
   await expect(pausedStep(win)).toContainText("Paused");
   await expect(win.getByTestId("tab-variables")).toHaveAttribute("aria-selected", "true");
