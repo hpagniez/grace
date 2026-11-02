@@ -19,6 +19,42 @@ export interface Step {
   background: boolean;
   log: string | null;
 }
+/** A step of a test as its feature file has it, before any run (step debugger R4.1). */
+export interface FileStep {
+  keyword: string;
+  text: string;
+  line: number;
+  background: boolean;
+}
+/** A step debugger breakpoint: the tree's `file` (Karate's feature path) and a step line. */
+export interface Breakpoint {
+  file: string;
+  line: number;
+}
+export type DebugCommand = "continue" | "over" | "into" | "pause";
+export type VarKind = "string" | "number" | "boolean" | "null" | "json" | "xml" | "function" | "other";
+export interface DebugVar {
+  name: string;
+  kind: VarKind;
+  /** The Java class's simple name, for `other` only. */
+  type?: string;
+  value: string;
+  /** Characters left out after the first 65,536. */
+  cut?: number;
+}
+/** Where a debug run waits: the step it has not run yet, and the scenario's variables. */
+export interface Paused {
+  /** The paused test's key in the tree; null if the tree has no such test. */
+  key: string | null;
+  file: string;
+  line: number;
+  /** 0 for the test's own steps, 1 or more inside a called feature. */
+  depth: number;
+  prefix: string;
+  keyword: string;
+  text: string;
+  vars: DebugVar[];
+}
 export interface ScenarioUpdate {
   key: string;
   status: Status;
@@ -52,8 +88,14 @@ export type AppEvent =
       total: number;
       startedAt: number;
       env: string | null;
+      /** A step debugger run: one thread, with the listener. */
+      debug: boolean;
     }
   | { type: "scenarios"; updates: ScenarioUpdate[] }
+  /** The open project's breakpoints, as main holds them. */
+  | { type: "breakpoints"; breakpoints: Breakpoint[] }
+  | { type: "debugPaused"; paused: Paused }
+  | { type: "debugResumed" }
   | { type: "steps"; key: string; steps: Step[] }
   | { type: "calls"; key: string; calls: HttpCall[] }
   | { type: "console"; lines: string[] }
