@@ -8,7 +8,7 @@ import {
 } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRunDir, writeRunRecord } from "../src/main/history";
@@ -77,6 +77,20 @@ export function flakyProject(): { dir: string; coin(heads: boolean): void } {
 export const emptyProject = () => tempDir("kk-empty-");
 
 /**
+ * `env` with a PATH that holds no Maven or Gradle: CI's runners have both, and a test must never run a real build
+ * tool (a project's own stand-in `mvnw.cmd` still runs). Windows names the key `Path`, any case goes.
+ */
+function withoutBuildTools(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = Object.fromEntries(Object.entries(env).filter(([k]) => k.toLowerCase() !== "path"));
+  const tools = ["mvn.cmd", "mvn.bat", "gradle.bat"];
+  out.PATH = (env.PATH ?? "")
+    .split(";")
+    .filter((d) => !tools.some((t) => existsSync(path.join(d, t))))
+    .join(";");
+  return out;
+}
+
+/**
  * Starts the built app (`.vite/build`) with its own fresh userData folder, or the given one (close the
  * first app before), `extraEnv` added to the app's environment, and an emulated colour scheme if given.
  * Playwright emulates light unless told otherwise: `colorScheme: null` turns the emulation off, so the
@@ -95,7 +109,12 @@ export async function launch(
   writeFileSync(noFeed, "[]");
   const app = await _electron.launch({
     args: ["."],
-    env: { ...process.env, GRACE_UPDATE_FEED: noFeed, ...extraEnv, GRACE_USER_DATA: userData },
+    env: {
+      ...withoutBuildTools(process.env),
+      GRACE_UPDATE_FEED: noFeed,
+      ...extraEnv,
+      GRACE_USER_DATA: userData,
+    },
     colorScheme: opts.colorScheme,
   });
   apps.push(app);
