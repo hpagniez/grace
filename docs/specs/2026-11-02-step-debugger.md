@@ -1,6 +1,6 @@
 # Step debugger: breakpoints on steps, pause, step, inspect variables
 
-Date 2026-11-02. Status: draft. Covers [#65](https://github.com/hpagniez/grace/issues/65). Research: [docs/research/2026-11-02-step-debugger/](../research/2026-11-02-step-debugger/README.md). Toolchain: [ADR 0025](../decisions/0025-compile-the-debug-listener-with-ecj-on-the-bundled-jre.md).
+Date 2026-11-02. Status: approved. Covers [#65](https://github.com/hpagniez/grace/issues/65). Research: [docs/research/2026-11-02-step-debugger/](../research/2026-11-02-step-debugger/README.md). Toolchain: [ADR 0025](../decisions/0025-compile-the-debug-listener-with-ecj-on-the-bundled-jre.md).
 
 ## Intent
 
@@ -57,7 +57,7 @@ Steps before a run (needed to set a breakpoint on a test that has not run): kept
 1. A debug run is a run like any other (its folder, history record, report, notices, cancel) with these differences: one thread whatever the Threads setting, `listener.jar` after `karate.jar` on the classpath, `--listener grace.DebugListener`, and `-Dgrace.debug.port=<port> -Dgrace.debug.token=<token>`. A normal run and the dry run are unchanged.
 2. Before Java starts, the main process listens on `127.0.0.1`, port 0, and makes a random token. It accepts one connection whose first line is the token, then stops listening. Any other connection is closed.
 3. It sends the project's breakpoints as the first line, and again whenever they change during the run. A pause asked before the listener connects goes with the first line.
-4. On a pause it stops tailing the JSONL (no timer runs while paused) after one last read, and emits `debugPaused` with the step, its call depth, the paused test's key and the variables, through the run's masker. On continue, step over or step into it sends the command, emits `debugResumed` and tails again. A window that reloads gets the paused state and the breakpoints again, as it gets the run's other state.
+4. On a pause it stops tailing the JSONL (no timer runs while paused) after one last read, and emits `debugPaused` with the step, its call depth, the paused test's key and the variables, through the run's masker. On continue, step over or step into it sends the command, emits `debugResumed` and tails again. A window that reloads gets the breakpoints again.
 5. Masking: a value Java cut at 64 KB also has its cut end masked when that end is the start of a secret's form. The masker also knows each secret's XML-escaped form, as an `xml` value shows it.
 6. `Cancel` while paused or running kills Java as for any run; the run ends cancelled. When the run ends, the socket and the server close. A socket that closes or fails while Java runs is not an error: the run goes on, without pausing.
 7. The record in the history says `threads: 1` and `debug: true`. Flaky detection leaves debug runs out: a long pause can fail a test that passes otherwise (an expired token, a server timeout). A re-run of a debug run from the history is a normal run.
