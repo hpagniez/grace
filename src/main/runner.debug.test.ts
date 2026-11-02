@@ -166,10 +166,14 @@ describe("debug runs", () => {
     expect(d.last("breakpoints").breakpoints).toEqual([]);
   });
 
+  // Karate names the file relative to src/test/java or to the project, as the path allows (#208): the
+  // dry run and the debug run name it alike, so the tree's file is the breakpoint's
   it("matches a breakpoint in a Maven project by the tree's file", T, async () => {
-    const d = await open("maven", [["examples/users.feature", 6]]);
-    const done = d.runner.debug(d.key("config, classpath data and classpath call"));
-    expect(await d.nth(1)).toMatchObject({ file: "examples/users.feature", line: 6 });
+    const d = await open("maven");
+    const test = byName(d.last("project").tree!, "config, classpath data and classpath call");
+    d.runner.toggleBreakpoint(test.file, 6);
+    const done = d.runner.debug(test.key);
+    expect(await d.nth(1)).toMatchObject({ file: test.file, line: 6, key: test.key });
     d.runner.debugCommand("continue");
     await done;
   });
