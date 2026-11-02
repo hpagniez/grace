@@ -160,3 +160,55 @@ describe("StatusBar", () => {
     expect(screen.getByRole("contentinfo")).toBeTruthy();
   });
 });
+
+describe("the project's path (toolbar spec R2)", () => {
+  const ROOT = "D:\\work\\payments-gateway-contract-tests";
+  const project = (root: string) => ({ project: { root, layout: "maven" as const } });
+  const parts = () => [...screen.getByTestId("project-path").children].map((c) => c.textContent);
+
+  it("starts the bar with the full path in the mono muted text, in two parts", () => {
+    show(view(), project(ROOT));
+    const path = screen.getByTestId("project-path");
+    expect(path.textContent).toBe(ROOT);
+    expect(screen.getByRole("contentinfo").firstElementChild!.contains(path)).toBe(true);
+    for (const c of ["font-mono", "flex", "min-w-0", "truncate"])
+      expect(path.className).toContain(c);
+    expect(screen.getByRole("contentinfo").className).toContain("text-muted");
+    expect(parts()).toEqual(["D:\\work\\", "payments-gateway-contract-tests"]);
+    // the folders give way first: the folder's name loses no fraction of a pixel while they can
+    const [head, tail] = path.children;
+    expect(head!.className).toContain("shrink-100000");
+    for (const c of ["min-w-0", "truncate"]) expect(tail!.className).toContain(c);
+    // the path takes the room the bar's own items leave
+    expect(path.parentElement!.className).toContain("flex-1");
+    expect(path.parentElement!.className).toContain("min-w-0");
+  });
+
+  it("splits forward slashes and a trailing separator at the project folder", () => {
+    show(null, project("D:/work/storefront/"));
+    expect(parts()).toEqual(["D:/work/", "storefront/"]);
+  });
+
+  it("shows the folder being opened, and the open project while another opens", () => {
+    show(null, { opening: "D:/p" });
+    expect(parts()).toEqual(["D:/", "p"]);
+    cleanup();
+    show(null, { ...project("D:\\a"), opening: "D:\\b" });
+    expect(screen.getByTestId("project-path").textContent).toBe("D:\\a");
+  });
+
+  it("shows no path on the home screen", () => {
+    show(view());
+    expect(screen.queryByTestId("project-path")).toBeNull();
+  });
+
+  it("explains a cut path in a tooltip, and says nothing while it fits", () => {
+    show(null, project(ROOT));
+    const path = screen.getByTestId("project-path");
+    expect(tipOf(path)).toBeNull();
+    // jsdom has no layout: make the folders look cut
+    Object.defineProperty(path.firstElementChild!, "scrollWidth", { value: 300 });
+    Object.defineProperty(path.firstElementChild!, "clientWidth", { value: 100 });
+    expect(tipOf(path)).toBe(ROOT);
+  });
+});

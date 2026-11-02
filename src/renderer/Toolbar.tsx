@@ -6,6 +6,7 @@ import { matchingLeaves } from "../shared/tags";
 // a file, never a data: URL, which the CSP (default-src 'self') would block
 import logo from "../../assets/icon-small.svg?no-inline";
 import { btn, btnIcon, narrowIcon, narrowLabel, primary } from "./buttons";
+import { Cut, Middle } from "./Cut";
 import { EnvPicker } from "./EnvPicker";
 import { Icon } from "./Icon";
 import { createNarrow } from "./narrow";
@@ -17,6 +18,8 @@ import { countPill } from "./ui";
 const LAYOUT_LABEL = { maven: "Maven", gradle: "Gradle", standalone: "Standalone" } as const;
 
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+/** A cut name keeps this many characters of its end in sight; they fit the 760 px window. */
+export const NAME_TAIL = 12;
 
 /** Between the groups of buttons (spec R13.1). */
 const Divider = () => <span aria-hidden="true" class="h-5 w-px shrink-0 bg-line" />;
@@ -28,7 +31,7 @@ export function Toolbar(props: { state: AppState; api: Api }) {
     !busy() &&
     !!props.state.tree &&
     matchingLeaves(props.state.tree, props.state.filter).length > 0;
-  const path = () => props.state.project?.root ?? props.state.opening ?? "No project";
+  const name = () => folderName(props.state.project?.root ?? props.state.opening ?? "No project");
   const newest = () => props.state.history[0]; // main sends the newest run first
   const failedCount = () => newest()?.failed ?? 0;
   // a button whose label is hidden gets its label as a tooltip; a visible label needs none
@@ -47,29 +50,17 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           <img src={logo} alt="" width="20" height="20" />
         </button>
       </Tooltip>
-      {/* a container: below 1280 px the layout chip goes when the name and the chip no longer fit side by side */}
-      <div class="@container flex min-w-0 flex-1 items-center gap-2 pr-2">
-        <Tooltip text={path()} class="min-w-0 shrink-100000">
-          <span data-testid="project-name" class="truncate text-base font-medium">
-            {folderName(path())}
-          </span>
-        </Tooltip>
+      {/* one 20 px line that wraps and hides the second: once the name and the chip no longer fit side by side, the chip goes there, whole, and only then is the name cut. The path is in the status bar. */}
+      <div class="flex h-5 min-w-0 flex-1 flex-wrap items-center gap-x-2 overflow-hidden pr-2">
+        <Cut full={name()} class="flex text-base font-medium" testid="project-name">
+          <Middle head={name().slice(0, -NAME_TAIL)} tail={name().slice(-NAME_TAIL)} />
+        </Cut>
         <span
           data-testid="project-layout"
-          class="h-5 min-w-0 truncate rounded-sm bg-selected px-1.5 text-2xs leading-5 font-medium text-muted empty:hidden max-[1280px]:@max-[160px]:hidden"
+          class="h-5 shrink-0 rounded-sm bg-selected px-1.5 text-2xs leading-5 font-medium text-muted empty:hidden"
         >
           {props.state.project ? LAYOUT_LABEL[props.state.project.layout] : ""}
         </span>
-        <Tooltip text={path()} class="min-w-0 shrink-1000000">
-          {/* rtl cuts the start of a long path; the ltr span inside keeps its characters in order. squeezed, the path gives way first (shrink-1000000), then the name (shrink-100000), then the chip (shrink 1): the factors are far apart so a chip that fits loses no fraction of a pixel, which would already show an ellipsis */}
-          <span
-            data-testid="project-path"
-            class="min-w-0 truncate font-mono text-xs text-muted"
-            style="direction:rtl;text-align:left"
-          >
-            <span dir="ltr">{path()}</span>
-          </span>
-        </Tooltip>
       </div>
       <EnvPicker state={props.state} api={props.api} />
       <Threads state={props.state} api={props.api} />

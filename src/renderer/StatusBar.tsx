@@ -1,6 +1,7 @@
 import { CircleArrowUp, Download, Settings as Gear } from "lucide";
 import { Show } from "solid-js";
 import type { Api } from "../shared/ipc";
+import { Cut, Middle } from "./Cut";
 import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
@@ -11,18 +12,33 @@ import { latestAvailable, updateBlocked } from "./updateState";
 const item =
   "inline-flex h-6 items-center gap-1 rounded-sm px-1.5 transition-colors duration-(--duration-fast) ease-standard focus-visible:-outline-offset-2 enabled:hover:bg-hover enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
 
+/** A path's project folder, with the separator after it if it has one, and the folders before it. */
+const splitPath = (path: string) => {
+  const folder = /[^\\/]*[\\/]?$/.exec(path)![0];
+  return { head: path.slice(0, path.length - folder.length), tail: folder };
+};
+
 /**
- * The bar along the bottom of every view (app-updates R3): the update marker, the running version and
- * Settings. 24 px on the ground, muted 12 px text, 14 px icons (spec R21).
+ * The bar along the bottom of every view (app-updates R3): the project's path while its view shows
+ * (toolbar spec R2), the update marker, the running version and Settings. 24 px on the ground, muted
+ * 12 px text, 14 px icons (spec R21).
  */
 export function StatusBar(props: { state: AppState; api: Api; openSettings(): void }) {
   const latest = () => latestAvailable(props.state.updates);
   const blocked = () => updateBlocked(props.state);
+  const path = () => props.state.project?.root ?? props.state.opening;
   return (
     <footer
       data-testid="status-bar"
       class="flex h-6 shrink-0 items-center justify-end gap-1 bg-ground px-2 text-xs text-muted"
     >
+      <Show when={path()}>
+        {(p) => (
+          <Cut full={p()} wrap="flex-1" class="flex px-1.5 font-mono" testid="project-path">
+            <Middle {...splitPath(p())} />
+          </Cut>
+        )}
+      </Show>
       <Show when={props.state.updates}>
         {(u) => (
           <>
