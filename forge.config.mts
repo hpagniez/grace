@@ -3,7 +3,7 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
-import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { APP_FILES } from "./src/shared/updates";
 
@@ -25,6 +25,10 @@ const config: ForgeConfig = {
     // The updater (R8.1) refuses a folder that holds anything not listed here.
     postPackage: async (_config, { outputPaths }) => {
       for (const out of outputPaths) {
+        // The UI is English only; Chromium falls back to en-US when a language's file is missing (#150).
+        const locales = path.join(out, "locales");
+        for (const file of readdirSync(locales))
+          if (file !== "en-US.pak") rmSync(path.join(locales, file));
         writeFileSync(path.join(out, "resources", APP_FILES), JSON.stringify(readdirSync(out)));
         for (const [name, from] of Object.entries(NPM_LICENSES))
           copyFileSync(from, path.join(out, "resources", "licenses", name));
