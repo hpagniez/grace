@@ -8,10 +8,11 @@ import { drawn } from "../../test/drawn";
 
 afterEach(cleanup);
 
-function show(panel: AppState["panel"], runs = 0) {
+function show(panel: AppState["panel"], runs = 0, run: Partial<AppState["run"]> = {}) {
   const state: AppState = {
     ...initialState(),
     panel,
+    run: { ...initialState().run, ...run },
     history: Array.from({ length: runs }, () => ({})) as unknown as AppState["history"],
   };
   render(() => (
@@ -80,5 +81,16 @@ describe("splitter (R18.1)", () => {
     expect(cls).toContain("after:bg-accent");
     expect(cls).toContain("hover:after:opacity-100");
     expect(cls).toContain("active:after:opacity-100");
+  });
+});
+
+describe("the Variables tab (step debugger R7.4)", () => {
+  it("shows only while a debug run is going", () => {
+    show("console", 0, { active: true, debug: false });
+    expect(screen.queryByTestId("tab-variables")).toBeNull();
+    cleanup();
+    show("variables", 0, { active: true, debug: true });
+    expect(screen.getByTestId("tab-variables").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("variables")).toBeTruthy();
   });
 });

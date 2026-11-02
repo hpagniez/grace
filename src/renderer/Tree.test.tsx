@@ -86,6 +86,7 @@ function setup() {
     refresh: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
     steps: vi.fn(async () => null),
+    debug: vi.fn(async () => {}),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
     setFilter: vi.fn(async () => {}),
@@ -1076,6 +1077,18 @@ describe("virtual tree", () => {
       expect(api.run).toHaveBeenCalledTimes(1);
     });
 
+    it("debugs the focused row with Ctrl+Shift+Enter; Ctrl+Enter alone still runs it", () => {
+      const { api, load } = setup();
+      load();
+      focusRow("s:tests/basic.feature#1");
+      expect(press("Enter", { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(true);
+      expect(api.debug).toHaveBeenCalledWith("s:tests/basic.feature#1");
+      expect(api.run).not.toHaveBeenCalled();
+      press("Enter", { ctrlKey: true });
+      expect(api.run).toHaveBeenCalledWith("s:tests/basic.feature#1");
+      expect(api.debug).toHaveBeenCalledTimes(1);
+    });
+
     it("runs nothing with Ctrl+Enter on a row the filter mutes: it has no run button", () => {
       const { api, send, load } = setup();
       load();
@@ -1202,7 +1215,7 @@ describe("virtual tree", () => {
         const { load } = setup();
         load();
         expect(items().map((r) => r.getAttribute("aria-keyshortcuts"))).toEqual(
-          Array(8).fill("Control+Enter"),
+          Array(8).fill("Control+Enter Control+Shift+Enter"),
         );
         const run = screen.getByRole("button", { name: "Run passing hello" });
         fireEvent.pointerEnter(run.parentElement!);
@@ -1330,5 +1343,64 @@ describe("virtual tree", () => {
         "s:tests/basic.feature#1",
       ]);
     });
+  });
+});
+
+describe("tree: step debugger (R5, R7)", () => {
+  const paused = (key: string): AppEvent => ({
+    type: "debugPaused",
+    paused: {
+      key,
+      file: "tests/basic.feature",
+      line: 7,
+      depth: 0,
+      prefix: "*",
+      keyword: "def",
+      text: "x",
+      vars: [],
+    },
+  });
+
+  it("a Debug button before Run, disabled during a run", () => {
+    const { api, send, load } = setup();
+    load();
+    const debug = screen.getByRole("button", { name: "Debug passing hello" });
+    const run = screen.getByRole("button", { name: "Run passing hello" });
+    expect(debug.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(debug);
+    expect(api.debug).toHaveBeenCalledWith("s:tests/basic.feature#1");
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261102-120000-000",
+      keys: [],
+      total: 0,
+      startedAt: Date.now(),
+      env: null,
+      debug: true,
+    });
+    expect((screen.getByRole("button", { name: "Debug passing hello" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("marks the feature and the scenario holding a breakpoint", () => {
+    const { send, load } = setup();
+    load();
+    send({ type: "breakpoints", breakpoints: [{ file: "tests/basic.feature", line: 15 }] });
+    const dotted = screen
+      .getAllByTestId("breakpoint-dot")
+      .map((d) => d.closest<HTMLElement>("[data-testid=tree-node]")!.dataset.key);
+    expect(dotted).toEqual(["f:tests/basic.feature", "s:tests/basic.feature#2"]);
+  });
+
+  it("shows the pause mark on the paused test and selects it", () => {
+    const { send, load } = setup();
+    load();
+    send(paused("s:tests/basic.feature#2"));
+    const mark = rowByKey("s:tests/basic.feature#2").querySelector("[data-status=paused]")!;
+    expect(mark.getAttribute("aria-label")).toBe("Paused");
+    expect(mark.querySelector("svg")!.getAttribute("class") ?? "").not.toContain("animate-spin");
+    expect(rowByKey("s:tests/basic.feature#2").className).toContain("bg-selected");
+    send({ type: "debugResumed" });
+    expect(rowByKey("s:tests/basic.feature#2").querySelector("[data-status=paused]")).toBeNull();
   });
 });

@@ -436,3 +436,92 @@ describe("details: styling", () => {
     expect(details().querySelectorAll("[title]")).toHaveLength(0);
   });
 });
+
+describe("details: steps and breakpoints (step debugger R4, R7)", () => {
+  const leafNode = node("scenario", "s:tests/x.feature#1", "variables", { line: 6 });
+  const project: AppEvent = {
+    type: "project",
+    project: { root: "D:/p", layout: "standalone" },
+    tree: node("folder", "d:", "p", { file: "", children: [leafNode] }),
+    error: null,
+  };
+  const fromFile = [
+    { keyword: "*", text: "def base = 1", line: 4, background: true },
+    { keyword: "*", text: "def name = 'grace'", line: 7, background: false },
+    { keyword: "*", text: "def user = { id: 7 }", line: 8, background: false },
+  ];
+  const pausedAt = (line: number, depth = 0, file = "tests/x.feature"): AppEvent => ({
+    type: "debugPaused",
+    paused: {
+      key: leafNode.key,
+      file,
+      line,
+      depth,
+      prefix: "*",
+      keyword: "def",
+      text: "x",
+      vars: [],
+    },
+  });
+
+  async function show() {
+    const [state, set] = createStore(initialState());
+    const send = (e: AppEvent) => {
+      set((draft) => reduce(draft, e));
+      flush();
+    };
+    const api = {
+      steps: vi.fn(async () => fromFile),
+      toggleBreakpoint: vi.fn(async () => {}),
+    };
+    render(() => <Details state={state} api={api as unknown as Api} />);
+    send(project);
+    set((draft) => void (draft.selected = leafNode.key));
+    flush();
+    await vi.waitFor(() => expect(screen.getAllByTestId("step")).toHaveLength(3));
+    return { api, send, set };
+  }
+  const toggles = () => screen.getAllByTestId("breakpoint");
+
+  it("lists the steps from the feature file before a run, with no status or time", async () => {
+    const { api } = await show();
+    expect(api.steps).toHaveBeenCalledTimes(1);
+    expect(api.steps).toHaveBeenCalledWith(leafNode.key);
+    const [first] = screen.getAllByTestId("step");
+    expect(first.dataset.status).toBeUndefined();
+    expect(first.textContent).toContain("Background");
+    expect(first.textContent).toContain("def base = 1");
+    expect(first.querySelector("[role=img]")).toBeNull();
+  });
+
+  it("toggles a breakpoint on a step and shows main's set", async () => {
+    const { api, send } = await show();
+    expect(toggles()[2].getAttribute("aria-label")).toBe("Add breakpoint at line 8");
+    fireEvent.click(toggles()[2]);
+    expect(api.toggleBreakpoint).toHaveBeenCalledWith("tests/x.feature", 8);
+    send({ type: "breakpoints", breakpoints: [{ file: "tests/x.feature", line: 8 }] });
+    expect(toggles()[2].getAttribute("aria-label")).toBe("Remove breakpoint at line 8");
+    expect(toggles()[2].querySelector("span")!.className).toContain("bg-failed");
+    expect(toggles()[1].querySelector("span")!.className).not.toContain("bg-failed");
+  });
+
+  it("marks the step the run is paused before, or names the called feature", async () => {
+    const { send } = await show();
+    send(pausedAt(8));
+    const rows = screen.getAllByTestId("step");
+    expect(rows[2].dataset.paused).toBe("");
+    expect(rows[2].textContent).toContain("Paused");
+    expect(rows[1].dataset.paused).toBeUndefined();
+    send(pausedAt(5, 1, "called.feature"));
+    expect(screen.getAllByTestId("step").some((r) => r.dataset.paused === "")).toBe(false);
+    expect(screen.getByTestId("paused-in").textContent).toBe("Paused in called.feature:5");
+  });
+
+  it("the run's steps replace the file's, with the same toggles", async () => {
+    const { send } = await show();
+    const run = fromFile.map((s) => ({ ...s, status: "passed", millis: 3, log: null }));
+    send({ type: "steps", key: leafNode.key, steps: run });
+    expect(screen.getAllByTestId("step")[0].dataset.status).toBe("passed");
+    expect(toggles()).toHaveLength(3);
+  });
+});
