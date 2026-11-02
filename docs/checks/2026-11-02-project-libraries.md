@@ -25,6 +25,38 @@ The same Maven project run without its libraries takes 956 to 964 ms and fails a
 - On the bundled JRE, Gradle 9.8.2 fails to resolve a Java project's `testRuntimeClasspath`: `Toolchain installation '…\vendor\jre' does not provide the required capabilities: [JAVA_COMPILER]`. Gradle needs a JDK, which anyone who builds with Gradle has. Grace now lends its JRE to Maven only (R2.4). With no Java at all, the notice reads: `Grace could not list the project's libraries with Gradle: JAVA_HOME is not set and no 'java' command could be found in your PATH. Tests that use them will fail.`
 - Gradle's first `* What went wrong:` line names only the failed task; the reason is now its deepest `>` cause, and a reason's own full stop no longer doubles the notice's (R6.3).
 
+## Karate 1.x projects and a stand-in for the work suite, in the built app
+
+Added the same day, after the review asked what a Karate 1.x dependency tree behind Grace's `karate.jar` breaks. The [sample projects and their check](../research/2026-11-02-project-libraries/README.md) are committed so the check can be repeated before a release. Build: `feature/project-libraries` at `9bfa89e1`, packaged with `npm run package`; the check opens each sample in the built app with Playwright (as `npm run e2e` does), Maven 3.9.16, Gradle 9.8.2 and IntelliJ's JBR 25 as the JDK.
+
+| Case | Listed jars | Open (lists, then finds the tests) | Run |
+|---|---|---|---|
+| `karate1-maven`: `com.intuit.karate:karate-junit5:1.4.1` | 87 | about 5.9 s | both scenarios passed |
+| `karate15-maven`: `io.karatelabs:karate-junit5:1.5.2` | 93 | about 5.8 s | both passed |
+| `karate1-gradle`: 1.4.1 with Gradle | | 8.0 to 13.1 s | both passed |
+| `work-suite` | | about 5.9 s | passed |
+| `work-suite` without `.mvn/maven.config` | | about 5.8 s | failed, as it must (below) |
+
+The open times are rounded up by the check's polling; the listing alone is in the first table.
+
+**Karate 1.x: nothing broke.**
+- **What sits behind Grace's jar:** the 1.x trees put a second Netty (4.1.96 or 4.2.6), Graal JS (22.3 or 24.0), Armeria, Jackson, Apache HttpClient 4, logback (1.4 or 1.5) and slf4j behind Grace's `karate.jar`.
+- **What ran:** with them on the classpath, the SQLite scenario passed, and so did a `karate-config.js` that uses `Java.type`. A local `karate.start` mock answered an HTTP call through Karate 2's own server and client.
+- **What the console showed:** no `SLF4J`, multiple-binding, `ClassNotFound`, `NoSuchMethod` or `LinkageError` line. The check fails on any of them. The same runs at the command line, outside the app, showed no warning either.
+- **Two Karate 1 to 2 differences seen** (Karate's, not the classpath's): Karate 2's JavaScript rejects a regex literal (`replace(/\\/g, '/')`) in `karate-config.js`, and the object `karate.start` returns has no `stop()`. A 1.x suite that uses either fails in Grace as it would with the Karate 2 CLI.
+
+**The work-suite sample proves:**
+- **The full chain:** a Maven project on Karate 1.5.2 opens and passes. Its feature calls a helper class the build compiled. The helper calls a company library that comes only from the project's own repository (declared in the pom), and that library opens the database through the SQLite driver.
+- **Options in `.mvn/maven.config` reach Grace:** the driver comes from a `work` profile that `.mvn/maven.config` switches on. Maven reads that file for every command, Grace's listing included.
+- **Command-line options don't:** without `.mvn/maven.config`, as if the team typed `mvn test -Pwork`, the driver is not listed and the scenario fails. A suite that needs a profile or `-D` option for its test libraries must put it in `.mvn/maven.config` (or make the profile active by default) for Grace to get them.
+
+**What only the owner's real suite can prove:**
+- **Their company repository:** a Nexus or Artifactory reached through `~/.m2/settings.xml`, with its mirror, credentials, proxy and VPN. The sample's repository is a folder.
+- **Their Maven, Gradle and JDK versions,** and whether their build lists its test classpath without the network or a step the sample lacks.
+- **Their own libraries and Karate version** working behind Grace's Karate 2.1.4.
+- **How they run it:** the command they use and any option only that command carries.
+- **Their run in the packaged `Grace.exe`,** started from Explorer with their own PATH and `JAVA_HOME`.
+
 ## Needs the owner
 
-Their work suite, opened and run in a packaged build: it is the case this feature is for, with their Maven or Gradle, their JDK and their company repository.
+Their work suite, opened and run in a packaged build, for the points just above.

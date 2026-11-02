@@ -1,0 +1,35 @@
+# Project libraries: sample projects and their check
+
+Date 2026-11-02. For [#64](https://github.com/hpagniez/grace/issues/64), spec [docs/specs/2026-11-02-project-libraries.md](../../specs/2026-11-02-project-libraries.md). Results: [docs/checks/2026-11-02-project-libraries.md](../../checks/2026-11-02-project-libraries.md).
+
+Sample projects that a real Maven or Gradle lists, and a Playwright check that opens each in the built app, runs it, and checks the result. Unit tests and `npm run e2e` never reach a real Maven or Gradle; this check does, so it runs only by hand, before a release or after a change to how Grace lists libraries.
+
+## The samples
+
+Each Karate 1.x sample has a `karate-config.js` that uses Java interop and a feature with two scenarios: one writes and reads a SQLite table through `org.xerial:sqlite-jdbc` 3.54.1.0, the other starts a local Karate mock and calls it over HTTP (Karate's own server and client, beside the second Netty the 1.x tree brings).
+
+| Sample | What it holds |
+|---|---|
+| `samples/karate1-maven` | Maven, `com.intuit.karate:karate-junit5:1.4.1`: 87 jars, Graal JS 22.3, Armeria, Netty 4.1.96, Jackson 2.15, logback 1.4 |
+| `samples/karate15-maven` | Maven, `io.karatelabs:karate-junit5:1.5.2`: 93 jars, Graal JS 24.0, Netty 4.2.6, Jackson 2.19, logback 1.5 |
+| `samples/karate1-gradle` | Gradle, `com.intuit.karate:karate-junit5:1.4.1` |
+| `samples/work-suite` | A stand-in for the owner's work suite: one Maven project on Karate 1.5.2, a company library (`com.acme:acme-db`, source in `samples/acme-db`) served by its own repository, a helper class in `src/test/java` that the build compiles and the config loads with `Java.type`, a JUnit runner class, and the SQLite driver in a `work` profile that `.mvn/maven.config` switches on |
+
+The check also runs `work-suite` without its `.mvn/maven.config`: the profile is then given only on a command line (`mvn test -Pwork`), which Grace never sees, and the scenario must fail. That case shows the limit, not a bug.
+
+## Run the check
+
+Needs a built app, a Maven, a Gradle and a JDK; none has to be installed.
+
+```bash
+npm run package
+```
+
+```bash
+CHECK_MAVEN_HOME=<maven folder> CHECK_GRADLE_HOME=<gradle folder> CHECK_JDK=<jdk folder> npx playwright test --config docs/research/2026-11-02-project-libraries/playwright.config.ts
+```
+
+- `CHECK_JDK` must hold `bin\javac.exe`: the check compiles the company library and runs `mvn test-compile` in a copy of `work-suite`, as the person's own build would have. Gradle needs a JDK too.
+- Set `MAVEN_OPTS=-Dmaven.repo.local=<folder>` and `GRADLE_USER_HOME=<folder>` to keep the downloads out of your own `~/.m2` and `~/.gradle`.
+- Each case copies its sample to a temp folder, so the samples here never get a `target/`, a `test.db` or a `company-repo/`.
+- The machine rules of `AGENTS.md` hold: never at the same time as `npm test`, `npm run e2e` or `npm run bench`.
