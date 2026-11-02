@@ -93,6 +93,8 @@ const CASES: {
   listed?: string;
   /** What the console must say. */
   says?: string;
+  /** The notice on open; none unless given. */
+  notice?: string;
 }[] = [
   { sample: "karate1-maven", scenarios: KARATE1 },
   { sample: "karate15-maven", scenarios: KARATE1 },
@@ -123,6 +125,8 @@ const CASES: {
       "a failed transaction leaves nothing behind": "failed",
     },
     says: "Java.type: class not found: com.example.qa.DbHelper",
+    notice:
+      "The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.",
   },
   {
     sample: "db-helper",
@@ -130,6 +134,8 @@ const CASES: {
     scenarios: { ...ORDERS, "count with a method added since the last build": "failed" },
     before: staleHelper,
     says: ".countOrders is not a function",
+    notice:
+      "The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.",
   },
 ];
 
@@ -147,7 +153,8 @@ for (const c of CASES)
     const names = Object.keys(c.scenarios);
     for (const s of names) await expect(node(win, s)).toBeVisible({ timeout: 300_000 });
     console.log(`${c.name ?? c.sample}: listed and found in ${Date.now() - opened} ms`);
-    await expect(win.getByTestId("notice")).toHaveCount(0);
+    if (c.notice) await expect(win.getByTestId("notice")).toHaveText(c.notice);
+    else await expect(win.getByTestId("notice")).toHaveCount(0);
     if (c.listed) {
       const kept = JSON.parse(
         readFileSync(path.join(projectDataDir(userData, dir), "libraries.json"), "utf8"),

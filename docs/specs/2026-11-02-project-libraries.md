@@ -34,7 +34,7 @@ Success:
 - Copying jars into `.karate/ext/` for the person, or writing anything into the project.
 - The launcher's `--cp` flag: it is given per call, so there is nothing in the project to read.
 - A setting to add or remove jars by hand, or a view listing them.
-- Compiling the project's Java code. Grace runs what the build already compiled (`target/test-classes`, first slice). A helper never compiled fails with Karate's `Java.type: class not found`, and one edited since its last build with `… is not a function` (Checks). A notice for both is proposed in [#215](https://github.com/hpagniez/grace/pull/215), not built.
+- Compiling the project's Java code. Grace runs what the build already compiled (`target/test-classes`, first slice) and says when that is missing or older than the source (R8), but never builds it.
 
 **Anti-goals:**
 - A project that runs with `karate run` but not in Grace because of the classpath.
@@ -117,6 +117,17 @@ Tried on a Maven project with `org.xerial:sqlite-jdbc` 3.54.1.0 and a scenario t
 1. The README's project line says that a Maven or Gradle project's libraries come from its build, and that jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath as with the Karate CLI. Its roadmap line keeps only multi-module projects.
 2. `AGENTS.md` states the owner's rule under the Karate integration rules, pointing at ADR 0026.
 
+### R8. Java code not built
+
+Added after the Checks: a helper never compiled fails with Karate's `Java.type: class not found: …`, and one edited since its last build with `… is not a function`, neither of which says the project needs building. The owner chose a notice.
+
+1. On open and on Refresh, for a Maven or Gradle project whose `src/test/java` holds `.java` files (in any sub-folder), Grace compares file times with the build's compiled test folder: Maven `target/test-classes`, Gradle `build/classes/java/test`.
+2. When that folder holds no `.class` file (it is missing, or empty): `The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.`
+3. When a `.java` file is newer than the newest `.class` file: `The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.`
+4. Gradle projects read `gradle testClasses` where Maven projects read `mvn test-compile`. Standalone projects get neither.
+5. On open the text joins the open notice, last. On Refresh it joins the libraries' notice, after it, or shows alone. Environment switches and runs never check.
+6. Grace starts no process and changes no file. A `git checkout` that touches file times can show the second text until the next build.
+
 ## Cost
 
 - **Idle:** zero. Nothing is watched or polled; the list is checked only on open and Refresh.
@@ -124,6 +135,7 @@ Tried on a Maven project with `org.xerial:sqlite-jdbc` 3.54.1.0 and a scenario t
 - **Open or Refresh, build files unchanged:** hash up to seven small files and check that each listed jar exists (about 30 to 100 file checks): a few milliseconds, no process.
 - **Build files changed (first open, a dependency added):** one build JVM for the time it takes, then nothing left running. Measured: Maven 16 s the first time with downloads, 3 s after, for 30 jars. Expected for Gradle with `--no-daemon`: about 10 to 30 s and 300 to 700 MB, more the first time its wrapper downloads Gradle (Checks). The dry run waits for it.
 - **Runs:** a longer `-cp`. The JVM opens a jar only when it looks up a class or resource there; Karate's lookups at the classpath root may open each jar once (Checks).
+- **Open or Refresh, Java code check (R8):** one asynchronous walk of `src/test/java` and of the compiled test folder, reading the time of each `.java` and `.class` file: a few milliseconds for a few hundred files, no process.
 - **Disk:** `libraries.json`, a few KB per project.
 - **Size:** the Gradle init script, under 1 KB. No dependency.
 - **Bench:** the bench project is standalone with no extension folder; its numbers do not move.
@@ -211,6 +223,17 @@ Feature: Project libraries
     When I open it
     And I cancel while Grace lists the libraries
     Then mvnw.cmd and its child processes have stopped
+
+  Scenario: The project's Java code is not built
+    Given a Maven project with src/test/java/com/example/qa/DbHelper.java and no target/test-classes
+    When I open it
+    Then the notice says "The project's Java code in src/test/java is not built: build it (mvn test-compile) before running."
+    When I build it with mvn test-compile
+    And I refresh
+    Then no notice shows
+    When DbHelper.java changes
+    And I refresh
+    Then the notice says "The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running."
 
   Scenario: Standalone projects run no tool
     Given a standalone project

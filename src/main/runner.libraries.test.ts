@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -165,6 +165,55 @@ describe("Runner project libraries", () => {
       passed(last);
       if (next) rmSync(next);
     }
+  });
+
+  describe("the project's Java code", () => {
+    const NOT_BUILT =
+      "The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.";
+    const CHANGED =
+      "The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.";
+    /** A Maven project with a helper's source, its libraries listed, and none of its code built. */
+    function withHelper() {
+      const root = project();
+      stubTool(root, "mvnw.cmd", lists(jar()));
+      writeFileSync(path.join(root, "src", "test", "java", "Helper.java"), "class Helper {}");
+      return root;
+    }
+    const at = (file: string, seconds: number) => {
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, "", { flag: "a" });
+      utimesSync(file, seconds, seconds);
+    };
+
+    it("says on open when it is not built", T, async () => {
+      const { runner, last } = setup();
+      await runner.open(withHelper());
+      expect(last("notice").message).toBe(NOT_BUILT);
+    });
+
+    it("comes after the libraries' notice", T, async () => {
+      const { runner, last } = setup();
+      const root = project();
+      writeFileSync(path.join(root, "src", "test", "java", "Helper.java"), "class Helper {}");
+      await runner.open(root);
+      expect(last("notice").message).toBe(
+        `Grace could not list the project's libraries with Maven: the project has no mvnw.cmd and mvn is not on PATH. Tests that use them will fail. ${NOT_BUILT}`,
+      );
+    });
+
+    it("says nothing once built, and says on Refresh when it changed since", T, async () => {
+      const { runner, last, all } = setup();
+      const root = withHelper();
+      const source = path.join(root, "src", "test", "java", "Helper.java");
+      at(source, 1_000_000_000);
+      at(path.join(root, "target", "test-classes", "Helper.class"), 1_000_000_100);
+      await runner.open(root);
+      await runner.refresh();
+      expect(all("notice")).toEqual([]);
+      at(source, 1_000_000_200);
+      await runner.refresh();
+      expect(last("notice").message).toBe(CHANGED);
+    });
   });
 
   it("joins the open notice", T, async () => {

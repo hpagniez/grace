@@ -48,6 +48,7 @@ import {
   selectionTargets,
   tagArgs,
 } from "./karate/command";
+import { testCodeNotice } from "./karate/compiled";
 import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
@@ -260,6 +261,7 @@ export class Runner {
               : null,
             detectLayout(root).pomNotice,
             libraries,
+            await testCodeNotice(root, layout),
           ].filter((n) => n !== null);
           if (notice.length) this.o.emit({ type: "notice", message: joinNotices(notice) });
           try {
@@ -333,8 +335,11 @@ export class Runner {
       await this.guarded(async () => {
         const project = this.project!;
         const libraries = await this.listLibraries(project.root, project.layout);
-        if ((await this.rediscover(project, this.filter, this.envs, this.threads)) && libraries)
-          this.o.emit({ type: "notice", message: libraries });
+        if (!(await this.rediscover(project, this.filter, this.envs, this.threads))) return;
+        const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
+          (n) => n !== null,
+        );
+        if (said.length) this.o.emit({ type: "notice", message: joinNotices(said) });
       });
   }
 
