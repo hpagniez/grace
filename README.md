@@ -117,7 +117,7 @@ Grace checks for a new version at startup. Update in one click, or let Grace upd
 <td valign="top">
 
 **Made for long sessions**<br>
-A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
+Grace uses next to no CPU while it waits. During a run, Java works at below-normal priority with a 2 GB memory cap, so your IDE and browser stay responsive. A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
 
 </td>
 </tr>
@@ -188,7 +188,7 @@ Next on the list:
 
 - **Project setup** for Maven, Gradle, a standalone jar and the Karate CLI ([#64](https://github.com/hpagniez/grace/issues/64)).
 - **Step debugger**: breakpoints on steps, step over, inspect variables ([#65](https://github.com/hpagniez/grace/issues/65)).
-- **Lighter runs**: Java at below-normal priority, with a memory cap ([#148](https://github.com/hpagniez/grace/issues/148), [#149](https://github.com/hpagniez/grace/issues/149)).
+- **Less CPU during a run**: less of Java's work spent compiling itself ([#179](https://github.com/hpagniez/grace/issues/179)).
 - **A toolbar that stays readable** with a long project path ([#81](https://github.com/hpagniez/grace/issues/81)).
 
 The full backlog is one [issue](https://github.com/hpagniez/grace/issues) per feature, on the [Grace project](https://github.com/users/hpagniez/projects/2) board.
