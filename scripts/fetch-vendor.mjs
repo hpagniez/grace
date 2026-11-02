@@ -1,4 +1,5 @@
-// Downloads, verifies and unpacks the bundled JRE and Karate jar into vendor/ (git-ignored).
+// Downloads, verifies and unpacks the bundled JRE and Karate jar into vendor/ (git-ignored), and compiles the
+// debug listener into vendor/listener.jar with ECJ on that JRE (ADR 0025).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync, readFileSync, readdirSync } from "node:fs";
@@ -15,7 +16,10 @@ const {
   jre: JRE,
   karate: JAR,
   license: LICENSE,
+  ecj: ECJ,
 } = JSON.parse(readFileSync(join(root, "scripts", "vendor.json"), "utf8"));
+// System32 bsdtar explicitly: Git Bash puts GNU tar first on PATH and it misreads "D:\..." paths
+const tar = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
 // The SHA-256 of the zip vendor/jre was unpacked from, so a changed pin replaces it.
 const jreMarker = join(vendor, ".jre-sha256");
 
@@ -63,8 +67,6 @@ async function setupJre() {
   await rm(tmp, { recursive: true, force: true });
   await rm(jreDir, { recursive: true, force: true });
   await mkdir(tmp, { recursive: true });
-  // System32 bsdtar explicitly: Git Bash puts GNU tar first on PATH and it misreads "D:\..." paths
-  const tar = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
   const r = spawnSync(tar, ["-xf", zip, "-C", tmp], { stdio: "inherit" });
   if (r.status !== 0) throw new Error("tar -xf failed for the JRE zip");
   const tops = readdirSync(tmp);
@@ -99,12 +101,34 @@ async function copyDir(from, to) {
   }
 }
 
+/** The zip of the listener's classes (`-a` would not take `.jar` for zip); a jar on the classpath needs no manifest. */
+const zipArgs =(jar, classes) => ["--format", "zip", "-c", "-f", jar, "-C", classes, "grace"];
+
+// Recompiled on every run, under a second: a changed source or a new Karate jar is always picked up.
+async function compileListener(jar) {
+  const ecj = join(vendor, "ecj.jar"); // beside karate.jar, so the CI vendor/ cache keeps it
+  if (!(await hasSha256(ecj, ECJ.sha256))) await copyFile(await fetchVerified(ECJ), ecj);
+  const classes = join(download, "listener-classes");
+  await rm(classes, { recursive: true, force: true });
+  const java = join(vendor, "jre", "bin", "java.exe");
+  const source = join(root, "listener", "grace", "DebugListener.java");
+  const c = spawnSync(java, ["-jar", ecj, "-21", "-nowarn", "-cp", jar, "-d", classes, source], {
+    stdio: "inherit",
+  });
+  if (c.status !== 0) throw new Error("the debug listener does not compile");
+  const out = join(vendor, "listener.jar");
+  await rm(out, { force: true });
+  const z = spawnSync(tar, zipArgs(out, classes), { stdio: "inherit" });
+  if (z.status !== 0) throw new Error("tar could not zip the debug listener");
+}
+
 async function main() {
   await mkdir(download, { recursive: true });
   await setupJre();
   const jar = join(vendor, "karate.jar");
   if (!(await hasSha256(jar, JAR.sha256))) await copyFile(await fetchVerified(JAR), jar);
   await verifySha256(jar, JAR.sha256);
+  await compileListener(jar);
   await setupLicenses();
   console.log("vendor ready");
 }
