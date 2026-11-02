@@ -785,7 +785,7 @@ export class Runner {
       argFile,
       threads,
       configDir,
-      debug: debug && { jar: listener, ...debug },
+      debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
   }
