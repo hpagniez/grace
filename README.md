@@ -41,7 +41,7 @@ Karate Labs sells its GUI runners. The Karate engine is open source, and its com
 <td width="50%" valign="top">
 
 **Test tree**<br>
-Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven, Gradle and standalone layouts. Arrow keys move through it, and it stays fast with 10,000 tests.
+Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. Arrow keys move through it, and it stays fast with 10,000 tests.
 
 </td>
 <td width="50%" valign="top">
@@ -117,7 +117,7 @@ Grace checks for a new version at startup. Update in one click, or let Grace upd
 <td valign="top">
 
 **Made for long sessions**<br>
-Grace uses next to no CPU while it waits. During a run, Java works at below-normal priority with a 2 GB memory cap, so your IDE and browser stay responsive. A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
+Grace uses next to no CPU while it waits. During a run, Java works at below-normal priority with a 2 GB memory cap and spends little CPU compiling itself, so your IDE and browser stay responsive. A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
 
 </td>
 </tr>
@@ -186,10 +186,8 @@ flowchart LR
 
 Next on the list:
 
-- **Project setup** for Maven, Gradle, a standalone jar and the Karate CLI ([#64](https://github.com/hpagniez/grace/issues/64)).
 - **Step debugger**: breakpoints on steps, step over, inspect variables ([#65](https://github.com/hpagniez/grace/issues/65)).
-- **Less CPU during a run**: less of Java's work spent compiling itself ([#179](https://github.com/hpagniez/grace/issues/179)).
-- **A toolbar that stays readable** with a long project path ([#81](https://github.com/hpagniez/grace/issues/81)).
+- **More project setup**: the dependency jars of Maven and Gradle projects, and multi-module projects ([#64](https://github.com/hpagniez/grace/issues/64)).
 
 The full backlog is one [issue](https://github.com/hpagniez/grace/issues) per feature, on the [Grace project](https://github.com/users/hpagniez/projects/2) board.
 
