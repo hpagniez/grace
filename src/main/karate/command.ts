@@ -100,6 +100,15 @@ export function tagArgs(f: TagFilter): string[] {
 }
 
 /**
+ * The absolute path of a tree file or folder: the first of `bases` (the project folder, then the classpath) that holds it.
+ * Karate gives it relative to the classpath folder whose karate-config.js it found, else to the working directory (#208).
+ */
+export function locate(bases: string[], file: string): string {
+  const all = bases.map((b) => path.join(b, ...file.split("/")));
+  return all.find((p) => existsSync(p)) ?? all[0];
+}
+
+/**
  * Run targets for a node. A `file:LINE` target bypasses `-t` and `@ignore`, so an outline under a
  * filter lists its matching rows' lines, even when every row matches: the outline's own line would
  * also run rows the dry run does not list. Only when a row has no line (dynamic Examples) and every
@@ -108,12 +117,12 @@ export function tagArgs(f: TagFilter): string[] {
  */
 export function selectionTargets(
   node: TestNode,
-  root: string,
+  bases: string[],
   featureRoots: string[],
   f: TagFilter,
 ): string[] | null {
   if (node.kind === "folder" && node.file === "") return featureRoots;
-  const abs = path.join(root, ...node.file.split("/"));
+  const abs = locate(bases, node.file);
   if (node.kind === "outline" && filterOn(f)) {
     const hits = matchingLeaves(node, f);
     const lines = hits.map((r) => r.line);
@@ -125,11 +134,11 @@ export function selectionTargets(
 }
 
 /** One `<abs file>:L1:L2…` target per feature file for nodes that have a line: lines ascending, files in first-seen order. */
-export function lineTargets(nodes: TestNode[], root: string): string[] {
+export function lineTargets(nodes: TestNode[], bases: string[]): string[] {
   const byFile = new Map<string, number[]>();
   for (const n of nodes) {
     if (n.line === null) continue;
-    const abs = path.join(root, ...n.file.split("/"));
+    const abs = locate(bases, n.file);
     byFile.set(abs, [...(byFile.get(abs) ?? []), n.line]);
   }
   return [...byFile].map(([abs, lines]) => `${abs}:${lines.sort((a, b) => a - b).join(":")}`);

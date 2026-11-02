@@ -9,6 +9,7 @@ import {
   childEnv,
   detectLayout,
   lineTargets,
+  locate,
   OUT_OF_MEMORY,
   outOfMemory,
   selectionTargets,
@@ -183,22 +184,32 @@ const node = (kind: TestNode["kind"], file: string, line: number | null): TestNo
   children: [],
 });
 
+describe("locate", () => {
+  it("takes the first base that holds the file, else the first base", () => {
+    const root = project(["pom.xml"], ["src/test/java/examples", "tests"]);
+    const java = path.join(root, "src/test/java");
+    expect(locate([root, java], "examples")).toBe(path.join(java, "examples"));
+    expect(locate([root, java], "tests")).toBe(path.join(root, "tests"));
+    expect(locate([root, java], "gone/a.feature")).toBe(path.join(root, "gone", "a.feature"));
+  });
+});
+
 describe("selectionTargets", () => {
   const root = path.join("D:", "Mes tests", "équipe");
   const roots = [path.join(root, "src", "test", "java")];
   const abs = path.join(root, "tests", "a.feature");
   it("maps each node kind", () => {
-    expect(selectionTargets(node("folder", "", null), root, roots, NO_FILTER)).toEqual(roots);
-    expect(selectionTargets(node("folder", "tests", null), root, roots, NO_FILTER)).toEqual([
+    expect(selectionTargets(node("folder", "", null), [root], roots, NO_FILTER)).toEqual(roots);
+    expect(selectionTargets(node("folder", "tests", null), [root], roots, NO_FILTER)).toEqual([
       path.join(root, "tests"),
     ]);
     expect(
-      selectionTargets(node("feature", "tests/a.feature", null), root, roots, NO_FILTER),
+      selectionTargets(node("feature", "tests/a.feature", null), [root], roots, NO_FILTER),
     ).toEqual([abs]);
     for (const kind of ["scenario", "outline", "row"] as const)
-      expect(selectionTargets(node(kind, "tests/a.feature", 12), root, roots, NO_FILTER)).toEqual([
-        `${abs}:12`,
-      ]);
+      expect(selectionTargets(node(kind, "tests/a.feature", 12), [root], roots, NO_FILTER)).toEqual(
+        [`${abs}:12`],
+      );
   });
 
   describe("outline targets under a filter", () => {
@@ -212,21 +223,23 @@ describe("selectionTargets", () => {
     });
     const f = (...include: string[]) => ({ include, exclude: [] });
     it("lists the matching rows' lines in one target", () => {
-      expect(selectionTargets(outline(), root, roots, f("fast"))).toEqual([`${abs}:9:10`]);
+      expect(selectionTargets(outline(), [root], roots, f("fast"))).toEqual([`${abs}:9:10`]);
     });
     it("lists every row's line when every row matches (the outline line would run @ignore rows)", () => {
-      expect(selectionTargets(outline(), root, roots, f("fast", "slow"))).toEqual([
+      expect(selectionTargets(outline(), [root], roots, f("fast", "slow"))).toEqual([
         `${abs}:9:10:11`,
       ]);
     });
     it("falls back to the outline line when every row matches and one has no line", () => {
-      expect(selectionTargets(outline(null), root, roots, f("fast", "slow"))).toEqual([`${abs}:5`]);
+      expect(selectionTargets(outline(null), [root], roots, f("fast", "slow"))).toEqual([
+        `${abs}:5`,
+      ]);
     });
     it("is null when a matching row has no line", () => {
-      expect(selectionTargets(outline(null), root, roots, f("fast"))).toBeNull();
+      expect(selectionTargets(outline(null), [root], roots, f("fast"))).toBeNull();
     });
     it("is null when no row matches", () => {
-      expect(selectionTargets(outline(), root, roots, f("other"))).toBeNull();
+      expect(selectionTargets(outline(), [root], roots, f("other"))).toBeNull();
     });
   });
 });
@@ -236,7 +249,7 @@ describe("lineTargets", () => {
   const at = (file: string, line: number) => node("scenario", file, line);
   it("groups by file with ascending lines, files in first-seen order", () => {
     const nodes = [at("tests/b.feature", 20), at("tests/a.feature", 12), at("tests/b.feature", 5)];
-    expect(lineTargets(nodes, root)).toEqual([
+    expect(lineTargets(nodes, [root])).toEqual([
       `${path.join(root, "tests", "b.feature")}:5:20`,
       `${path.join(root, "tests", "a.feature")}:12`,
     ]);

@@ -53,6 +53,38 @@ describe("Runner project setup", () => {
     expect(all("notice")).toHaveLength(seen);
   });
 
+  it("puts Maven's compiled output on the classpath", T, async () => {
+    const { runner, last } = setup();
+    const root = write(
+      {
+        "target/test-classes/data/built.json": '{ "built": true }',
+        "src/test/java/examples/built.feature":
+          "Feature: built\nScenario: reads compiled output\n  * match read('classpath:data/built.json').built == true\n",
+      },
+      fixture("maven"),
+    );
+    await runner.open(root);
+    await runner.run("s:examples/built.feature#1");
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
+  // Karate names the files relative to src/test/java, which holds karate-config.js (#208)
+  it("runs one row of a Maven outline", T, async () => {
+    const { runner, last } = setup();
+    const root = write(
+      {
+        "src/test/java/examples/rows.feature":
+          "Feature: rows\nScenario Outline: row <n>\n  * assert <n> > 0\nExamples:\n  | n |\n  | 1 |\n  | 2 |\n",
+      },
+      fixture("maven"),
+    );
+    await runner.open(root);
+    expect(last("project").error).toBeNull();
+    await runner.run("s:examples/rows.feature#1.2");
+    expect(last("runStarted")).toMatchObject({ keys: ["s:examples/rows.feature#1.2"], total: 1 });
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
   it("uses the default folders when karate-pom.json cannot be read", T, async () => {
     const { runner, last } = setup();
     const root = write({ "karate-pom.json": "{" }, fixture("clean"));

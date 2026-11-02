@@ -79,7 +79,13 @@ For compiled code:
 2. They are not feature roots and environments are not read from them: a stale copy of a feature or of `karate-config-<env>.js` must not show.
 3. Standalone projects are unchanged: the project folder is the classpath.
 
-### R3. #64's Karate surface
+### R3. Tree paths in Maven and Gradle projects
+
+Added while building: found by the end-to-end test, filed as [#208](https://github.com/hpagniez/grace/issues/208).
+
+1. Karate names each feature relative to the classpath folder whose `karate-config.js` it found (`examples/users.feature` for `src/test/java/examples/users.feature`), else relative to the working directory. Running a test, feature or folder, Re-run failed, and reading an outline's row lines take the first of the project folder, then the classpath folders, that holds the path.
+
+### R4. #64's Karate surface
 
 1. The issue's `Karate surface:` line drops `karate doctor --json` and says why (Intent).
 
@@ -149,6 +155,13 @@ Feature: Project setup
     When I open it
     Then the tree has no old.feature
     And the environment picker does not offer "stale"
+
+  Scenario: One row of a Maven outline runs
+    Given a Maven project with src/test/java/karate-config.js and an outline in src/test/java/examples/rows.feature
+    When I open it
+    Then it opens without an error
+    When I run its second row
+    Then that row runs and passes
 
   Scenario: Gradle's compiled output is on the classpath
     Given a Gradle project with build/classes/java/test and build/resources/test
