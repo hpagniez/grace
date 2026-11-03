@@ -73,7 +73,8 @@ export function createConsoleSearch(o: {
   let back: Element | null = null; // what had the focus before the bar opened
 
   // nothing is searched while the bar is closed (R3.11)
-  const matches = createMemo(() => (open() ? findMatches(o.lines(), query()) : []));
+  // nor while another tab shows: nothing would show them (R3.11)
+  const matches = createMemo(() => (open() && o.shown() ? findMatches(o.lines(), query()) : []));
   const current = createMemo(() => {
     const p = held();
     const at = p ? p.line - o.dropped() : -1;
@@ -145,20 +146,20 @@ export function createConsoleSearch(o: {
   };
   const close = () => {
     setOpen(false);
+    setHeld(null); // reopened, the bar picks from the view again (R3.10)
     flush();
     if (back instanceof HTMLElement && back.isConnected) back.focus();
     back = null;
   };
 
   const onKey = (e: KeyboardEvent) => {
-    if (document.querySelector("dialog[open]") || !o.visible()) return;
-    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
-      e.preventDefault();
-      openBar();
-    } else if (e.key === "F8" && !e.ctrlKey && !e.altKey) {
-      e.preventDefault();
-      stepError(e.shiftKey ? -1 : 1);
-    }
+    const find = e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f";
+    const error = e.key === "F8" && !e.ctrlKey && !e.altKey;
+    // the key first: every key typed anywhere passes here, and the visibility check flushes style
+    if (!(find || error) || document.querySelector("dialog[open]") || !o.visible()) return;
+    e.preventDefault();
+    if (find) openBar();
+    else stepError(e.shiftKey ? -1 : 1);
   };
   window.addEventListener("keydown", onKey);
   onCleanup(() => window.removeEventListener("keydown", onKey));
@@ -229,6 +230,7 @@ export function Console(props: {
           r.offsetTop + r.offsetHeight <= el.scrollTop + el.clientHeight;
         if (onlyIfHidden && inView) return;
         el.scrollTop = Math.max(0, r.offsetTop - (el.clientHeight - r.offsetHeight) / 2);
+        onScroll(); // now: a batch may come before the scroll event and pull the view back down
       },
       focusField() {
         field?.focus();
@@ -237,20 +239,21 @@ export function Console(props: {
     }),
   );
 
+  // Static: a live Range would be updated on every DOM change, and the ranges are made again on each anyway.
   const range = (line: number, start?: number, end?: number) => {
-    const r = new Range();
-    const text = row(line)?.firstChild;
+    const text = row(line)?.firstChild as Text | null | undefined;
     if (!text) return null;
-    if (start === undefined) r.selectNodeContents(text);
-    else {
-      r.setStart(text, start);
-      r.setEnd(text, end!);
-    }
-    return r;
+    return new StaticRange({
+      startContainer: text,
+      startOffset: start ?? 0,
+      endContainer: text,
+      endOffset: end ?? text.length,
+    });
   };
-  const paint = (name: (typeof HIGHLIGHTS)[number], ranges: (Range | null)[]) => {
-    const kept = ranges.filter((r) => r !== null);
-    if (kept.length > 0) CSS.highlights.set(name, new Highlight(...kept));
+  const paint = (name: (typeof HIGHLIGHTS)[number], ranges: (StaticRange | null)[]) => {
+    const h = new Highlight(); // added one by one: spread into the constructor, 65,000 ranges overflow the stack
+    for (const r of ranges) if (r) h.add(r);
+    if (h.size > 0) CSS.highlights.set(name, h);
     else CSS.highlights.delete(name);
   };
   // The browser paints over the text: no row is redrawn (R4.1).

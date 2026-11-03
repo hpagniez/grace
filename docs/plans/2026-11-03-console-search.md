@@ -136,7 +136,7 @@ Expected: PASS.
 - Test: `src/renderer/reduce.test.ts`
 
 **Interfaces:**
-- Produces: `AppState.consoleDropped: number`: the lines dropped at `CONSOLE_LIMIT` since the run started. A line's number is `consoleDropped + index`.
+- Produces: `AppState.consoleDropped: number`: the lines dropped at `CONSOLE_LIMIT`, and those a new run clears (Task 5 ruling), since the project opened. A line's number is `consoleDropped + index`.
 
 - [ ] **Step 1: Write the failing test**
 

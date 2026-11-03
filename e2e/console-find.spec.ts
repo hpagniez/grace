@@ -77,14 +77,15 @@ test("a full console", async () => {
   );
   await win.keyboard.press("Control+f");
   await win.keyboard.type("match-m");
-  // the last keystroke's work, synchronous, and until the next frame is drawn (spec Cost: under 16 ms)
+  // the last keystroke's work, synchronous, and until the next frame is painted (spec Cost: under 16 ms)
   const ms = await win.evaluate(async () => {
     const field = document.querySelector<HTMLInputElement>('[data-testid="find-field"]')!;
     const start = performance.now();
     field.value = "match-me";
     field.dispatchEvent(new InputEvent("input", { bubbles: true }));
     const work = performance.now() - start;
-    await new Promise(requestAnimationFrame);
+    // a frame's callbacks run before its paint: the task after it runs once the highlights are painted
+    await new Promise((done) => requestAnimationFrame(() => setTimeout(done)));
     return { work: Math.round(work), frame: Math.round(performance.now() - start) };
   });
   test.info().annotations.push({

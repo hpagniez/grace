@@ -88,8 +88,8 @@ export function BottomPanel(props: {
     lines: () => props.state.console,
     dropped: () => props.state.consoleDropped,
     shown: () => panel() === "console",
-    // the project view stays mounted, invisible, under the Settings page
-    visible: () => section?.checkVisibility() ?? false,
+    // the project view stays mounted under the Settings page, with visibility: hidden, which only this option sees
+    visible: () => section?.checkVisibility({ visibilityProperty: true }) ?? false,
     showConsole: () => props.showPanel("console"),
   });
   return (

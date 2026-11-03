@@ -2,12 +2,19 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import type { JSX } from "@solidjs/web";
 import { createSignal, flush, untrack } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as find from "./consoleFind";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
 import { Console, createConsoleSearch } from "./Console";
 import { CONSOLE_LIMIT, type AppState } from "./reduce";
 import { createAppStore } from "./store";
+
+// a spy that calls through, so a test can tell whether the console was searched
+vi.mock("./consoleFind", async (load) => {
+  const real = await load<typeof import("./consoleFind")>();
+  return { ...real, findMatches: vi.fn(real.findMatches) };
+});
 
 afterEach(() => {
   cleanup();
@@ -170,7 +177,12 @@ const type = (text: string) => {
 };
 /** The console's line elements, after the banner. */
 const rows = () => [...screen.getByTestId("console").children].slice(1) as HTMLElement[];
-const painted = (name: string) => [...(CSS.highlights.get(name) ?? [])] as Range[];
+/** What a highlight paints: each range's line, its start and its text. */
+const painted = (name: string) =>
+  [...(CSS.highlights.get(name) ?? [])].map((r) => {
+    const line = (r.startContainer as Text).data;
+    return { line, start: r.startOffset, text: line.slice(r.startOffset, r.endOffset) };
+  });
 const started: AppEvent = {
   type: "runStarted",
   selection: "all",
@@ -254,7 +266,7 @@ describe("find (console search R3)", () => {
     const before = rows();
     ctrlF();
     type("user");
-    expect(painted("console-match").map(String)).toEqual(["user", "user"]);
+    expect(painted("console-match").map((r) => r.text)).toEqual(["user", "user"]);
     expect(painted("console-match-current")).toEqual([painted("console-match")[0]]);
     expect(rows().every((r, i) => r === before[i])).toBe(true);
   });
@@ -302,7 +314,7 @@ describe("find (console search R3)", () => {
     el.dispatchEvent(new Event("scroll"));
     p.lines("user later");
     expect(count()).toBe("2 of 4");
-    expect(painted("console-match-current")[0].startContainer.textContent).toBe("user 15");
+    expect(painted("console-match-current")[0].line).toBe("user 15");
     expect(el.scrollTop).toBe(77);
   });
 
@@ -316,10 +328,68 @@ describe("find (console search R3)", () => {
     ctrlF();
     type("user");
     press("Enter");
-    expect(painted("console-match-current")[0].startContainer.textContent).toBe("user 9000");
+    expect(painted("console-match-current")[0].line).toBe("user 9000");
     p.lines(...Array.from({ length: 100 }, (_, i) => `m${i}`));
-    expect(painted("console-match-current")[0].startContainer.textContent).toBe("user 9000");
+    expect(painted("console-match-current")[0].line).toBe("user 9000");
     expect(count()).toBe("2 of 2");
+  });
+
+  it("paints more matches than one call can take", () => {
+    const p = panel();
+    p.lines(...Array.from({ length: 2000 }, () => "a".repeat(100)));
+    ctrlF();
+    type("a");
+    expect(count()).toBe("1 of 200000");
+    expect(painted("console-match")).toHaveLength(200_000);
+  });
+
+  it("paints with static ranges, which no DOM change has to update", () => {
+    const p = panel();
+    p.lines("get user 42");
+    ctrlF();
+    type("user");
+    for (const name of ["console-match", "console-match-current"])
+      expect([...CSS.highlights.get(name)!][0], name).toBeInstanceOf(StaticRange);
+  });
+
+  it("stops following the bottom once a step scrolls, before the scroll event", () => {
+    const p = panel();
+    p.lines(...Array.from({ length: 30 }, (_, i) => (i === 5 ? "user 5" : `l${i}`)));
+    const el = screen.getByTestId("console");
+    Object.defineProperty(el, "scrollHeight", { get: () => rows().length * 10 });
+    Object.defineProperty(el, "clientHeight", { value: 100 });
+    p.lines("l30"); // following the bottom
+    expect(el.scrollTop).toBe(310);
+    ctrlF();
+    type("user");
+    expect(el.scrollTop).toBe(0); // the match was out of view
+    p.lines("l31"); // jsdom fires no scroll event: the step alone must stop the following
+    expect(el.scrollTop).toBe(0);
+  });
+
+  it("picks the current match from the view again when the bar reopens", () => {
+    const p = panel();
+    p.lines("get user 42", "create user");
+    ctrlF();
+    type("user");
+    press("Enter");
+    expect(count()).toBe("2 of 2");
+    press("Escape");
+    ctrlF();
+    expect(count()).toBe("1 of 2");
+  });
+
+  it("does not search while another tab shows", () => {
+    const p = panel();
+    p.lines("get user 42");
+    ctrlF();
+    type("user");
+    p.show("history");
+    vi.mocked(find.findMatches).mockClear();
+    p.lines("user more");
+    expect(find.findMatches).not.toHaveBeenCalled();
+    p.show("console");
+    expect(count()).toBe("1 of 2");
   });
 
   it("does not search while the bar is closed", () => {
@@ -339,7 +409,8 @@ describe("find (console search R3)", () => {
     ctrlF();
     expect(screen.queryByTestId("find-bar")).toBeNull();
     d.remove();
-    screen.getByTestId("bottom-panel").checkVisibility = () => false;
+    // the Settings page hides the project view with visibility: hidden, which only this option sees
+    screen.getByTestId("bottom-panel").checkVisibility = (o) => !o?.visibilityProperty;
     ctrlF();
     expect(screen.queryByTestId("find-bar")).toBeNull();
   });
@@ -410,7 +481,7 @@ describe("errors (console search R2)", () => {
     p.lines(...THREE_ERRORS);
     press("F8");
     press("F8");
-    expect(painted("console-error-current").map(String)).toEqual(["    - fails match"]);
+    expect(painted("console-error-current").map((r) => r.text)).toEqual(["    - fails match"]);
   });
 
   it("has no group and no F8 without errors", () => {
@@ -440,7 +511,7 @@ describe("errors (console search R2)", () => {
     press("F8");
     expect(errorsCount()).toBe("3 errors");
     d.remove();
-    screen.getByTestId("bottom-panel").checkVisibility = () => false;
+    screen.getByTestId("bottom-panel").checkVisibility = (o) => !o?.visibilityProperty;
     press("F8");
     expect(errorsCount()).toBe("3 errors");
   });
