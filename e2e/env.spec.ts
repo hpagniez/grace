@@ -248,6 +248,7 @@ test("Settings survive a restart", async () => {
   await app.close();
   const { win } = await launch(userData);
   await expect(input(win)).toHaveValue("qa", { timeout: 15_000 });
+  await openFeatures(win); // a restart starts with the features closed (#224 R1.3)
   await expect(node(win, "qa only")).toBeVisible();
 
   await openProperties(win);

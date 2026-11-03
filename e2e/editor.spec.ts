@@ -114,6 +114,7 @@ test("main refuses what it must not open", async () => {
   const { app, win } = await launch();
   const opened = await stubVsCode(app, "");
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   const notice = win.getByTestId("notice");
 

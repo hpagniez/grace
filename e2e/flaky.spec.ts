@@ -264,6 +264,7 @@ test("Marks survive a restart", async () => {
   // one app per user-data folder: close it before the second starts
   await app.close();
   const { win } = await launch(userData);
+  await openFeatures(win); // a restart starts with the features closed (#224 R1.3)
   await expect(node(win, "coin")).toBeVisible({ timeout: 15_000 });
   await expect(mark(win, "coin")).toBeVisible();
 });

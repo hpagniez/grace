@@ -125,6 +125,7 @@ test("Grace draws its own typefaces without any network request", async () => {
   win.on("request", (r) => urls.push(r.url()));
   await win.reload(); // everything the page needs is requested again, with the listener on
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
+  await openFeatures(win); // a new page starts with the features closed
   await expect(win.getByTestId("console-banner")).toBeVisible();
 
   await win.evaluate(async () => void (await document.fonts.ready)); // the faces in use have loaded

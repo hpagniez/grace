@@ -68,10 +68,15 @@ function removeWipTags(dir: string) {
   writeFileSync(file, readFileSync(file, "utf8").replace(/@wip/g, ""));
 }
 
+/** The drawn rows' keys in list order: the focus row is first in the DOM, so sort by place. */
 const treeKeys = (win: Page) =>
   win
-    .locator("[data-testid=tree-node]")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-key")));
+    .locator("[role=treeitem]")
+    .evaluateAll((els) =>
+      (els as HTMLElement[])
+        .sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top))
+        .map((e) => e.dataset.key),
+    );
 
 test("Chips list the project's tags", async () => {
   const { win } = await openClean();
