@@ -8,6 +8,7 @@ import { ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
+import { Examples } from "./Examples";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
@@ -294,7 +295,7 @@ function Group(props: { node: TestNode; state: AppState }) {
   );
 }
 
-export function Details(props: { state: AppState; api: Api }) {
+export function Details(props: { state: AppState; api: Api; select(key: string): void }) {
   const node = () =>
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
@@ -304,7 +305,7 @@ export function Details(props: { state: AppState; api: Api }) {
   return (
     <aside
       data-testid="details"
-      class="min-h-0 flex-1 space-y-3 overflow-auto border-l border-line p-4"
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto border-l border-line p-4"
     >
       <Show
         when={call()}
@@ -318,7 +319,14 @@ export function Details(props: { state: AppState; api: Api }) {
             {(n) => (
               <Show
                 when={n().kind === "scenario" || n().kind === "row"}
-                fallback={<Group node={n()} state={props.state} />}
+                fallback={
+                  <>
+                    <Group node={n()} state={props.state} />
+                    <Show when={n().kind === "outline"}>
+                      <Examples outline={n()} state={props.state} select={props.select} />
+                    </Show>
+                  </>
+                }
               >
                 <Leaf node={n()} state={props.state} api={props.api} />
               </Show>
