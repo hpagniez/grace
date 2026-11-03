@@ -90,18 +90,21 @@ import {
   loadProjectEnv,
   loadProjectFilter,
   loadProjectThreads,
+  loadProjectWatch,
   loadRecentProjects,
   removeRecentProject,
   saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
   saveProjectThreads,
+  saveProjectWatch,
   skippedProperties,
   type EnvSettings,
   type StoredLists,
   type StoredRow,
 } from "./settings";
 import type { VendorPaths } from "./vendor";
+import { watchFeatures, type FeatureWatcher } from "./watch";
 
 const BUSY = "A run is already in progress";
 
@@ -151,7 +154,9 @@ function setRowLines(tree: TestNode, bases: string[]): void {
  */
 type RunTarget =
   | { key: string; old: Pick<TestNode, "key" | "kind" | "file" | "name"> | null; gone: string }
-  | { tests: StoredTest[]; failedOf: number | null };
+  | { tests: StoredTest[]; failedOf: number | null }
+  /** Features saved while watch mode is on, as absolute paths (watch mode R3). */
+  | { files: string[] };
 
 /** The tests of run.json: each selected leaf with the final status and duration its run gave it. */
 function storedTests(leaves: TestNode[], results: ReturnType<RunState["results"]>): StoredTest[] {
@@ -198,6 +203,12 @@ export class Runner {
   private session: DebugSession | null = null;
   /** Sends `debugResumed` and tails the run again; set only while a debug run is paused. */
   private resume: (() => void) | null = null;
+  /** Watch mode (docs/specs/2026-11-03-watch-mode.md): the choice in force, its watcher and the roots it watches. */
+  private watching = false;
+  private watcher: FeatureWatcher | null = null;
+  private watchedRoots = "";
+  /** Saved features waiting for Grace to be idle (R4.1). */
+  private readonly waiting = new Set<string>();
   private readonly pidFile: string;
   /** Checks the saved recent list and emits it as a `recent` event; main calls it after the `ready` replay. */
   readonly sendRecent: () => Promise<void>;
@@ -231,6 +242,9 @@ export class Runner {
       root = path.resolve(root);
       if (!isDir(root)) {
         this.project = this.tree = null;
+        this.watching = false;
+        this.arm();
+        this.sendWatch();
         this.publish({
           type: "project",
           project: null,
@@ -256,6 +270,10 @@ export class Runner {
         if (!opened) this.report = report;
         else {
           this.sendBreakpoints([]); // another project's lines mean nothing here
+          this.waiting.clear(); // saves of the project open before
+          this.watching = loadProjectWatch(this.o.dataDir, root);
+          this.arm();
+          this.sendWatch();
           const notice = [
             skipped.length
               ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
@@ -319,6 +337,9 @@ export class Runner {
     this.tagEnvs = [];
     this.o.emit({ type: "project", project: null, tree: null, error: null }); // not publish: `last` stays null
     this.sendBreakpoints([]);
+    this.watching = false;
+    this.arm();
+    this.sendWatch();
     try {
       forgetLastProject(this.o.dataDir);
     } catch (err) {
@@ -337,6 +358,7 @@ export class Runner {
         const project = this.project!;
         const libraries = await this.listLibraries(project.root, project.layout);
         if (!(await this.rediscover(project, this.filter, this.envs, this.threads))) return;
+        this.arm(); // karate-pom.json may have changed the feature roots (R2.4)
         const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
           (n) => n !== null,
         );
@@ -399,6 +421,30 @@ export class Runner {
       });
     }
     this.sendThreads();
+  }
+
+  /**
+   * Watch mode R1: refused for anything but a boolean, and while a project is being opened (the choice in force
+   * is re-sent); ignored with no project. Applied even if it cannot be saved, as the thread count is.
+   */
+  setWatch(on: unknown): void {
+    if (typeof on !== "boolean" || this.opening) {
+      this.o.emit({ type: "notice", message: this.opening ? BUSY : "Invalid request" });
+      this.sendWatch();
+      return;
+    }
+    if (!this.project) return;
+    this.watching = on;
+    try {
+      saveProjectWatch(this.o.dataDir, this.project.root, on);
+    } catch (err) {
+      this.o.emit({
+        type: "notice",
+        message: `Watch mode could not be saved: ${(err as Error).message}`,
+      });
+    }
+    this.arm();
+    this.sendWatch();
   }
 
   /**
@@ -555,6 +601,7 @@ export class Runner {
   }
 
   async cancel(): Promise<void> {
+    this.waiting.clear(); // Cancel means stop (watch mode R4.2)
     if (!this.busy) return;
     // also between two JVMs of one operation: each start checks it (a re-run's switch, then its run)
     this.cancelled = true;
@@ -587,6 +634,7 @@ export class Runner {
           this.last,
           { type: "filter", filter: this.filter },
           { type: "threads", count: this.threads },
+          { type: "watch", on: this.watching },
           this.envEvent(),
           ...this.historyEvents(),
           { type: "breakpoints", breakpoints: this.breakpoints },
@@ -600,6 +648,8 @@ export class Runner {
   async dispose(): Promise<void> {
     this.disposing = true;
     this.cancelled = true;
+    this.watcher?.close();
+    this.waiting.clear();
     // The kill ends the run's process; the run then writes its record before `running` settles.
     await within(Promise.allSettled([this.proc?.kill(), this.running]), 10_000);
     rmSync(this.pidFile, { force: true });
@@ -722,7 +772,60 @@ export class Runner {
     } finally {
       this.busy = false;
       this.o.emit({ type: "busy", busy: false });
+      this.drain();
     }
+  }
+
+  private sendWatch() {
+    this.o.emit({ type: "watch", on: this.watching });
+  }
+
+  /**
+   * Watches the open project's feature roots while watch mode is on, keeping a watcher already on the same roots;
+   * stops watching and drops waiting saves otherwise (R1.5, R2). A watcher that fails turns watch mode off in
+   * memory only, so the next open tries again (R2.5).
+   */
+  private arm() {
+    const roots =
+      this.watching && this.project ? detectLayout(this.project.root).featureRoots : null;
+    if (this.watcher && roots?.join("|") === this.watchedRoots) return;
+    this.watcher?.close();
+    this.watcher = null;
+    if (!roots) {
+      this.waiting.clear();
+      return;
+    }
+    const stop = (err: Error) => {
+      this.watcher?.close();
+      this.watcher = null;
+      this.watching = false;
+      this.waiting.clear();
+      this.sendWatch();
+      this.o.emit({ type: "notice", message: `Watch mode stopped: ${err.message}` });
+    };
+    try {
+      this.watcher = watchFeatures(
+        roots,
+        (files) => {
+          for (const f of files) this.waiting.add(f);
+          this.drain();
+        },
+        stop,
+      );
+      this.watchedRoots = roots.join("|"); // no Windows path holds a |
+    } catch (err) {
+      stop(err as Error);
+    }
+  }
+
+  /** Runs the saved features waiting, once nothing else runs (R3.1, R4.1). */
+  private drain() {
+    if (this.busy || this.disposing || !this.project || !this.waiting.size) return;
+    const files = [...this.waiting];
+    this.waiting.clear();
+    this.guarded(() => this.runTarget({ files }, this.filter)).catch((err: unknown) =>
+      this.o.emit({ type: "notice", message: (err as Error).message }),
+    );
   }
 
   /**
@@ -1040,6 +1143,30 @@ export class Runner {
     const { root } = this.project!;
     const { bases, featureRoots } = detectLayout(root);
     const run = { tree, filter, threads: debug ? 1 : this.threads, env, props, debug };
+
+    if ("files" in target) {
+      // Saved features the tree lists with a test to run; the others (a called feature) are skipped quietly (R3.2).
+      const nodes = target.files
+        .map((file) =>
+          bases
+            .map((b) => path.relative(b, file).split(path.sep).join("/"))
+            .filter((rel) => !rel.startsWith(".."))
+            .map((rel) => findNode(tree, `f:${rel}`))
+            .find((n) => n !== null),
+        )
+        .filter((n): n is TestNode => !!n && matchingLeaves(n, filter).length > 0);
+      if (!nodes.length) return;
+      await this.runBody({
+        ...run,
+        leaves: nodes.flatMap((n) => matchingLeaves(n, filter)),
+        targets: nodes.flatMap((n) => selectionTargets(n, bases, featureRoots, filter)!),
+        // several features go through the targets file, so a git checkout never hits Windows' command line limit
+        targetFile: nodes.length > 1,
+        selection: nodes.length === 1 ? nodes[0] : null,
+        failedOf: null,
+      });
+      return;
+    }
 
     if ("tests" in target) {
       // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
