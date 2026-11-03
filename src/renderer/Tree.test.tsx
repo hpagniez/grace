@@ -1635,6 +1635,22 @@ describe("virtual tree", () => {
       expect(vi.mocked(leaves).mock.calls.map(([n]) => n.key)).toEqual([]);
     });
 
+    it("walks only the new rows when a feature opens (#224 R4.3)", () => {
+      const { load } = setup();
+      load();
+      vi.mocked(deriveStatus).mockClear();
+      vi.mocked(leaves).mockClear();
+      click(chevron("f:tests/basic.feature"));
+      // not the folder above it again, whose walk is the whole tree
+      expect(walked()).toEqual(["s:tests/basic.feature#1", "s:tests/basic.feature#2"]);
+      expect(
+        vi
+          .mocked(leaves)
+          .mock.calls.map(([n]) => n.key)
+          .sort(),
+      ).toEqual(["s:tests/basic.feature#1", "s:tests/basic.feature#2"]);
+    });
+
     it("works out no status when the selection or the focus moves", () => {
       const { load } = setup();
       load();

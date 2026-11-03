@@ -259,10 +259,25 @@ export function Tree(props: Ctx) {
     if (isOpen(key) && props.state.run.active) run.done.add(key);
     setOpen(key, !isOpen(key));
   };
-  // Reads no status, so a status update never redraws a row (R2.3).
-  const rows = createMemo(() =>
-    props.state.tree ? treeRows(props.state.tree, isOpen, props.state.filter) : [],
-  );
+  // Reads no status, so a status update never redraws a row (R2.3). A row that stays as it was keeps its object, so
+  // a feature that opens draws only its own rows: a run opens features while it goes (#224 R4.3).
+  let built = new Map<string, TreeRow>();
+  const rows = createMemo(() => {
+    const next = props.state.tree ? treeRows(props.state.tree, isOpen, props.state.filter) : [];
+    const kept = next.map((r) => {
+      const old = built.get(r.node.key);
+      return old &&
+        old.node === r.node &&
+        old.level === r.level &&
+        old.setSize === r.setSize &&
+        old.posInSet === r.posInSet &&
+        old.parentKey === r.parentKey
+        ? old
+        : r;
+    });
+    built = new Map(kept.map((r) => [r.node.key, r]));
+    return kept;
+  });
   let list: VirtualListHandle | undefined;
   const withBreakpoints = createMemo(() =>
     breakpointKeys(props.state.tree, props.state.breakpoints),
