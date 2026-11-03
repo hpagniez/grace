@@ -14,6 +14,7 @@ export const CH = {
   debugCommand: "debug:command",
   breakpoint: "debug:breakpoint",
   steps: "steps:get",
+  openInEditor: "editor:open",
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
@@ -50,6 +51,8 @@ export interface Api {
   toggleBreakpoint(file: string, line: number): Promise<void>;
   /** A scenario's or row's steps as its feature file has them; null for any other key. */
   steps(key: string): Promise<FileStep[] | null>;
+  /** Opens a tree feature path or an absolute path at the line in VS Code; main refuses any file outside the open project (docs/specs/2026-11-03-open-in-editor.md). */
+  openInEditor(file: string, line: number): Promise<void>;
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
