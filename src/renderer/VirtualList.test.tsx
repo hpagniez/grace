@@ -10,7 +10,7 @@ const keys = (n: number) => Array.from({ length: n }, (_, i) => `r${i}`);
 /** The view jsdom has: no height, so the 600 px fallback. */
 const at = (scrollTop: number) => ({ scrollTop, height: 0, rowHeight: 24, pad: 0 });
 
-function setup(n = 1000, selected: string | null = null) {
+function setup(n = 1000, selected: string | null = null, selectOnMove?: boolean) {
   const [items, setItems] = createSignal(keys(n));
   const [selectedKey, setSelectedKey] = createSignal(selected);
   const [cue, setCue] = createSignal(0);
@@ -31,6 +31,7 @@ function setup(n = 1000, selected: string | null = null) {
       attrs={(k) => ({ "aria-selected": k === selectedKey() ? "true" : "false" })}
       selectedKey={selectedKey()}
       onSelect={onSelect}
+      selectOnMove={selectOnMove}
       onKey={onKey}
       revealSelectedOn={cue()}
       ref={(h) => (handle = h)}
@@ -182,6 +183,23 @@ describe("VirtualList", () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(e.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(row("r0"));
+  });
+
+  it("with selectOnMove false, moves the focus without selecting, and selects with Enter or a click", () => {
+    const { focus, row, key, onSelect } = setup(1000, null, false);
+    focus("r0");
+    key("ArrowDown");
+    key("End");
+    key("Home");
+    key("PageDown");
+    expect(document.activeElement).toBe(row("r25"));
+    expect(onSelect).not.toHaveBeenCalled();
+    key("Enter");
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith("r25");
+    fireEvent.click(row("r3")!);
+    flush();
+    expect(onSelect).toHaveBeenLastCalledWith("r3");
   });
 
   it("selects with Enter and Space", () => {
