@@ -341,6 +341,35 @@ describe("find (console search R3)", () => {
     type("a");
     expect(count()).toBe("1 of 200000");
     expect(painted("console-match")).toHaveLength(200_000);
+  }, 30_000); // 200,000 ranges: Node's own spread limit is about 125,000
+
+  it("paints only the matches in and near the view, and again as it scrolls", () => {
+    const p = panel();
+    p.lines(...Array.from({ length: 100 }, (_, i) => `user ${i}`));
+    const el = screen.getByTestId("console");
+    // a 100 px view over rows 10 px tall: rows 50 to 59 are in view at 500
+    rows().forEach((r, i) => {
+      Object.defineProperty(r, "offsetTop", { value: i * 10 });
+      Object.defineProperty(r, "offsetHeight", { value: 10 });
+    });
+    Object.defineProperty(el, "clientHeight", { value: 100 });
+    Object.defineProperty(el, "scrollHeight", { value: 1000 });
+    el.scrollTop = 500;
+    el.dispatchEvent(new Event("scroll"));
+    ctrlF();
+    type("user");
+    expect(count()).toBe("51 of 100");
+    const lines = () => painted("console-match").map((r) => Number(r.line.split(" ")[1]));
+    expect(lines()).toEqual(Array.from({ length: 30 }, (_, i) => 40 + i)); // a view's worth either side
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+    flush();
+    expect(lines()).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    expect(painted("console-match-current")[0].line).toBe("user 50"); // the current one, wherever it is
+    type("user 1"); // matches on lines 1 and 10 to 19, all above the view once it is back at 500
+    el.scrollTop = 500;
+    el.dispatchEvent(new Event("scroll"));
+    expect(painted("console-match")).toEqual([]);
   });
 
   it("paints with static ranges, which no DOM change has to update", () => {

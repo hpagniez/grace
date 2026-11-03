@@ -196,6 +196,8 @@ export function Console(props: {
   let pinned = true;
   const onScroll = () => {
     pinned = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+    // scroll events come at most once a frame; the matches near the view are a few dozen
+    if (props.search.open()) paintMatches(props.search.matches(), props.search.current());
   };
   createEffect(
     // the array is replaced on every append; its length stops changing at the line cap
@@ -205,23 +207,26 @@ export function Console(props: {
     },
   );
 
-  // the lines are the scroller's last children, after the banner
+  // The lines are the scroller's last children, after the banner. children.length, not childElementCount:
+  // Chromium caches the collection's length, but counts the children on every childElementCount.
   const row = (i: number) =>
-    el.children[el.childElementCount - props.lines.length + i] as HTMLElement | undefined;
+    el.children[el.children.length - props.lines.length + i] as HTMLElement | undefined;
+  /** The first line whose bottom is below `y` in the scroller; the line count when none is. */
+  const indexAt = (y: number) => {
+    let lo = 0;
+    let hi = props.lines.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const r = row(mid)!;
+      if (r.offsetTop + r.offsetHeight > y) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  };
   onCleanup(
     props.search.attach({
       row,
-      topIndex() {
-        let lo = 0;
-        let hi = props.lines.length;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          const r = row(mid)!;
-          if (r.offsetTop + r.offsetHeight > el.scrollTop) hi = mid;
-          else lo = mid + 1;
-        }
-        return lo;
-      },
+      topIndex: () => indexAt(el.scrollTop),
       show(i, onlyIfHidden) {
         const r = row(i);
         if (!r) return;
@@ -256,17 +261,25 @@ export function Console(props: {
     if (h.size > 0) CSS.highlights.set(name, h);
     else CSS.highlights.delete(name);
   };
-  // The browser paints over the text: no row is redrawn (R4.1).
+  /**
+   * The browser paints over the text: no row is redrawn (R4.1). Only the matches within a view's height of the
+   * view are painted, so a keystroke on 10,000 matches makes a few dozen ranges; a scroller that measures 0
+   * (jsdom) gets them all.
+   */
+  const paintMatches = (list: readonly Match[], at: number) => {
+    const h = el.clientHeight;
+    const from = h > 0 ? indexAt(el.scrollTop - h) : 0;
+    const to = h > 0 ? indexAt(el.scrollTop + 2 * h) : Infinity;
+    const near = list
+      .filter((m) => m.line >= from && m.line < to)
+      .map((m) => range(m.line, m.start, m.end));
+    paint("console-match", near);
+    const m = list[at];
+    paint("console-match-current", m ? [range(m.line, m.start, m.end)] : []);
+  };
   createEffect(
     () => ({ list: props.search.matches(), at: props.search.current() }),
-    ({ list, at }) => {
-      paint(
-        "console-match",
-        list.map((m) => range(m.line, m.start, m.end)),
-      );
-      const m = list[at];
-      paint("console-match-current", m ? [range(m.line, m.start, m.end)] : []);
-    },
+    ({ list, at }) => paintMatches(list, at),
   );
   createEffect(
     () => ({ list: props.search.errors(), at: props.search.currentError() }),

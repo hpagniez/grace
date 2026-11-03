@@ -104,7 +104,7 @@ Find keeps every line on screen and steps through matches, rather than hiding th
 
 ### R4. Paint
 
-1. Matches are painted with the CSS Custom Highlight API: `console-match` (every match), `console-match-current` (the current match), `console-error-current` (the whole text of the current error's line). No console row is redrawn or wrapped to paint.
+1. Matches are painted with the CSS Custom Highlight API: `console-match` (the matches within a view's height above and below the view, painted again as the console scrolls), `console-match-current` (the current match), `console-error-current` (the whole text of the current error's line). No console row is redrawn or wrapped to paint. The ranges are static (`StaticRange`): a live `Range` is updated on every change of the page.
 2. Their colours come from tokens in `src/index.css`: two new colour tokens for a match and the current match, with light and dark values, and `--color-failed-tint` for the current error. The current match differs from the others by more than hue alone (a stronger fill).
 3. The ERROR and WARN text colours stay as they are.
 
@@ -117,12 +117,13 @@ Find keeps every line on screen and steps through matches, rather than hiding th
 ## Cost
 
 - **Idle (no run going):** zero CPU. Two `keydown` listeners on the window while a project is open (Ctrl+F, F8): they run only on a key press. No timer, poll or animation.
-- **A keystroke in the find field:** one pass over the console's lines (at most 10,000): a lower-case copy of each line and an `indexOf` loop, then one `Range` per match handed to the browser, which paints without layout. Measured target: under 16 ms (one frame) for 10,000 lines with 10,000 matches on the reference machine, checked once with a timing in e2e or by hand and written in the PR.
+- **A keystroke in the find field:** one pass over the console's lines (at most 10,000) with one case-insensitive pattern, then one static range per match near the view (a few dozen) handed to the browser, which paints without layout. Target: under 16 ms of work for 10,000 lines with 10,000 matches. Measured in the built app (e2e `a full console`, 2026-11-03, the reference machine): 4 to 5 ms of work; the next frame is painted 18 to 31 ms after the key, the wait for the display's next frame included.
+- **A scroll while the bar is open:** the matches near the view are painted again: a few dozen ranges, at most once a frame.
 - **A step (Enter, F8, a button):** a lookup in the match or error list and one `scrollIntoView`.
 - **During a run, find bar closed:** while the Console tab shows, the error list is worked out again on each console batch: one pass over the lines with `includes(" ERROR ")` and the summary rule, the same order of work as the store's existing `concat` and `slice` of the same lines and the `For` that redraws them. Nothing while another tab shows.
 - **During a run, find bar open:** the error pass, plus the find pass and a new set of ranges on each batch.
 - **A 10,000-test run:** the console holds at most 10,000 lines whatever the number of tests, so every pass is bounded by 10,000 lines. With the bar closed and another tab showing, the run costs exactly what it costs today.
-- **Memory:** the match positions (three numbers per match) and one `Range` per match while the bar is open; the error line numbers. Under 1 MB at 10,000 matches. Nothing kept once the bar closes.
+- **Memory:** the match positions (three numbers per match) while the bar is open, the static ranges near the view, and the error line numbers. Under 1 MB at 10,000 matches. Nothing kept once the bar closes.
 - **Start time and size:** no work at start; a few kilobytes of code and CSS, no dependency.
 
 ## Design decisions already made

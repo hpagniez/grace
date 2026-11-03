@@ -19,7 +19,13 @@ async function runAll(app: ElectronApplication, win: Page, dir: string) {
 
 /** The text of the ranges in one of the console's highlights. */
 const painted = (win: Page, name: string) =>
-  win.evaluate((n) => [...(CSS.highlights.get(n) ?? [])].map(String), name);
+  win.evaluate(
+    (n) =>
+      [...(CSS.highlights.get(n) ?? [])].map((r) =>
+        (r.startContainer as Text).data.slice(r.startOffset, r.endOffset),
+      ),
+    name,
+  );
 
 test("find in a real run", async () => {
   test.setTimeout(120_000);
