@@ -87,6 +87,26 @@ describe("Runner project setup", () => {
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
   });
 
+  // Karate names the files relative to a configDir that holds them (#223)
+  it("runs one row of an outline in the configDir", T, async () => {
+    const { runner, last, all } = setup();
+    await runner.open(
+      write({
+        "tests/karate-config.js": "function fn() { return { cfg: 'base' }; }",
+        "tests/a/rows.feature":
+          "Feature: rows\nScenario Outline: row <n>\n  * match cfg == 'base'\nExamples:\n  | n |\n  | 1 |\n  | 2 |\n",
+        "karate-pom.json": JSON.stringify({ configDir: "tests" }),
+      }),
+    );
+    expect(last("project").error).toBeNull();
+    const row = byName(last("project").tree!, "row 2").key;
+    await runner.run(row);
+    expect(all("scenarios").flatMap((e) => e.updates)).toContainEqual(
+      expect.objectContaining({ key: row, status: "passed" }),
+    );
+    expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
   it("uses the default folders when karate-pom.json cannot be read", T, async () => {
     const { runner, last } = setup();
     const root = write({ "karate-pom.json": "{" }, fixture("clean"));
