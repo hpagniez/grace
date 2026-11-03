@@ -35,34 +35,78 @@ describe("findTool", () => {
   it("takes the project's wrapper before PATH", () => {
     const root = folder({ "mvnw.cmd": "" });
     const bin = folder({ "mvn.cmd": "" });
-    expect(findTool(root, "maven", bin)).toBe(path.join(root, "mvnw.cmd"));
+    expect(findTool(root, "maven", { PATH: bin })).toBe(path.join(root, "mvnw.cmd"));
   });
   it("searches PATH in order, mvn.cmd before mvn.bat", () => {
     const a = folder({ "mvn.bat": "" });
     const b = folder({ "mvn.cmd": "" });
-    expect(findTool(folder(), "maven", `;${a};${b}`)).toBe(path.join(a, "mvn.bat"));
+    expect(findTool(folder(), "maven", { PATH: `;${a};${b}` })).toBe(path.join(a, "mvn.bat"));
     const c = folder({ "mvn.bat": "", "mvn.cmd": "" });
-    expect(findTool(folder(), "maven", c)).toBe(path.join(c, "mvn.cmd"));
+    expect(findTool(folder(), "maven", { PATH: c })).toBe(path.join(c, "mvn.cmd"));
   });
   it("finds gradlew.bat, else gradle.bat", () => {
     const root = folder({ "gradlew.bat": "" });
     const bin = folder({ "gradle.bat": "" });
-    expect(findTool(root, "gradle", bin)).toBe(path.join(root, "gradlew.bat"));
-    expect(findTool(folder(), "gradle", bin)).toBe(path.join(bin, "gradle.bat"));
+    expect(findTool(root, "gradle", { PATH: bin })).toBe(path.join(root, "gradlew.bat"));
+    expect(findTool(folder(), "gradle", { PATH: bin })).toBe(path.join(bin, "gradle.bat"));
   });
   it("reads a quoted PATH entry as cmd.exe does", () => {
     const bin = folder({ "mvn.cmd": "", "java.exe": "" });
-    expect(findTool(folder(), "maven", `"${bin}"`)).toBe(path.join(bin, "mvn.cmd"));
+    expect(findTool(folder(), "maven", { PATH: `"${bin}"` })).toBe(path.join(bin, "mvn.cmd"));
     const o = { tool: "t", file: "f", initScript: "i", searchPath: `"${bin}"`, jreDir: "jre" };
     expect(toolEnv({}, o).JAVA_HOME).toBeUndefined();
   });
-  it("finds nothing", () => {
-    expect(findTool(folder(), "maven", "")).toBeNull();
-    expect(findTool(folder({ "mvnw.cmd": "" }), "gradle", "")).toBeNull();
+  it("then looks in MAVEN_HOME, then M2_HOME, and in GRADLE_HOME for Gradle", () => {
+    const m = folder({ "bin/mvn.cmd": "" });
+    const m2 = folder({ "bin/mvn.cmd": "" });
+    const g = folder({ "bin/gradle.bat": "" });
+    const env = { MAVEN_HOME: m, M2_HOME: m2, GRADLE_HOME: `"${g}"` };
+    expect(findTool(folder(), "maven", env)).toBe(path.join(m, "bin", "mvn.cmd"));
+    expect(findTool(folder(), "maven", { ...env, MAVEN_HOME: folder() })).toBe(
+      path.join(m2, "bin", "mvn.cmd"),
+    );
+    expect(findTool(folder(), "gradle", env)).toBe(path.join(g, "bin", "gradle.bat"));
+    expect(findTool(folder(), "maven", { GRADLE_HOME: g })).toBeNull();
+    const bin = folder({ "mvn.cmd": "" });
+    expect(findTool(folder(), "maven", { ...env, PATH: bin })).toBe(path.join(bin, "mvn.cmd"));
   });
-  it("names what is missing", () => {
-    expect(noToolReason("maven")).toBe("the project has no mvnw.cmd and mvn is not on PATH");
-    expect(noToolReason("gradle")).toBe("the project has no gradlew.bat and gradle is not on PATH");
+  it("then takes IntelliJ IDEA's Maven, the newest build first", () => {
+    const mvn = "plugins/maven/lib/maven3/bin/mvn.cmd";
+    const programFiles = folder({
+      [`JetBrains/IntelliJ IDEA 2024.3/${mvn}`]: "",
+      "JetBrains/IntelliJ IDEA 2024.3/build.txt": "IU-243.21565.193",
+      "JetBrains/Rider/build.txt": "RD-261.1.1",
+    });
+    // a higher build, whatever the product code before it
+    const localAppData = folder({
+      [`Programs/IntelliJ IDEA/${mvn}`]: "",
+      "Programs/IntelliJ IDEA/build.txt": "IC-243.21565.1000",
+      "Programs/Microsoft VS Code/Code.exe": "",
+    });
+    const env = { ProgramFiles: programFiles, LOCALAPPDATA: localAppData };
+    const newest = path.join(localAppData, "Programs", "IntelliJ IDEA", mvn);
+    expect(findTool(folder(), "maven", env)).toBe(newest);
+    rmSync(path.join(localAppData, "Programs", "IntelliJ IDEA", "build.txt"));
+    expect(findTool(folder(), "maven", env)).toBe(
+      path.join(programFiles, "JetBrains", "IntelliJ IDEA 2024.3", mvn),
+    );
+    const m2 = folder({ "bin/mvn.cmd": "" });
+    expect(findTool(folder(), "maven", { ...env, M2_HOME: m2 })).toBe(
+      path.join(m2, "bin", "mvn.cmd"),
+    );
+    expect(findTool(folder(), "gradle", env)).toBeNull();
+  });
+  it("finds nothing", () => {
+    expect(findTool(folder(), "maven", {})).toBeNull();
+    expect(findTool(folder({ "mvnw.cmd": "" }), "gradle", {})).toBeNull();
+  });
+  it("names where it looked", () => {
+    expect(noToolReason("maven")).toBe(
+      "the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA",
+    );
+    expect(noToolReason("gradle")).toBe(
+      "the project has no gradlew.bat, and gradle is not on PATH or in GRADLE_HOME",
+    );
   });
 });
 

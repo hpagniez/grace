@@ -58,6 +58,19 @@ describe("Runner project libraries", () => {
     passed(last);
   });
 
+  it("runs the Maven of MAVEN_HOME when the project has no wrapper", T, async () => {
+    const home = mkdtempSync(path.join(tmpdir(), "kk-maven-"));
+    temps.push(home);
+    mkdirSync(path.join(home, "bin"));
+    const log = stubTool(path.join(home, "bin"), "mvn.cmd", lists(jar()));
+    const lookupEnv = { MAVEN_HOME: home };
+    const { runner, last } = setup(undefined, undefined, undefined, undefined, { lookupEnv });
+    await runner.open(project());
+    expect(calls(log)).toHaveLength(1);
+    await runner.run("d:");
+    passed(last);
+  });
+
   it("runs gradlew.bat without a daemon", T, async () => {
     const { runner, last, dataDir } = setup();
     const root = project("build.gradle");
@@ -104,7 +117,7 @@ describe("Runner project libraries", () => {
     const { runner, last } = setup();
     await runner.open(project());
     expect(last("notice").message).toBe(
-      "Grace could not list the project's libraries with Maven: the project has no mvnw.cmd and mvn is not on PATH. Tests that use them will fail.",
+      "Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven wrapper to the project.",
     );
     expect(last("project").tree).not.toBeNull();
   });
@@ -197,7 +210,7 @@ describe("Runner project libraries", () => {
       writeFileSync(path.join(root, "src", "test", "java", "Helper.java"), "class Helper {}");
       await runner.open(root);
       expect(last("notice").message).toBe(
-        `Grace could not list the project's libraries with Maven: the project has no mvnw.cmd and mvn is not on PATH. Tests that use them will fail. ${NOT_BUILT}`,
+        `Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven wrapper to the project. ${NOT_BUILT}`,
       );
     });
 
@@ -222,7 +235,7 @@ describe("Runner project libraries", () => {
     writeFileSync(path.join(root, "karate-pom.json"), JSON.stringify({ env: "qa" }));
     await runner.open(root);
     expect(last("notice").message).toBe(
-      "Grace does not use these karate-pom.json settings: env. Grace could not list the project's libraries with Maven: the project has no mvnw.cmd and mvn is not on PATH. Tests that use them will fail.",
+      "Grace does not use these karate-pom.json settings: env. Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven wrapper to the project.",
     );
   });
 

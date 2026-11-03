@@ -1,6 +1,6 @@
 // A Maven or Gradle project's libraries, listed by its own build (docs/specs/2026-11-02-project-libraries.md, ADR 0027).
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Layout } from "../../shared/model";
 
@@ -19,10 +19,15 @@ export interface KeptLibraries {
 }
 
 const WRAPPER: Record<BuildLayout, string> = { maven: "mvnw.cmd", gradle: "gradlew.bat" };
-const ON_PATH: Record<BuildLayout, string[]> = {
+const LAUNCHERS: Record<BuildLayout, string[]> = {
   maven: ["mvn.cmd", "mvn.bat"],
   gradle: ["gradle.bat"],
 };
+const HOMES: Record<BuildLayout, string[]> = {
+  maven: ["MAVEN_HOME", "M2_HOME"],
+  gradle: ["GRADLE_HOME"],
+};
+const IDEA_MAVEN = path.join("plugins", "maven", "lib", "maven3", "bin");
 
 // cmd.exe and Node read a quoted entry ("C:\Program Files\…\bin") as the folder inside the quotes
 const folders = (searchPath: string) =>
@@ -31,20 +36,59 @@ const folders = (searchPath: string) =>
     .map((d) => d.replace(/"/g, ""))
     .filter(Boolean);
 
-/** R2: the project's wrapper, else the first launcher in a `searchPath` folder; null if none. */
-export function findTool(root: string, layout: BuildLayout, searchPath: string): string | null {
+/**
+ * The `bin` folder of each IntelliJ IDEA's own Maven, the highest `build.txt` first: installed for all users in
+ * `%ProgramFiles%\JetBrains`, for one user or by the Toolbox App in `%LOCALAPPDATA%\Programs` (find-build-tools R1.3).
+ */
+function ideaMavens(env: NodeJS.ProcessEnv): string[] {
+  const build = (dir: string) => {
+    try {
+      return readFileSync(path.join(dir, "build.txt"), "utf8")
+        .trim()
+        .replace(/^[A-Z]+-/, "");
+    } catch {
+      return "";
+    }
+  };
+  return [
+    env.ProgramFiles && path.join(env.ProgramFiles, "JetBrains"),
+    env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, "Programs"),
+  ]
+    .flatMap((parent) => {
+      try {
+        return parent ? readdirSync(parent).map((name) => path.join(parent, name)) : [];
+      } catch {
+        return [];
+      }
+    })
+    .filter((dir) => existsSync(path.join(dir, IDEA_MAVEN, "mvn.cmd")))
+    .map((dir) => ({ dir, build: build(dir) }))
+    .sort((a, b) => b.build.localeCompare(a.build, undefined, { numeric: true }))
+    .map(({ dir }) => path.join(dir, IDEA_MAVEN));
+}
+
+/** In order, and only as far as needed: PATH, the tool's home variables, then IntelliJ IDEA's Maven. */
+function* toolFolders(layout: BuildLayout, env: NodeJS.ProcessEnv): Generator<string> {
+  yield* folders(env.PATH ?? "");
+  for (const home of HOMES[layout])
+    if (env[home]) yield path.join(env[home].replace(/"/g, ""), "bin");
+  if (layout === "maven") yield* ideaMavens(env);
+}
+
+/** R2 and find-build-tools R1: the project's wrapper, else the first launcher `env` leads to; null if none. */
+export function findTool(root: string, layout: BuildLayout, env: NodeJS.ProcessEnv): string | null {
   const wrapper = path.join(root, WRAPPER[layout]);
   if (existsSync(wrapper)) return wrapper;
-  for (const dir of folders(searchPath))
-    for (const name of ON_PATH[layout])
+  for (const dir of toolFolders(layout, env))
+    for (const name of LAUNCHERS[layout])
       if (existsSync(path.join(dir, name))) return path.join(dir, name);
   return null;
 }
 
 export const noToolReason = (layout: BuildLayout) =>
   layout === "maven"
-    ? "the project has no mvnw.cmd and mvn is not on PATH"
-    : "the project has no gradlew.bat and gradle is not on PATH";
+    ? "the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA"
+    : "the project has no gradlew.bat, and gradle is not on PATH or in GRADLE_HOME";
 
 /** R4.2: the files whose change can change the list. */
 const BUILD_FILES: Record<BuildLayout, string[]> = {
