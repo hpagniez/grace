@@ -441,6 +441,24 @@ describe("reduce", () => {
     expect(s.console[0]).toBe("l500");
   });
 
+  it("counts the console lines dropped at the cap, from 0 at each run and project close", () => {
+    const s = initialState();
+    apply(s, project());
+    expect(s.consoleDropped).toBe(0);
+    apply(s, {
+      type: "console",
+      lines: Array.from({ length: CONSOLE_LIMIT + 5 }, (_, i) => `l${i}`),
+    });
+    apply(s, { type: "console", lines: ["a", "b"] });
+    expect(s.consoleDropped).toBe(7);
+    expect(s.console[0]).toBe("l7"); // a line's number is consoleDropped + its index
+    apply(s, started());
+    expect(s.consoleDropped).toBe(0);
+    s.consoleDropped = 3;
+    apply(s, { type: "project", project: null, tree: null, error: "Folder not found" });
+    expect(s.consoleDropped).toBe(0);
+  });
+
   it("busy follows the runner, and a finished run ends it", () => {
     const s = initialState();
     expect(s.busy).toBe(false);
