@@ -66,6 +66,7 @@ Ways to show the folded tags, also settled with the owner: a panel over the tree
 - The panel over the tree, not a bar that grows: the owner's choice.
 - Tags that are on keep their A-to-Z place, counted on the fold chip: the owner's choice.
 - The browser wraps the chips and an `IntersectionObserver` counts the folded ones: the owner's choice (approach 2).
+- A clicked chip may fold when Clear and the counter appear and take room: the owner's choice, over keeping their room while no filter is on. The `+N · K on` count shows where it went, and a focused chip hands the focus to the fold chip.
 - My call: the panel holds every tag, not only the folded ones, so one A-to-Z list has them all.
 - My call: the fold chip works during a run (R2.3); reading which tags are on is harmless.
 - My call: no search box in the panel. A project with hundreds of tags may want one; that is a feature of its own.
