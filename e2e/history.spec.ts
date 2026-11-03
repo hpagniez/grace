@@ -8,6 +8,7 @@ import {
   launch,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   openWithSecret,
   ourJavaPids,
@@ -35,6 +36,7 @@ async function openClean(seed = 0, opts: { report?: boolean; record?: Partial<Ru
   const ids = seedRuns(userData, dir, seed, opts);
   const { app, win } = await launch(userData);
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData, ids };
 }
@@ -44,6 +46,7 @@ async function openFix() {
   const dir = project("history");
   const { app, win, userData } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "fixable")).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData };
 }
@@ -255,6 +258,7 @@ test("Cancelling the environment switch of a re-run runs nothing", async () => {
   });
   const { app, win } = await launch(userData);
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "always")).toBeVisible({ timeout: 15_000 });
   await expect(win.getByTestId("env-input")).toHaveValue("");
   await expect(tab(win)).toHaveText("History (1)");

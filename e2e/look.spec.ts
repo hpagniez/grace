@@ -11,6 +11,7 @@ import {
   launchWithSettings,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   openProperties,
   ourJavaPids,
@@ -47,6 +48,7 @@ async function openClean(colorScheme?: Scheme) {
   const dir = project("clean");
   const { app, win, userData } = await launch(undefined, {}, { colorScheme });
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData };
 }
@@ -85,6 +87,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`The window follows Windows in ${scheme} mode`, async () => {
     const { app, win } = await launch(undefined, {}, { colorScheme: scheme });
     await openProject(app, project("http"));
+    await openFeatures(win);
     await expect(win.getByTestId("tree-node").first()).toBeVisible({ timeout: 15_000 });
 
     const want = THEME[scheme];

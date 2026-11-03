@@ -1,7 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { expect, launch, node, nodeByKey, openProject, project, tempDir, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openFeatures,
+  openProject,
+  project,
+  tempDir,
+  test,
+} from "./helpers";
 
 /** Writes `files` (relative path → content) under `root`. */
 function write(root: string, files: Record<string, string>) {
@@ -29,6 +39,7 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
   });
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
 
   await expect(nodeByKey(win, "f:tests/a/a.feature")).toBeVisible({ timeout: 15_000 });
   await expect(nodeByKey(win, "f:tests/b/b.feature")).toHaveCount(0);
@@ -57,6 +68,7 @@ test("Maven's compiled output is on the classpath", async () => {
   });
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
 
   await expect(node(win, "reads compiled output")).toBeVisible({ timeout: 15_000 });
   await node(win, "reads compiled output")
@@ -83,6 +95,7 @@ const LIB_FEATURE =
 async function runsWithTheLibrary(dir: string) {
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "reads a library")).toBeVisible({ timeout: 15_000 });
   await node(win, "reads a library")
     .getByRole("button", { name: "Run reads a library", exact: true })

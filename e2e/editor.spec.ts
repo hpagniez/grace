@@ -1,5 +1,14 @@
 import type { ElectronApplication, Page } from "@playwright/test";
-import { expect, launch, node, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openFeatures,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 /** Makes Windows' `vscode://` handler `name` ("" for none) and records the links handed to it. */
 async function stubVsCode(app: ElectronApplication, name: string) {
@@ -39,6 +48,7 @@ test("Open a scenario in VS Code", async () => {
   const { app, win } = await launch();
   const opened = await stubVsCode(app, "Visual Studio Code");
   await openProject(app, dir);
+  await openFeatures(win);
   const feature = nodeByKey(win, "f:tests/basic.feature");
   await expect(feature).toBeVisible({ timeout: 15_000 });
   const link = `vscode://file/${dir.replaceAll("\\", "/")}/tests/basic.feature`;
@@ -62,6 +72,7 @@ test("Open a scenario from the tree", async () => {
   const opened = await stubVsCode(app, "Visual Studio Code");
   const menu = await stubMenu(app);
   await openProject(app, dir);
+  await openFeatures(win);
   const feature = nodeByKey(win, "f:tests/basic.feature");
   await expect(feature).toBeVisible({ timeout: 15_000 });
   const link = `vscode://file/${dir.replaceAll("\\", "/")}/tests/basic.feature`;

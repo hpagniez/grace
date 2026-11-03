@@ -14,11 +14,12 @@ import {
 
 const ROW = 24; // px, a tree row
 const PAD = 8; // px before the first row and after the last
-// tests/, 8 areas, 40 modules, 200 features, 200 outlines and 2,000 tests
-const ROWS = 2449;
-const LAST_TEST = "s:tests/area-8/module-5/feature-5.feature#7.4"; // "outline 8.5.5 row 2000"
-// The 1,500th row: "scenario 1224", tagged module-5-5. It makes no HTTP call, so a run of it is short.
-const ROW_1500 = "s:tests/area-5/module-5/feature-3.feature#4";
+// tests/, 8 areas, 40 modules and 200 features: the features of its 2,000 tests start closed (#224)
+const ROWS = 249;
+const LAST_ROW = "f:tests/area-8/module-5/feature-5.feature";
+// Row 153, tagged module-5-5. Open, it holds "scenario 1224" at row 157, which makes no HTTP call: a run of it is short.
+const FEATURE_1224 = "f:tests/area-5/module-5/feature-3.feature";
+const SCENARIO_1224 = "s:tests/area-5/module-5/feature-3.feature#4";
 const FEATURE_2 = "f:tests/area-1/module-1/feature-2.feature";
 // Every 7th test name is long enough to be cut in the tree: this is test 14.
 const CUT = "s:tests/area-1/module-1/feature-2.feature#4";
@@ -133,9 +134,9 @@ test("Only the rows in view are drawn", async () => {
   expect(await scroller(win).evaluate((el) => el.scrollHeight)).toBe(rows * ROW + 2 * PAD);
 
   await scroller(win).evaluate((el) => (el.scrollTop = el.scrollHeight));
-  await expect(nodeByKey(win, LAST_TEST)).toHaveAttribute("data-kind", "row");
-  await expect(nodeByKey(win, LAST_TEST)).toContainText("outline 8.5.5 row 2000");
-  expect((await rowAt(win, rows - 1))?.key).toBe(LAST_TEST);
+  await expect(nodeByKey(win, LAST_ROW)).toHaveAttribute("data-kind", "feature");
+  await expect(nodeByKey(win, LAST_ROW)).toContainText("feature-5.feature");
+  expect((await rowAt(win, rows - 1))?.key).toBe(LAST_ROW);
   expect((await rowAt(win, rows - 1))?.inView).toBe(true);
   expect(await win.getByTestId("tree-node").count()).toBeLessThan(100);
 });
@@ -175,47 +176,52 @@ test("Focus survives scrolling away", async () => {
 test("A new tree keeps the rows in view still", async () => {
   test.setTimeout(120_000);
   const { win } = await openBig();
-  await label(win, await keyAt(win, 9)).click(); // selected, and out of view below
-  await scrollToRow(win, 1499);
-  expect(await topInView(win)).toBe(ROW_1500);
+  await scrollToRow(win, 153);
+  await nodeByKey(win, FEATURE_1224).locator("button").first().click(); // its chevron opens it
+  await expect(nodeByKey(win, SCENARIO_1224)).toBeVisible();
+  await scrollToRow(win, 0);
+  await label(win, await keyAt(win, 8)).click(); // a folder: selected, then out of view
+  await scrollToRow(win, 153);
+  expect(await topInView(win)).toBe(FEATURE_1224);
   const top = await scrollTop(win);
   await recordScrolls(win);
 
-  await nodeByKey(win, ROW_1500).getByTestId("run-node").click();
+  await nodeByKey(win, SCENARIO_1224).getByTestId("run-node").click();
   await expect(win.getByTestId("run-outcome")).toHaveText("Running…", { timeout: 60_000 });
-  expect(await topInView(win)).toBe(ROW_1500);
+  expect(await topInView(win)).toBe(FEATURE_1224);
   expect(await scrollTop(win)).toBe(top);
 
   // the status updates and the end of the run do not move the list either
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 60_000 });
-  expect(await topInView(win)).toBe(ROW_1500);
+  expect(await topInView(win)).toBe(FEATURE_1224);
   expect(await scrolls(win)).toEqual([]);
 });
 
 test("A filter change scrolls to the selected row", async () => {
   const { win } = await openBig();
-  await scrollToRow(win, 1499);
-  expect(await topInView(win)).toBe(ROW_1500);
-  await label(win, ROW_1500).click();
-  await expect(item(win, ROW_1500)).toHaveAttribute("aria-selected", "true");
+  await scrollToRow(win, 153);
+  await label(win, FEATURE_1224).click(); // selects and opens it
+  await label(win, SCENARIO_1224).click();
+  await expect(item(win, SCENARIO_1224)).toHaveAttribute("aria-selected", "true");
 
   await chip(win, "module-5-5").click();
   await expect(chip(win, "module-5-5")).toHaveAttribute("data-state", "include");
   await scroller(win).evaluate((el) => (el.scrollTop = 0));
-  await expect.poll(async () => (await rowAt(win, 1499))?.inView).toBe(false); // out of view again
+  await expect.poll(async () => (await rowAt(win, 157))?.inView).toBe(false); // out of view again
 
   await win.getByTestId("hide-non-matching").click();
   await expect(win.getByTestId("hide-non-matching")).toBeChecked();
-  // only module-5-5 and its parents are left
-  await expect(tree(win)).toHaveAttribute("data-rows", String(3 + 5 * 12));
+  // only module-5-5 and its parents are left: 3 folders, 5 features and the open one's 11 rows
+  await expect(tree(win)).toHaveAttribute("data-rows", String(3 + 5 + 11));
   await expect
-    .poll(async () => (await drawn(win)).find((r) => r.key === ROW_1500)?.inView)
+    .poll(async () => (await drawn(win)).find((r) => r.key === SCENARIO_1224)?.inView)
     .toBe(true);
 });
 
 // A mouse click is not keyboard focus (R4.10, R10.1): no ring, and no tooltip for a cut label.
 test("A click shows neither the focus ring nor a tooltip", async () => {
   const { win } = await openBig();
+  await label(win, FEATURE_2).click(); // selects and opens it
   await label(win, CUT).click();
 
   await expect(item(win, CUT)).toBeFocused();
@@ -245,6 +251,7 @@ test("A click on an HTTP call shows no focus ring", async () => {
 // The keyboard shows what a click does not (R4.9, R4.10).
 test("The keyboard shows the focus ring and a cut label's tooltip", async () => {
   const { win } = await openBig();
+  await label(win, FEATURE_2).click(); // selects and opens it
   await item(win, BEFORE_CUT).focus();
   await expect(item(win, BEFORE_CUT)).toBeFocused();
 

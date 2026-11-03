@@ -1,7 +1,16 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { expect, launch, node, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openFeatures,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 // Keys of the clean sample project; `node()` cannot find these once they are dimmed (no run button).
 const FAILING_MATCH = "s:tests/basic.feature#2";
@@ -31,6 +40,7 @@ async function openClean() {
   const dir = project("clean");
   const { app, win, userData } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   return { dir, win, userData };
 }
@@ -47,6 +57,7 @@ async function openTags() {
   const dir = project("tags");
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, OUTLINE)).toBeVisible({ timeout: 15_000 });
   return { dir, win };
 }
