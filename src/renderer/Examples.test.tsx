@@ -173,6 +173,8 @@ describe("the Examples table (data-driven view R2, R3)", () => {
     expect(heading()).toBe("add <a> and <b>");
     key("Enter");
     expect(heading()).toBe("add 2 and 3");
+    // the focused line is gone: focus goes to the row's heading, not the page
+    expect(document.activeElement).toBe(within(details()).getByRole("heading"));
   });
 
   it("shows empty cells for a row without values, and a column only some rows have", () => {
@@ -209,6 +211,34 @@ describe("the Examples table (data-driven view R2, R3)", () => {
     select("add <a> and <b>");
     expect(table().getAttribute("data-rows")).toBe("10000");
     expect(options().length).toBeLessThan(60);
+  });
+
+  it("opens another outline's table at its top, and keeps the place on a refresh", () => {
+    const outline = (n: number) =>
+      node("outline", `o:${F}#${n}`, `outline ${n}`, {
+        line: n,
+        children: Array.from({ length: 20 }, (_, i) =>
+          node("row", `s:${F}#${n}.${i + 1}`, `o${n} row ${i + 1}`, {
+            refId: `[${n}.${i + 1}:${n}]`,
+            example: { i: `${i + 1}` },
+          }),
+        ),
+      });
+    const big = () =>
+      node("folder", "d:", "p", {
+        children: [node("feature", `f:${F}`, "o", { children: [outline(1), outline(2)] })],
+      });
+    const { select, project } = setup(big());
+    const scroller = () => table().parentElement!;
+    select("outline 1");
+    scroller().scrollTop = 200;
+    scroller().dispatchEvent(new Event("scroll"));
+    flush();
+    project(big());
+    expect(scroller().scrollTop).toBe(200);
+    select("outline 2");
+    expect(heading()).toBe("outline 2");
+    expect(scroller().scrollTop).toBe(0);
   });
 
   it("is not shown for a scenario", () => {
