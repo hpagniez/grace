@@ -441,7 +441,7 @@ describe("reduce", () => {
     expect(s.console[0]).toBe("l500");
   });
 
-  it("counts the console lines dropped at the cap, from 0 at each run and project close", () => {
+  it("counts the console lines dropped at the cap or by a run, from 0 at project close", () => {
     const s = initialState();
     apply(s, project());
     expect(s.consoleDropped).toBe(0);
@@ -452,9 +452,9 @@ describe("reduce", () => {
     apply(s, { type: "console", lines: ["a", "b"] });
     expect(s.consoleDropped).toBe(7);
     expect(s.console[0]).toBe("l7"); // a line's number is consoleDropped + its index
+    // a new run's lines take new numbers: a place held in the last run never lands on one of them
     apply(s, started());
-    expect(s.consoleDropped).toBe(0);
-    s.consoleDropped = 3;
+    expect(s.consoleDropped).toBe(7 + CONSOLE_LIMIT);
     apply(s, { type: "project", project: null, tree: null, error: "Folder not found" });
     expect(s.consoleDropped).toBe(0);
   });

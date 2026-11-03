@@ -1,8 +1,15 @@
 import type { JSX } from "@solidjs/web";
-import { ArrowDown, ArrowUp, X } from "lucide";
+import { ArrowDown, ArrowUp, CircleX, X } from "lucide";
 import { createEffect, createMemo, createSignal, flush, For, onCleanup, Show } from "solid-js";
 import { btnIconSmall } from "./buttons";
-import { findMatches, isErrorLine, startIndex, stepIndex, type Match } from "./consoleFind";
+import {
+  errorLines,
+  findMatches,
+  isErrorLine,
+  startIndex,
+  stepIndex,
+  type Match,
+} from "./consoleFind";
 import { Icon } from "./Icon";
 import { Tooltip } from "./Tooltip";
 import { findBar, input } from "./ui";
@@ -61,6 +68,7 @@ export function createConsoleSearch(o: {
   const [query, setQuery] = createSignal("");
   const [open, setOpen] = createSignal(false);
   const [held, setHeld] = createSignal<Place | null>(null);
+  const [heldError, setHeldError] = createSignal<number | null>(null); // a line number
   let view: ConsoleView | undefined;
   let back: Element | null = null; // what had the focus before the bar opened
 
@@ -70,6 +78,12 @@ export function createConsoleSearch(o: {
     const p = held();
     const at = p ? p.line - o.dropped() : -1;
     return p ? matches().findIndex((m) => m.line === at && m.start === p.start) : -1;
+  });
+  // only while the Console tab shows: the count is on its tab row (R2.1)
+  const errors = createMemo(() => (o.shown() ? errorLines(o.lines()) : []));
+  const currentError = createMemo(() => {
+    const line = heldError();
+    return line === null ? -1 : errors().indexOf(line - o.dropped());
   });
   const top = () => view?.topIndex() ?? 0;
   const hold = (list: readonly Match[], i: number) =>
@@ -113,6 +127,15 @@ export function createConsoleSearch(o: {
     flush();
     view?.show(list[next].line, false);
   };
+  const stepError = (dir: 1 | -1) => {
+    const list = errors();
+    if (list.length === 0) return;
+    const i = currentError();
+    const next = i < 0 ? startIndex(list, top(), dir) : stepIndex(list.length, i, dir);
+    setHeldError(list[next] + o.dropped());
+    flush();
+    view?.show(list[next], false);
+  };
   const openBar = () => {
     if (!open()) back = document.activeElement;
     o.showConsole();
@@ -132,6 +155,9 @@ export function createConsoleSearch(o: {
     if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
       openBar();
+    } else if (e.key === "F8" && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      stepError(e.shiftKey ? -1 : 1);
     }
   };
   window.addEventListener("keydown", onKey);
@@ -146,9 +172,9 @@ export function createConsoleSearch(o: {
     matches,
     current,
     step,
-    errors: () => [],
-    currentError: () => -1,
-    stepError: () => {},
+    errors,
+    currentError,
+    stepError,
     attach(v) {
       view = v;
       return () => {
@@ -239,6 +265,10 @@ export function Console(props: {
       paint("console-match-current", m ? [range(m.line, m.start, m.end)] : []);
     },
   );
+  createEffect(
+    () => ({ list: props.search.errors(), at: props.search.currentError() }),
+    ({ list, at }) => paint("console-error-current", at >= 0 ? [range(list[at])] : []),
+  );
   onCleanup(() => HIGHLIGHTS.forEach((name) => CSS.highlights.delete(name)));
 
   const count = () => {
@@ -317,5 +347,54 @@ export function Console(props: {
         <For each={props.lines}>{(line) => <div class={lineClass(line)}>{line}</div>}</For>
       </div>
     </div>
+  );
+}
+
+/** The error count and stepping on the Console tab's row (R2); absent with no error. */
+export function ConsoleErrors(props: { search: ConsoleSearch }) {
+  const count = () => {
+    const n = props.search.errors().length;
+    const i = props.search.currentError();
+    const noun = n === 1 ? "error" : "errors";
+    return i >= 0 ? `${i + 1} of ${n} ${noun}` : `${n} ${noun}`;
+  };
+  return (
+    <Show when={props.search.errors().length > 0}>
+      <div
+        data-testid="console-errors"
+        role="group"
+        aria-label="Errors"
+        class="flex items-center gap-1"
+      >
+        <span class="inline-flex items-center gap-1 px-1 text-xs font-medium text-failed tabular-nums">
+          <Icon icon={CircleX} size={14} />
+          <span data-testid="errors-count" role="status">
+            {count()}
+          </span>
+        </span>
+        <Tooltip text="Previous error (Shift+F8)">
+          <button
+            type="button"
+            data-testid="error-prev"
+            aria-label="Previous error"
+            class={btnIconSmall}
+            onClick={() => props.search.stepError(-1)}
+          >
+            <Icon icon={ArrowUp} size={14} />
+          </button>
+        </Tooltip>
+        <Tooltip text="Next error (F8)">
+          <button
+            type="button"
+            data-testid="error-next"
+            aria-label="Next error"
+            class={btnIconSmall}
+            onClick={() => props.search.stepError(1)}
+          >
+            <Icon icon={ArrowDown} size={14} />
+          </button>
+        </Tooltip>
+      </div>
+    </Show>
   );
 }

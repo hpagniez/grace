@@ -11,7 +11,7 @@ import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
 import { btnIconSmall } from "./buttons";
-import { Console, createConsoleSearch } from "./Console";
+import { Console, ConsoleErrors, createConsoleSearch } from "./Console";
 import { ClearHistory, History } from "./History";
 import { callsOf, scopeTests, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
@@ -151,6 +151,7 @@ export function BottomPanel(props: {
         </Show>
         <Show when={panel() === "console"}>
           <div class="ml-auto flex items-center gap-1">
+            <ConsoleErrors search={search} />
             <Tooltip text="Find (Ctrl+F)">
               <button
                 type="button"

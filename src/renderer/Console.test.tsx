@@ -355,3 +355,112 @@ describe("find (console search R3)", () => {
     expect(screen.queryByTestId("find-button")).toBeNull();
   });
 });
+
+const THREE_ERRORS = [
+  "12:00:00.001 [main] INFO  karate.scenario - hello",
+  "12:00:00.002 [main] ERROR karate.scenario - [ERROR] custom boom",
+  "failed features:",
+  "  C:\\work\\a.feature",
+  "    - fails match",
+  "      C:\\work\\a.feature:7",
+  "    - line 2",
+  "============================================================",
+];
+const errorsCount = () => screen.getByTestId("errors-count").textContent;
+
+describe("errors (console search R2)", () => {
+  it("shows the count and steps through the errors with the buttons and F8, wrapping", () => {
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    expect(errorsCount()).toBe("3 errors");
+    expect(screen.getByTestId("errors-count").getAttribute("role")).toBe("status");
+    fireEvent.click(screen.getByTestId("error-next"));
+    flush();
+    expect(errorsCount()).toBe("1 of 3 errors");
+    press("F8");
+    press("F8");
+    expect(errorsCount()).toBe("3 of 3 errors");
+    press("F8");
+    expect(errorsCount()).toBe("1 of 3 errors");
+    press("F8", { shiftKey: true });
+    expect(errorsCount()).toBe("3 of 3 errors");
+    fireEvent.click(screen.getByTestId("error-prev"));
+    flush();
+    expect(errorsCount()).toBe("2 of 3 errors");
+  });
+
+  it("leaves no error current after a new run", () => {
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    press("F8");
+    expect(errorsCount()).toBe("1 of 3 errors");
+    p.send(started);
+    p.lines(...THREE_ERRORS);
+    expect(errorsCount()).toBe("3 errors");
+  });
+
+  it("counts one error in the singular", () => {
+    const p = panel();
+    p.lines(THREE_ERRORS[1]);
+    expect(errorsCount()).toBe("1 error");
+  });
+
+  it("paints the current error's line", () => {
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    press("F8");
+    press("F8");
+    expect(painted("console-error-current").map(String)).toEqual(["    - fails match"]);
+  });
+
+  it("has no group and no F8 without errors", () => {
+    const p = panel();
+    p.lines("12:00:00.001 [main] WARN  karate.scenario - careful");
+    expect(screen.queryByTestId("console-errors")).toBeNull();
+    press("F8");
+    expect(CSS.highlights.size).toBe(0);
+  });
+
+  it("belongs to the Console tab", () => {
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    p.show("history");
+    expect(screen.queryByTestId("console-errors")).toBeNull();
+    press("F8");
+    p.show("console");
+    expect(errorsCount()).toBe("3 errors");
+  });
+
+  it("ignores F8 while a dialog is open, and under the Settings page", () => {
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    const d = document.createElement("dialog");
+    d.setAttribute("open", "");
+    document.body.append(d);
+    press("F8");
+    expect(errorsCount()).toBe("3 errors");
+    d.remove();
+    screen.getByTestId("bottom-panel").checkVisibility = () => false;
+    press("F8");
+    expect(errorsCount()).toBe("3 errors");
+  });
+
+  it("names its buttons and gives them their keys as tooltips", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const p = panel();
+    p.lines(...THREE_ERRORS);
+    expect(screen.getByTestId("console-errors").getAttribute("aria-label")).toBe("Errors");
+    for (const [id, name, text] of [
+      ["error-prev", "Previous error", "Previous error (Shift+F8)"],
+      ["error-next", "Next error", "Next error (F8)"],
+    ]) {
+      expect(screen.getByTestId(id).getAttribute("aria-label"), id).toBe(name);
+      const wrap = screen.getByTestId(id).closest("span.inline-flex") as HTMLElement;
+      fireEvent.pointerEnter(wrap);
+      vi.advanceTimersByTime(500);
+      expect(document.querySelector('[role="tooltip"]')?.textContent, id).toBe(text);
+      fireEvent.pointerLeave(wrap);
+      flush();
+    }
+  });
+});

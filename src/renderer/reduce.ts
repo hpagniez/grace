@@ -49,7 +49,10 @@ export interface AppState {
   /** Each test's HTTP calls, in run order; cleared exactly as `steps` is. */
   calls: Record<string, HttpCall[]>;
   console: string[];
-  /** The console lines dropped at CONSOLE_LIMIT since the run started: a line's number is this plus its index. */
+  /**
+   * The console lines dropped at CONSOLE_LIMIT or cleared by a run since the project opened: a line's number is
+   * this plus its index, and no two lines share one.
+   */
   consoleDropped: number;
   run: RunView;
   /** The last notice from main; `success` reports something done, not a problem. */
@@ -232,8 +235,8 @@ export function reduce(s: AppState, e: AppEvent): void {
         delete s.steps[key];
         delete s.calls[key];
       }
+      s.consoleDropped += s.console.length;
       s.console = [];
-      s.consoleDropped = 0;
       break;
     case "scenarios":
       for (const u of e.updates) {
