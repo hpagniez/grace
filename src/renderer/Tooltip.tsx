@@ -150,7 +150,15 @@ export function Tooltip(props: {
   // Once the tooltip exists: shown, then measured and placed.
   createEffect(open, (on) => {
     if (!on || !tip) return;
-    tip.showPopover?.(); // jsdom has no Popover API; shown first: it has no size while display is none
+    // jsdom has no Popover API; shown first: it has no size while display is none. Chromium refuses
+    // while another popover shows or hides (the panel of tags hands the focus back on Escape): the
+    // tooltip stays closed, since a throw here would halt every effect of the window.
+    try {
+      tip.showPopover?.();
+    } catch {
+      hide();
+      return;
+    }
     place();
   });
 
