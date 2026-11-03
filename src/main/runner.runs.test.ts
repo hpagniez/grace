@@ -98,6 +98,7 @@ describe("Runner runs", () => {
     await runner.open(fixture("edge"));
     const rows = byName(last("project").tree!, "dynamic <a>").children;
     expect(rows.map((r) => r.line)).toEqual([null, null]);
+    expect(rows.map((r) => r.example)).toEqual([{ a: "1" }, { a: "2" }]); // data-driven view R1.2
     await runner.run(rows[0].key);
     expect(last("notice").message).toBe("Run the outline to run its rows");
     expect(all("runStarted")).toHaveLength(0);

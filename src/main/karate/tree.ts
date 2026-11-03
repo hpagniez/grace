@@ -51,6 +51,8 @@ function sortFolders(folder: TestNode): void {
  * an outline with no rows is dropped. A row's key number is its 1-based position in the
  * outline across all Examples tables, because refId examples restart per table.
  * Row lines are left null: the Runner fills them from the feature file with `rowLines`.
+ * A row's values come from its result's `exampleData` in the feature's FEATURE_EXIT; a value that
+ * is not a string (a dynamic table's JSON) is kept as its JSON text.
  * Folders come first, then features, each sorted by path; scenarios keep file order.
  */
 export function buildTree(events: KarateEvent[], rootName: string): TestNode {
@@ -70,10 +72,14 @@ export function buildTree(events: KarateEvent[], rootName: string): TestNode {
   let feature: TestNode | null = null;
   let outlineEvent: KarateEvent | null = null;
   let outline: TestNode | null = null;
+  const examples = new Map<string, Record<string, unknown>>(); // by `${file}|${refId}`
   for (const ev of events) {
     const d = ev.data;
     if (d.callDepth !== 0) continue;
-    if (ev.type === "FEATURE_ENTER") {
+    if (ev.type === "FEATURE_EXIT") {
+      for (const r of d.scenarioResults ?? [])
+        if (r.exampleData) examples.set(`${d.relativePath}|${r.refId}`, r.exampleData);
+    } else if (ev.type === "FEATURE_ENTER") {
       const file: string = d.path;
       const cut = file.lastIndexOf("/");
       feature = node("feature", `f:${file}`, d.name || file.slice(cut + 1), file, {
@@ -114,6 +120,14 @@ export function buildTree(events: KarateEvent[], rootName: string): TestNode {
         ),
       );
     }
+  }
+  const index = leafIndex(root);
+  for (const [at, data] of examples) {
+    const row = index.get(at);
+    if (row?.kind === "row")
+      row.example = Object.fromEntries(
+        Object.entries(data).map(([c, v]) => [c, typeof v === "string" ? v : JSON.stringify(v)]),
+      );
   }
   sortFolders(root);
   return root;
