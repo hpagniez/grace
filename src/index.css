@@ -114,6 +114,9 @@
   --color-skipped-tint: #ecedee;
   --color-running-tint: #e5edf6;
   --color-cancelled-tint: #f2ebe0;
+  /* A find match in the console, and the current one, stronger (console search R4.2). */
+  --color-found: #f2e3a6;
+  --color-found-current: #e8b84a;
 
   /* Type (R2). */
   --font-sans: "IBM Plex Sans Variable", "Segoe UI Variable", system-ui, sans-serif;
@@ -203,6 +206,8 @@
       --color-skipped-tint: #26282e;
       --color-running-tint: #1d2a3a;
       --color-cancelled-tint: #322a1e;
+      --color-found: #3d3519;
+      --color-found-current: #6b5216;
       --shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
       --backdrop: rgb(0 0 0 / 0.6);
     }
@@ -212,6 +217,16 @@
     background: var(--color-ground);
     color: var(--color-ink);
     font-family: var(--font-sans);
+  }
+  /* The console's find and error stepping paint over its text, so no row redraws (console search R4). */
+  ::highlight(console-match) {
+    background-color: var(--color-found);
+  }
+  ::highlight(console-match-current) {
+    background-color: var(--color-found-current);
+  }
+  ::highlight(console-error-current) {
+    background-color: var(--color-failed-tint);
   }
   /* Body text is text-sm. It sits on body, not html: Tailwind's spacing is in rem, so a 13px root would shrink the 4px scale. */
   body {

@@ -37,6 +37,8 @@ const TOKENS = [
   "on-danger",
   "focus",
   "failed-hover",
+  "found",
+  "found-current",
   ...STATUSES,
   ...STATUSES.map((s) => `${s}-tint`),
 ];
@@ -135,6 +137,14 @@ describe("colour tokens (spec R1)", () => {
         ).toBeGreaterThanOrEqual(4.5);
       });
 
+      it("paints console matches readably, the current one stronger (console search R4.2)", () => {
+        expect(contrast(t.ink, t.found), "ink on found").toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t.ink, t["found-current"]), "ink on found-current").toBeGreaterThanOrEqual(
+          4.5,
+        );
+        expect(contrast(t["found-current"], t.sunken)).toBeGreaterThan(contrast(t.found, t.sunken));
+      });
+
       it("keeps control borders and the focus ring at 3:1", () => {
         for (const bg of ["surface", "ground"])
           for (const fg of ["control", "focus"])
@@ -142,6 +152,23 @@ describe("colour tokens (spec R1)", () => {
       });
     });
   }
+});
+
+describe("the console's highlights (console search R4)", () => {
+  const css = readFileSync(INDEX_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("paint matches, the current match and the current error from tokens", () => {
+    for (const [name, token] of [
+      ["console-match", "found"],
+      ["console-match-current", "found-current"],
+      ["console-error-current", "failed-tint"],
+    ])
+      expect(css).toMatch(
+        new RegExp(
+          String.raw`::highlight\(${name}\)\s*\{\s*background-color:\s*var\(--color-${token}\);`,
+        ),
+      );
+  });
 });
 
 describe("the floating shadow (spec R3.5)", () => {
