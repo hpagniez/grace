@@ -158,12 +158,12 @@ git commit -m "feat(ui): open every tag in a panel from the fold chip"
 **Interfaces:**
 - Consumes: `tag-strip`, `tag-more`, `tag-panel` (Tasks 1, 2); `openBig()`, `tree()` of `virtual.spec.ts`.
 
-- [ ] **Step 1: Write the e2e test** `"The filter bar keeps one line with 53 tags"` (spec R1 to R3)
+- [ ] **Step 1: Write the e2e test** `"The filter bar keeps one line with 54 tags"` (spec R1 to R3)
 
 - `bar` height ≤ 37 px (24 px chip + 2 × 6 px padding + 1 px border).
 - `hidden()` = count of `[data-testid=tag-strip] [data-testid=tag-chip].invisible`, > 0; `tag-more` has text `+${hidden}`.
 - The tree's top before opening = after opening the panel (`tree(win).boundingBox()`).
-- Click `tag-more` → `tag-panel` holds 53 `tag-chip`; click its `[data-tag="module-5-5"]` → `data-state` `include`; `expect.poll` of `tag-more`'s text equals `` `+${await hidden()} · 1 on` ``.
+- Click `tag-more` → `tag-panel` holds 54 `tag-chip`; click its `[data-tag="module-5-5"]` → `data-state` `include`; `expect.poll` of `tag-more`'s text equals `` `+${await hidden()} · 1 on` ``.
 - Press Escape → `tag-panel` hidden, `tag-more` focused.
 
 - [ ] **Step 2: Move the folded chip click of `"A filter change scrolls to the selected row"` into the panel**

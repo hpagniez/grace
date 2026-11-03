@@ -4,7 +4,7 @@ Date 2026-11-03. Status: approved. Covers [#127](https://github.com/hpagniez/gra
 
 ## Intent
 
-The filter bar wraps its tag chips onto as many lines as they need. In a big project that is most of the tree's height: with the bench's 53 tags it takes 4 to 6 lines, 127 to 187 px ([big-project note](../research/2026-10-29-big-project-perf/README.md), section 6). The bar keeps one line instead, and the tags that do not fit fold into a panel, so the tree keeps its height whatever the number of tags.
+The filter bar wraps its tag chips onto as many lines as they need. In a big project that is most of the tree's height: with the bench's 54 tags it takes 4 to 6 lines, 127 to 187 px ([big-project note](../research/2026-10-29-big-project-perf/README.md), section 6). The bar keeps one line instead, and the tags that do not fit fold into a panel, so the tree keeps its height whatever the number of tags.
 
 ## Goals, non-goals, anti-goals
 
@@ -58,7 +58,7 @@ Ways to show the folded tags, also settled with the owner: a panel over the tree
 
 - Idle: nothing runs. One `IntersectionObserver` per open project, on the strip; the browser calls it only when a chip crosses the fold: a resize, a tag list change, a chip that widens or narrows when it turns on or off, Clear and the counter appearing. No timer, no poll, no layout read in Grace's code.
 - During a run: the tags and the chips' states do not change, so the observer is not called.
-- Memory and nodes: the fold chip and the empty panel add a few nodes; the panel adds one chip per tag only while open (53 with the bench project). The chips on the line are the ones drawn today, so `page.nodes.open` does not grow beyond the fold chip.
+- Memory and nodes: the fold chip and the empty panel add a few nodes; the panel adds one chip per tag only while open (54 with the bench project). The chips on the line are the ones drawn today, so `page.nodes.open` does not grow beyond the fold chip.
 - Start: one observer call after the first layout, off the paint. Size: about 2 KB of code; no dependency.
 
 ## Design decisions already made
@@ -118,7 +118,7 @@ Feature: A one-line filter bar
     Then the panel's chips are disabled
 
   Scenario: The bench project keeps a one-line bar (e2e)
-    Given the big project with 53 tags is open
+    Given the big project with 54 tags is open
     Then the filter bar is one chip line tall
     And the fold chip reads "+N" with N the number of hidden chips
     When I open the panel and include "module-5-5"

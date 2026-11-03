@@ -119,7 +119,7 @@ const focusState = (win: Page) =>
     };
   });
 
-// The big project's 53 tags fold past the filter bar's one line (spec 2026-11-03-compact-filter-bar).
+// The big project's 54 tags fold past the filter bar's one line (spec 2026-11-03-compact-filter-bar).
 const panelChip = (win: Page, tag: string) =>
   win.getByTestId("tag-panel").locator(`[data-tag="${tag}"]`);
 const foldedChips = (win: Page) =>
@@ -196,7 +196,7 @@ test("A new tree keeps the rows in view still", async () => {
   expect(await scrolls(win)).toEqual([]);
 });
 
-test("The filter bar keeps one line with 53 tags", async () => {
+test("The filter bar keeps one line with 54 tags", async () => {
   const { win } = await openBig();
   const bar = win.getByTestId("filter-bar");
   const more = win.getByTestId("tag-more");
@@ -211,7 +211,7 @@ test("The filter bar keeps one line with 53 tags", async () => {
   const top = (await tree(win).boundingBox())!.y;
   await more.click();
   const panel = win.getByTestId("tag-panel");
-  await expect(panel.getByTestId("tag-chip")).toHaveCount(53);
+  await expect(panel.getByTestId("tag-chip")).toHaveCount(54);
   expect((await tree(win).boundingBox())!.y).toBe(top); // the panel lies over the tree
   const under = (await bar.boundingBox())!;
   expect(Math.abs((await panel.boundingBox())!.y - (under.y + under.height))).toBeLessThanOrEqual(
@@ -230,6 +230,9 @@ test("The filter bar keeps one line with 53 tags", async () => {
   await win.keyboard.press("Escape");
   await expect(panel).toBeHidden();
   await expect(more).toBeFocused();
+  // the window still answers: the panel's state follows, and its chips are gone
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await expect(panel.getByTestId("tag-chip")).toHaveCount(0);
 });
 
 test("A filter change scrolls to the selected row", async () => {
