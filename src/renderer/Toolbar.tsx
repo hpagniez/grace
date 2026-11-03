@@ -1,5 +1,7 @@
 import {
   ArrowDownToDot,
+  Eye,
+  EyeOff,
   FileText,
   FolderOpen,
   Pause,
@@ -116,6 +118,19 @@ export function Toolbar(props: { state: AppState; api: Api }) {
           onClick={() => void props.api.refresh()}
         >
           <Icon icon={RefreshCw} />
+        </button>
+      </Tooltip>
+      {/* enabled during a run: it touches only the watcher; on and off differ by icon, not only by fill (watch mode R1) */}
+      <Tooltip text="Watch: run a feature when it is saved">
+        <button
+          data-testid="watch-button"
+          class={`${btnIcon} ${props.state.watch ? "bg-selected" : ""}`}
+          aria-label="Watch"
+          aria-pressed={props.state.watch ? "true" : "false"}
+          disabled={!props.state.project || !!props.state.opening}
+          onClick={() => void props.api.setWatch(!props.state.watch)}
+        >
+          <Icon icon={props.state.watch ? Eye : EyeOff} />
         </button>
       </Tooltip>
       <Tooltip text={spoken("Open…")}>

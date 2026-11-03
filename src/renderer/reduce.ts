@@ -67,6 +67,8 @@ export interface AppState {
    * box resets even when main re-sends the count it held. Null with no project.
    */
   threads: { count: number } | null;
+  /** Whether watch mode is on for the open project, as main holds it. */
+  watch: boolean;
   /** The Runner holds its one-at-a-time slot: discovering, or running. */
   busy: boolean;
   /** The open project's listed runs, newest first, as main sends them. */
@@ -140,6 +142,7 @@ export function initialState(): AppState {
     filter: noFilter(),
     env: null,
     threads: null,
+    watch: false,
     busy: false,
     history: [],
     flaky: {},
@@ -322,6 +325,9 @@ export function reduce(s: AppState, e: AppEvent): void {
     case "threads":
       if (!s.project) break; // main can still hold the previous project's count
       s.threads = { count: e.count };
+      break;
+    case "watch":
+      s.watch = e.on;
       break;
     case "busy":
       s.busy = e.busy;

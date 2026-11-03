@@ -67,6 +67,7 @@ function setup(root = ROOT) {
     openReport: vi.fn(async () => {}),
     rerunFailed: vi.fn(async () => {}),
     debugCommand: vi.fn(async () => {}),
+    setWatch: vi.fn(async (_on: boolean) => {}),
   };
   render(() => <Toolbar state={state} api={api as unknown as Api} />);
   const send = (...events: AppEvent[]) => {
@@ -131,6 +132,7 @@ describe("order and shape (R13.1)", () => {
       "threads-input",
       "properties-button",
       "refresh-button",
+      "watch-button",
       "open-button",
       "report-button",
       "rerun-failed-button",
@@ -563,5 +565,52 @@ describe("toolbar: step debugger", () => {
     fireEvent.keyDown(window, { key: "F5" });
     expect(api.debugCommand).not.toHaveBeenCalled();
     expect(ids()).toContain("debug-pause");
+  });
+});
+
+describe("the Watch toggle (watch mode R1)", () => {
+  const watch = () => button("watch-button");
+
+  it("is an icon button named Watch, off until main says on, with its own icon and the selected fill when on", () => {
+    const { send } = setup();
+    expect(watch()).toBe(screen.getByRole("button", { name: "Watch" }));
+    expect(watch().className).toContain("size-7");
+    expect(watch().textContent).toBe("");
+    expect(watch().getAttribute("aria-pressed")).toBe("false");
+    expect(watch().className).not.toContain("bg-selected");
+    const off = watch().querySelector("svg")!.innerHTML;
+    send({ type: "watch", on: true });
+    expect(watch().getAttribute("aria-pressed")).toBe("true");
+    expect(watch().className).toContain("bg-selected");
+    expect(watch().querySelector("svg")!.innerHTML).not.toBe(off);
+  });
+
+  it("asks main for the other state on a click", () => {
+    const { api, send } = setup();
+    fireEvent.click(watch());
+    expect(api.setWatch).toHaveBeenLastCalledWith(true);
+    send({ type: "watch", on: true });
+    fireEvent.click(watch());
+    expect(api.setWatch).toHaveBeenLastCalledWith(false);
+  });
+
+  it("says what it does in its tooltip", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    setup();
+    hover(watch());
+    expect(tip().textContent).toBe("Watch: run a feature when it is saved");
+  });
+
+  it("stays enabled during a run, and is disabled during an open and with no project", () => {
+    const { send } = setup();
+    send({ type: "busy", busy: true });
+    expect(watch().disabled).toBe(false);
+    send({ type: "opening", root: "D:\\other" });
+    expect(watch().disabled).toBe(true);
+    send(
+      { type: "opening", root: null },
+      { type: "project", project: null, tree: null, error: null },
+    );
+    expect(watch().disabled).toBe(true);
   });
 });
