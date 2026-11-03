@@ -67,9 +67,9 @@ Which runs: **any run in the history (chosen by the owner)** over the last run o
 
 1. It holds everything in the run's folder except Grace's `run.json` and Karate's event folder `karate-json`, with `karate-summary.html` at its root, so the report opens once it is unzipped.
 2. File names keep their characters: names are written in UTF-8.
-3. Main writes it with `%SystemRoot%\System32\tar.exe` in zip format, without a shell and with no window. It names the run folder's entries itself; nothing the window sent reaches the command.
+3. Main writes it with `%SystemRoot%\System32\tar.exe` in zip format, without a shell and with no window. It names the run folder's entries itself; nothing the window sent reaches the command. tar reads its arguments in the ANSI code page, so no path goes on its command line: it runs in the run's folder and writes the zip to its output, which main saves next to the chosen path and then moves onto it. Any chosen path and any run folder work, whatever their characters.
 4. When it is written, a success notice says "Report saved to <full path>".
-5. When it cannot be written, a notice says "The report could not be saved: <reason>", and nothing is left at the chosen path.
+5. When it cannot be written, a notice says "The report could not be saved: <reason>", no partial file is left, and the chosen path keeps what it had: nothing, or the file the person meant to replace.
 6. A file the person chose to replace in the Save dialog is replaced.
 
 ## Cost
@@ -142,6 +142,10 @@ Feature: Export a run's report
     When main zips it to "out.zip"
     Then out.zip holds karate-summary.html, feature-html/café.html and junit-xml/a.xml
     And it holds neither run.json nor anything under karate-json
+
+  Scenario: Any characters in the chosen path
+    When main zips a run folder named "отчёт łódź" to "報告/r łódź.zip"
+    Then "報告" holds only "r łódź.zip", which holds the report
 
   Scenario: A zip that cannot be written leaves nothing
     Given the run's folder is deleted while it is zipped
