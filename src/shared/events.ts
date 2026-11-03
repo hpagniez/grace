@@ -18,6 +18,8 @@ export interface Step {
   millis: number;
   background: boolean;
   log: string | null;
+  /** The `#` lines Karate attached to the step, trimmed; absent when it has none (step comments R1). */
+  comments?: string[];
 }
 /** A step of a test as its feature file has it, before any run (step debugger R4.1). */
 export interface FileStep {
@@ -25,6 +27,7 @@ export interface FileStep {
   text: string;
   line: number;
   background: boolean;
+  comments?: string[];
 }
 /** A step debugger breakpoint: the tree's `file` (Karate's feature path) and a step line. */
 export interface Breakpoint {
