@@ -1,8 +1,18 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFile, vscodeUrl } from "./editor";
+
+// The real realpathSync, its native form counted: a path it reads is a path it touched.
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  const realpathSync = (p: string) => fs.realpathSync(p);
+  return {
+    ...fs,
+    realpathSync: Object.assign(realpathSync, { native: vi.fn(fs.realpathSync.native) }),
+  };
+});
 
 let outer: string;
 let root: string;
@@ -45,6 +55,19 @@ describe("projectFile (open-in-editor R3.3)", () => {
     }
     expect(projectFile(root, path.join(root, "tests", "gone.feature"))).toBeNull();
     expect(projectFile(root, root)).toBeNull();
+  });
+
+  it("refuses a path outside the project without reading it: a share or a device is never reached", () => {
+    const outside = [
+      "\\\\attacker\\s\\x.feature",
+      "//attacker/s/x.feature",
+      "\\\\.\\pipe\\x",
+      "\\\\?\\C:\\Windows\\win.ini",
+      "C:\\Windows\\win.ini",
+    ];
+    for (const file of outside) expect(projectFile(root, file)).toBeNull();
+    const read = vi.mocked(realpathSync.native).mock.calls.map(([p]) => p);
+    for (const file of outside) expect(read).not.toContain(file);
   });
 
   it("refuses a file reached through a link to a folder outside the project", () => {
