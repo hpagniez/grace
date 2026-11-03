@@ -88,6 +88,26 @@ describe("reduce", () => {
     expect(s.run).toMatchObject({ active: true, total: 2, done: 0, startedAt: 1000 });
   });
 
+  it("keeps the run's starting key (#224 R3.1)", () => {
+    const s = initialState();
+    apply(s, project(), { ...started(), selection: keys[1] } as AppEvent);
+    expect(s.run.selection).toBe(keys[1]);
+  });
+
+  it("lists the tests that fail in the run, once each, in order (#224 R3.3)", () => {
+    const s = initialState();
+    apply(s, project(), started(keys.slice(0, 3)));
+    const update = (key: string, status: "passed" | "failed") =>
+      apply(s, { type: "scenarios", updates: [{ key, status }] });
+    update(keys[1], "failed");
+    update(keys[0], "passed");
+    update(keys[2], "failed");
+    update(keys[1], "failed");
+    expect(s.run.failedKeys).toEqual([keys[1], keys[2]]);
+    apply(s, started(keys.slice(0, 3)));
+    expect(s.run.failedKeys).toEqual([]);
+  });
+
   it("replays a whole run: done 9, passed 8, failed 1, outcome finished", () => {
     const s = initialState();
     apply(s, project(), started());
