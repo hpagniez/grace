@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- A step with no comment has no `comments` field and no extra node (R1.5, R2.2).
+- A step with no comment has no `comments` field and no extra element (R1.5, R2.2).
 - Comments are kept as Karate gives them: trimmed, `#` kept (R1.1).
 - Colours only through semantic tokens (`text-muted`); no `title=`, no raw palette class.
 

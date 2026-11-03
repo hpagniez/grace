@@ -10,7 +10,7 @@ Teams write `#` comments above their steps to say what a step checks and why: wh
 
 - Goals: a step's comments above it in Details, muted, as written, for the test's own steps and its Background's; before a run, after it, and on the step a debug run is paused at.
 - Non-goals: comments Karate attaches to no step; a step inside a called feature (Details shows no such step today, only "Paused in called.feature:5"); folding or cutting a long comment; editing comments; comments in the tree or the Examples table.
-- Anti-goals: any cost while idle; an extra node on a step that has no comment; Grace attaching comments differently from Karate.
+- Anti-goals: any cost while idle; an extra element on a step that has no comment; Grace attaching comments differently from Karate.
 
 ## Constraints
 
@@ -41,7 +41,7 @@ Teams write `#` comments above their steps to say what a step checks and why: wh
 ### R2. How they show
 
 1. Details shows a step's comments above its row, one line each, as written, in the muted colour and the mono font of the step text, aligned with the step's status mark. A long line wraps; nothing folds or is cut.
-2. A step with no comments shows as today, with no extra node.
+2. A step with no comments shows as today, with no extra element.
 3. The step a debug run is paused at shows its comments like any other row, inside the paused tint.
 4. The failed test's error box stays as Karate writes it, with the failed step's closest comment above the step; the step list below shows all its comments.
 
@@ -54,7 +54,7 @@ Teams write `#` comments above their steps to say what a step checks and why: wh
 
 - Idle: nothing. No timer, listener or poll.
 - A run: the `steps` event carries a `comments` array only on steps that have comments; a few short strings each. `fileSteps` collects them in its existing pass over the file.
-- Drawing: one more element per commented step, none for the others.
+- Drawing: one element per commented step, plus one line per comment. Every step row also gets one empty text node, Solid's placeholder for the comments when there are none, as each `Show` in the row has: no element, no layout. The PR's bench measured `page.nodes.open` +11 and `page.nodes.run` +7, within their limits.
 - Memory, start time: no measurable change. Size: under 1 KB of code; no dependency.
 
 ## Design decisions already made
