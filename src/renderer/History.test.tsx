@@ -1,5 +1,5 @@
 import { render, screen, cleanup, fireEvent, within } from "@solidjs/testing-library";
-import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
+import { Check, Download, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
 import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
@@ -66,6 +66,7 @@ function setup() {
     rerun: vi.fn(async (_id: string) => {}),
     rerunFailed: vi.fn(async (_id: string) => {}),
     openRunReport: vi.fn(async (_id: string) => {}),
+    exportReport: vi.fn(async (_id: string) => {}),
     clearHistory: vi.fn(async () => {}),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
@@ -95,7 +96,12 @@ const showHistory = () => click(screen.getByTestId("tab-history"));
 const rows = () => screen.queryAllByTestId("history-row");
 const inRow = (i: number, id: string) => within(rows()[i]).getByTestId(id) as HTMLButtonElement;
 const text = (i: number, id: string) => within(rows()[i]).getByTestId(id).textContent;
-const rowButtons = ["history-report", "history-rerun", "history-rerun-failed"] as const;
+const rowButtons = [
+  "history-report",
+  "history-export",
+  "history-rerun",
+  "history-rerun-failed",
+] as const;
 const toolbarRerunFailed = () => screen.getByTestId("rerun-failed-button") as HTMLButtonElement;
 const clear = () => screen.getByTestId("clear-history") as HTMLButtonElement;
 const confirm = () => screen.getByTestId("clear-history-dialog") as HTMLDialogElement;
@@ -438,8 +444,10 @@ describe("history actions", () => {
     load(entry("a", { reportAvailable: false }), entry("b"));
     showHistory();
     expect(inRow(0, "history-report").disabled).toBe(true);
+    expect(inRow(0, "history-export").disabled).toBe(true);
     expect(inRow(0, "history-rerun").disabled).toBe(false);
     expect(inRow(1, "history-report").disabled).toBe(false);
+    expect(inRow(1, "history-export").disabled).toBe(false);
   });
 
   it("Re-run failed is disabled with no failure", () => {
@@ -457,16 +465,20 @@ describe("history actions", () => {
     showHistory();
     expect(rowButtons.map((id) => inRow(1, id).textContent)).toEqual([
       "Report",
+      "Export",
       "Re-run",
       "Re-run failed",
     ]);
     // small ghost buttons, each with its icon
     for (const id of rowButtons) expect(inRow(1, id).className, id).toContain(ghostSmall);
     expect(drawn(inRow(1, "history-report").querySelector("svg"), FileText)).toBe(true);
+    expect(drawn(inRow(1, "history-export").querySelector("svg"), Download)).toBe(true);
     expect(drawn(inRow(1, "history-rerun").querySelector("svg"), Play)).toBe(true);
     expect(drawn(inRow(1, "history-rerun-failed").querySelector("svg"), RotateCcw)).toBe(true);
     click(inRow(1, "history-report"));
     expect(api.openRunReport).toHaveBeenCalledExactlyOnceWith("20261024-172000-000");
+    click(inRow(1, "history-export"));
+    expect(api.exportReport).toHaveBeenCalledExactlyOnceWith("20261024-172000-000");
     click(inRow(0, "history-rerun"));
     expect(api.rerun).toHaveBeenCalledExactlyOnceWith("20261025-143200-000");
     click(inRow(1, "history-rerun-failed"));
