@@ -1,6 +1,6 @@
 # Watch mode: re-run on save
 
-Date 2026-11-03. Status: draft. Covers [#67](https://github.com/hpagniez/grace/issues/67).
+Date 2026-11-03. Status: approved. Covers [#67](https://github.com/hpagniez/grace/issues/67).
 
 ## Intent
 
@@ -45,7 +45,7 @@ No file watcher. The tree changes on open, on Refresh, on an environment switch 
 2. An event counts only for a path ending in `.feature` (any case) with no folder named `.git`, `node_modules` or `.gradle` (`SKIPPED_DIRS`) in its path below the root.
 3. A feature counts as saved once 300 ms passed with no counted event in any root (one quiet window for all, so a "Save all" is one batch). It is then checked once: a path that is no longer a file (deleted or renamed away) is dropped, and so is one whose modified time is not later than both the watcher's start and the time Grace last counted it. Windows can report a read or an attribute change; Karate reads every feature in each dry run and run, so without this check a run could start the next one for ever.
 4. Refresh starts the watcher again on the feature roots of the new discovery (`karate-pom.json` may have changed them); waiting saves and a running quiet time are kept. The dry run before a run does not touch the watcher.
-5. If a root cannot be watched (`fs.watch` throws, or the watcher reports an error later), Grace closes every watcher, turns watch mode off in memory without saving it, sends `watch` off and the notice "Watch mode stopped: <reason>". The next open of the project tries again.
+5. If a root cannot be watched (`fs.watch` throws, the watcher reports an error later, or the root itself is deleted or renamed: Windows then reports the root's own path in a loop, about 50,000 events a second, and never an error), Grace closes every watcher, turns watch mode off in memory without saving it, sends `watch` off and the notice "Watch mode stopped: <reason>". The next open of the project tries again.
 
 ### R3. What a save runs
 
