@@ -83,6 +83,29 @@ The `db-helper` samples follow that shape, with a helper written for them (`com.
 
 The same build passed `npm test` (105 files, 1645 tests) and `npm run e2e` (175 passed, 9.7 m).
 
-## Needs the owner
+## The guide as written, with SQLite: the owner's stand-in
 
-Their work suite, opened and run in a packaged build, for the points just above.
+Added on 2026-11-03. `samples/db-guide-sqlite` follows Karate's [database testing](https://docs.karatelabs.io/advanced/database-testing/) guide as closely as SQLite allows:
+- **The project:** Maven on Karate 2.1.4, with `org.xerial:sqlite-jdbc` 3.54.1.0 as a `test`-scoped dependency.
+- **The helper:** at the guide's path and name, `com.mycompany.DbUtils`, written for this sample. It has the guide's `query`, `queryWithParams`, `execute` and `executeInTransaction` over plain JDBC, and its URL is a constant: `jdbc:sqlite:target/test.db`, a local file.
+- **The features:** they load the helper with `Java.type('com.mycompany.DbUtils')` and use it as the guide's examples do: Background setup and `afterScenario` cleanup, a parameterised query, a transaction that commits and one that rolls back, and the database checked after a POST to a local mock.
+- **Left out:** the guide's `callStoredProc`, because SQLite has no stored procedures.
+
+Build: `feature/project-libraries` with app code unchanged since `e4ace800`, packaged then; the same tools as above. `mvn test-compile` first, as the person's build would.
+
+| What | Result |
+|---|---|
+| Listed classpath | 30 jars, `sqlite-jdbc-3.54.1.0.jar` among them (the `test` scope) |
+| Open | about 4.7 s (listing, then finding 6 scenarios), no notice: the helper is built |
+| Run | all 6 scenarios passed; `target/test.db` is the database |
+| The whole check | 10 of 10 cases passed |
+
+Two things the guide does not say, met on the way:
+- **`executeInTransaction` takes Java varargs:** Karate 2 passes the feature's arguments to it as written.
+- **Karate 2 turns Java off in mock features:** their data comes from requests. A mock that writes to the database through `DbUtils` must opt in with `configure javaBridgeEnabled = true`. Without it, it fails with `java bridge not enabled`.
+
+The owner takes this sample as the stand-in for their own work-suite check: "what about creating a sample project, which replicates, exactly like the documentation says such behavior with a test sqllite database on local and appropriate driver so we can unblock this PR".
+
+## Still only the owner's real suite can prove
+
+Their company repository, versions, own libraries and way of running the suite (the list above). The owner chose the stand-in instead of that run, so this record stops here.

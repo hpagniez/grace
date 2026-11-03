@@ -114,6 +114,20 @@ const CASES: {
       rmSync(path.join(dir, ".mvn"), { recursive: true });
     },
   },
+  // Karate's database testing guide as written: com.mycompany.DbUtils, a local SQLite file, the owner's stand-in
+  {
+    sample: "db-guide-sqlite",
+    scenarios: {
+      "read every row": "passed",
+      "read with a parameter": "passed",
+      "change rows and count them": "passed",
+      "a transaction that commits": "passed",
+      "a transaction that fails leaves nothing behind": "passed",
+      "a created user is in the database": "passed",
+    },
+    before: testCompile,
+    listed: "sqlite-jdbc-3.54.1.0.jar",
+  },
   // Karate's database testing guide: a compiled helper and a test-scoped driver
   { sample: "db-helper", scenarios: ORDERS, before: testCompile, listed: "h2-2.2.224.jar" },
   { sample: "db-helper-karate1", scenarios: ORDERS, before: testCompile, listed: "h2-2.2.224.jar" },
