@@ -49,6 +49,11 @@ export interface AppState {
   /** Each test's HTTP calls, in run order; cleared exactly as `steps` is. */
   calls: Record<string, HttpCall[]>;
   console: string[];
+  /**
+   * The console lines dropped at CONSOLE_LIMIT or cleared by a run since the project opened: a line's number is
+   * this plus its index, and no two lines share one.
+   */
+  consoleDropped: number;
   run: RunView;
   /** The last notice from main; `success` reports something done, not a problem. */
   notice: { text: string; success: boolean } | null;
@@ -128,6 +133,7 @@ export function initialState(): AppState {
     steps: {},
     calls: {},
     console: [],
+    consoleDropped: 0,
     run: idleRun(),
     notice: null,
     selected: null,
@@ -182,7 +188,10 @@ export function reduce(s: AppState, e: AppEvent): void {
           vars: null,
           panel: s.panel === "variables" ? "console" : s.panel,
         });
-        if (!e.project) s.console = []; // a closed project leaves no console behind
+        if (!e.project) {
+          s.console = []; // a closed project leaves no console behind
+          s.consoleDropped = 0;
+        }
       }
       // A key only says where a test sits: inserting a scenario gives the next one its key.
       const before = byKey(s.tree);
@@ -226,6 +235,7 @@ export function reduce(s: AppState, e: AppEvent): void {
         delete s.steps[key];
         delete s.calls[key];
       }
+      s.consoleDropped += s.console.length;
       s.console = [];
       break;
     case "scenarios":
@@ -251,9 +261,12 @@ export function reduce(s: AppState, e: AppEvent): void {
     case "calls":
       s.calls[e.key] = e.calls;
       break;
-    case "console":
-      s.console = s.console.concat(e.lines).slice(-CONSOLE_LIMIT);
+    case "console": {
+      const all = s.console.concat(e.lines);
+      s.consoleDropped += Math.max(0, all.length - CONSOLE_LIMIT);
+      s.console = all.slice(-CONSOLE_LIMIT);
       break;
+    }
     case "runFinished":
       s.run.active = false;
       s.run.outcome = e.outcome;
