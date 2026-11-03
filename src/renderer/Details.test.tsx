@@ -328,7 +328,7 @@ describe("details: a group during a run", () => {
       set((draft) => reduce(draft, e));
       flush();
     };
-    render(() => <Details state={state} api={{} as Api} />);
+    render(() => <Details state={state} api={{} as Api} select={() => {}} />);
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },
@@ -476,7 +476,7 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
       steps: vi.fn(async () => fromFile),
       toggleBreakpoint: vi.fn(async () => {}),
     };
-    render(() => <Details state={state} api={api as unknown as Api} />);
+    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
     send(project);
     set((draft) => void (draft.selected = leafNode.key));
     flush();
@@ -539,7 +539,7 @@ describe("details: open in VS Code (open-in-editor R1, R2)", () => {
       flush();
     };
     const api = { steps: vi.fn(async () => null), openInEditor: vi.fn(async () => {}) };
-    render(() => <Details state={state} api={api as unknown as Api} />);
+    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },

@@ -1,5 +1,5 @@
 import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, MousePointerClick } from "lucide";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, For, Show } from "solid-js";
 import type { FileStep, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
@@ -8,6 +8,7 @@ import { ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
+import { Examples } from "./Examples";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
@@ -171,7 +172,10 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
     props.node.line === null ? props.node.file : `${props.node.file}:${props.node.line}`;
   return (
     <>
-      <h2 class="text-lg font-semibold break-words">{nodeName(props.node)}</h2>
+      {/* Focus lands here when a row is opened from the Examples table with the keyboard */}
+      <h2 tabindex="-1" class="text-lg font-semibold break-words outline-none">
+        {nodeName(props.node)}
+      </h2>
       <p>
         <StatusBadge status={status()} />
       </p>
@@ -294,17 +298,27 @@ function Group(props: { node: TestNode; state: AppState }) {
   );
 }
 
-export function Details(props: { state: AppState; api: Api }) {
+export function Details(props: { state: AppState; api: Api; select(key: string): void }) {
   const node = () =>
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
       : null;
   // The call replaces the node while the HTTP tab is up; findCall is null once the call is gone.
   const call = () => (props.state.panel === "http" ? findCall(props.state) : null);
+  let aside!: HTMLElement;
+  // Opening a row unmounts the table: focus inside it moves to the row's heading, not the page.
+  const open = (key: string) => {
+    const focused = aside.contains(document.activeElement);
+    props.select(key);
+    if (!focused) return;
+    flush();
+    aside.querySelector<HTMLElement>("h2")?.focus();
+  };
   return (
     <aside
+      ref={(e) => (aside = e)}
       data-testid="details"
-      class="min-h-0 flex-1 space-y-3 overflow-auto border-l border-line p-4"
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto border-l border-line p-4"
     >
       <Show
         when={call()}
@@ -318,7 +332,15 @@ export function Details(props: { state: AppState; api: Api }) {
             {(n) => (
               <Show
                 when={n().kind === "scenario" || n().kind === "row"}
-                fallback={<Group node={n()} state={props.state} />}
+                fallback={
+                  <>
+                    <Group node={n()} state={props.state} />
+                    {/* Keyed: another outline gets a new table, at its top; a refresh keeps the place */}
+                    <Show when={n().kind === "outline" && n().key} keyed>
+                      {(_key) => <Examples outline={n()} state={props.state} select={open} />}
+                    </Show>
+                  </>
+                }
               >
                 <Leaf node={n()} state={props.state} api={props.api} />
               </Show>

@@ -17,6 +17,8 @@ export interface ProjectLayout {
   configDirs: string[];
   /** What the open notice says about karate-pom.json; null when there is nothing to say. */
   pomNotice: string | null;
+  /** Where Karate's names of the tree's files resolve, for `locate`: Karate's root, then the project. */
+  bases: string[];
 }
 
 const SOURCE = ["src/test/java", "src/test/resources"];
@@ -36,6 +38,22 @@ export const inside = (root: string, abs: string) => {
   const rel = path.relative(root, abs);
   return rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 };
+
+/**
+ * The folder Karate names files relative to, as its `Suite.computeRoot` finds it: a configDir that is not on the
+ * classpath, else the folder of the first `karate-config.js` (or configDir file) on the classpath, else the project.
+ * shortcut: a library folder later on the classpath is not checked, as no tree file is under one; check them if one can be.
+ */
+function karateRoot(root: string, classpath: string[], configDir: string | null): string {
+  if (configDir !== null && !configDir.startsWith("classpath:")) {
+    const dir = path.resolve(root, configDir.replace(/^file:/, ""));
+    return configDir.endsWith(".js") ? path.dirname(dir) : dir;
+  }
+  const rel = configDir?.slice("classpath:".length) ?? "";
+  const config = rel.endsWith(".js") ? rel : path.join(rel, "karate-config.js");
+  const hit = classpath.map((d) => path.join(d, config)).find((f) => existsSync(f));
+  return hit ? path.dirname(hit) : root;
+}
 
 /**
  * All paths absolute. Maven/Gradle: whichever of src/test/java and src/test/resources exist. The project's
@@ -71,9 +89,10 @@ export function detectLayout(root: string): ProjectLayout {
             ]
           : []),
       ];
+  const classpath = [...source, ...existing(COMPILED[layout])];
   return {
     layout,
-    classpath: [...source, ...existing(COMPILED[layout])],
+    classpath,
     featureRoots: pom.paths ? kept.map((p) => path.resolve(root, p)) : source,
     configDir,
     configDirs:
@@ -86,6 +105,7 @@ export function detectLayout(root: string): ProjectLayout {
             root,
           ],
     pomNotice: notice.length ? notice.join(" ") : null,
+    bases: [...new Set([karateRoot(root, classpath, configDir), root])],
   };
 }
 
@@ -119,8 +139,8 @@ export function tagArgs(f: TagFilter): string[] {
 }
 
 /**
- * The absolute path of a tree file or folder: the first of `bases` (the project folder, then the classpath) that holds it.
- * Karate gives it relative to the classpath folder whose karate-config.js it found, else to the working directory (#208).
+ * The absolute path of a tree file or folder: the first of `bases` (Karate's root, then the project folder) that holds it.
+ * Karate gives it relative to its root when the file is under it, else to the working directory (#208, #223).
  */
 export function locate(bases: string[], file: string): string {
   const all = bases.map((b) => path.join(b, ...file.split("/")));
