@@ -1,6 +1,6 @@
 # Open in VS Code from the test tree
 
-Date 2026-11-03. Status: draft. Covers [#222](https://github.com/hpagniez/grace/issues/222). Builds on [Open a test in VS Code](2026-11-03-open-in-editor.md) (#68).
+Date 2026-11-03. Status: approved. Covers [#222](https://github.com/hpagniez/grace/issues/222). Builds on [Open a test in VS Code](2026-11-03-open-in-editor.md) (#68).
 
 ## Intent
 
