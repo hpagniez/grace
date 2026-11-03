@@ -99,6 +99,13 @@ const fold = (...tags: string[]) => {
   flush();
 };
 const more = () => screen.queryByTestId("tag-more") as HTMLButtonElement | null;
+const panel = () => screen.getByTestId("tag-panel");
+/** jsdom has no Popover API: the browser's toggle of the panel, as its event. */
+const toggle = (newState: "open" | "closed") => {
+  panel().dispatchEvent(Object.assign(new Event("toggle"), { newState }));
+  flush();
+};
+const panelChips = () => [...panel().querySelectorAll<HTMLButtonElement>("[data-testid=tag-chip]")];
 
 beforeEach(() => vi.stubGlobal("IntersectionObserver", FakeIO));
 afterEach(() => {
@@ -149,6 +156,52 @@ describe("folding", () => {
     send({ type: "filter", filter: smokeNotWip() });
     expect(FakeIO.all.length).toBe(n);
     expect(more()!.textContent).toBe("+1 · 1 on");
+  });
+
+  it("opens a panel of every tag that cycles them", () => {
+    const { api, load } = setup();
+    load();
+    fold("smoke", "wip");
+    expect(more()!.getAttribute("popovertarget")).toBe("tag-panel");
+    expect(panel().getAttribute("popover")).toBe("auto");
+    expect(panel().getAttribute("aria-label")).toBe("All tags");
+    expect(panelChips()).toEqual([]);
+    expect(more()!.getAttribute("aria-expanded")).toBe("false");
+    toggle("open");
+    expect(more()!.getAttribute("aria-expanded")).toBe("true");
+    expect(panelChips().map((c) => c.textContent)).toEqual(["@slow", "@smoke", "@wip"]);
+    expect(panelChips().some((c) => c.className.includes("invisible"))).toBe(false);
+    fireEvent.click(panelChips()[1]);
+    expect(api.setFilter).toHaveBeenCalledWith({
+      include: ["smoke"],
+      exclude: [],
+      hideNonMatching: false,
+    });
+    expect(panelChips()).toHaveLength(3);
+    toggle("closed");
+    expect(panelChips()).toEqual([]);
+    expect(more()!.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes the panel when nothing is folded", () => {
+    const { load } = setup();
+    load();
+    fold("wip");
+    toggle("open");
+    fold();
+    expect(more()).toBeNull();
+    expect(panelChips()).toEqual([]);
+  });
+
+  it("disables the panel's chips during a run", () => {
+    const { send, load } = setup();
+    load();
+    fold("wip");
+    send({ type: "busy", busy: true });
+    toggle("open");
+    expect(panelChips().length).toBe(3);
+    expect(panelChips().every((c) => c.disabled)).toBe(true);
+    expect(more()!.disabled).toBe(false);
   });
 
   it("shows the next click on the fold chip in a tooltip", () => {

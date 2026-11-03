@@ -40,6 +40,9 @@ export function FilterBar(props: { state: AppState; api: Api }) {
   let strip: HTMLDivElement | undefined;
   const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
   const foldedOn = () => [...folded()].filter((t) => stateOf(t) !== "off").length;
+  // The panel of every tag: a native popover, so Escape, a click outside and the focus come free (R3).
+  let panel: HTMLDivElement | undefined;
+  const [open, setOpen] = createSignal(false);
   // Keyed on the tag names: a filter echo makes a new array of the same tags.
   const tagKey = createMemo(() => tags().join(" "));
   createEffect(tagKey, (key) => {
@@ -53,6 +56,11 @@ export function FilterBar(props: { state: AppState; api: Api }) {
           else past.add(tag);
         }
         setFolded(new Set(past));
+        // Nothing left to unfold: the panel goes with its fold chip (R3.5).
+        if (past.size === 0 && open()) {
+          panel?.hidePopover?.();
+          setOpen(false);
+        }
       },
       { root: strip },
     );
@@ -103,12 +111,35 @@ export function FilterBar(props: { state: AppState; api: Api }) {
               type="button"
               data-testid="tag-more"
               class={chip}
+              popovertarget="tag-panel"
+              aria-expanded={open() ? "true" : "false"}
               aria-label={`${folded().size} more ${folded().size === 1 ? "tag" : "tags"}${foldedOn() ? `, ${foldedOn()} on` : ""}`}
             >
               {`+${folded().size}${foldedOn() ? ` · ${foldedOn()} on` : ""}`}
             </button>
           </Tooltip>
         </Show>
+        {/* Under the bar, its width, over the tree (R3.1); its chips exist only while it is open (R3.6). */}
+        <div
+          ref={(e) => (panel = e)}
+          id="tag-panel"
+          data-testid="tag-panel"
+          popover="auto"
+          role="group"
+          aria-label="All tags"
+          onToggle={(e) => setOpen(e.newState === "open")}
+          style={{
+            "position-anchor": "--filter-bar",
+            inset: "anchor(bottom) anchor(right) auto anchor(left)",
+          }}
+          class="m-0 max-h-[50vh] w-auto overflow-auto rounded-b-lg border border-line bg-raised p-2 shadow-float"
+        >
+          <Show when={open()}>
+            <div class="flex flex-wrap gap-1.5">
+              <For each={tags()}>{(tag) => <TagChip tag={tag} />}</For>
+            </div>
+          </Show>
+        </div>
         <Show when={filterOn(filter())}>
           <button
             type="button"
