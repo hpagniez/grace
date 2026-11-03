@@ -61,6 +61,10 @@ export const dialog = [
   "open:backdrop:opacity-100 open:backdrop:duration-(--duration-base) starting:open:backdrop:opacity-0",
 ].join(" ");
 
+/** The console's find bar (console search R3.2): it floats over the console's top right corner. */
+export const findBar =
+  "absolute top-1 right-4 z-10 flex items-center gap-1 rounded-lg border border-line bg-raised p-1 shadow-float";
+
 /** The count in a tab or a button, e.g. the failed tests behind Re-run failed. */
 export const countPill =
   "inline-flex h-4 min-w-5 items-center justify-center rounded-full bg-selected px-1.5 text-2xs font-medium text-muted tabular-nums";

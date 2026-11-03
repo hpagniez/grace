@@ -1,15 +1,24 @@
-import { Braces, Globe, History as HistoryIcon, SquareTerminal, type IconNode } from "lucide";
+import {
+  Braces,
+  Globe,
+  History as HistoryIcon,
+  Search,
+  SquareTerminal,
+  type IconNode,
+} from "lucide";
 import { createMemo, Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
-import { Console } from "./Console";
+import { btnIconSmall } from "./buttons";
+import { Console, createConsoleSearch } from "./Console";
 import { ClearHistory, History } from "./History";
 import { callsOf, scopeTests, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
 import { Icon } from "./Icon";
 import { Splitter } from "./Splitter";
 import type { AppState } from "./reduce";
+import { Tooltip } from "./Tooltip";
 import { countPill, tab, tabOn } from "./ui";
 import { Variables } from "./Variables";
 
@@ -74,6 +83,15 @@ export function BottomPanel(props: {
   const narrowed = createMemo(() => callsOf(scope(), props.state.calls));
   const httpCount = createMemo(() => shownCalls(narrowed(), props.state.httpGroups).length);
   let section: HTMLElement | undefined;
+  // Here, not in the Console: its content unmounts while another tab shows, and the search outlives that (R3.12).
+  const search = createConsoleSearch({
+    lines: () => props.state.console,
+    dropped: () => props.state.consoleDropped,
+    shown: () => panel() === "console",
+    // the project view stays mounted, invisible, under the Settings page
+    visible: () => section?.checkVisibility() ?? false,
+    showConsole: () => props.showPanel("console"),
+  });
   return (
     <section
       ref={(e) => (section = e)}
@@ -131,11 +149,26 @@ export function BottomPanel(props: {
             <ClearHistory state={props.state} api={props.api} />
           </div>
         </Show>
+        <Show when={panel() === "console"}>
+          <div class="ml-auto flex items-center gap-1">
+            <Tooltip text="Find (Ctrl+F)">
+              <button
+                type="button"
+                data-testid="find-button"
+                aria-label="Find"
+                class={btnIconSmall}
+                onClick={() => search.openBar()}
+              >
+                <Icon icon={Search} size={14} />
+              </button>
+            </Tooltip>
+          </div>
+        </Show>
       </div>
       <div role="tabpanel" aria-labelledby={`tab-${panel()}`} class="flex min-h-0 flex-1 flex-col">
         <Switch>
           <Match when={panel() === "console"}>
-            <Console lines={props.state.console}>
+            <Console lines={props.state.console} search={search}>
               <Banner state={props.state} />
             </Console>
           </Match>
