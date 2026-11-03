@@ -1,6 +1,6 @@
 # Export a run's report
 
-Date 2026-11-03. Status: draft. Covers [#70](https://github.com/hpagniez/grace/issues/70). Builds on [Run history](2026-10-25-run-history.md) and [Project setup](2026-11-02-project-setup.md).
+Date 2026-11-03. Status: approved. Covers [#70](https://github.com/hpagniez/grace/issues/70). Builds on [Run history](2026-10-25-run-history.md) and [Project setup](2026-11-02-project-setup.md).
 
 ## Intent
 
