@@ -305,6 +305,35 @@ describe("Tooltip", () => {
     }
   });
 
+  it("stays closed, not thrown, when the engine refuses to show it", () => {
+    // Chromium refuses while another popover shows or hides: the panel of tags hands the focus back
+    // to its fold chip on Escape. A throw in an effect would halt every effect of the window.
+    HTMLElement.prototype.showPopover = () => {
+      throw new DOMException(
+        "Invalid to show a popover during another show operation",
+        "InvalidStateError",
+      );
+    };
+    try {
+      focusVisible(true);
+      const { button, wrapper } = one();
+      fireEvent.focusIn(button);
+      expect(tips()).toHaveLength(0);
+      // nothing is left listening: Escape goes on to whatever owns it
+      const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+      document.dispatchEvent(esc);
+      expect(esc.defaultPrevented).toBe(false);
+      // @ts-expect-error jsdom has none; put it back as it was
+      delete HTMLElement.prototype.showPopover;
+      leave(wrapper);
+      hover(wrapper);
+      expect(tips()).toHaveLength(1);
+    } finally {
+      // @ts-expect-error jsdom has none; put it back as it was
+      delete HTMLElement.prototype.showPopover;
+    }
+  });
+
   describe("pinned", () => {
     const TEXT = "Refresh the tree";
 

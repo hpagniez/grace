@@ -119,7 +119,11 @@ const focusState = (win: Page) =>
     };
   });
 
-const chip = (win: Page, tag: string) => win.locator(`[data-testid=tag-chip][data-tag="${tag}"]`);
+// The big project's 54 tags fold past the filter bar's one line (spec 2026-11-03-compact-filter-bar).
+const panelChip = (win: Page, tag: string) =>
+  win.getByTestId("tag-panel").locator(`[data-tag="${tag}"]`);
+const foldedChips = (win: Page) =>
+  win.locator("[data-testid=tag-strip] [data-testid=tag-chip].invisible").count();
 
 test("Only the rows in view are drawn", async () => {
   const { win } = await openBig();
@@ -192,6 +196,45 @@ test("A new tree keeps the rows in view still", async () => {
   expect(await scrolls(win)).toEqual([]);
 });
 
+test("The filter bar keeps one line with 54 tags", async () => {
+  const { win } = await openBig();
+  const bar = win.getByTestId("filter-bar");
+  const more = win.getByTestId("tag-more");
+  // a 24 px chip, 6 px of padding above and below, the 1 px rule
+  expect((await bar.boundingBox())!.height).toBeLessThanOrEqual(37);
+  // the observer settles over a few frames: the fold chip takes room and folds one chip more
+  await expect(more).toBeVisible();
+  await expect
+    .poll(async () => (await more.textContent()) === `+${await foldedChips(win)}`)
+    .toBe(true);
+
+  const top = (await tree(win).boundingBox())!.y;
+  await more.click();
+  const panel = win.getByTestId("tag-panel");
+  await expect(panel.getByTestId("tag-chip")).toHaveCount(54);
+  expect((await tree(win).boundingBox())!.y).toBe(top); // the panel lies over the tree
+  const under = (await bar.boundingBox())!;
+  expect(Math.abs((await panel.boundingBox())!.y - (under.y + under.height))).toBeLessThanOrEqual(
+    1,
+  );
+
+  await panelChip(win, "module-5-5").click();
+  await expect(panelChip(win, "module-5-5")).toHaveAttribute("data-state", "include");
+  await expect(panel).toBeVisible(); // a click in the panel keeps it open
+  // Clear and the counter take room, so more chips fold: the count follows
+  await expect
+    .poll(async () => (await more.textContent()) === `+${await foldedChips(win)} · 1 on`)
+    .toBe(true);
+  expect((await bar.boundingBox())!.height).toBeLessThanOrEqual(37); // with Clear and the counter
+
+  await win.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(more).toBeFocused();
+  // the window still answers: the panel's state follows, and its chips are gone
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await expect(panel.getByTestId("tag-chip")).toHaveCount(0);
+});
+
 test("A filter change scrolls to the selected row", async () => {
   const { win } = await openBig();
   await scrollToRow(win, 1499);
@@ -199,8 +242,10 @@ test("A filter change scrolls to the selected row", async () => {
   await label(win, ROW_1500).click();
   await expect(item(win, ROW_1500)).toHaveAttribute("aria-selected", "true");
 
-  await chip(win, "module-5-5").click();
-  await expect(chip(win, "module-5-5")).toHaveAttribute("data-state", "include");
+  await win.getByTestId("tag-more").click();
+  await panelChip(win, "module-5-5").click();
+  await expect(panelChip(win, "module-5-5")).toHaveAttribute("data-state", "include");
+  await win.keyboard.press("Escape");
   await scroller(win).evaluate((el) => (el.scrollTop = 0));
   await expect.poll(async () => (await rowAt(win, 1499))?.inView).toBe(false); // out of view again
 
