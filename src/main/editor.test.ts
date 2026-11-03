@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFile, vscodeUrl } from "./editor";
+import { projectFile, validPoint, validRequest, vscodeUrl } from "./editor";
 
 // The real realpathSync, its native form counted: a path it reads is a path it touched.
 vi.mock("node:fs", async (importOriginal) => {
@@ -98,5 +98,32 @@ describe("vscodeUrl (open-in-editor R4.2)", () => {
     expect(vscodeUrl("\\\\server\\share\\p\\x.feature", 3)).toBe(
       "vscode://file//server/share/p/x.feature:3",
     );
+  });
+});
+
+describe("validRequest and validPoint (open-in-editor-from-tree R3.1)", () => {
+  it("takes a path of at most 1000 characters and a line of 1 or more", () => {
+    expect(validRequest("tests/a.feature", 1)).toBe(true);
+    expect(validRequest("a".repeat(1000), 12)).toBe(true);
+    for (const [file, line] of [
+      ["tests/a.feature", 0],
+      ["tests/a.feature", 1.5],
+      ["tests/a.feature", "12"],
+      ["a".repeat(1001), 1],
+      [null, 1],
+    ])
+      expect(validRequest(file, line)).toBe(false);
+  });
+
+  it("takes a point of two finite numbers", () => {
+    expect(validPoint(0, 0)).toBe(true);
+    expect(validPoint(30.5, 40)).toBe(true);
+    for (const [x, y] of [
+      ["12", 4],
+      [1, Number.NaN],
+      [Infinity, 1],
+      [1, undefined],
+    ])
+      expect(validPoint(x, y)).toBe(false);
   });
 });
