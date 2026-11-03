@@ -20,6 +20,7 @@ import { GROUND, THEMES } from "./shared/theme";
 import type { Channel } from "./shared/updates";
 import { parseVersion } from "./shared/version";
 import { batched } from "./main/batch";
+import { vscodeUrl } from "./main/editor";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { isDebugCommand } from "./main/karate/debug";
@@ -289,6 +290,23 @@ app.whenReady().then(async () => {
     if (typeof file === "string" && typeof line === "number") runner.toggleBreakpoint(file, line);
   });
   handle(CH.steps, (key) => (nodeKey(key) ? runner.steps(key) : null));
+  handle(CH.openInEditor, async (file, line) => {
+    if (
+      typeof file !== "string" ||
+      file.length > 1000 ||
+      !Number.isInteger(line) ||
+      (line as number) < 1
+    ) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    const abs = runner.editorFile(file);
+    if (!abs) emit({ type: "notice", message: "Grace opens only files of the open project" });
+    // Windows would otherwise offer to find an app for the link
+    else if (!app.getApplicationNameForProtocol("vscode://"))
+      emit({ type: "notice", message: "Open in VS Code needs VS Code installed" });
+    else await shell.openExternal(vscodeUrl(abs, line as number));
+  });
   handle(CH.filter, (f) => {
     const filter = parseFilterState(f);
     if (!filter) {

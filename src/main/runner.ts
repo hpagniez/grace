@@ -25,6 +25,7 @@ import {
   type FilterState,
 } from "../shared/tags";
 import { THREADS_ERROR, validThreads } from "../shared/threads";
+import { projectFile } from "./editor";
 import { projectFingerprint } from "./fingerprint";
 import { findFlaky } from "./flaky";
 import {
@@ -513,6 +514,16 @@ export class Runner {
     } catch {
       return null;
     }
+  }
+
+  /** A tree feature path, or an absolute path, as a file of the open project to open in an editor (open-in-editor R3); null otherwise. */
+  editorFile(file: string): string | null {
+    if (!this.project) return null;
+    const { root } = this.project;
+    const abs = path.isAbsolute(file)
+      ? file
+      : locate([root, ...detectLayout(root).classpath], file);
+    return projectFile(root, abs);
   }
 
   /** Re-run (R5): the run's selection on its environment and filter; a Re-run failed run's tests, all of them. */
