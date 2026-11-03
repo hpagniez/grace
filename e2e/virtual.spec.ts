@@ -202,9 +202,11 @@ test("The filter bar keeps one line with 53 tags", async () => {
   const more = win.getByTestId("tag-more");
   // a 24 px chip, 6 px of padding above and below, the 1 px rule
   expect((await bar.boundingBox())!.height).toBeLessThanOrEqual(37);
-  const folded = await foldedChips(win);
-  expect(folded).toBeGreaterThan(0);
-  await expect(more).toHaveText(`+${folded}`);
+  // the observer settles over a few frames: the fold chip takes room and folds one chip more
+  await expect(more).toBeVisible();
+  await expect
+    .poll(async () => (await more.textContent()) === `+${await foldedChips(win)}`)
+    .toBe(true);
 
   const top = (await tree(win).boundingBox())!.y;
   await more.click();
