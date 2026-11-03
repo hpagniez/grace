@@ -154,6 +154,7 @@ describe("Runner tag filter", () => {
       second.runner.current(),
       saved,
       { type: "threads", count: 1 },
+      { type: "watch", on: false },
       second.last("environment"),
       second.last("history"),
       second.last("flaky"),

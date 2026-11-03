@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { byName, cleanUp, fixture, projectDir, setup, T, until } from "../../test/runner";
@@ -54,6 +54,15 @@ describe("Runner watch mode", () => {
     expect(last("notice").message).toBe("Invalid request");
     expect(last("watch").on).toBe(true);
     expect(loadProjectWatch(dataDir, root)).toBe(true);
+  });
+
+  it("applies a choice it cannot save, and says so (R1.3)", T, async () => {
+    const { runner, last, dataDir } = await watching();
+    rmSync(path.join(dataDir, "settings.json")); // open saved it: replace it with a folder
+    mkdirSync(path.join(dataDir, "settings.json")); // writing a file there fails
+    runner.setWatch(false);
+    expect(last("notice").message).toMatch(/^Watch mode could not be saved: /);
+    expect(last("watch").on).toBe(false);
   });
 
   it("runs a saved feature as its selection, and its run starts no other (R3)", T, async () => {

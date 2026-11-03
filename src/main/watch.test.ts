@@ -142,6 +142,27 @@ describe("watchFeatures", () => {
     expect(process.cpuUsage(cpu).user).toBeLessThan(100_000);
   });
 
+  it.each([
+    ["renamed", (root: string) => renameSync(root, `${root}-renamed`)],
+    ["moved away", (root: string) => renameSync(root, `${path.dirname(root)}-gone`)],
+  ])("reports one error when a watched root is %s (R2.5)", async (_, move) => {
+    const root = tmp();
+    const { onError } = start([root]);
+    move(root);
+    await settle();
+    expect(onError).toHaveBeenCalledTimes(1);
+    temps.push(`${root}-renamed`, `${path.dirname(root)}-gone`);
+  });
+
+  it("hands over every feature of a burst the OS cannot report whole (R2.3)", async () => {
+    const root = tmp();
+    const { onSaved } = start([root]);
+    const files = Array.from({ length: 300 }, (_, i) => path.join(root, "m", `f${i}.feature`));
+    for (const f of files) write(f); // in one tick: Windows' change buffer overflows
+    await sleep(1000);
+    expect(onSaved.mock.calls.flatMap(([saved]) => saved).sort()).toEqual([...files].sort());
+  });
+
   it("stops on close, and frees the root's parent folder", async () => {
     const root = tmp();
     const { w, onSaved } = start([root]);

@@ -189,6 +189,7 @@ describe("Runner history", () => {
       runner.current(),
       { type: "filter", filter: NO_FILTER },
       { type: "threads", count: 1 },
+      { type: "watch", on: false },
       last("environment"),
       last("history"),
       last("flaky"),
