@@ -525,3 +525,85 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
     expect(toggles()).toHaveLength(3);
   });
 });
+
+describe("details: open in VS Code (open-in-editor R1, R2)", () => {
+  const scenario = node("scenario", "s:tests/x.feature#1", "greets", { line: 6 });
+  const row = node("row", "s:tests/x.feature#2.1", "row 1", { line: null });
+
+  function show(selected: TestNode) {
+    const [state, set] = createStore(initialState());
+    const send = (e: AppEvent) => {
+      set((draft) => reduce(draft, e));
+      flush();
+    };
+    const api = { steps: vi.fn(async () => null), openInEditor: vi.fn(async () => {}) };
+    render(() => <Details state={state} api={api as unknown as Api} />);
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: node("folder", "d:", "p", { file: "", children: [scenario, row] }),
+      error: null,
+    });
+    set((draft) => void (draft.selected = selected.key));
+    flush();
+    const start = () =>
+      send({
+        type: "runStarted",
+        selection: "d:",
+        runId: "20261103-090000-000",
+        keys: [scenario.key],
+        total: 1,
+        startedAt: Date.now(),
+        env: null,
+        debug: false,
+      });
+    const fail = (error: string) => {
+      start();
+      send({ type: "scenarios", updates: [{ key: scenario.key, status: "failed", error }] });
+    };
+    return { api, start, fail };
+  }
+  const open = () => screen.queryByRole("button", { name: "Open in VS Code" });
+  const inError = () => within(screen.getByTestId("details-error")).queryAllByRole("button");
+
+  it("opens the test at its line, during a run too", () => {
+    const { api, start } = show(scenario);
+    fireEvent.click(open()!);
+    expect(api.openInEditor).toHaveBeenCalledWith("tests/x.feature", 6);
+    start();
+    expect(open()).not.toBeNull();
+  });
+
+  it("shows no button for a row with no line", () => {
+    show(row);
+    expect(open()).toBeNull();
+  });
+
+  it("makes the place Karate names on the error's first line a link", () => {
+    const error = String.raw`C:\p\tests\auth.feature:9` + "\nThen status 200\nexpected status: 200";
+    const { api, fail } = show(scenario);
+    fail(error);
+    expect(screen.getByTestId("details-error").textContent).toBe(error);
+    fireEvent.click(
+      screen.getByRole("button", { name: String.raw`Open C:\p\tests\auth.feature:9 in VS Code` }),
+    );
+    expect(api.openInEditor).toHaveBeenCalledWith(String.raw`C:\p\tests\auth.feature`, 9);
+  });
+
+  it("takes a lowercase drive and / separators", () => {
+    const { api, fail } = show(scenario);
+    fail("c:/p/a.feature:3\nboom");
+    fireEvent.click(inError()[0]);
+    expect(api.openInEditor).toHaveBeenCalledWith("c:/p/a.feature", 3);
+  });
+
+  it.each([
+    "Config evaluation failed: karate-config.js - js failed:\nLine: 4",
+    "boom at x.feature:7",
+  ])("shows an error without a place as text: %s", (error) => {
+    const { fail } = show(scenario);
+    fail(error);
+    expect(inError()).toHaveLength(0);
+    expect(screen.getByTestId("details-error").textContent).toBe(error);
+  });
+});

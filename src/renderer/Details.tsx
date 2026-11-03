@@ -1,4 +1,4 @@
-import { ChevronRight, CircleAlert, LoaderCircle, MousePointerClick } from "lucide";
+import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, MousePointerClick } from "lucide";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { FileStep, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
@@ -15,7 +15,7 @@ import { findNode, formatMillis, leaves, nodeName, STATUS_LABEL } from "./nodes"
 import type { AppState } from "./reduce";
 import { MARK, StatusMark, type MarkStatus } from "./StatusMark";
 import { Tooltip } from "./Tooltip";
-import { badge, box, tagChip, TINT } from "./ui";
+import { badge, box, link, tagChip, TINT } from "./ui";
 
 /** The tint a test's status takes in its badge: not run and pending are the grey of a skipped step. */
 const BADGE: Record<Status, keyof typeof TINT> = {
@@ -118,6 +118,32 @@ function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paus
   );
 }
 
+/** Where Karate says a test failed, on its error's first line: an absolute Windows path, a colon, a line. */
+const FAILED_AT = /^([A-Za-z]:[\\/].*):(\d+)$/;
+
+/** A failed test's error; the place on its first line opens in VS Code (open-in-editor R2). */
+function ErrorText(props: { error: string; api: Api }) {
+  const first = () => props.error.split("\n", 1)[0];
+  return (
+    <Show when={FAILED_AT.exec(first())} fallback={props.error}>
+      {(place) => (
+        <>
+          <button
+            type="button"
+            data-testid="error-place"
+            aria-label={`Open ${first()} in VS Code`}
+            class={link}
+            onClick={() => void props.api.openInEditor(place()[1], Number(place()[2]))}
+          >
+            {first()}
+          </button>
+          {props.error.slice(first().length)}
+        </>
+      )}
+    </Show>
+  );
+}
+
 function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
   const result = () => props.state.results[props.node.key];
@@ -156,6 +182,19 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
         <Cut full={location()} testid="details-location" class="font-mono" wrap="max-w-full">
           {location()}
         </Cut>
+        <Show when={props.node.line}>
+          {(line) => (
+            <button
+              type="button"
+              data-testid="open-in-editor"
+              class={ghostSmall}
+              onClick={() => void props.api.openInEditor(props.node.file, line())}
+            >
+              <Icon icon={ExternalLink} size={14} />
+              Open in VS Code
+            </button>
+          )}
+        </Show>
         <Show when={result()?.durationMillis !== undefined}>
           <span data-testid="details-duration" class="font-mono tabular-nums">
             {formatMillis(result()!.durationMillis!)}
@@ -183,7 +222,7 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
             data-testid="details-error"
             class="mt-1 font-mono text-xs break-words whitespace-pre-wrap text-ink"
           >
-            {result()!.error}
+            <ErrorText error={result()!.error!} api={props.api} />
           </pre>
         </div>
       </Show>
