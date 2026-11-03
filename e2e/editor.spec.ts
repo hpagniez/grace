@@ -31,6 +31,8 @@ test("Open a scenario in VS Code", async () => {
   await feature.getByTestId("run-node").click();
   await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 30_000 });
   await select(win, "failing match");
+  // a long place that wraps reads as text, not centred
+  await expect(win.getByTestId("error-place")).toHaveCSS("text-align", "left");
   await win.getByTestId("error-place").click();
   await expect.poll(opened).toEqual([`${link}:15`, `${link}:20`]);
 });
