@@ -233,6 +233,14 @@ describe("after a run (R14.2)", () => {
     expect(outcomeIcon()!.getAttribute("class")).toContain("animate-spin");
   });
 
+  it("says which build tool lists the libraries, then Finding tests…", () => {
+    const { send } = setup();
+    send(loaded(2), { type: "busy", busy: true }, { type: "listing", tool: "Gradle" });
+    expect(text("run-outcome")).toBe("Listing the project's libraries with Gradle…");
+    send({ type: "listing", tool: null });
+    expect(text("run-outcome")).toBe("Finding tests…");
+  });
+
   it("shows the run's environment chip, hides it when there is none, and explains it in a tooltip", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { send } = setup();

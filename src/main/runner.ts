@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import {
   editErrors,
@@ -14,7 +15,7 @@ import {
 } from "../shared/env";
 import type { AppEvent, Breakpoint, DebugCommand, FileStep, Project } from "../shared/events";
 import { toEntry, type RunRecord, type StoredTest } from "../shared/history";
-import type { TestNode } from "../shared/model";
+import type { Layout, TestNode } from "../shared/model";
 import {
   matches,
   matchingLeaves,
@@ -39,6 +40,7 @@ import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import {
   buildArgs,
   detectLayout,
+  extensionJars,
   lineTargets,
   locate,
   OUT_OF_MEMORY,
@@ -46,10 +48,26 @@ import {
   selectionTargets,
   tagArgs,
 } from "./karate/command";
+import { testCodeNotice } from "./karate/compiled";
 import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { JsonlTail, readAllEvents } from "./karate/events";
-import { spawnKarate, within, type KarateProcess } from "./karate/process";
+import {
+  failureReason,
+  findTool,
+  INIT_SCRIPT,
+  isStale,
+  keptJars,
+  libraryKey,
+  noToolReason,
+  parseLibraries,
+  readKept,
+  TOOL_COMMAND,
+  TOOL_NAME,
+  toolEnv,
+  writeKept,
+} from "./karate/libraries";
+import { CMD, spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
 import { fileSteps } from "./karate/steps";
 import {
@@ -93,6 +111,14 @@ const isDir = (p: string) => {
     return false;
   }
 };
+
+/** `<dataDir>/projects/<hash>`: the run folders, the dry run folder, the argument files and the libraries of a project. */
+const projectDirOf = (dataDir: string, root: string) =>
+  path.join(dataDir, "projects", createHash("sha1").update(root).digest("hex").slice(0, 12));
+
+/** One notice of several sentences: the window shows only the last notice. */
+const joinNotices = (said: string[]) =>
+  said.map((m) => (said.length > 1 && !m.endsWith(".") ? `${m}.` : m)).join(" ");
 
 /** Karate's own words for a failed dry run: lines naming an exception or a feature, else the tail. */
 export function dryRunError(lines: string[]): string {
@@ -159,6 +185,8 @@ export class Runner {
   /** The operation `guarded` is running, for `dispose` to wait on. */
   private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
+  /** The build tool listing the project's libraries, while it runs. */
+  private listing: "Maven" | "Gradle" | null = null;
   private cancelled = false;
   /** Set by `dispose` alone (`cancel` leaves it): the app is quitting, so a run skips its second walk. */
   private disposing = false;
@@ -182,6 +210,10 @@ export class Runner {
       pollMs?: number;
       /** A test seam; the default is `projectFingerprint`. */
       fingerprint?: (root: string) => Promise<string | null>;
+      /** Where `~/.karate/ext` is; a test seam, the default is the person's home folder. */
+      home?: string;
+      /** Where Maven and Gradle are looked for; a test seam, the default is PATH. */
+      toolPath?: string;
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
@@ -212,8 +244,10 @@ export class Runner {
         const report = this.report;
         this.report = null; // a report of the project open before
         const skipped = skippedProperties(this.o.dataDir, root);
+        const { layout } = detectLayout(root);
+        const libraries = await this.listLibraries(root, layout);
         opened = await this.rediscover(
-          { root, layout: detectLayout(root).layout },
+          { root, layout },
           loadProjectFilter(this.o.dataDir, root),
           loadProjectEnv(this.o.dataDir, root),
           loadProjectThreads(this.o.dataDir, root),
@@ -226,9 +260,10 @@ export class Runner {
               ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
               : null,
             detectLayout(root).pomNotice,
+            libraries,
+            await testCodeNotice(root, layout),
           ].filter((n) => n !== null);
-          // the properties text has no full stop of its own
-          if (notice.length) this.o.emit({ type: "notice", message: notice.join(". ") });
+          if (notice.length) this.o.emit({ type: "notice", message: joinNotices(notice) });
           try {
             saveOpenedProject(this.o.dataDir, root);
           } catch (err) {
@@ -297,9 +332,15 @@ export class Runner {
 
   async refresh(): Promise<void> {
     if (this.project)
-      await this.guarded(() =>
-        this.rediscover(this.project!, this.filter, this.envs, this.threads),
-      );
+      await this.guarded(async () => {
+        const project = this.project!;
+        const libraries = await this.listLibraries(project.root, project.layout);
+        if (!(await this.rediscover(project, this.filter, this.envs, this.threads))) return;
+        const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
+          (n) => n !== null,
+        );
+        if (said.length) this.o.emit({ type: "notice", message: joinNotices(said) });
+      });
   }
 
   /**
@@ -527,7 +568,11 @@ export class Runner {
   /** What a window that just loaded needs: events sent before it subscribed are lost. */
   replay(): AppEvent[] {
     const opening: AppEvent = { type: "opening", root: this.opening };
-    const busy: AppEvent = { type: "busy", busy: this.busy };
+    const busy: AppEvent[] = [
+      { type: "busy", busy: this.busy },
+      // only while it runs: a window that just loaded starts with none
+      ...(this.listing ? [{ type: "listing" as const, tool: this.listing }] : []),
+    ];
     return this.last
       ? [
           this.last,
@@ -537,9 +582,9 @@ export class Runner {
           ...this.historyEvents(),
           { type: "breakpoints", breakpoints: this.breakpoints },
           opening,
-          busy,
+          ...busy,
         ]
-      : [opening, busy];
+      : [opening, ...busy];
   }
 
   /** Bounded to 10 s: the app quits after it whatever happens. */
@@ -743,10 +788,75 @@ export class Runner {
     return true;
   }
 
-  /** `<dataDir>/projects/<hash>`: the run folders, the dry run folder and the argument and targets files of the project. */
   private projectDir(): string {
-    const hash = createHash("sha1").update(this.project!.root).digest("hex").slice(0, 12);
-    return path.join(this.o.dataDir, "projects", hash);
+    return projectDirOf(this.o.dataDir, this.project!.root);
+  }
+
+  /**
+   * Lists a Maven or Gradle project's libraries with its own build when the kept list is stale (project libraries
+   * spec R2–R6). Returns the notice of a failure; null when listed, still good, standalone or cancelled.
+   */
+  private async listLibraries(root: string, layout: Layout): Promise<string | null> {
+    if (layout === "standalone") return null;
+    const dir = projectDirOf(this.o.dataDir, root);
+    const key = libraryKey(root, layout);
+    const kept = readKept(dir);
+    if (!isStale(kept, layout, key)) return null;
+    const said = (reason: string) =>
+      `Grace could not list the project's libraries with ${TOOL_NAME[layout]}: ${reason}. ${
+        kept?.tool === layout
+          ? "Grace uses the libraries it listed before."
+          : "Tests that use them will fail."
+      }`;
+    const searchPath = this.o.toolPath ?? process.env.PATH ?? "";
+    const tool = findTool(root, layout, searchPath);
+    if (!tool) return said(noToolReason(layout));
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "libraries.txt");
+    const initScript = path.join(dir, "libraries.gradle");
+    rmSync(file, { force: true });
+    if (layout === "gradle") writeFileSync(initScript, INIT_SCRIPT);
+    const lines: string[] = [];
+    let code: number | null;
+    if (this.cancelled) return null;
+    try {
+      this.proc = spawnKarate(
+        CMD,
+        ["/d", "/s", "/c", `"${TOOL_COMMAND[layout]}"`],
+        root,
+        (l) => lines.push(...l),
+        5000,
+        {
+          env: toolEnv(process.env, {
+            tool,
+            file,
+            initScript,
+            searchPath,
+            jreDir: layout === "maven" ? this.o.vendor.jreDir : null,
+          }),
+          windowsVerbatimArguments: true,
+        },
+      );
+      // after the spawn: a Cancel prompted by this event finds the process to kill
+      this.listing = TOOL_NAME[layout];
+      this.o.emit({ type: "listing", tool: this.listing });
+      code = await this.proc.exit;
+    } finally {
+      this.proc = null;
+      this.listing = null;
+      this.o.emit({ type: "listing", tool: null });
+    }
+    if (this.cancelled) return null;
+    let text: string | null = null;
+    try {
+      text = readFileSync(file, "utf8");
+      rmSync(file, { force: true });
+    } catch {
+      // no file: a failure
+    }
+    if (code !== 0 || text === null) return said(failureReason(lines));
+    writeKept(dir, { tool: layout, key, jars: parseLibraries(text, detectLayout(root).classpath) });
+    return null;
   }
 
   /** Empties and returns `<dataDir>/projects/<hash>/dryrun`, so no file of an earlier dry run is ever read. */
@@ -771,11 +881,16 @@ export class Runner {
     const { root } = this.project!;
     const { java, jar, listener } = this.o.vendor;
     const { classpath, configDir } = detectLayout(root);
+    const home = this.o.home ?? homedir();
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
     const args = buildArgs({
       jar,
-      classpath,
+      classpath: [
+        ...classpath,
+        ...extensionJars(home, root),
+        ...keptJars(this.projectDir(), this.project!.layout),
+      ],
       root,
       outDir,
       dryRun,
@@ -792,6 +907,7 @@ export class Runner {
 
   /** Dry run on all feature roots with `env`; emits and returns the new tree, or null on error. */
   private async discover(env: string | null): Promise<TestNode | null> {
+    if (this.cancelled) return null; // cancelled while the build tool listed the libraries
     const project = this.project!;
     const { featureRoots, classpath } = detectLayout(project.root);
     const rootName = path.basename(project.root);
@@ -929,8 +1045,7 @@ export class Runner {
         found.length ? "" : "Nothing to run",
       ].filter(Boolean);
       // one notice: the window shows only the last
-      if (said.length)
-        notice(said.map((m) => (said.length > 1 && !m.endsWith(".") ? `${m}.` : m)).join(" "));
+      if (said.length) notice(joinNotices(said));
       if (!found.length) return;
       await this.runBody({
         ...run,

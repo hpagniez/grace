@@ -8,6 +8,7 @@ import {
   buildArgs,
   childEnv,
   detectLayout,
+  extensionJars,
   lineTargets,
   locate,
   OUT_OF_MEMORY,
@@ -33,6 +34,24 @@ const pom = (root: string, json: object | string) =>
     path.join(root, "karate-pom.json"),
     typeof json === "string" ? json : JSON.stringify(json),
   );
+
+describe("extensionJars", () => {
+  const ext = (root: string) => path.join(root, ".karate", "ext");
+  it("lists the home folder, then the project's, as wildcards", () => {
+    const home = project([], [".karate/ext"]);
+    const root = project([], [".karate/ext"]);
+    expect(extensionJars(home, root)).toEqual([
+      path.join(ext(home), "*"),
+      path.join(ext(root), "*"),
+    ]);
+  });
+  it("skips a folder that does not exist", () => {
+    const home = project([]);
+    const root = project([], [".karate/ext"]);
+    expect(extensionJars(home, root)).toEqual([path.join(ext(root), "*")]);
+    expect(extensionJars(home, project([]))).toEqual([]);
+  });
+});
 
 describe("detectLayout", () => {
   const at = (root: string, ...dirs: string[]) => dirs.map((d) => path.join(root, d));

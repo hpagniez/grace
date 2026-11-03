@@ -509,6 +509,11 @@ describe("main screen", () => {
     expect(loading.parentElement!.querySelector("svg")!.getAttribute("class")).toContain(
       "animate-spin",
     );
+    send({ type: "listing", tool: "Maven" });
+    expect(screen.getByTestId("tree-message").textContent).toBe(
+      "Listing the project's libraries with Maven…",
+    );
+    send({ type: "listing", tool: null });
     send({
       type: "project",
       project: { root: "D:/p", layout: "maven" },

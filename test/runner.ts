@@ -1,7 +1,7 @@
 // Helpers shared by the runner test files, src/main/runner.*.test.ts.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { copyFixture } from "./fixtures/copy";
@@ -35,8 +35,12 @@ export function setup(
   secrets: SecretBox = fakeSecretBox(),
   paths: VendorPaths = vendor,
   fingerprint?: (root: string) => Promise<string | null>,
+  // never the developer's own ~/.karate/ext nor a real Maven or Gradle on PATH
+  opts: { home?: string; toolPath?: string } = {},
 ) {
   temps.push(dataDir);
+  const home = opts.home ?? mkdtempSync(path.join(tmpdir(), "kk-home-"));
+  if (!opts.home) temps.push(home);
   const events: AppEvent[] = [];
   let listener = (_e: AppEvent) => {};
   const runner = new Runner({
@@ -48,6 +52,8 @@ export function setup(
       listener(e);
     },
     fingerprint,
+    home,
+    toolPath: opts.toolPath ?? "",
   });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
@@ -56,6 +62,43 @@ export function setup(
   /** Calls `f` with each event as it is emitted, before the runner goes on. */
   const onEvent = (f: (e: AppEvent) => void) => (listener = f);
   return { runner, events, dataDir, all, last, onEvent };
+}
+
+/** `<dir>/lib.jar` holding `files` (relative path → content), zipped by Windows' own tar. */
+export function makeJar(dir: string, files: Record<string, string>): string {
+  const src = mkdtempSync(path.join(tmpdir(), "kk-jar-"));
+  temps.push(src);
+  for (const [f, text] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(src, f)), { recursive: true });
+    writeFileSync(path.join(src, f), text);
+  }
+  mkdirSync(dir, { recursive: true });
+  const jar = path.join(dir, "lib.jar");
+  // System32's bsdtar: Git Bash puts GNU tar first on PATH
+  const tar = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  execFileSync(tar, ["--format", "zip", "-c", "-f", jar, "-C", src, ...Object.keys(files)]);
+  return jar;
+}
+
+/**
+ * Writes a stand-in build tool `name` into `root`: it logs its arguments to `<root>/calls.log`, then runs `body`
+ * (batch lines joined by CRLF). Returns the log's path.
+ */
+export function stubTool(root: string, name: "mvnw.cmd" | "gradlew.bat", body: string): string {
+  writeFileSync(
+    path.join(root, name),
+    ["@echo off", 'echo %*>>"%~dp0calls.log"', body, ""].join("\r\n"),
+  );
+  return path.join(root, "calls.log");
+}
+
+/** The lines of a stub's log; none before its first call. */
+export function calls(log: string): string[] {
+  try {
+    return readFileSync(log, "utf8").split(/\r?\n/).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 export function fixture(

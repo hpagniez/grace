@@ -17,6 +17,7 @@ import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
+import { findingText } from "./bannerText";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { ancestors, breakpointKeys, leaves, nodeName, STATUS_LABEL } from "./nodes";
@@ -330,7 +331,7 @@ export function Tree(props: Ctx) {
         <div class={MESSAGE}>
           <div class="flex items-center gap-2 p-2 text-sm text-muted">
             <Icon icon={LoaderCircle} class="animate-spin" />
-            <p data-testid="tree-message">Finding tests…</p>
+            <p data-testid="tree-message">{findingText(props.state)}</p>
           </div>
         </div>
       </Match>

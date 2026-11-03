@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { copyFixture } from "../../../test/fixtures/copy";
 import { vendorPaths } from "../vendor";
 import { buildArgs, detectLayout } from "./command";
-import { killOrphan, spawnKarate, within, type KarateProcess } from "./process";
+import { CMD, killOrphan, spawnKarate, within, type KarateProcess } from "./process";
 
 const { java, jar, jreDir } = vendorPaths(path.resolve("vendor"));
 const temps: string[] = [];
@@ -55,6 +55,20 @@ const pidFile = (pid: number | string) => {
 };
 
 describe("spawnKarate", () => {
+  it("passes the given environment and verbatim arguments", { timeout: 30_000 }, async () => {
+    const lines: string[] = [];
+    const p = spawnKarate(
+      CMD,
+      ["/d", "/s", "/c", '"echo "%GRACE_X%""'],
+      tmpdir(),
+      (l) => lines.push(...l),
+      5000,
+      { env: { ...process.env, GRACE_X: "a b&c" }, windowsVerbatimArguments: true },
+    );
+    expect(await p.exit).toBe(0);
+    expect(lines).toEqual(['"a b&c"']);
+  });
+
   it("runs karate and streams console lines", { timeout: 60_000 }, async () => {
     const lines: string[] = [];
     const p = start(true, (l) => lines.push(...l));

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, launch, node, nodeByKey, openProject, project, tempDir, test } from "./helpers";
@@ -64,4 +65,46 @@ test("Maven's compiled output is on the classpath", async () => {
   await expect(node(win, "reads compiled output")).toHaveAttribute("data-status", "passed", {
     timeout: 60_000,
   });
+});
+
+/** `<dir>/lib.jar` holding a data.json, zipped by Windows' own tar; its folder has no space or `&`. */
+function libJar(dir = tempDir("kk-libjar-")): string {
+  const src = write(tempDir("kk-libsrc-"), { "data.json": '{ "lib": true }' });
+  mkdirSync(dir, { recursive: true });
+  const jar = path.join(dir, "lib.jar");
+  const tar = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  execFileSync(tar, ["--format", "zip", "-c", "-f", jar, "-C", src, "data.json"]);
+  return jar;
+}
+
+const LIB_FEATURE =
+  "Feature: lib\nScenario: reads a library\n  * match read('classpath:data.json').lib == true\n";
+
+async function runsWithTheLibrary(dir: string) {
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await expect(node(win, "reads a library")).toBeVisible({ timeout: 15_000 });
+  await node(win, "reads a library")
+    .getByRole("button", { name: "Run reads a library", exact: true })
+    .click();
+  await expect(node(win, "reads a library")).toHaveAttribute("data-status", "passed", {
+    timeout: 60_000,
+  });
+}
+
+test("a Maven project's libraries come from its build", async () => {
+  test.setTimeout(120_000);
+  const dir = write(project("maven"), {
+    "src/test/java/examples/lib.feature": LIB_FEATURE,
+    // a stand-in for Maven: it lists the jar where Grace asks
+    "mvnw.cmd": `@echo off\r\n>"%GRACE_CLASSPATH_FILE%" echo ${libJar()}\r\n`,
+  });
+  await runsWithTheLibrary(dir);
+});
+
+test("jars in .karate/ext are on the classpath", async () => {
+  test.setTimeout(120_000);
+  const dir = write(tempDir("kk-ext-"), { "lib.feature": LIB_FEATURE });
+  libJar(path.join(dir, ".karate", "ext"));
+  await runsWithTheLibrary(dir);
 });

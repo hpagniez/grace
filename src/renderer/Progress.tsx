@@ -1,5 +1,6 @@
 import { CircleAlert, CircleCheck, CircleSlash, LoaderCircle, Pause, type IconNode } from "lucide";
 import { createEffect, createSignal, Show } from "solid-js";
+import { findingText } from "./bannerText";
 import { Icon } from "./Icon";
 import { leaves } from "./nodes";
 import type { AppState } from "./reduce";
@@ -15,7 +16,6 @@ interface Outcome {
 }
 const WORKING = { icon: LoaderCircle, tone: "text-running", turning: true } as const;
 const RUNNING: Outcome = { text: "Running…", ...WORKING };
-const FINDING: Outcome = { text: "Finding tests…", ...WORKING };
 // a debug run waiting on the user: nothing turns (step debugger R7.2)
 const PAUSED: Outcome = { text: "Paused", icon: Pause, tone: "text-running" };
 const OUTCOME = {
@@ -56,7 +56,7 @@ export function Progress(props: { state: AppState }) {
         ? PAUSED
         : RUNNING
       : props.state.busy
-        ? FINDING
+        ? { text: findingText(props.state), ...WORKING }
         : run().outcome
           ? OUTCOME[run().outcome!]
           : null;
