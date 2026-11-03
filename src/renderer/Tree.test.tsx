@@ -1471,6 +1471,22 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
     expect(api.editorMenu).toHaveBeenCalledWith(String.raw`C:\p\tests\common.feature`, 20, 0, 0);
   });
 
+  it("asks from an open tooltip over a row", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { api, load } = setup();
+      load();
+      const run = screen.getByRole("button", { name: "Run failing match" });
+      fireEvent.pointerEnter(run.closest("span.inline-flex")!);
+      vi.advanceTimersByTime(500);
+      const tip = document.querySelector<HTMLElement>("[role=tooltip]")!;
+      fireEvent.contextMenu(tip, { clientX: 5, clientY: 6 });
+      expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 5, 6);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("opens a failed test without a place at its own line", () => {
     const { api, send, load } = setup();
     load();

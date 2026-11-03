@@ -84,10 +84,18 @@ test("Open a scenario from the tree", async () => {
   await menu.choose();
   await expect.poll(opened).toEqual([`${link}:15`, `${link}:20`]);
 
+  // a tooltip lying on the row is the row's
+  await node(win, "failing match").getByTestId("run-node").hover();
+  await win.getByRole("tooltip").click({ button: "right" });
+  await expect.poll(menu.count).toBe(3);
+  await menu.choose();
+  await expect.poll(opened).toHaveLength(3);
+  expect((await opened())[2]).toBe(`${link}:20`);
+
   // the menu key's other form, on the focused row
   await item.focus();
   await win.keyboard.press("Shift+F10");
-  await expect.poll(menu.count).toBe(3);
+  await expect.poll(menu.count).toBe(4);
 });
 
 test("main refuses what it must not open", async () => {
