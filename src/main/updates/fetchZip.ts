@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 // not node:fs: Electron's asar-aware fs takes app.asar for a folder, so access fails and rm hangs (#131)
 import { createReadStream, createWriteStream, promises, type WriteStream } from "original-fs";
@@ -6,10 +6,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
-import { promisify } from "node:util";
-const { access, mkdir, rm } = promises;
-
-const run = promisify(execFile);
+const { access, mkdir, open, rm } = promises;
 
 /** bsdtar reads zip. By absolute path: Git's GNU tar on PATH cannot. */
 export const TAR = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
@@ -71,14 +68,29 @@ export async function verify(file: string, size: number, sha256: string): Promis
  * R8.4: unpacks `zip` into `dir`. Rejects unless the app's two key files are there.
  * Without `-P`, bsdtar refuses `..` entries and strips the drive or leading slash of an absolute
  * one, which then lands inside `dir`: nothing lands outside it.
+ * tar reads its arguments in the ANSI code page, so no path goes on its command line (#238): it runs
+ * in `dir` and reads the zip from a file handle on its input, which, unlike a pipe, it can seek.
  */
 export async function unpack(zip: string, dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
+  const file = await open(zip);
   try {
-    await run(TAR, ["-xf", zip, "-C", dir], { windowsHide: true });
+    const tar = spawn(TAR, ["-xf", "-"], {
+      cwd: dir,
+      windowsHide: true,
+      stdio: [file.fd, "ignore", "pipe"],
+    });
+    let stderr = "";
+    tar.stderr!.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    const code = await new Promise<number | null>((resolve, reject) => {
+      tar.on("error", reject);
+      tar.on("close", resolve);
+    });
+    if (code !== 0) throw new Error(stderr.trim() || `tar exited with code ${code}`);
   } catch (e) {
-    const { stderr } = e as { stderr?: string };
-    throw new Error(`Unpacking failed: ${stderr?.trim() || (e as Error).message}`);
+    throw new Error(`Unpacking failed: ${(e as Error).message}`);
+  } finally {
+    await file.close();
   }
   for (const file of ["Grace.exe", path.join("resources", "app.asar")]) {
     await access(path.join(dir, file)).catch(() => {
