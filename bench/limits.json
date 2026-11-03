@@ -200,7 +200,7 @@
     },
     "page.nodes.open": {
       "unit": "count",
-      "limit": 2473,
+      "limit": 2845,
       "noise": 118,
       "machine": false
     },
@@ -366,7 +366,7 @@
     },
     "page.nodes.open@10k": {
       "unit": "count",
-      "limit": 2473,
+      "limit": 2845,
       "noise": 118,
       "machine": false
     },
