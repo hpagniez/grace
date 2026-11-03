@@ -271,6 +271,24 @@ export function saveProjectThreads(dataDir: string, root: string, n: number): vo
   });
 }
 
+/** Whether watch mode is saved on for a project; off if not saved, malformed or unreadable. Never throws. */
+export function loadProjectWatch(dataDir: string, root: string): boolean {
+  try {
+    const entry = savedEntry(dataDir, root);
+    return isObject(entry) && entry.watch === true;
+  } catch {
+    return false;
+  }
+}
+
+/** On is saved as `watch: true`; off removes the key. */
+export function saveProjectWatch(dataDir: string, root: string, on: boolean): void {
+  updateEntry(dataDir, root, (e) => {
+    if (on) e.watch = true;
+    else delete e.watch;
+  });
+}
+
 /** The rows of a saved list that the rules of today reject, as written. */
 const rejectedRows = (x: unknown): unknown[] =>
   Array.isArray(x) ? x.filter((r) => parseStoredRow(r) === null) : [];

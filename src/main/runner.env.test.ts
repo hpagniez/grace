@@ -39,6 +39,7 @@ describe("Runner environment", () => {
       "history",
       "flaky",
       "breakpoints",
+      "watch",
     ]);
   });
 
@@ -104,6 +105,7 @@ describe("Runner environment", () => {
       second.runner.current(),
       { type: "filter", filter: NO_FILTER },
       { type: "threads", count: 1 },
+      { type: "watch", on: false },
       second.last("environment"),
       second.last("history"),
       second.last("flaky"),

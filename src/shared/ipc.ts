@@ -20,6 +20,7 @@ export const CH = {
   report: "report:open",
   filter: "filter:set",
   threads: "threads:set",
+  watch: "watch:set",
   env: "env:set",
   properties: "properties:save",
   rerun: "history:rerun",
@@ -61,6 +62,8 @@ export interface Api {
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;
   setThreads(n: number): Promise<void>;
+  /** Turns watch mode on or off for the open project; main sends the choice in force as a `watch` event (docs/specs/2026-11-03-watch-mode.md). */
+  setWatch(on: boolean): Promise<void>;
   setEnv(name: string | null): Promise<void>;
   /** True once main applied the edit; false if it refused it (a notice says why). */
   saveProperties(edit: PropertiesEdit): Promise<boolean>;

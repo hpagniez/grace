@@ -648,3 +648,14 @@ describe("the step debugger", () => {
     expect(s.breakpoints).toEqual([{ file: "a.feature", line: 3 }]);
   });
 });
+
+describe("watch", () => {
+  it("starts off and follows main's watch event", () => {
+    const s = initialState();
+    expect(s.watch).toBe(false);
+    reduce(s, { type: "watch", on: true });
+    expect(s.watch).toBe(true);
+    reduce(s, { type: "watch", on: false });
+    expect(s.watch).toBe(false);
+  });
+});

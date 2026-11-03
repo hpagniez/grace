@@ -12,6 +12,7 @@ import {
   loadProjectEnv,
   loadProjectFilter,
   loadProjectThreads,
+  loadProjectWatch,
   loadRecentProjects,
   loadUpdateSettings,
   loadWindowState,
@@ -22,6 +23,7 @@ import {
   saveProjectEnv,
   saveProjectFilter,
   saveProjectThreads,
+  saveProjectWatch,
   saveUpdateSettings,
   saveWindowState,
   skippedProperties,
@@ -462,6 +464,30 @@ describe("settings", () => {
       e.properties.shared.push({ name: "a", value: "1" });
       e.properties.byEnv.qa = [];
       expect(emptyEnvSettings()).toEqual({ env: null, properties: { shared: [], byEnv: {} } });
+    });
+  });
+
+  describe("watch mode", () => {
+    it("is off with nothing saved, on once saved on, and off saved removes the key", () => {
+      const data = tmp();
+      expect(loadProjectWatch(data, "x")).toBe(false);
+      saveProjectThreads(data, "x", 3);
+      saveProjectWatch(data, "x", true);
+      expect(loadProjectWatch(data, "x")).toBe(true);
+      expect(loadProjectWatch(data, "y")).toBe(false);
+      saveProjectWatch(data, "x", false);
+      expect(loadProjectWatch(data, "x")).toBe(false);
+      const saved = JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8"));
+      expect(saved.projects.x).toEqual({ threads: 3 });
+    });
+
+    it.each(["yes", 1, null])("a malformed saved value %j loads as off", (watch) => {
+      const data = tmp();
+      writeFileSync(
+        path.join(data, "settings.json"),
+        JSON.stringify({ projects: { x: { watch } } }),
+      );
+      expect(loadProjectWatch(data, "x")).toBe(false);
     });
   });
 

@@ -68,6 +68,7 @@ const TOOLBAR_BUTTONS = {
   "home-button": "Home",
   "properties-button": "Properties…",
   "refresh-button": "Refresh",
+  "watch-button": "Watch",
   "open-button": "Open…",
   "report-button": "Report",
   "rerun-failed-button": /^Re-run failed( [1-9]\d*)?$/, // the count only once there is one

@@ -119,6 +119,8 @@ export type AppEvent =
   | { type: "filter"; filter: FilterState }
   /** The open project's thread count, as main holds it and passes to every run. */
   | { type: "threads"; count: number }
+  /** Whether watch mode is on for the open project (docs/specs/2026-11-03-watch-mode.md). */
+  | { type: "watch"; on: boolean }
   /** The open project's environment, suggestions and run properties, as main holds them. */
   | { type: "environment"; view: EnvView }
   /** The open project's listed runs, newest first. */

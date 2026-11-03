@@ -63,6 +63,7 @@ describe("Runner discovery", () => {
     // the recent list check is asynchronous: it may or may not have arrived
     expect(events.filter((e) => e.type !== "recent")).toEqual([
       { type: "busy", busy: true },
+      { type: "watch", on: false },
       { type: "project", project: null, tree: null, error: `Folder not found: ${missing}` },
       { type: "flaky", tests: [] },
       { type: "busy", busy: false },
@@ -87,6 +88,7 @@ describe("Runner discovery", () => {
       runner.current(),
       { type: "filter", filter: NO_FILTER },
       { type: "threads", count: 1 },
+      { type: "watch", on: false },
       last("environment"),
       last("history"),
       last("flaky"),
