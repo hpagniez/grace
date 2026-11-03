@@ -151,7 +151,10 @@ function Row(props: {
           type="button"
           tabindex={-1}
           class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
-          onClick={() => props.ctx.select(props.node.key)}
+          onClick={() => {
+            props.ctx.select(props.node.key);
+            if (isFeature() && !props.open) props.toggle(); // a click opens a feature, never closes it (#224 R2.1)
+          }}
         >
           {label()}
           <Show when={title()}>
@@ -226,20 +229,25 @@ function Row(props: {
 export function Tree(props: Ctx) {
   const loading = () => !props.state.project || !props.state.tree;
   const root = createMemo(() => props.state.project?.root);
-  // The closed rows by key: a refresh keeps them, another project starts with everything open (R2.2).
-  const [closed, setClosed] = createSignal<ReadonlySet<string>>(() => {
+  // The rows turned from where they start, by key: a feature starts closed, every other row open. A refresh keeps
+  // them; another project starts afresh (#224 R1).
+  const [turned, setTurned] = createSignal<ReadonlySet<string>>(() => {
     root();
     return new Set<string>();
   });
-  const toggle = (key: string) =>
-    setClosed((c) => {
-      const next = new Set(c);
-      if (!next.delete(key)) next.add(key);
+  const startsOpen = (key: string) => !key.startsWith("f:");
+  const isOpen = (key: string) => startsOpen(key) !== turned().has(key);
+  const setOpen = (key: string, open: boolean) =>
+    setTurned((t) => {
+      const next = new Set(t);
+      if (open === startsOpen(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-  // Reads no status, so a run never redraws a row (R2.3).
+  const toggle = (key: string) => setOpen(key, !isOpen(key));
+  // Reads no status, so a status update never redraws a row (R2.3).
   const rows = createMemo(() =>
-    props.state.tree ? treeRows(props.state.tree, closed(), props.state.filter) : [],
+    props.state.tree ? treeRows(props.state.tree, isOpen, props.state.filter) : [],
   );
   let list: VirtualListHandle | undefined;
   const withBreakpoints = createMemo(() =>
@@ -251,9 +259,7 @@ export function Tree(props: Ctx) {
     (key) => {
       const tree = props.state.tree;
       if (key === null || !tree) return;
-      const above = ancestors(tree, key);
-      if (above.some((a) => closed().has(a)))
-        setClosed((c) => new Set([...c].filter((k) => !above.includes(k))));
+      for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
     },
   );
 
@@ -270,7 +276,7 @@ export function Tree(props: Ctx) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return false;
     const kids = row.node.children.length > 0;
-    const open = kids && !closed().has(key);
+    const open = kids && isOpen(key);
     if (e.key === "ArrowRight") {
       const child = rows()[index + 1]; // an open row's first child follows it
       if (kids && !open) toggle(key);
@@ -306,7 +312,7 @@ export function Tree(props: Ctx) {
               "aria-setsize": r.setSize,
               "aria-posinset": r.posInSet,
               "aria-expanded":
-                n.children.length > 0 ? (closed().has(n.key) ? "false" : "true") : undefined,
+                n.children.length > 0 ? (isOpen(n.key) ? "true" : "false") : undefined,
               "aria-selected": props.state.selected === n.key ? "true" : "false",
               "aria-label": rowName(labelOf(n), row.status(), row.flaky(), n.tags),
               "aria-keyshortcuts": "Control+Enter Control+Shift+Enter",
@@ -328,7 +334,7 @@ export function Tree(props: Ctx) {
           {(r, _index, keyboardFocused, row) => (
             <Row
               node={r.node}
-              open={!closed().has(r.node.key)}
+              open={isOpen(r.node.key)}
               toggle={() => toggle(r.node.key)}
               keyboardFocused={keyboardFocused()}
               status={row.status()}

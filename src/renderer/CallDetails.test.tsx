@@ -11,6 +11,7 @@ import { btnSmall } from "./buttons";
 import { GROUP_TINT } from "./HttpCalls";
 import { TINT } from "./ui";
 import { drawn } from "../../test/drawn";
+import { openFeatures } from "../../test/openFeatures";
 
 afterEach(() => {
   cleanup();
@@ -98,6 +99,7 @@ function setup() {
     flush();
   };
   send({ type: "project", project: { root: "D:/p", layout: "standalone" }, tree, error: null });
+  openFeatures();
   send({ type: "calls", key: "s:a.feature#1", calls: [created, xml] });
   send({ type: "calls", key: "s:a.feature#2", calls: [timedOut, refused, noContent, silent] });
   return { send };

@@ -20,6 +20,7 @@ import { App } from "./App";
 import { leaves } from "./nodes";
 import { treeRows } from "./treeRows";
 import { drawn } from "../../test/drawn";
+import { openFeatures } from "../../test/openFeatures";
 
 // The real functions, counted: their own recursion is not, so each call is one walk of a subtree.
 vi.mock("../shared/status", async (importOriginal) => {
@@ -120,6 +121,7 @@ describe("main screen", () => {
   it("shows a failed scenario's status on its feature", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({
       type: "runStarted",
       selection: "d:",
@@ -148,6 +150,7 @@ describe("main screen", () => {
   it("runs a row from its run button", () => {
     const { api, load } = setup();
     load();
+    openFeatures();
     fireEvent.click(screen.getByRole("button", { name: "Run add 2 and 3" }));
     expect(api.run).toHaveBeenCalledWith("s:tests/outline.feature#1.2");
   });
@@ -155,6 +158,7 @@ describe("main screen", () => {
   it("shows each row's status by shape, named for a screen reader (R4.4)", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     const mark = (key: string) => within(rowByKey(key)).getByRole("img");
     for (const n of screen.getAllByTestId("tree-node"))
       expect(within(n).getByRole("img").getAttribute("aria-label")).toBe("Not run");
@@ -184,6 +188,7 @@ describe("main screen", () => {
   it("swaps the chevron when a folder opens and closes, and icons folders and features", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const row = () => rowByKey("d:tests"); // a toggle draws the row again
     const toggle = within(row()).getByRole("button", { name: "Collapse tests" });
     const chevron = toggle.querySelector("svg");
@@ -210,6 +215,7 @@ describe("main screen", () => {
   it("marks the selected row with its background and the accent bar, rings focus inside the row", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const row = rowByKey("s:tests/basic.feature#2");
     expect(row.className).toContain("h-6");
     expect(row.className).toContain("rounded-sm");
@@ -228,6 +234,7 @@ describe("main screen", () => {
   it("shows the run button muted, green when its row is hovered, focused or selected", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const key = "s:tests/basic.feature#2";
     const run = (k: string) => within(rowByKey(k)).getByTestId("run-node");
     const green = /(^| )text-passed( |$)/;
@@ -261,6 +268,7 @@ describe("main screen", () => {
       try {
         const { load } = setup();
         load();
+        openFeatures();
         const label = screen.getByText("failing match");
         expect(label.className).toContain("truncate");
         expect(label.hasAttribute("title")).toBe(false);
@@ -279,6 +287,7 @@ describe("main screen", () => {
       try {
         const { load } = setup();
         load();
+        openFeatures();
         const label = screen.getByText("failing match");
         measure(label, 100, 100);
         rest(label);
@@ -297,6 +306,7 @@ describe("main screen", () => {
       try {
         const { load } = setup();
         load();
+        openFeatures();
         const row = rowByKey("s:tests/basic.feature#2");
         const label = screen.getByText("failing match");
         measure(label, 200, 100);
@@ -320,6 +330,7 @@ describe("main screen", () => {
   it("gives tags the 20 px tag chip, so they clear the rows above and below", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const tag = screen.getByText("smoke"); // the tree tag; the filter chip reads @smoke
     expect(tag.className).toContain("h-5");
     expect(tag.className).not.toContain("h-6");
@@ -329,6 +340,7 @@ describe("main screen", () => {
   it("gives every run button an accessible name", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const names = screen.getAllByTestId("run-node").map((b) => b.getAttribute("aria-label"));
     expect(names).toContain("Run failing match");
     expect(names).toContain("Run tests");
@@ -338,6 +350,7 @@ describe("main screen", () => {
   it("labels a feature with its file name, then its title", () => {
     const { load } = setup();
     load();
+    openFeatures();
     const feature = screen
       .getAllByTestId("tree-node")
       .find((n) => n.dataset.key === "f:tests/basic.feature")!;
@@ -351,6 +364,7 @@ describe("main screen", () => {
   it("selects a node by clicking its label", () => {
     const { load } = setup();
     load();
+    openFeatures();
     fireEvent.click(screen.getByText("failing match"));
     flush();
     const selected = screen.getByRole("treeitem", { selected: true });
@@ -363,6 +377,7 @@ describe("main screen", () => {
   it("disables run buttons while a run is active and enables Cancel", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     expect(button("run-all-button").disabled).toBe(false);
     expect(button("cancel-button").disabled).toBe(true);
     send({
@@ -386,6 +401,7 @@ describe("main screen", () => {
   it("shows discovery as busy: actions off, Cancel on, Finding tests…", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({ type: "busy", busy: true });
     for (const id of ["run-all-button", "open-button", "refresh-button"])
       expect(button(id).disabled).toBe(true);
@@ -419,6 +435,7 @@ describe("main screen", () => {
   it("keeps the stripe until the first result, then reports progress", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     startRun(send);
     expect(screen.getByTestId("progress-stripe")).toBeTruthy();
     send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "running" }] });
@@ -438,6 +455,7 @@ describe("main screen", () => {
   it("drops the stripe when a run is cancelled before any result", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     startRun(send);
     send({
       type: "runFinished",
@@ -452,6 +470,7 @@ describe("main screen", () => {
   it("fills smoothly and keeps the stripe still under reduced motion", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({ type: "busy", busy: true });
     const stripe = screen.getByTestId("progress-stripe");
     expect(stripe.className).toContain("animate-slide");
@@ -467,6 +486,7 @@ describe("main screen", () => {
   it("draws the stripe over the last run's results", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     startRun(send);
     send({ type: "scenarios", updates: [{ key: "s:tests/basic.feature#1", status: "passed" }] });
     send({
@@ -495,6 +515,7 @@ describe("main screen", () => {
       }),
       error: null,
     });
+    openFeatures();
     expect(screen.getByRole("button", { name: "Run Scenario at line 3" })).toBeTruthy();
     fireEvent.click(screen.getByText("Scenario at line 3"));
     flush();
@@ -544,6 +565,7 @@ describe("main screen", () => {
   it("shows steps once they arrive, with their log on demand", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     fireEvent.click(screen.getByText("passing hello"));
     flush();
     expect(screen.getByTestId("details").textContent).toContain(
@@ -585,6 +607,7 @@ describe("main screen", () => {
   it("shows progress, outcome, elapsed and the notice", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({
       type: "runStarted",
       selection: "d:",
@@ -661,6 +684,7 @@ describe("flaky marks", () => {
       tree: flakyTree(),
       error: null,
     });
+    openFeatures();
     send({
       type: "flaky",
       tests: [
@@ -711,6 +735,7 @@ describe("flaky marks", () => {
         tree: flakyTree(),
         error: null,
       });
+      openFeatures();
       send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
       fireEvent.pointerEnter(markOf(SCENARIO)!.parentElement!);
       vi.advanceTimersByTime(500);
@@ -731,6 +756,7 @@ describe("flaky marks", () => {
       tree: flakyTree(),
       error: null,
     });
+    openFeatures();
     send({ type: "flaky", tests: [{ key: SCENARIO, envs: proof }] });
     expect(screen.getByRole("img", { name: FLAKY_TITLE })).toBe(markOf(SCENARIO));
   });
@@ -738,6 +764,7 @@ describe("flaky marks", () => {
   it("counts a flaky test the tag filter hides", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({
       type: "filter",
       filter: { include: ["smoke"], exclude: [], hideNonMatching: true },
@@ -753,6 +780,7 @@ describe("flaky marks", () => {
   it("keeps the mark of a dimmed test", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({
       type: "filter",
       filter: { include: ["smoke"], exclude: [], hideNonMatching: false },
@@ -765,6 +793,7 @@ describe("flaky marks", () => {
   it("clears the marks for a new project", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({ type: "flaky", tests: [{ key: "s:tests/basic.feature#2", envs: proof }] });
     expect(screen.getAllByTestId("flaky-mark")).toHaveLength(1);
     send({
@@ -780,6 +809,7 @@ describe("flaky marks", () => {
   it("drops the mark of a key that now holds another test, keeps the rest", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({
       type: "flaky",
       tests: [
@@ -824,8 +854,9 @@ describe("virtual tree", () => {
         }),
       ],
     });
-  /** The keys of the rows a person can scroll to, all open and unfiltered. */
-  const order = (t: TestNode) => treeRows(t, new Set(), NO_FILTER).map((r) => r.node.key);
+  /** The keys of the rows a person can scroll to, unfiltered; all open unless `isOpen` says otherwise. */
+  const order = (t: TestNode, isOpen: (key: string) => boolean = () => true) =>
+    treeRows(t, isOpen, NO_FILTER).map((r) => r.node.key);
   const open = (send: (e: AppEvent) => void, t: TestNode, root = "D:/p") =>
     send({ type: "project", project: { root, layout: "standalone" }, tree: t, error: null });
   const startRun = (send: (e: AppEvent) => void) =>
@@ -875,6 +906,8 @@ describe("virtual tree", () => {
   const focused = () => (document.activeElement as HTMLElement).dataset.key;
   const selected = () => items().filter((r) => r.getAttribute("aria-selected") === "true");
   const chevron = (key: string) => within(rowByKey(key)).getAllByRole("button")[0];
+  // The row's label is its second button: the chevron, the label, then debug and run.
+  const nameOf = (key: string) => within(rowByKey(key)).getAllByRole("button")[1];
   const click = (el: HTMLElement) => {
     fireEvent.click(el);
     flush();
@@ -886,11 +919,115 @@ describe("virtual tree", () => {
       (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled,
     );
 
+  describe("folders open, features closed (#224 R1, R2)", () => {
+    const BASIC = "f:tests/basic.feature";
+    const OUTLINE = "f:tests/outline.feature";
+    const expanded = (key: string) => item(key)!.getAttribute("aria-expanded");
+
+    it("starts with folders open and features closed", () => {
+      const { load } = setup();
+      load();
+      expect(shown()).toEqual(["d:tests", BASIC, OUTLINE]);
+      expect([expanded("d:tests"), expanded(BASIC), expanded(OUTLINE)]).toEqual([
+        "true",
+        "false",
+        "false",
+      ]);
+    });
+
+    it("selects and opens a closed feature when its name is clicked", () => {
+      const { load } = setup();
+      load();
+      click(nameOf(BASIC));
+      expect(selected()).toEqual([item(BASIC)]);
+      expect(expanded(BASIC)).toBe("true");
+      expect(shown()).toEqual([
+        "d:tests",
+        BASIC,
+        "s:tests/basic.feature#1",
+        "s:tests/basic.feature#2",
+        OUTLINE,
+      ]);
+    });
+
+    it("keeps an open feature open when its name is clicked again", () => {
+      const { load } = setup();
+      load();
+      click(nameOf(BASIC));
+      click(nameOf(BASIC));
+      expect(expanded(BASIC)).toBe("true");
+    });
+
+    it("still closes a feature with its chevron", () => {
+      const { load } = setup();
+      load();
+      click(chevron(BASIC));
+      expect(expanded(BASIC)).toBe("true");
+      click(chevron(BASIC));
+      expect(expanded(BASIC)).toBe("false");
+      expect(item("s:tests/basic.feature#1")).toBeUndefined();
+    });
+
+    it("opens no feature with the keys that select; Right opens it, its outline open too", () => {
+      const { load } = setup();
+      load();
+      focusRow("d:tests");
+      press("ArrowDown");
+      press("ArrowDown");
+      expect(focused()).toBe(OUTLINE);
+      expect(selected()).toEqual([item(OUTLINE)]);
+      expect([expanded(BASIC), expanded(OUTLINE)]).toEqual(["false", "false"]);
+      press("Enter");
+      press(" ");
+      expect(expanded(OUTLINE)).toBe("false");
+      press("ArrowRight");
+      expect(expanded(OUTLINE)).toBe("true");
+      expect(shown().slice(3)).toEqual([
+        "o:tests/outline.feature#1",
+        "s:tests/outline.feature#1.1",
+        "s:tests/outline.feature#1.2",
+      ]);
+    });
+
+    it("keeps what was opened and closed through a refresh; a new feature starts closed", () => {
+      const { send, load } = setup();
+      load();
+      click(nameOf(BASIC));
+      click(chevron("d:tests"));
+      const t = tree();
+      t.children[0].children.push(
+        node("feature", "f:tests/new.feature", "new", {
+          file: "tests/new.feature",
+          children: [node("scenario", "s:tests/new.feature#1", "new one", { line: 3 })],
+        }),
+      );
+      open(send, t); // a refresh: the same project, a new tree
+      expect(expanded("d:tests")).toBe("false");
+      click(chevron("d:tests"));
+      expect([expanded(BASIC), expanded(OUTLINE), expanded("f:tests/new.feature")]).toEqual([
+        "true",
+        "false",
+        "false",
+      ]);
+    });
+
+    it("starts another project with its features closed again", () => {
+      const { send, load } = setup();
+      load();
+      click(nameOf(BASIC));
+      open(send, tree(), "D:/other");
+      expect(expanded(BASIC)).toBe("false");
+      load();
+      expect(expanded(BASIC)).toBe("false");
+    });
+  });
+
   describe("drawing (R1, R2)", () => {
     it("draws the first 25 rows of a project of 30 tests", () => {
       const { send } = setup();
       const t = bigTree(30);
       open(send, t);
+      openFeatures();
       const drawnKeys = items().map((r) => r.dataset.key);
       for (const key of order(t).slice(0, 25)) expect(drawnKeys).toContain(key);
     });
@@ -898,6 +1035,7 @@ describe("virtual tree", () => {
     it("shows the same rows, order and indents as before, and only matches under Hide non-matching", () => {
       const { send, load } = setup();
       load();
+      openFeatures();
       expect(shown()).toEqual([
         "d:tests",
         "f:tests/basic.feature",
@@ -918,39 +1056,16 @@ describe("virtual tree", () => {
       expect(shown()).toEqual(["d:tests", "f:tests/basic.feature", "s:tests/basic.feature#1"]);
     });
 
-    it("keeps closed folders through a refresh, and opens them for another project", () => {
-      const { send, load } = setup();
-      load();
-      click(chevron("f:tests/basic.feature"));
-      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
-      expect(item("s:tests/basic.feature#1")).toBeUndefined();
-      load(); // a refresh: the same project, a new tree
-      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
-      expect(item("s:tests/basic.feature#1")).toBeUndefined();
-      open(send, tree(), "D:/other");
-      load();
-      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("true");
-      expect(item("s:tests/basic.feature#1")).toBeDefined();
-    });
-
-    it("starts everything open in another project", () => {
-      const { send, load } = setup();
-      load();
-      click(chevron("f:tests/basic.feature"));
-      open(send, tree(), "D:/other");
-      expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("true");
-    });
-
     it("keeps the scroll position and the drawn rows when a run updates 500 statuses", () => {
       const { send } = setup();
       const t = bigTree(2000);
       open(send, t);
-      scrollTo(26_408); // half way
+      scrollTo(8 + 90 * 24); // half way
       const before = shown();
       const nodes = screen.getAllByTestId("tree-node");
       const tests = order(t)
         .filter((k) => k.startsWith("s:"))
-        .slice(800, 1300); // tests 800 to 1299, the drawn ones among them
+        .slice(800, 1300); // tests 800 to 1299, in the features drawn
       send({
         type: "runStarted",
         selection: "d:",
@@ -962,8 +1077,8 @@ describe("virtual tree", () => {
         debug: false,
       });
       send({ type: "scenarios", updates: tests.map((key) => ({ key, status: "passed" })) });
-      expect(rowByKey("s:tests/f100.feature#1").dataset.status).toBe("passed");
-      expect(scroller().scrollTop).toBe(26_408);
+      expect(rowByKey("f:tests/f100.feature").dataset.status).toBe("passed");
+      expect(scroller().scrollTop).toBe(8 + 90 * 24);
       expect(shown()).toEqual(before);
       expect(screen.getAllByTestId("tree-node")).toEqual(nodes); // not one row drawn again
     });
@@ -979,6 +1094,7 @@ describe("virtual tree", () => {
     it("moves and selects with Down, and the details pane follows", () => {
       const { load } = setup();
       load();
+      openFeatures();
       focusRow("d:tests");
       press("ArrowDown");
       expect(focused()).toBe("f:tests/basic.feature");
@@ -990,6 +1106,7 @@ describe("virtual tree", () => {
       it("opens a closed feature with Right, focus staying on it", () => {
         const { load } = setup();
         load();
+        openFeatures();
         click(chevron("f:tests/basic.feature"));
         focusRow("f:tests/basic.feature");
         expect(press("ArrowRight").defaultPrevented).toBe(true);
@@ -1001,6 +1118,7 @@ describe("virtual tree", () => {
       it("moves to the first scenario of an open feature with Right, and selects it", () => {
         const { load } = setup();
         load();
+        openFeatures();
         focusRow("f:tests/basic.feature");
         press("ArrowRight");
         expect(focused()).toBe("s:tests/basic.feature#1");
@@ -1010,6 +1128,7 @@ describe("virtual tree", () => {
       it("closes an open feature with Left, focus staying on it", () => {
         const { load } = setup();
         load();
+        openFeatures();
         focusRow("f:tests/basic.feature");
         press("ArrowLeft");
         expect(item("f:tests/basic.feature")!.getAttribute("aria-expanded")).toBe("false");
@@ -1020,6 +1139,7 @@ describe("virtual tree", () => {
       it("moves from a scenario to its feature with Left, and selects it", () => {
         const { load } = setup();
         load();
+        openFeatures();
         focusRow("s:tests/basic.feature#2");
         press("ArrowLeft");
         expect(focused()).toBe("f:tests/basic.feature");
@@ -1029,6 +1149,7 @@ describe("virtual tree", () => {
       it("does nothing with Left on a closed top-level folder", () => {
         const { load } = setup();
         load();
+        openFeatures();
         click(chevron("d:tests"));
         focusRow("d:tests");
         press("ArrowLeft");
@@ -1043,15 +1164,15 @@ describe("virtual tree", () => {
       const { send } = setup();
       const t = bigTree(2000);
       open(send, t);
-      expect(items()).toHaveLength(35); // of 2,201 rows
-      const keys = order(t);
+      expect(items()).toHaveLength(35); // of 201 rows: the folder and its features
+      const keys = order(t, (k) => !k.startsWith("f:"));
       focusRow("d:tests");
       press("End");
-      expect(focused()).toBe(keys[2200]);
-      expect(selected()).toEqual([item(keys[2200])]);
-      expectInView(keys[2200]);
+      expect(focused()).toBe(keys[200]);
+      expect(selected()).toEqual([item(keys[200])]);
+      expectInView(keys[200]);
       press("PageUp"); // 25 whole rows in the 600 px view
-      expect(focused()).toBe(keys[2175]);
+      expect(focused()).toBe(keys[175]);
       press("Home");
       expect(focused()).toBe("d:tests");
       expectInView("d:tests");
@@ -1061,9 +1182,8 @@ describe("virtual tree", () => {
     it("brings a scrolled-away focused row back before Right opens it (R4.2)", () => {
       const { send } = setup();
       open(send, bigTree(2000));
-      click(chevron("f:tests/f0.feature"));
-      expect(focused()).toBe("f:tests/f0.feature");
-      scrollTo(20_000);
+      focusRow("f:tests/f0.feature");
+      scrollTo(8 + 150 * 24);
       press("ArrowRight");
       expect(item("f:tests/f0.feature")!.getAttribute("aria-expanded")).toBe("true");
       expect(focused()).toBe("f:tests/f0.feature");
@@ -1073,6 +1193,7 @@ describe("virtual tree", () => {
     it("runs the focused row with Ctrl+Enter, and not during a run", () => {
       const { api, send, load } = setup();
       load();
+      openFeatures();
       focusRow("s:tests/basic.feature#1");
       expect(press("Enter", { ctrlKey: true }).defaultPrevented).toBe(true);
       expect(api.run).toHaveBeenCalledTimes(1);
@@ -1086,6 +1207,7 @@ describe("virtual tree", () => {
     it("debugs the focused row with Ctrl+Shift+Enter; Ctrl+Enter alone still runs it", () => {
       const { api, load } = setup();
       load();
+      openFeatures();
       focusRow("s:tests/basic.feature#1");
       expect(press("Enter", { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(true);
       expect(api.debug).toHaveBeenCalledWith("s:tests/basic.feature#1");
@@ -1098,6 +1220,7 @@ describe("virtual tree", () => {
     it("runs nothing with Ctrl+Enter on a row the filter mutes: it has no run button", () => {
       const { api, send, load } = setup();
       load();
+      openFeatures();
       send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: false } });
       focusRow("s:tests/basic.feature#2");
       press("Enter", { ctrlKey: true });
@@ -1107,6 +1230,7 @@ describe("virtual tree", () => {
     it("keeps the row's buttons out of the tab order, and they still click", () => {
       const { api, load } = setup();
       load();
+      openFeatures();
       const buttons = within(screen.getByTestId("tree")).getAllByRole("button");
       expect(buttons.length).toBeGreaterThan(0);
       for (const b of buttons) expect(b.getAttribute("tabindex")).toBe("-1");
@@ -1117,6 +1241,7 @@ describe("virtual tree", () => {
     it("makes a clicked row the focused one, so the next key moves from it", () => {
       const { load } = setup();
       load();
+      openFeatures();
       focusRow("d:tests");
       click(within(rowByKey("f:tests/outline.feature")).getByText("outline.feature"));
       press("ArrowDown");
@@ -1129,6 +1254,7 @@ describe("virtual tree", () => {
     it("takes focus to a folder closed by its chevron, keeping the selection", () => {
       const { load } = setup();
       load();
+      openFeatures();
       click(screen.getByText("passing hello"));
       expect(focused()).toBe("s:tests/basic.feature#1");
       click(chevron("f:tests/basic.feature"));
@@ -1139,6 +1265,7 @@ describe("virtual tree", () => {
     it("moves focus to the nearest shown row above when Hide non-matching hides it", () => {
       const { send, load } = setup();
       load();
+      openFeatures();
       click(screen.getByText("failing match"));
       send({ type: "filter", filter: { include: ["smoke"], exclude: [], hideNonMatching: true } });
       expect(focused()).toBe("s:tests/basic.feature#1");
@@ -1148,6 +1275,7 @@ describe("virtual tree", () => {
     it("keeps focus in the tree when a refresh removes the focused row", () => {
       const { send, load } = setup();
       load();
+      openFeatures();
       focusRow("s:tests/basic.feature#2");
       const t = tree();
       t.children[0].children.shift(); // basic.feature is gone
@@ -1159,10 +1287,11 @@ describe("virtual tree", () => {
     it("scrolls to the selected row after a filter change takes rows away above the view", () => {
       const { send } = setup();
       open(send, bigTree(2000));
-      const target = "s:tests/f150.feature#1"; // test 1500, even, row 1652
-      scrollTo(8 + 1652 * 24 - 300);
+      const target = "s:tests/f150.feature#1"; // test 1500, even, row 152 once f150 is open
+      scrollTo(8 + 151 * 24 - 300);
+      click(nameOf("f:tests/f150.feature"));
       click(screen.getByText("test 1500"));
-      scrollTo(8 + 1000 * 24); // row 1000 on top, the selected row far below
+      scrollTo(8 + 100 * 24); // row 100 on top, the selected row below
       send({ type: "filter", filter: { include: ["even"], exclude: [], hideNonMatching: true } });
       expect(selected()).toEqual([item(target)]);
       expectInView(target);
@@ -1171,17 +1300,19 @@ describe("virtual tree", () => {
     it("does not scroll to the selected row for a new tree and the same filter", () => {
       const { send } = setup();
       open(send, bigTree(2000));
-      scrollTo(8 + 1652 * 24 - 300);
+      scrollTo(8 + 151 * 24 - 300);
+      click(nameOf("f:tests/f150.feature"));
       click(screen.getByText("test 1500"));
-      scrollTo(8 + 200 * 24);
+      scrollTo(8 + 50 * 24);
       open(send, bigTree(2000)); // a refresh, which main follows with the filter in force
       send({ type: "filter", filter: { ...NO_FILTER } });
-      expect(scroller().scrollTop).toBe(8 + 200 * 24);
+      expect(scroller().scrollTop).toBe(8 + 50 * 24);
     });
 
     it("shows a cut label whole when Down moves to its row, and closes it on the next Down", () => {
       const { load } = setup();
       load();
+      openFeatures();
       const label = screen.getByText("failing match");
       Object.defineProperty(label, "scrollWidth", { value: 200, configurable: true });
       Object.defineProperty(label, "clientWidth", { value: 100, configurable: true });
@@ -1199,6 +1330,7 @@ describe("virtual tree", () => {
     it("shows a cut label whole when Left or Right moves to its row", () => {
       const { load } = setup();
       load();
+      openFeatures();
       const cut = (label: HTMLElement) => {
         Object.defineProperty(label, "scrollWidth", { value: 200, configurable: true });
         Object.defineProperty(label, "clientWidth", { value: 100, configurable: true });
@@ -1220,6 +1352,7 @@ describe("virtual tree", () => {
       try {
         const { load } = setup();
         load();
+        openFeatures();
         expect(items().map((r) => r.getAttribute("aria-keyshortcuts"))).toEqual(
           Array(8).fill("Control+Enter Control+Shift+Enter"),
         );
@@ -1259,6 +1392,7 @@ describe("virtual tree", () => {
           ],
         }),
       );
+      openFeatures();
       const aria = (key: string) =>
         ["level", "posinset", "setsize", "expanded"].map((a) =>
           item(key)!.getAttribute(`aria-${a}`),
@@ -1285,6 +1419,7 @@ describe("virtual tree", () => {
           ],
         }),
       );
+      openFeatures();
       startRun(send);
       send({
         type: "scenarios",
@@ -1318,6 +1453,7 @@ describe("virtual tree", () => {
     it("works out a changed row's status once per update, and does not count its flaky tests again", () => {
       const { send, load } = setup();
       load();
+      openFeatures();
       startRun(send);
       vi.mocked(deriveStatus).mockClear();
       vi.mocked(leaves).mockClear();
@@ -1335,6 +1471,7 @@ describe("virtual tree", () => {
     it("works out no status when the selection or the focus moves", () => {
       const { load } = setup();
       load();
+      openFeatures();
       click(screen.getByText("passing hello"));
       vi.mocked(deriveStatus).mockClear();
       vi.mocked(leaves).mockClear();
@@ -1370,6 +1507,7 @@ describe("tree: step debugger (R5, R7)", () => {
   it("a Debug button before Run, disabled during a run", () => {
     const { api, send, load } = setup();
     load();
+    openFeatures();
     const debug = screen.getByRole("button", { name: "Debug passing hello" });
     const run = screen.getByRole("button", { name: "Run passing hello" });
     expect(debug.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1394,6 +1532,7 @@ describe("tree: step debugger (R5, R7)", () => {
   it("marks the feature and the scenario holding a breakpoint", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send({ type: "breakpoints", breakpoints: [{ file: "tests/basic.feature", line: 15 }] });
     const dotted = screen
       .getAllByTestId("breakpoint-dot")
@@ -1404,6 +1543,7 @@ describe("tree: step debugger (R5, R7)", () => {
   it("shows the pause mark on the paused test and selects it", () => {
     const { send, load } = setup();
     load();
+    openFeatures();
     send(paused("s:tests/basic.feature#2"));
     const mark = rowByKey("s:tests/basic.feature#2").querySelector("[data-status=paused]")!;
     expect(mark.getAttribute("aria-label")).toBe("Paused");
@@ -1436,6 +1576,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
   it("asks for the menu at the pointer, for a test at its line, and keeps the selection", () => {
     const { api, load } = setup();
     load();
+    openFeatures();
     fireEvent.contextMenu(screen.getByText("failing match"), { clientX: 30, clientY: 40 });
     expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 30, 40);
     expect(rowByKey("s:tests/basic.feature#2").parentElement!.getAttribute("aria-selected")).toBe(
@@ -1446,6 +1587,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
   it("asks from a row's run button and from the focused row itself, as the menu key does", () => {
     const { api, load } = setup();
     load();
+    openFeatures();
     fireEvent.contextMenu(screen.getByRole("button", { name: "Run add 2 and 3" }));
     fireEvent.contextMenu(rowByKey("s:tests/outline.feature#1.2").parentElement!);
     expect(api.editorMenu).toHaveBeenNthCalledWith(1, "tests/x.feature", 7, 0, 0);
@@ -1455,6 +1597,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
   it("opens a feature at line 1, and asks nothing for a folder or the list's padding", () => {
     const { api, load } = setup();
     load();
+    openFeatures();
     fireEvent.contextMenu(rowByKey("f:tests/basic.feature"));
     expect(api.editorMenu).toHaveBeenCalledWith("tests/basic.feature", 1, 0, 0);
     api.editorMenu.mockClear();
@@ -1466,6 +1609,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
   it("opens a failed test at its failed step during a run, even in a called feature", () => {
     const { api, send, load } = setup();
     load();
+    openFeatures();
     for (const e of failed(String.raw`C:\p\tests\common.feature:20` + "\nmatch failed")) send(e);
     fireEvent.contextMenu(screen.getByText("failing match"));
     expect(api.editorMenu).toHaveBeenCalledWith(String.raw`C:\p\tests\common.feature`, 20, 0, 0);
@@ -1476,6 +1620,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
     try {
       const { api, load } = setup();
       load();
+      openFeatures();
       const run = screen.getByRole("button", { name: "Run failing match" });
       fireEvent.pointerEnter(run.closest("span.inline-flex")!);
       vi.advanceTimersByTime(500);
@@ -1490,6 +1635,7 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
   it("opens a failed test without a place at its own line", () => {
     const { api, send, load } = setup();
     load();
+    openFeatures();
     for (const e of failed("boom")) send(e);
     fireEvent.contextMenu(screen.getByText("failing match"));
     expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 0, 0);

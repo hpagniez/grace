@@ -19,6 +19,7 @@ import { App } from "./App";
 import { Details } from "./Details";
 import { initialState, reduce } from "./reduce";
 import { drawn } from "../../test/drawn";
+import { openFeatures } from "../../test/openFeatures";
 
 // The real deriveStatus, counted: its own recursion is not, so each call is one walk of a subtree.
 vi.mock("../shared/status", async (importOriginal) => {
@@ -95,6 +96,7 @@ function setup() {
     tree: tree(),
     error: null,
   });
+  openFeatures();
   const select = (name: string) => {
     fireEvent.click(screen.getByText(name));
     flush();
