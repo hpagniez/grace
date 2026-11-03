@@ -1428,6 +1428,42 @@ describe("virtual tree", () => {
       expectInView(target);
     });
 
+    it("scrolls to a test paused in a closed feature, once its rows are open (#224 R3.7)", () => {
+      const { send } = setup();
+      open(send, bigTree(2000));
+      send({
+        type: "runStarted",
+        selection: "d:tests",
+        runId: "20261103-120000-001",
+        keys: [],
+        total: 0,
+        startedAt: Date.now(),
+        env: null,
+        debug: true,
+      });
+      const at = (key: string): AppEvent => ({
+        type: "debugPaused",
+        paused: {
+          key,
+          file: "tests/f150.feature",
+          line: 3,
+          depth: 0,
+          prefix: "*",
+          keyword: "def",
+          text: "x",
+          vars: [],
+        },
+      });
+      send(at("s:tests/f150.feature#3"));
+      expect(item("f:tests/f150.feature")!.getAttribute("aria-expanded")).toBe("true");
+      expectInView("s:tests/f150.feature#3");
+      // a second pause in the same test scrolls back to it too
+      scrollTo(0);
+      send({ type: "debugResumed" });
+      send(at("s:tests/f150.feature#3"));
+      expectInView("s:tests/f150.feature#3");
+    });
+
     it("does not scroll to the selected row for a new tree and the same filter", () => {
       const { send } = setup();
       open(send, bigTree(2000));

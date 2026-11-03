@@ -267,13 +267,16 @@ export function Tree(props: Ctx) {
   const withBreakpoints = createMemo(() =>
     breakpointKeys(props.state.tree, props.state.breakpoints),
   );
-  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1)
+  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1). The cue
+  // changes with the rows it opens, not with the pause: the list would look for the row before it is there.
+  const [pauses, setPauses] = createSignal(0);
   createEffect(
-    () => props.state.paused?.key ?? null,
-    (key) => {
+    () => [props.state.paused?.key ?? null, props.state.run.pauses] as const,
+    ([key]) => {
       const tree = props.state.tree;
       if (key === null || !tree) return;
       for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
+      setPauses((n) => n + 1);
     },
   );
   // A run opens the feature it started in, and each feature where one of its tests fails, once (#224 R3). The rows
@@ -360,7 +363,7 @@ export function Tree(props: Ctx) {
             void props.api.editorMenu(place.file, place.line, e.clientX, e.clientY);
           }}
           // By value: main sends the filter in force again after every refresh, which must not scroll (R4.7).
-          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${props.state.run.pauses}`}
+          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${pauses()}`}
           ref={(h) => (list = h)}
         >
           {(r, _index, keyboardFocused, row) => (
