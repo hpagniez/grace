@@ -32,16 +32,23 @@ beforeEach(() => {
 afterEach(() => rmSync(outer, { recursive: true, force: true }));
 
 describe("projectFile (open-in-editor R3.3)", () => {
-  it("keeps a file of the project, by its real path, whatever its letter case", () => {
+  it("keeps a file of the project, by its path in the project, whatever its letter case", () => {
     const file = path.join(root, "tests", "a.feature");
-    const real = realpathSync.native(file);
-    expect(projectFile(root, file)).toBe(real);
-    expect(projectFile(root, file.toUpperCase())).toBe(real);
+    expect(projectFile(root, file)).toBe(file);
+    expect(projectFile(root, file.toUpperCase())).toBe(file);
+  });
+
+  it("names the file under the project folder as it was opened: a mapped drive keeps its letter", () => {
+    // A junction stands for a mapped drive: its real path is elsewhere, as Z:\ is \\server\share.
+    const opened = path.join(outer, "z");
+    symlinkSync(root, opened, "junction");
+    const file = path.join(opened, "tests", "a.feature");
+    expect(projectFile(opened, file)).toBe(file);
   });
 
   it("keeps a file under a folder whose name starts with ..", () => {
     const file = touch(root, "..data/b.feature");
-    expect(projectFile(root, file)).toBe(realpathSync.native(file));
+    expect(projectFile(root, file)).toBe(file);
   });
 
   it("refuses a file outside the project, a missing file and the project folder", () => {
@@ -84,6 +91,12 @@ describe("vscodeUrl (open-in-editor R4.2)", () => {
     );
     expect(vscodeUrl("C:\\p\\100%\\é?.feature", 2)).toBe(
       "vscode://file/C:/p/100%25/%C3%A9%3F.feature:2",
+    );
+  });
+
+  it("keeps a share path's two leading slashes, as VS Code reads them", () => {
+    expect(vscodeUrl("\\\\server\\share\\p\\x.feature", 3)).toBe(
+      "vscode://file//server/share/p/x.feature:3",
     );
   });
 });

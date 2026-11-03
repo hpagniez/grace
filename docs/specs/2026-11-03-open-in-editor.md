@@ -53,11 +53,12 @@ The Details pane (`src/renderer/Details.tsx`) shows a scenario's or row's `file:
 1. The request is a path of at most 1000 characters and a line, an integer of 1 or more; anything else is refused with the notice "Invalid request".
 2. A relative path resolves as the run resolves the tree's features: the project root, then its classpath roots. An absolute path stays as it is.
 3. The resolved path must be an existing file whose real path (links followed) is inside the open project's real folder. Otherwise, or with no project open, Grace shows the notice "Grace opens only files of the open project" and opens nothing.
+4. Grace names the file under the project folder as the project was opened, not by its real path: a project on a mapped drive keeps its drive letter, so VS Code opens the file inside a workspace opened from that drive, and its prompt for a share host does not appear.
 
 ### R4. Open in VS Code
 
 1. When Windows has no app for `vscode://` links, Grace shows the notice "Open in VS Code needs VS Code installed" and opens nothing.
-2. Otherwise Grace hands Windows the link `vscode://file/<path>:<line>`: the checked path with `/` separators, percent-encoded where a URL needs it (`%`, space, `#`, `?`). Grace starts no process and no shell.
+2. Otherwise Grace hands Windows the link `vscode://file/<path>:<line>`: the path of R3.4 with `/` separators, percent-encoded where a URL needs it (`%`, space, `#`, `?`). A share path `\\server\share\…` gives `vscode://file//server/share/…`: VS Code reads `file///server` as `\server`, a folder of the current drive. Grace starts no process and no shell.
 
 ## Cost
 
@@ -128,6 +129,10 @@ Feature: Open a test in VS Code
   Scenario: The link VS Code opens
     Given the checked file "C:\My Project\a#b.feature"
     Then the link is "vscode://file/C:/My%20Project/a%23b.feature:7" for line 7
+
+  Scenario: The link to a file on a share
+    Given the checked file "\\server\share\p\x.feature"
+    Then the link is "vscode://file//server/share/p/x.feature:3" for line 3
 
   Scenario: Open a scenario in VS Code (e2e)
     Given a project with a failing scenario is open

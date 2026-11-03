@@ -1,5 +1,4 @@
 import type { ElectronApplication, Page } from "@playwright/test";
-import { realpathSync } from "node:fs";
 import { expect, launch, node, nodeByKey, openProject, project, test } from "./helpers";
 
 /** Makes Windows' `vscode://` handler `name` ("" for none) and records the links handed to it. */
@@ -23,7 +22,7 @@ test("Open a scenario in VS Code", async () => {
   await openProject(app, dir);
   const feature = nodeByKey(win, "f:tests/basic.feature");
   await expect(feature).toBeVisible({ timeout: 15_000 });
-  const link = `vscode://file/${realpathSync.native(dir).replaceAll("\\", "/")}/tests/basic.feature`;
+  const link = `vscode://file/${dir.replaceAll("\\", "/")}/tests/basic.feature`;
 
   await select(win, "failing match");
   await win.getByTestId("open-in-editor").click();
