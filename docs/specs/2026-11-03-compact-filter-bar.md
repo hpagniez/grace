@@ -1,6 +1,6 @@
 # A one-line filter bar
 
-Date 2026-11-03. Status: draft. Covers [#127](https://github.com/hpagniez/grace/issues/127). Builds on the [tag filter](2026-10-24-tag-filter.md) and the filter bar of the [premium UI](2026-10-29-premium-ui.md) (R7.3).
+Date 2026-11-03. Status: approved. Covers [#127](https://github.com/hpagniez/grace/issues/127). Builds on the [tag filter](2026-10-24-tag-filter.md) and the filter bar of the [premium UI](2026-10-29-premium-ui.md) (R7.3).
 
 ## Intent
 
@@ -42,7 +42,7 @@ Ways to show the folded tags, also settled with the owner: a panel over the tree
 ### R2. The fold chip
 
 1. While at least one chip is folded, a chip follows the last one that fits: `+N`, N the number of folded tags. When K of the folded tags are included or excluded, it reads `+N · K on`.
-2. Its accessible name is "N more tags", plus ", K on" when K is not 0. It says whether the panel is open (`aria-expanded`). Its tooltip is "Show all tags".
+2. Its accessible name is "N more tags" ("1 more tag"), plus ", K on" when K is not 0. It says whether the panel is open (`aria-expanded`). Its tooltip is "Show all tags".
 3. It works during a run, so the panel can be read; the chips in the panel are disabled then, like those on the line.
 
 ### R3. The panel
@@ -52,13 +52,13 @@ Ways to show the folded tags, also settled with the owner: a panel over the tree
 3. The panel closes on a second click on the fold chip, on Escape, and on a click outside it. Escape puts the focus back on the fold chip.
 4. The panel's chips follow the fold chip in the Tab order.
 5. The panel closes when no chip is folded any more (the window grew, or the project has fewer tags).
-6. The panel's nodes exist only while it is open.
+6. The panel's chips exist only while it is open; closed, the panel is one empty element.
 
 ## Cost
 
 - Idle: nothing runs. One `IntersectionObserver` per open project, on the strip; the browser calls it only when a chip crosses the fold: a resize, a tag list change, a chip that widens or narrows when it turns on or off, Clear and the counter appearing. No timer, no poll, no layout read in Grace's code.
 - During a run: the tags and the chips' states do not change, so the observer is not called.
-- Memory and nodes: the fold chip adds a few nodes; the panel adds one chip per tag only while open (53 with the bench project). The chips on the line are the ones drawn today, so `page.nodes.open` does not grow beyond the fold chip.
+- Memory and nodes: the fold chip and the empty panel add a few nodes; the panel adds one chip per tag only while open (53 with the bench project). The chips on the line are the ones drawn today, so `page.nodes.open` does not grow beyond the fold chip.
 - Start: one observer call after the first layout, off the paint. Size: about 2 KB of code; no dependency.
 
 ## Design decisions already made
