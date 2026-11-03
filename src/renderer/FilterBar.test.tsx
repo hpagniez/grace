@@ -2,7 +2,7 @@ import path from "node:path";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
 import { Check, Minus, type IconNode } from "lucide";
 import { flush } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
@@ -69,7 +69,102 @@ const drawn = (el: Element, icon: IconNode) => {
   );
 };
 
-afterEach(cleanup);
+/** jsdom has no IntersectionObserver: this one reports only what a test tells it to. */
+class FakeIO {
+  static all: FakeIO[] = [];
+  targets: Element[] = [];
+  constructor(
+    public cb: IntersectionObserverCallback,
+    public opts?: IntersectionObserverInit,
+  ) {
+    FakeIO.all.push(this);
+  }
+  observe(el: Element) {
+    this.targets.push(el);
+  }
+  disconnect() {
+    this.targets = [];
+  }
+}
+const io = () => FakeIO.all.at(-1)!;
+/** The browser's report: the chips of `tags` past the line, every other chip on it. */
+const fold = (...tags: string[]) => {
+  io().cb(
+    io().targets.map((t) => ({
+      target: t,
+      isIntersecting: !tags.includes((t as HTMLElement).dataset.tag!),
+    })) as unknown as IntersectionObserverEntry[],
+    io() as unknown as IntersectionObserver,
+  );
+  flush();
+};
+const more = () => screen.queryByTestId("tag-more") as HTMLButtonElement | null;
+
+beforeEach(() => vi.stubGlobal("IntersectionObserver", FakeIO));
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe("folding", () => {
+  it("folds the chips past the line behind a count", () => {
+    const { load } = setup();
+    load();
+    fold("smoke", "wip");
+    expect(io().opts!.root).toBe(screen.getByTestId("tag-strip"));
+    expect(io().targets).toEqual(screen.getAllByTestId("tag-chip"));
+    expect(more()!.textContent).toBe("+2");
+    expect(more()!.getAttribute("aria-label")).toBe("2 more tags");
+    expect(chip("smoke").className).toContain("invisible");
+    expect(chip("wip").className).toContain("invisible");
+    expect(chip("slow").className).not.toContain("invisible");
+  });
+
+  it("counts the folded tags that are on", () => {
+    const { load } = setup();
+    load({ include: [], exclude: ["wip"], hideNonMatching: false });
+    fold("smoke", "wip");
+    expect(more()!.textContent).toBe("+2 · 1 on");
+    expect(more()!.getAttribute("aria-label")).toBe("2 more tags, 1 on");
+    fold("wip");
+    expect(more()!.textContent).toBe("+1 · 1 on");
+    expect(more()!.getAttribute("aria-label")).toBe("1 more tag, 1 on");
+  });
+
+  it("has no fold chip when every chip fits", () => {
+    const { load } = setup();
+    load();
+    fold();
+    expect(more()).toBeNull();
+    expect(screen.getByTestId("filter-bar").className).not.toContain("flex-wrap");
+    const strip = screen.getByTestId("tag-strip").className;
+    for (const c of ["flex-wrap", "h-6", "overflow-clip"]) expect(strip).toContain(c);
+  });
+
+  it("keeps one observer while only the filter changes", () => {
+    const { send, load } = setup();
+    load();
+    fold("wip");
+    const n = FakeIO.all.length;
+    send({ type: "filter", filter: smokeNotWip() });
+    expect(FakeIO.all.length).toBe(n);
+    expect(more()!.textContent).toBe("+1 · 1 on");
+  });
+
+  it("shows the next click on the fold chip in a tooltip", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { load } = setup();
+      load();
+      fold("wip");
+      fireEvent.pointerEnter(more()!.parentElement!);
+      vi.advanceTimersByTime(500);
+      expect(document.querySelector("[role=tooltip]")!.textContent).toBe("Show all tags");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe("filter bar", () => {
   it("shows a chip per tag", () => {
