@@ -283,9 +283,9 @@ Feature: Find in the console, and step through its errors
   Scenario: A full console (e2e)
     # The lines are sent to the window as console events, as e2e/panel.spec.ts does: a real run's summary
     # and banner would push matching lines out at the cap.
-    Given a console of 10,000 lines that each match once
+    Given a console of 10,000 lines that each match once, followed to its bottom
     When I type the search
-    Then the count reads "1 of 10000"
+    Then the count reads "<n> of 10000", the current match being the first in view (R3.6)
     # The keystroke's time (Cost: under 16 ms) is measured by hand on the reference machine and written in the PR:
     # a timing assertion would be flaky on CI.
 ```
