@@ -9,6 +9,7 @@ import {
   screen,
   shell,
   type OpenDialogOptions,
+  type SaveDialogOptions,
 } from "electron";
 import path from "node:path";
 import { parsePropertiesEdit } from "./shared/env";
@@ -26,6 +27,7 @@ import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { isDebugCommand } from "./main/karate/debug";
 import { killOrphan } from "./main/karate/process";
 import { checkRecent } from "./main/recent";
+import { zipReport } from "./main/report-zip";
 import { Runner } from "./main/runner";
 import { safeStorageBox } from "./main/secrets";
 import {
@@ -352,6 +354,29 @@ app.whenReady().then(async () => {
   handleRunId(CH.runReport, async (id) => {
     const report = runner.runReportPath(id);
     if (report) await shell.openPath(report);
+  });
+  handleRunId(CH.exportReport, async (id) => {
+    const source = runner.exportSource(id);
+    if (!source) return;
+    const options: SaveDialogOptions = {
+      title: "Export report",
+      defaultPath: path.join(app.getPath("downloads"), source.name),
+      filters: [{ name: "Zip archive", extensions: ["zip"] }],
+    };
+    const r =
+      win && !win.isDestroyed()
+        ? await dialog.showSaveDialog(win, options)
+        : await dialog.showSaveDialog(options);
+    if (r.canceled || !r.filePath) return;
+    try {
+      await zipReport(source.dir, r.filePath);
+      emit({ type: "notice", message: `Report saved to ${r.filePath}`, success: true });
+    } catch (err) {
+      emit({
+        type: "notice",
+        message: `The report could not be saved: ${(err as Error).message}`,
+      });
+    }
   });
   handle(CH.clearHistory, () => runner.clearHistory());
   handle(CH.checkUpdates, () => updater.check());

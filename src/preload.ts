@@ -22,6 +22,7 @@ const api: Api = {
   rerun: (id) => ipcRenderer.invoke(CH.rerun, id),
   rerunFailed: (id) => ipcRenderer.invoke(CH.rerunFailed, id),
   openRunReport: (id) => ipcRenderer.invoke(CH.runReport, id),
+  exportReport: (id) => ipcRenderer.invoke(CH.exportReport, id),
   clearHistory: () => ipcRenderer.invoke(CH.clearHistory),
   openRecent: (root) => ipcRenderer.invoke(CH.openRecent, root),
   removeRecent: (root) => ipcRenderer.invoke(CH.removeRecent, root),

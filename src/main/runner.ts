@@ -556,6 +556,14 @@ export class Runner {
     return existsSync(report) ? report : null;
   }
 
+  /** The folder and proposed zip name of a listed run's report (export spec R2.3); null if it has none. */
+  exportSource(id: string): { dir: string; name: string } | null {
+    const report = this.runReportPath(id);
+    return report
+      ? { dir: path.dirname(report), name: `${path.basename(this.project!.root)}-report-${id}.zip` }
+      : null;
+  }
+
   async cancel(): Promise<void> {
     if (!this.busy) return;
     // also between two JVMs of one operation: each start checks it (a re-run's switch, then its run)
