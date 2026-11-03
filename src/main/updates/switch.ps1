@@ -22,6 +22,7 @@ function Start-Program($exe, $arguments, $folder) {
 }
 
 $switching = Join-Path $PSScriptRoot 'switching'
+$log = Join-Path ([IO.Path]::GetTempPath()) 'grace-switch.log'
 
 if (-not $Detached) {
   # Grace started this copy, which dies when Grace exits (Node kills the processes it started).
@@ -60,12 +61,17 @@ function Remove-Copy($dir) {
   Remove-Tree $dir
 }
 
-# Undoing must not leave Grace without an install folder: retry while an antivirus or a dying
-# process holds a file, as long as the wait for Grace to quit (60 s).
-function Move-Back($from, $to) {
+# Retries while an antivirus or a dying process holds a file, as long as the wait for Grace to quit
+# (60 s): a switch must not fail on a moment's hold (#145), and undoing must not leave Grace without
+# an install folder. Each failed try goes in the log, outside <install>.update (ADR 0019).
+function Move-Folder($from, $to) {
   $deadline = [DateTime]::UtcNow.AddSeconds($plan.exitTimeoutSec)
   for (;;) {
-    try { [IO.Directory]::Move($from, $to); return } catch { if ([DateTime]::UtcNow -gt $deadline) { throw } }
+    try { [IO.Directory]::Move($from, $to); return } catch {
+      $line = "$([DateTime]::UtcNow.ToString('o')) moving $from to $to failed: $(Get-Message $_)`r`n"
+      try { [IO.File]::AppendAllText($log, $line, (New-Object Text.UTF8Encoding $false)) } catch {}
+      if ([DateTime]::UtcNow -gt $deadline) { throw }
+    }
     Start-Sleep 1
   }
 }
@@ -122,7 +128,7 @@ function Remove-Leftover($dir, $name) {
   if (-not (Test-Path -LiteralPath $dir)) { return }
   $inside = Join-Path $PSScriptRoot $name
   Remove-Tree $inside
-  Move-Back $dir $inside  # retried: an antivirus may hold a file for a moment
+  Move-Folder $dir $inside  # retried: an antivirus may hold a file for a moment
   # Once inside the staging folder it is out of the way; Grace removes what is left later (R10.8).
   try { Remove-Tree $inside } catch {}
 }
@@ -181,9 +187,9 @@ try {
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     while ((Get-Grace) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
 
-    [IO.Directory]::Move($install, $old)
+    Move-Folder $install $old
     $movedOld = $true
-    [IO.Directory]::Move($app, $install)
+    Move-Folder $app $install
     $movedNew = $true
 
     # R10.5: the result first, since the new version reads it when it starts
@@ -216,17 +222,17 @@ try {
           $err += "; clearing $aside failed: $(Get-Message $_)"
           $dest = $app
         }
-        Move-Back $install $dest
+        Move-Folder $install $dest
       } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
     } elseif ($movedNew) {
-      try { Move-Back $install $app } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
+      try { Move-Folder $install $app } catch { $err += "; moving $($plan.to) aside failed: $(Get-Message $_)" }
     }
     if ($movedOld -and -not (Test-Path -LiteralPath $install)) {
-      try { Move-Back $old $install } catch {
+      try { Move-Folder $old $install } catch {
         $err += "; putting $($plan.from) back failed: $(Get-Message $_)"
         # never no install folder: the new version goes back in rather than none
         try {
-          Move-Back $(if ($startedNew) { $dest } else { $app }) $install
+          Move-Folder $(if ($startedNew) { $dest } else { $app }) $install
           $err += ", so $($plan.to) stays installed"
         } catch { $err += "; putting $($plan.to) back failed too: $(Get-Message $_)" }
       }

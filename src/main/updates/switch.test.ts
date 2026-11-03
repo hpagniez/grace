@@ -180,6 +180,8 @@ setInterval(() => { try { process.kill(${process.pid}, 0); } catch { process.exi
   beforeEach(() => {
     // a space, a non-ASCII letter and a wildcard in every path (plan Review Focus 1)
     const dir = mkdtempSync(path.join(root, "t-"));
+    // the script logs failed renames in the temp folder: each test's own
+    env.TMP = dir;
     install = path.join(dir, "Grace [dir] Zoë");
     staging = `${install}.update`;
     data = path.join(dir, "Grace [data] Zoë");
@@ -329,6 +331,22 @@ setInterval(() => { try { process.kill(${process.pid}, 0); } catch { process.exi
     expect(existsSync(path.join(data, "projects", "p", "runs", "r", "run.json"))).toBe(true);
     // the old version started again
     expect(pidsUnder(install)).not.toHaveLength(0);
+  });
+
+  it("retries a rename while a file is held for a moment (#145)", T, async () => {
+    const log = path.join(path.dirname(install), "grace-switch.log");
+    const held = await hold(path.join(install, "resources", "app.asar"));
+    const done = run();
+    // released only once a try has failed, so the switch goes on after a failed rename
+    await until(() => existsSync(log));
+    held.release();
+    await done;
+    expect(result()).toMatchObject({ ok: true, error: null });
+    expect(read(install, "v.txt")).toBe("1.0.0-rc.6");
+    expect(read(`${install}.old`, "v.txt")).toBe("1.0.0-rc.5");
+    expect(readFileSync(log, "utf8")).toMatch(
+      /^\S+ moving .+Grace \[dir\] Zoë to .+Grace \[dir\] Zoë\.old failed: .+\r\n/,
+    );
   });
 
   it("puts the old folder back when the second rename fails (R10.4)", T, async () => {
