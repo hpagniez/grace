@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEvent } from "../shared/events";
 import { FLAKY_TITLE, type FlakyEnv } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
-import type { TestNode } from "../shared/model";
+import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { NO_FILTER } from "../shared/tags";
 import { App } from "./App";
@@ -26,6 +26,10 @@ import { openFeatures } from "../../test/openFeatures";
 vi.mock("../shared/status", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/status")>();
   return { ...actual, deriveStatus: vi.fn(actual.deriveStatus) };
+});
+vi.mock("./treeRows", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./treeRows")>();
+  return { ...actual, treeRows: vi.fn(actual.treeRows) };
 });
 vi.mock("./nodes", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./nodes")>();
@@ -1019,6 +1023,133 @@ describe("virtual tree", () => {
       expect(expanded(BASIC)).toBe("false");
       load();
       expect(expanded(BASIC)).toBe("false");
+    });
+  });
+
+  describe("a run opens features (#224 R3, R4)", () => {
+    const BASIC = "f:tests/basic.feature";
+    const OUTLINE = "f:tests/outline.feature";
+    const TESTS = [
+      "s:tests/basic.feature#1",
+      "s:tests/basic.feature#2",
+      "s:tests/outline.feature#1.1",
+      "s:tests/outline.feature#1.2",
+    ];
+    const expanded = (key: string) => item(key)!.getAttribute("aria-expanded");
+    let runs = 0;
+    const run = (send: (e: AppEvent) => void, selection: string, debug = false) =>
+      send({
+        type: "runStarted",
+        selection,
+        runId: `20261103-120000-${String(++runs).padStart(3, "0")}`,
+        keys: TESTS,
+        total: TESTS.length,
+        startedAt: Date.now(),
+        env: null,
+        debug,
+      });
+    const result = (send: (e: AppEvent) => void, key: string, status: Status) =>
+      send({ type: "scenarios", updates: [{ key, status }] });
+    const end = (send: (e: AppEvent) => void) =>
+      send({
+        type: "runFinished",
+        outcome: "finished",
+        exitCode: 1,
+        summary: null,
+        reportAvailable: false,
+      });
+
+    it.each([
+      ["a run of the feature", BASIC, false],
+      ["a debug run of the feature", BASIC, true],
+      ["History's Re-run of a run of one of its tests", "s:tests/basic.feature#2", false],
+    ])("opens the feature as %s starts", (_, selection, debug) => {
+      const { send, load } = setup();
+      load();
+      run(send, selection, debug);
+      expect([expanded(BASIC), expanded(OUTLINE)]).toEqual(["true", "false"]);
+    });
+
+    it("opens nothing as Run all or a rerun of the failed tests starts", () => {
+      const { send, load } = setup();
+      load();
+      run(send, "d:");
+      expect([expanded(BASIC), expanded(OUTLINE)]).toEqual(["false", "false"]);
+    });
+
+    it("opens a feature when one of its tests fails, and none where they pass", () => {
+      const { send, load } = setup();
+      load();
+      run(send, "d:");
+      result(send, "s:tests/outline.feature#1.1", "passed");
+      expect(expanded(BASIC)).toBe("false");
+      result(send, "s:tests/basic.feature#2", "failed");
+      expect([expanded(BASIC), expanded(OUTLINE)]).toEqual(["true", "false"]);
+    });
+
+    it.each([
+      ["it opened on a failure", false, false],
+      ["it was open before the run", true, false],
+      ["its name was clicked during the run", false, true],
+    ])("never reopens a feature closed during the run, where %s", (_, before, during) => {
+      const { send, load } = setup();
+      load();
+      if (before) click(nameOf(BASIC));
+      run(send, "d:");
+      if (during) click(nameOf(BASIC));
+      if (!before && !during) result(send, "s:tests/basic.feature#1", "failed");
+      expect(expanded(BASIC)).toBe("true");
+      click(chevron(BASIC));
+      result(send, "s:tests/basic.feature#2", "failed");
+      expect(expanded(BASIC)).toBe("false");
+    });
+
+    it("opens nothing for a failure of an earlier run", () => {
+      const { send, load } = setup();
+      load();
+      run(send, "d:");
+      result(send, "s:tests/basic.feature#2", "failed");
+      end(send);
+      click(chevron(BASIC));
+      run(send, OUTLINE);
+      result(send, "s:tests/outline.feature#1.1", "failed");
+      expect([expanded(BASIC), expanded(OUTLINE)]).toEqual(["false", "true"]);
+    });
+
+    it("opens the feature only, not a folder or an outline that was closed", () => {
+      const { send, load } = setup();
+      load();
+      click(nameOf(OUTLINE));
+      click(chevron("o:tests/outline.feature#1"));
+      click(chevron("d:tests"));
+      run(send, "d:");
+      result(send, "s:tests/basic.feature#1", "failed");
+      result(send, "s:tests/outline.feature#1.2", "failed");
+      expect(expanded("d:tests")).toBe("false");
+      click(chevron("d:tests"));
+      expect(expanded(BASIC)).toBe("true");
+      expect(expanded("o:tests/outline.feature#1")).toBe("false");
+      expect(rowByKey("o:tests/outline.feature#1").dataset.status).toBe("failed");
+    });
+
+    it("leaves open what a run opened, after it", () => {
+      const { send, load } = setup();
+      load();
+      run(send, "d:");
+      result(send, "s:tests/basic.feature#1", "failed");
+      end(send);
+      expect(expanded(BASIC)).toBe("true");
+    });
+
+    it("rebuilds no rows for statuses that open nothing", () => {
+      const { send, load } = setup();
+      load();
+      run(send, BASIC);
+      vi.mocked(treeRows).mockClear();
+      result(send, "s:tests/basic.feature#1", "passed");
+      result(send, "s:tests/basic.feature#2", "failed"); // its feature is open already
+      result(send, "s:tests/outline.feature#1.1", "passed");
+      expect(vi.mocked(treeRows)).not.toHaveBeenCalled();
     });
   });
 

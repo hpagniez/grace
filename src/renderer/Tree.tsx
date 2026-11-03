@@ -20,7 +20,15 @@ import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { findingText } from "./bannerText";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
-import { ancestors, breakpointKeys, failedAt, leaves, nodeName, STATUS_LABEL } from "./nodes";
+import {
+  ancestors,
+  breakpointKeys,
+  failedAt,
+  featureOf,
+  leaves,
+  nodeName,
+  STATUS_LABEL,
+} from "./nodes";
 import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
 import { StatusMark } from "./StatusMark";
@@ -244,7 +252,13 @@ export function Tree(props: Ctx) {
       else next.add(key);
       return next;
     });
-  const toggle = (key: string) => setOpen(key, !isOpen(key));
+  // The run in progress, or the last: the features it may no longer open, and how many failed keys it has read.
+  let run = { id: null as string | null, done: new Set<string>(), read: 0 };
+  const toggle = (key: string) => {
+    // a feature the person closes during a run stays closed until it ends (#224 R3.5)
+    if (isOpen(key) && props.state.run.active) run.done.add(key);
+    setOpen(key, !isOpen(key));
+  };
   // Reads no status, so a status update never redraws a row (R2.3).
   const rows = createMemo(() =>
     props.state.tree ? treeRows(props.state.tree, isOpen, props.state.filter) : [],
@@ -260,6 +274,24 @@ export function Tree(props: Ctx) {
       const tree = props.state.tree;
       if (key === null || !tree) return;
       for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
+    },
+  );
+  // A run opens the feature it started in, and each feature where one of its tests fails, once (#224 R3). The rows
+  // still read no status: they change only when a feature opens (R4.3).
+  createEffect(
+    () => [props.state.run.runId, props.state.run.failedKeys.length] as const,
+    ([id, failed]) => {
+      if (id === null) return;
+      const open = (feature: string | null) => {
+        if (feature === null || run.done.has(feature)) return;
+        run.done.add(feature);
+        if (!isOpen(feature)) setOpen(feature, true);
+      };
+      if (id !== run.id) {
+        run = { id, done: new Set(), read: 0 };
+        open(featureOf(props.state.run.selection));
+      }
+      for (; run.read < failed; run.read++) open(featureOf(props.state.run.failedKeys[run.read]));
     },
   );
 
