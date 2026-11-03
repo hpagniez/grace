@@ -77,16 +77,22 @@ export function flakyProject(): { dir: string; coin(heads: boolean): void } {
 export const emptyProject = () => tempDir("kk-empty-");
 
 /**
- * `env` with a PATH that holds no Maven or Gradle: CI's runners have both, and a test must never run a real build
- * tool (a project's own stand-in `mvnw.cmd` still runs). Windows names the key `Path`, any case goes.
+ * `env` where Grace finds no Maven or Gradle: none on PATH, no MAVEN_HOME, M2_HOME or GRADLE_HOME, and ProgramFiles
+ * and LOCALAPPDATA at an empty folder, so no IntelliJ IDEA either. CI's runners have both tools, a developer may have
+ * IntelliJ, and a test must never run a real build tool (a project's own stand-in `mvnw.cmd` still runs). Windows
+ * names the key `Path`, any case goes.
  */
 function withoutBuildTools(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const out = Object.fromEntries(Object.entries(env).filter(([k]) => k.toLowerCase() !== "path"));
+  const hidden = ["path", "maven_home", "m2_home", "gradle_home", "programfiles", "localappdata"];
+  const out = Object.fromEntries(
+    Object.entries(env).filter(([k]) => !hidden.includes(k.toLowerCase())),
+  );
   const tools = ["mvn.cmd", "mvn.bat", "gradle.bat"];
   out.PATH = (env.PATH ?? "")
     .split(";")
     .filter((d) => !tools.some((t) => existsSync(path.join(d, t))))
     .join(";");
+  out.ProgramFiles = out.LOCALAPPDATA = tempDir("kk-no-ide-");
   return out;
 }
 

@@ -35,8 +35,8 @@ export function setup(
   secrets: SecretBox = fakeSecretBox(),
   paths: VendorPaths = vendor,
   fingerprint?: (root: string) => Promise<string | null>,
-  // never the developer's own ~/.karate/ext nor a real Maven or Gradle on PATH
-  opts: { home?: string; toolPath?: string } = {},
+  // never the developer's own ~/.karate/ext nor a real Maven or Gradle
+  opts: { home?: string; lookupEnv?: NodeJS.ProcessEnv } = {},
 ) {
   temps.push(dataDir);
   const home = opts.home ?? mkdtempSync(path.join(tmpdir(), "kk-home-"));
@@ -53,7 +53,7 @@ export function setup(
     },
     fingerprint,
     home,
-    toolPath: opts.toolPath ?? "",
+    lookupEnv: opts.lookupEnv ?? {},
   });
   runners.push(runner);
   const all = <K extends AppEvent["type"]>(type: K) =>
@@ -84,7 +84,11 @@ export function makeJar(dir: string, files: Record<string, string>): string {
  * Writes a stand-in build tool `name` into `root`: it logs its arguments to `<root>/calls.log`, then runs `body`
  * (batch lines joined by CRLF). Returns the log's path.
  */
-export function stubTool(root: string, name: "mvnw.cmd" | "gradlew.bat", body: string): string {
+export function stubTool(
+  root: string,
+  name: "mvnw.cmd" | "gradlew.bat" | "mvn.cmd",
+  body: string,
+): string {
   writeFileSync(
     path.join(root, name),
     ["@echo off", 'echo %*>>"%~dp0calls.log"', body, ""].join("\r\n"),

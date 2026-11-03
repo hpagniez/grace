@@ -213,8 +213,8 @@ export class Runner {
       fingerprint?: (root: string) => Promise<string | null>;
       /** Where `~/.karate/ext` is; a test seam, the default is the person's home folder. */
       home?: string;
-      /** Where Maven and Gradle are looked for; a test seam, the default is PATH. */
-      toolPath?: string;
+      /** The variables Maven and Gradle are looked for with (find-build-tools R1); a test seam, the default is Grace's. */
+      lookupEnv?: NodeJS.ProcessEnv;
     },
   ) {
     this.pidFile = path.join(o.dataDir, "running.pid");
@@ -825,9 +825,11 @@ export class Runner {
           ? "Grace uses the libraries it listed before."
           : "Tests that use them will fail."
       }`;
-    const searchPath = this.o.toolPath ?? process.env.PATH ?? "";
-    const tool = findTool(root, layout, searchPath);
-    if (!tool) return said(noToolReason(layout));
+    const lookup = this.o.lookupEnv ?? process.env;
+    const searchPath = lookup.PATH ?? "";
+    const tool = findTool(root, layout, lookup);
+    if (!tool)
+      return `${said(noToolReason(layout))} Install ${TOOL_NAME[layout]}, or add the ${TOOL_NAME[layout]} wrapper to the project.`;
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "libraries.txt");
     const initScript = path.join(dir, "libraries.gradle");

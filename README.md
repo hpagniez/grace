@@ -41,7 +41,7 @@ Karate Labs sells its GUI runners. The Karate engine is open source, and its com
 <td width="50%" valign="top">
 
 **Test tree**<br>
-Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw`, `gradlew`, or `mvn` or `gradle` on PATH), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. Arrow keys move through it, and it stays fast with 10,000 tests.
+Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw` or `gradlew`, else the Maven or Gradle found on PATH, in `MAVEN_HOME`, `M2_HOME` or `GRADLE_HOME`, or the Maven that IntelliJ IDEA bundles), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. Arrow keys move through it, and it stays fast with 10,000 tests.
 
 </td>
 <td width="50%" valign="top">
