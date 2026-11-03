@@ -1,4 +1,3 @@
-import { realpathSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TestNode } from "../shared/model";
@@ -16,9 +15,9 @@ describe("editorFile (open-in-editor R3)", () => {
     const feature = flat(last("project").tree!).find(
       (n) => n.kind === "feature" && n.file.endsWith("users.feature"),
     )!;
-    const real = realpathSync.native(path.join(root, "src/test/java/examples/users.feature"));
-    expect(runner.editorFile(feature.file)).toBe(real);
-    expect(runner.editorFile(real)).toBe(real);
+    const file = path.resolve(root, "src/test/java/examples/users.feature");
+    expect(runner.editorFile(feature.file)).toBe(file);
+    expect(runner.editorFile(file)).toBe(file);
     expect(runner.editorFile("../x.feature")).toBeNull();
   });
 

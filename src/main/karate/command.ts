@@ -31,8 +31,8 @@ const COMPILED: Record<Layout, string[]> = {
   standalone: [],
 };
 
-/** True for the project folder and anything under it; a folder named `..data` is under it. */
-const inside = (root: string, abs: string) => {
+/** True for the project folder and anything under it, by the names alone; a folder named `..data` is under it. */
+export const inside = (root: string, abs: string) => {
   const rel = path.relative(root, abs);
   return rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 };

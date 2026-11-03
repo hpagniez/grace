@@ -44,7 +44,7 @@ export const sheet =
 
 /** A button that reads as a link inside a sentence: Check for updates, What's new. */
 export const link =
-  "rounded-sm font-medium text-ink underline decoration-control underline-offset-2 transition-colors duration-(--duration-fast) ease-standard enabled:hover:decoration-ink disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40";
+  "rounded-sm text-left font-medium text-ink underline decoration-control underline-offset-2 transition-colors duration-(--duration-fast) ease-standard enabled:hover:decoration-ink disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40";
 
 /**
  * A modal <dialog> (R19.1). It enters over --duration-base with a fade and a scale from 0.98, and its
