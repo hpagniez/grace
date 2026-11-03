@@ -148,6 +148,15 @@ describe("folding", () => {
     for (const c of ["flex-wrap", "h-6", "overflow-clip"]) expect(strip).toContain(c);
   });
 
+  it("moves the focus to the fold chip when the focused chip folds", () => {
+    const { load } = setup();
+    load();
+    fold("wip");
+    chip("smoke").focus();
+    fold("smoke", "wip"); // turning it on made Clear and the counter appear, pushing it past the line
+    expect(document.activeElement).toBe(more());
+  });
+
   it("keeps one observer while only the filter changes", () => {
     const { send, load } = setup();
     load();

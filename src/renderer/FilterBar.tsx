@@ -1,5 +1,5 @@
 import { Check, Minus } from "lucide";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, For, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { chipTags, cycleTag, filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { ghostSmall } from "./buttons";
@@ -42,6 +42,7 @@ export function FilterBar(props: { state: AppState; api: Api }) {
   const foldedOn = () => [...folded()].filter((t) => stateOf(t) !== "off").length;
   // The panel of every tag: a native popover, so Escape, a click outside and the focus come free (R3).
   let panel: HTMLDivElement | undefined;
+  let moreButton: HTMLButtonElement | undefined;
   const [open, setOpen] = createSignal(false);
   // Keyed on the tag names: a filter echo makes a new array of the same tags.
   const tagKey = createMemo(() => tags().join(" "));
@@ -56,6 +57,12 @@ export function FilterBar(props: { state: AppState; api: Api }) {
           else past.add(tag);
         }
         setFolded(new Set(past));
+        // A hidden chip loses the focus: hand it to the fold chip, which now holds that tag.
+        const focused = document.activeElement as HTMLElement | null;
+        if (focused?.dataset.tag && past.has(focused.dataset.tag) && strip!.contains(focused)) {
+          flush();
+          moreButton?.focus();
+        }
         // Nothing left to unfold: the panel goes with its fold chip (R3.5).
         if (past.size === 0 && open()) {
           panel?.hidePopover?.();
@@ -108,6 +115,7 @@ export function FilterBar(props: { state: AppState; api: Api }) {
         <Show when={folded().size > 0}>
           <Tooltip text="Show all tags" class="shrink-0">
             <button
+              ref={(e) => (moreButton = e)}
               type="button"
               data-testid="tag-more"
               class={chip}
