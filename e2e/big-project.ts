@@ -18,7 +18,7 @@ const WORDS =
 export function writeBigProject(
   dir: string,
   featuresPerModule: number,
-): { tests: number; calls: number } {
+): { tests: number; calls: number; rows: number } {
   const write = (rel: string, text: string) => {
     mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     writeFileSync(path.join(dir, rel), text);
@@ -122,5 +122,7 @@ Scenario:
         lines.push("");
         write(`tests/area-${a}/module-${m}/feature-${f}.feature`, lines.join("\n"));
       }
-  return { tests, calls };
+  // the tree's rows as it opens, its features closed (#224): tests/, the areas, the modules and the features
+  const rows = 1 + AREAS + AREAS * MODULES * (1 + featuresPerModule);
+  return { tests, calls, rows };
 }

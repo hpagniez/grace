@@ -54,7 +54,7 @@ import {
 /** @typedef {import("./judge.mjs").Values} Values */
 /** @typedef {import("@playwright/test").Page} Page */
 /** @typedef {import("./app.mjs").App} App */
-/** @typedef {{ dir: string, tests: number }} Project */
+/** @typedef {{ dir: string, rows: number }} Project `rows`: the tree's as it opens, its features closed (#224). */
 
 /** The machine the limits are measured on (docs/specs/2026-10-31-light-and-fast.md, R5.2), and the screen the bench uses there. */
 const REFERENCE_MACHINE = "Windows 11 Pro, Ryzen 7 5800X, 32 GB, second screen 2560x1440 at 59 Hz";
@@ -283,10 +283,11 @@ async function startRun(page) {
 }
 
 /**
- * Waits for the tree to hold the project's tests and gives its row count. A build whose tree never does (it reads
- * differently) gives the rows it has after 2 minutes, and the probes read null rather than the bench waits for ever.
+ * Waits for the tree to hold at least `expected` rows, the project's folders and features, and gives its row count. A
+ * build whose tree never does (it reads differently) gives the rows it has after 2 minutes, and the probes read null
+ * rather than the bench waits for ever.
  */
-async function treeRows(/** @type {Page} */ page, /** @type {number} */ tests) {
+async function treeRows(/** @type {Page} */ page, /** @type {number} */ expected) {
   // A virtual list draws only the rows in view and says how many there are in data-rows.
   const rows = () =>
     page
@@ -299,12 +300,12 @@ async function treeRows(/** @type {Page} */ page, /** @type {number} */ tests) {
       .catch(() => 0); // the page may be mid-navigation at first
   const until = Date.now() + TREE_LOAD_MS;
   let count = await rows();
-  while (count < tests && Date.now() < until) {
+  while (count < expected && Date.now() < until) {
     await sleep(250);
     count = await rows();
   }
-  if (count < tests)
-    log(`the tree has ${count} rows, not ${tests}, after ${TREE_LOAD_MS / 1000} s`);
+  if (count < expected)
+    log(`the tree has ${count} rows, not ${expected}, after ${TREE_LOAD_MS / 1000} s`);
   return count;
 }
 
@@ -315,7 +316,7 @@ async function treeRows(/** @type {Page} */ page, /** @type {number} */ tests) {
  * never got to start reads null. `index` is the test row to select, one that is not selected already, or the click
  * would time nothing.
  * @param {Page} page
- * @param {{ state: "idle" | "run", index: number, total: number }} opts `total` is the tree's rows with every folder open.
+ * @param {{ state: "idle" | "run", index: number, total: number }} opts `total` is the tree's rows with its folders and first feature open.
  * @returns {Promise<Values>}
  */
 async function smoothProbes(page, { state, index, total }) {
@@ -364,7 +365,7 @@ async function smoothProbes(page, { state, index, total }) {
  * @param {string} tag
  * @returns {Promise<Values>}
  */
-async function interactive(exe, { dir, tests }, tag) {
+async function interactive(exe, { dir, rows }, tag) {
   const app = await launch(exe, { project: dir, dataDir: freshDir(), cdp: true });
   /** @type {Values} */
   const out = {};
@@ -374,7 +375,10 @@ async function interactive(exe, { dir, tests }, tag) {
   try {
     const page = /** @type {Page} */ (app.page);
     const cdp = /** @type {import("@playwright/test").CDPSession} */ (app.cdp);
-    const total = await treeRows(page, tests);
+    await treeRows(page, rows);
+    // A test to select (#224 R2.1): a click on a feature's name opens it, and never closes the open one of a base build.
+    await page.locator(`${NODE}[data-kind=feature]`).first().locator("button").nth(1).click();
+    const total = await treeRows(page, rows + 1);
     await instrument(page); // before Run all: the watch on "Finished" starts here
     for (const [id, v] of Object.entries(
       await smoothProbes(page, { state: "idle", index: 4, total }),
@@ -565,7 +569,7 @@ async function main() {
   };
   function makeProject(/** @type {string} */ name, /** @type {number} */ perModule) {
     const dir = path.join(/** @type {string} */ (workDir), name);
-    return { dir, tests: writeBigProject(dir, perModule).tests };
+    return { dir, rows: writeBigProject(dir, perModule).rows };
   }
 
   const sizes = Object.fromEntries(
