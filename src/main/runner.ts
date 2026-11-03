@@ -509,7 +509,7 @@ export class Runner {
     if (!section || section.line === null) return null;
     const { root } = this.project!;
     try {
-      const file = locate([root, ...detectLayout(root).classpath], node.file);
+      const file = locate(detectLayout(root).bases, node.file);
       return fileSteps(readFileSync(file, "utf8"), section.line);
     } catch {
       return null;
@@ -520,9 +520,7 @@ export class Runner {
   editorFile(file: string): string | null {
     if (!this.project) return null;
     const { root } = this.project;
-    const abs = path.isAbsolute(file)
-      ? file
-      : locate([root, ...detectLayout(root).classpath], file);
+    const abs = path.isAbsolute(file) ? file : locate(detectLayout(root).bases, file);
     return projectFile(root, abs);
   }
 
@@ -929,7 +927,7 @@ export class Runner {
   private async discover(env: string | null): Promise<TestNode | null> {
     if (this.cancelled) return null; // cancelled while the build tool listed the libraries
     const project = this.project!;
-    const { featureRoots, classpath } = detectLayout(project.root);
+    const { featureRoots, bases } = detectLayout(project.root);
     const rootName = path.basename(project.root);
     let tree: TestNode | null = null;
     let error: string | null = null;
@@ -959,7 +957,7 @@ export class Runner {
             readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")),
             rootName,
           );
-          setRowLines(tree, [project.root, ...classpath]);
+          setRowLines(tree, bases);
         } catch (err) {
           error = (err as Error).message;
         }
@@ -1049,8 +1047,7 @@ export class Runner {
     if (!tree) return;
     const notice = (message: string) => this.o.emit({ type: "notice", message });
     const { root } = this.project!;
-    const { classpath, featureRoots } = detectLayout(root);
-    const bases = [root, ...classpath];
+    const { bases, featureRoots } = detectLayout(root);
     const run = { tree, filter, threads: debug ? 1 : this.threads, env, props, debug };
 
     if ("tests" in target) {

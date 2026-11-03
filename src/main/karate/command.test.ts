@@ -66,6 +66,7 @@ describe("detectLayout", () => {
       configDirs: [root, ...both],
       pomNotice: null,
       junitXml: false,
+      bases: [root],
     });
   });
   it("gradle", () => {
@@ -87,6 +88,41 @@ describe("detectLayout", () => {
       configDirs: [root],
       pomNotice: null,
       junitXml: false,
+      bases: [root],
+    });
+  });
+
+  // Karate's names of the files are relative to its root when they are under it (#208, #223)
+  describe("bases", () => {
+    it("Karate's root first: the classpath folder of the first karate-config.js", () => {
+      const root = project(
+        ["pom.xml"],
+        ["src/test/java", "src/test/resources", "target/test-classes"],
+      );
+      for (const d of ["src/test/resources", "target/test-classes"])
+        writeFileSync(path.join(root, d, "karate-config.js"), "");
+      expect(detectLayout(root).bases).toEqual([path.join(root, "src/test/resources"), root]);
+    });
+    it("a configDir off the classpath, as a folder, a file: path or a .js file", () => {
+      const root = project([]);
+      for (const configDir of ["conf", "file:conf", "conf/my-config.js"]) {
+        pom(root, { configDir });
+        expect(detectLayout(root).bases).toEqual([path.join(root, "conf"), root]);
+      }
+    });
+    it("the classpath folder of a classpath: configDir", () => {
+      const root = project(["pom.xml"], ["src/test/java/conf", "src/test/resources/conf"]);
+      writeFileSync(path.join(root, "src/test/resources/conf/karate-config.js"), "");
+      pom(root, { configDir: "classpath:conf" });
+      expect(detectLayout(root).bases).toEqual([path.join(root, "src/test/resources/conf"), root]);
+      writeFileSync(path.join(root, "src/test/java/conf/my.js"), "");
+      pom(root, { configDir: "classpath:/conf/my.js" });
+      expect(detectLayout(root).bases).toEqual([path.join(root, "src/test/java/conf"), root]);
+    });
+    it("the project when no classpath folder holds the config", () => {
+      const root = project(["pom.xml", "karate-config.js"], ["src/test/java"]);
+      pom(root, { configDir: "classpath:conf" });
+      expect(detectLayout(root).bases).toEqual([root]);
     });
   });
 
