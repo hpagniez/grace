@@ -89,6 +89,7 @@ function setup() {
     debug: vi.fn(async () => {}),
     cancel: vi.fn(async () => {}),
     openReport: vi.fn(async () => {}),
+    editorMenu: vi.fn(async (_file: string, _line: number, _x: number, _y: number) => {}),
     setFilter: vi.fn(async () => {}),
     setEnv: vi.fn(async () => {}),
     saveProperties: vi.fn(async () => true),
@@ -1410,5 +1411,87 @@ describe("tree: step debugger (R5, R7)", () => {
     expect(rowByKey("s:tests/basic.feature#2").className).toContain("bg-selected");
     send({ type: "debugResumed" });
     expect(rowByKey("s:tests/basic.feature#2").querySelector("[data-status=paused]")).toBeNull();
+  });
+});
+
+// The fixture's scenarios and rows keep the default file "tests/x.feature"; a real tree gives them their feature's.
+describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
+  const failed = (error: string): AppEvent[] => [
+    {
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261025-120000-000",
+      keys: ["s:tests/basic.feature#2"],
+      total: 1,
+      startedAt: Date.now(),
+      env: null,
+      debug: false,
+    },
+    {
+      type: "scenarios",
+      updates: [{ key: "s:tests/basic.feature#2", status: "failed", error }],
+    },
+  ];
+
+  it("asks for the menu at the pointer, for a test at its line, and keeps the selection", () => {
+    const { api, load } = setup();
+    load();
+    fireEvent.contextMenu(screen.getByText("failing match"), { clientX: 30, clientY: 40 });
+    expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 30, 40);
+    expect(rowByKey("s:tests/basic.feature#2").parentElement!.getAttribute("aria-selected")).toBe(
+      "false",
+    );
+  });
+
+  it("asks from a row's run button and from the focused row itself, as the menu key does", () => {
+    const { api, load } = setup();
+    load();
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Run add 2 and 3" }));
+    fireEvent.contextMenu(rowByKey("s:tests/outline.feature#1.2").parentElement!);
+    expect(api.editorMenu).toHaveBeenNthCalledWith(1, "tests/x.feature", 7, 0, 0);
+    expect(api.editorMenu).toHaveBeenNthCalledWith(2, "tests/x.feature", 7, 0, 0);
+  });
+
+  it("opens a feature at line 1, and asks nothing for a folder or the list's padding", () => {
+    const { api, load } = setup();
+    load();
+    fireEvent.contextMenu(rowByKey("f:tests/basic.feature"));
+    expect(api.editorMenu).toHaveBeenCalledWith("tests/basic.feature", 1, 0, 0);
+    api.editorMenu.mockClear();
+    fireEvent.contextMenu(rowByKey("d:tests"));
+    fireEvent.contextMenu(screen.getByTestId("tree"));
+    expect(api.editorMenu).not.toHaveBeenCalled();
+  });
+
+  it("opens a failed test at its failed step during a run, even in a called feature", () => {
+    const { api, send, load } = setup();
+    load();
+    for (const e of failed(String.raw`C:\p\tests\common.feature:20` + "\nmatch failed")) send(e);
+    fireEvent.contextMenu(screen.getByText("failing match"));
+    expect(api.editorMenu).toHaveBeenCalledWith(String.raw`C:\p\tests\common.feature`, 20, 0, 0);
+  });
+
+  it("asks from an open tooltip over a row", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { api, load } = setup();
+      load();
+      const run = screen.getByRole("button", { name: "Run failing match" });
+      fireEvent.pointerEnter(run.closest("span.inline-flex")!);
+      vi.advanceTimersByTime(500);
+      const tip = document.querySelector<HTMLElement>("[role=tooltip]")!;
+      fireEvent.contextMenu(tip, { clientX: 5, clientY: 6 });
+      expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 5, 6);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("opens a failed test without a place at its own line", () => {
+    const { api, send, load } = setup();
+    load();
+    for (const e of failed("boom")) send(e);
+    fireEvent.contextMenu(screen.getByText("failing match"));
+    expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 0, 0);
   });
 });

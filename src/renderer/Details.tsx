@@ -11,7 +11,7 @@ import { EmptyState } from "./EmptyState";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
-import { findNode, formatMillis, leaves, nodeName, STATUS_LABEL } from "./nodes";
+import { failedAt, findNode, formatMillis, leaves, nodeName, STATUS_LABEL } from "./nodes";
 import type { AppState } from "./reduce";
 import { MARK, StatusMark, type MarkStatus } from "./StatusMark";
 import { Tooltip } from "./Tooltip";
@@ -118,14 +118,11 @@ function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paus
   );
 }
 
-/** Where Karate says a test failed, on its error's first line: an absolute Windows path, a colon, a line. */
-const FAILED_AT = /^([A-Za-z]:[\\/].*):(\d+)$/;
-
 /** A failed test's error; the place on its first line opens in VS Code (open-in-editor R2). */
 function ErrorText(props: { error: string; api: Api }) {
   const first = () => props.error.split("\n", 1)[0];
   return (
-    <Show when={FAILED_AT.exec(first())} fallback={props.error}>
+    <Show when={failedAt(props.error)} fallback={props.error}>
       {(place) => (
         <>
           <button
@@ -133,7 +130,7 @@ function ErrorText(props: { error: string; api: Api }) {
             data-testid="error-place"
             aria-label={`Open ${first()} in VS Code`}
             class={link}
-            onClick={() => void props.api.openInEditor(place()[1], Number(place()[2]))}
+            onClick={() => void props.api.openInEditor(place().file, place().line)}
           >
             {first()}
           </button>

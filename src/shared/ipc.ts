@@ -15,6 +15,7 @@ export const CH = {
   breakpoint: "debug:breakpoint",
   steps: "steps:get",
   openInEditor: "editor:open",
+  editorMenu: "editor:menu",
   cancel: "run:cancel",
   report: "report:open",
   filter: "filter:set",
@@ -53,6 +54,8 @@ export interface Api {
   steps(key: string): Promise<FileStep[] | null>;
   /** Opens a tree feature path or an absolute path at the line in VS Code; main refuses any file outside the open project (docs/specs/2026-11-03-open-in-editor.md). */
   openInEditor(file: string, line: number): Promise<void>;
+  /** Shows Windows' menu with "Open in VS Code" at the point, in window pixels; choosing it does what `openInEditor` does (docs/specs/2026-11-03-open-in-editor-from-tree.md). */
+  editorMenu(file: string, line: number, x: number, y: number): Promise<void>;
   cancel(): Promise<void>;
   openReport(): Promise<void>;
   setFilter(f: FilterState): Promise<void>;

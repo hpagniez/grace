@@ -40,7 +40,10 @@ export function keyboardFocus(el: EventTarget | null) {
   }
 }
 
-/** The tooltip is a child of the target's wrapper in the DOM: a click on it must not reach a row or a toolbar. */
+/**
+ * The tooltip is a child of the target's wrapper in the DOM: a click on it must not reach a row or a toolbar.
+ * A right-click does, as on the target: a tree row's menu (open-in-editor-from-tree R1).
+ */
 const keepHere = (e: Event) => e.stopPropagation();
 
 const within = (r: DOMRect, e: MouseEvent) =>
@@ -194,9 +197,9 @@ export function Tooltip(props: {
       }}
       // A press of the target: the person acted on it. The tooltip is hoverable, so it would stay up over
       // whatever lies below and take the next click. A press inside the tooltip leaves it open: its click
-      // closes it.
+      // closes it. A right press closes it, so the menu's right-click lands on what lies below.
       onPointerDown={(e) => {
-        if (tip?.contains(e.target as Node)) return;
+        if (e.button !== 2 && tip?.contains(e.target as Node)) return;
         pressedAt = { x: e.clientX, y: e.clientY };
         hide();
       }}
@@ -209,8 +212,7 @@ export function Tooltip(props: {
           ref={(e) => {
             tip = e;
             // Native listeners: Solid's own run at the document, after a row's native ones.
-            for (const type of ["click", "dblclick", "contextmenu"])
-              e.addEventListener(type, keepHere);
+            for (const type of ["click", "dblclick"]) e.addEventListener(type, keepHere);
             e.addEventListener("click", onTipClick);
           }}
           popover="manual"

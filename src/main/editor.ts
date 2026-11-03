@@ -31,3 +31,13 @@ export const vscodeUrl = (file: string, line: number) => {
   const p = encodeURI(file.replaceAll("\\", "/")).replaceAll("#", "%23").replaceAll("?", "%3F");
   return `vscode://file${p.startsWith("/") ? "" : "/"}${p}:${line}`;
 };
+
+/** A path of at most 1000 characters and a line, an integer of 1 or more (open-in-editor R3.1). */
+export const validRequest = (file: unknown, line: unknown) =>
+  typeof file === "string" &&
+  file.length <= 1000 &&
+  Number.isInteger(line) &&
+  (line as number) >= 1;
+
+/** A point to show a menu at: two finite numbers (open-in-editor-from-tree R3.1). */
+export const validPoint = (x: unknown, y: unknown) => Number.isFinite(x) && Number.isFinite(y);

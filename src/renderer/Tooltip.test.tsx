@@ -488,7 +488,7 @@ describe("Tooltip", () => {
       ));
       hover(wrapperOf(screen.getByRole("button")));
       const tip = tipOf()!;
-      for (const type of ["dblclick", "contextmenu", "click"])
+      for (const type of ["dblclick", "click"])
         tip.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
       expect(delegated).not.toHaveBeenCalled();
       expect(native).not.toHaveBeenCalled();
@@ -497,6 +497,24 @@ describe("Tooltip", () => {
 
       fireEvent.click(screen.getByRole("button")); // the target itself still reaches the row
       expect(delegated).toHaveBeenCalledTimes(1);
+    });
+
+    it("but a right-click does, as on the target, and its press closes it", () => {
+      const delegated = vi.fn(); // Solid's onContextMenu, run at the document
+      render(() => (
+        <div data-testid="row" onContextMenu={delegated}>
+          <Tooltip text="Hint">
+            <button type="button">x</button>
+          </Tooltip>
+        </div>
+      ));
+      hover(wrapperOf(screen.getByRole("button")));
+      fireEvent.contextMenu(tipOf()!);
+      expect(delegated).toHaveBeenCalledTimes(1);
+      fireEvent.pointerDown(tipOf()!, { button: 2 });
+      flush();
+      expect(tips()).toHaveLength(0);
+      fireEvent.pointerLeave(wrapperOf(screen.getByRole("button"))); // forgets the press, for the next test
     });
 
     /** A tooltip with `side` whose target is a 200 x 24 label at (100, 300); a click on the tooltip at x. */

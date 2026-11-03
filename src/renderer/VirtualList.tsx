@@ -53,6 +53,8 @@ export function VirtualList<T, S = undefined>(props: {
   onSelect(item: T): void;
   /** The list's own keys; true when handled. */
   onKey?(e: KeyboardEvent, item: T, index: number): boolean;
+  /** A right-click or the menu key on a row or inside one; not on the padding around the rows. */
+  onContextMenu?(e: MouseEvent, item: T): void;
   ref?(handle: VirtualListHandle): void;
   children(item: T, index: number, keyboardFocused: () => boolean, shared: S): JSX.Element;
 }) {
@@ -222,6 +224,12 @@ export function VirtualList<T, S = undefined>(props: {
           height: `${props.items.length * props.rowHeight + 2 * pad()}px`,
         }}
         onKeyDown={onKeyDown}
+        onContextMenu={(e) => {
+          let row = e.target instanceof Element ? e.target : null;
+          while (row && row.parentElement !== list) row = row.parentElement;
+          const i = row ? keys().indexOf((row as HTMLElement).dataset.key!) : -1;
+          if (i >= 0) props.onContextMenu?.(e, props.items[i]);
+        }}
         onFocusIn={(e) => {
           const row = e.target as HTMLElement;
           const key = rowKey(row);

@@ -20,7 +20,7 @@ import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { findingText } from "./bannerText";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
-import { ancestors, breakpointKeys, leaves, nodeName, STATUS_LABEL } from "./nodes";
+import { ancestors, breakpointKeys, failedAt, leaves, nodeName, STATUS_LABEL } from "./nodes";
 import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
 import { StatusMark } from "./StatusMark";
@@ -61,6 +61,18 @@ const matches = (n: TestNode, f: FilterState) => !filterOn(f) || matchingLeaves(
 const flakyChip = (n: TestNode, flaky: AppState["flaky"]) => {
   const count = leaves(n).filter((l) => l.key in flaky).length;
   return count === 0 ? null : isTest(n) ? "flaky" : `${count} flaky`;
+};
+/**
+ * Where "Open in VS Code" opens a row (open-in-editor-from-tree R2): a failed test where Karate says it failed, any
+ * other test or outline at its line, a feature at its top; null for a folder.
+ */
+const editorPlace = (n: TestNode, state: AppState) => {
+  if (n.kind === "folder") return null;
+  const place =
+    isTest(n) && state.statuses[n.key] === "failed"
+      ? failedAt(state.results[n.key]?.error ?? "")
+      : null;
+  return place ?? { file: n.file, line: n.line ?? 1 };
 };
 
 /** What a tree row draws; the list around it makes it a treeitem, named from the same status and flaky chip. */
@@ -303,6 +315,12 @@ export function Tree(props: Ctx) {
           selectedKey={props.state.selected}
           onSelect={(r) => props.select(r.node.key)}
           onKey={onKey}
+          onContextMenu={(e, r) => {
+            const place = editorPlace(r.node, props.state);
+            if (!place) return;
+            e.preventDefault();
+            void props.api.editorMenu(place.file, place.line, e.clientX, e.clientY);
+          }}
           // By value: main sends the filter in force again after every refresh, which must not scroll (R4.7).
           revealSelectedOn={`${JSON.stringify(props.state.filter)} ${props.state.run.pauses}`}
           ref={(h) => (list = h)}

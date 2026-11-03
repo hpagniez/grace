@@ -20,7 +20,7 @@ import { GROUND, THEMES } from "./shared/theme";
 import type { Channel } from "./shared/updates";
 import { parseVersion } from "./shared/version";
 import { batched } from "./main/batch";
-import { vscodeUrl } from "./main/editor";
+import { validPoint, validRequest, vscodeUrl } from "./main/editor";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
 import { isDebugCommand } from "./main/karate/debug";
@@ -290,22 +290,33 @@ app.whenReady().then(async () => {
     if (typeof file === "string" && typeof line === "number") runner.toggleBreakpoint(file, line);
   });
   handle(CH.steps, (key) => (nodeKey(key) ? runner.steps(key) : null));
-  handle(CH.openInEditor, async (file, line) => {
-    if (
-      typeof file !== "string" ||
-      file.length > 1000 ||
-      !Number.isInteger(line) ||
-      (line as number) < 1
-    ) {
-      emit({ type: "notice", message: "Invalid request" });
-      return;
-    }
+  const openInEditor = async (file: string, line: number) => {
     const abs = runner.editorFile(file);
     if (!abs) emit({ type: "notice", message: "Grace opens only files of the open project" });
     // Windows would otherwise offer to find an app for the link
     else if (!app.getApplicationNameForProtocol("vscode://"))
       emit({ type: "notice", message: "Open in VS Code needs VS Code installed" });
-    else await shell.openExternal(vscodeUrl(abs, line as number));
+    else await shell.openExternal(vscodeUrl(abs, line));
+  };
+  handle(CH.openInEditor, (file, line) => {
+    if (validRequest(file, line)) return openInEditor(file as string, line as number);
+    emit({ type: "notice", message: "Invalid request" });
+  });
+  handle(CH.editorMenu, (file, line, x, y) => {
+    if (!validRequest(file, line) || !validPoint(x, y)) {
+      emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    // The item checks the file when chosen, against the project open then.
+    const open = () =>
+      openInEditor(file as string, line as number).catch((err: unknown) =>
+        emit({ type: "notice", message: err instanceof Error ? err.message : String(err) }),
+      );
+    Menu.buildFromTemplate([{ label: "Open in VS Code", click: () => void open() }]).popup({
+      ...(win && !win.isDestroyed() ? { window: win } : {}),
+      x: Math.round(x as number),
+      y: Math.round(y as number),
+    });
   });
   handle(CH.filter, (f) => {
     const filter = parseFilterState(f);

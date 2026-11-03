@@ -12,6 +12,7 @@ const api: Api = {
   toggleBreakpoint: (file, line) => ipcRenderer.invoke(CH.breakpoint, file, line),
   steps: (key) => ipcRenderer.invoke(CH.steps, key),
   openInEditor: (file, line) => ipcRenderer.invoke(CH.openInEditor, file, line),
+  editorMenu: (file, line, x, y) => ipcRenderer.invoke(CH.editorMenu, file, line, x, y),
   cancel: () => ipcRenderer.invoke(CH.cancel),
   openReport: () => ipcRenderer.invoke(CH.report),
   setFilter: (f) => ipcRenderer.invoke(CH.filter, f),

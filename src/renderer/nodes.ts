@@ -60,3 +60,12 @@ export const STATUS_LABEL: Record<Status, string> = {
 export function formatMillis(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
 }
+
+/** Where Karate says a test failed, on its error's first line: an absolute Windows path, a colon, a line. */
+const FAILED_AT = /^([A-Za-z]:[\\/].*):(\d+)$/;
+
+/** The place on a failed test's error's first line (open-in-editor R2.1); null when it names none. */
+export const failedAt = (error: string) => {
+  const m = FAILED_AT.exec(error.split("\n", 1)[0]);
+  return m ? { file: m[1], line: Number(m[2]) } : null;
+};
