@@ -82,7 +82,7 @@ export function App(props: { api: Api }) {
                     <Tree state={state} select={select} api={props.api} />
                   </div>
                   <div class="flex min-h-0 w-1/2 flex-col">
-                    <Details state={state} api={props.api} />
+                    <Details state={state} api={props.api} select={select} />
                   </div>
                 </main>
                 <BottomPanel

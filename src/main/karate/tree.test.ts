@@ -103,6 +103,40 @@ describe("buildTree", () => {
     expect(new Set(keys).size).toBe(8);
   });
 
+  it("keeps each row's Examples values from the dry run", () => {
+    const tree = buildTree(clean(), "clean");
+    expect(findNode(tree, "s:tests/outline.feature#1.2")!.example).toEqual({
+      a: "2",
+      b: "3",
+      expected: "5",
+    });
+    expect(findNode(tree, "o:tests/outline.feature#1")!.example).toBeUndefined();
+    const scenario = leafIndex(tree).get("tests/basic.feature|[1:7]")!;
+    expect(scenario.kind).toBe("scenario");
+    expect(scenario.example).toBeUndefined();
+  });
+
+  it("keeps the values of rows in two Examples tables", () => {
+    const tree = buildTree(events("dryrun-outline-sizes.jsonl"), "extra");
+    const rows = findNode(tree, "o:extra/outline-sizes.feature#2")!.children;
+    expect(rows.map((r) => r.example)).toEqual(
+      ["1", "2", "3", "4", "5", "6", "7"].map((a) => ({ a })),
+    );
+  });
+
+  it("keeps a non-string value as JSON and leaves a row without values bare", () => {
+    const evs = structuredClone(clean());
+    const exit = evs.find(
+      (e) => e.type === "FEATURE_EXIT" && e.data.relativePath === "tests/outline.feature",
+    )!;
+    const [first, , third] = exit.data.scenarioResults;
+    first.exampleData = { a: 1, b: { x: 1 } };
+    delete third.exampleData;
+    const rows = findNode(buildTree(evs, "clean"), "o:tests/outline.feature#1")!.children;
+    expect(rows[0].example).toEqual({ a: "1", b: '{"x":1}' });
+    expect(rows[2].example).toBeUndefined();
+  });
+
   it("keeps scenario tags", () => {
     const node = findNode(buildTree(clean(), "clean"), "s:tests/basic.feature#2")!;
     expect(node).toMatchObject({ name: "failing match", tags: ["wip"], line: 15, refId: "[2:15]" });

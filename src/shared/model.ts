@@ -17,5 +17,7 @@ export interface TestNode {
   refId: string | null;
   /** Without '@'. */
   tags: string[];
+  /** Rows only: the row's values by Examples column, as Karate's dry run gives them (data-driven view R1). */
+  example?: Record<string, string>;
   children: TestNode[];
 }
