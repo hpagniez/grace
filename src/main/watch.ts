@@ -44,7 +44,9 @@ export function watchFeatures(
   onError: (err: Error) => void,
   quietMs = QUIET_MS,
 ): FeatureWatcher {
-  const started = Date.now();
+  // Windows stamps a file from a clock that ticks every 15.6 ms (2 s on FAT): a save just after the start may
+  // look older than it. A feature changed in the slack before the start can count once on a read; harmless.
+  const started = Date.now() - 2000;
   const seen = new Map<string, number>();
   const pending = new Set<string>();
   const handles: FSWatcher[] = [];

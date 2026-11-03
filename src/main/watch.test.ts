@@ -1,4 +1,12 @@
-import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -99,7 +107,7 @@ describe("watchFeatures", () => {
     const root = tmp();
     const old = path.join(root, "old.feature");
     write(old);
-    await sleep(50); // the watcher starts after the file's modified time
+    utimesSync(old, new Date(), new Date(Date.now() - 3_600_000)); // saved an hour before the start
     const { onSaved } = start([root]);
     chmodSync(old, 0o444); // an attribute event, the modified time unchanged
     const file = path.join(root, "a.feature");
@@ -111,6 +119,16 @@ describe("watchFeatures", () => {
     expect(onSaved.mock.calls).toEqual([[[file]]]);
     chmodSync(old, 0o666); // so afterEach can delete them
     chmodSync(file, 0o666);
+  });
+
+  it("counts a save stamped a moment before the start: Windows stamps files from a coarse clock", async () => {
+    const root = tmp();
+    const { onSaved } = start([root]);
+    const file = path.join(root, "a.feature");
+    write(file);
+    utimesSync(file, new Date(), new Date(Date.now() - 500));
+    await settle();
+    expect(onSaved.mock.calls).toEqual([[[file]]]);
   });
 
   it("watches a root that is a file", async () => {
