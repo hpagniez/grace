@@ -45,6 +45,7 @@ describe("Runner tag filter", () => {
       argFile: null,
       threads: 1,
       configDir: null,
+      junitXml: false,
     });
     expect(await spawnKarate(vendor.java, args, root, () => {}).exit).toBe(0);
     return buildTree(readAllEvents(path.join(outDir, "karate-json", "karate-events.jsonl")), "x");

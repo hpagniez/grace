@@ -201,6 +201,36 @@ export async function recordOpenDialog(
     );
 }
 
+export interface SaveDialogCall {
+  parent: boolean;
+  title?: string;
+  defaultPath?: string;
+  filters?: { name: string; extensions: string[] }[];
+}
+
+/**
+ * Replaces the Save dialog with one that picks `file`, or is closed for null; the returned function
+ * reads each call's parent window (whether one was passed) and options.
+ */
+export async function stubSaveDialog(
+  app: ElectronApplication,
+  file: string | null,
+): Promise<() => Promise<SaveDialogCall[]>> {
+  await app.evaluate(({ dialog }, f) => {
+    const calls: SaveDialogCall[] = [];
+    (globalThis as { saveDialogCalls?: SaveDialogCall[] }).saveDialogCalls = calls;
+    dialog.showSaveDialog = (async (...args: unknown[]) => {
+      const { title, defaultPath, filters } = args[args.length - 1] as SaveDialogCall;
+      calls.push({ parent: args.length === 2, title, defaultPath, filters });
+      return f === null ? { canceled: true, filePath: "" } : { canceled: false, filePath: f };
+    }) as never;
+  }, file);
+  return () =>
+    app.evaluate(
+      () => (globalThis as { saveDialogCalls?: SaveDialogCall[] }).saveDialogCalls ?? [],
+    );
+}
+
 /** Replaces `shell.openPath` with a recorder; the returned function reads the recorded paths. */
 export async function stubOpenPath(app: ElectronApplication): Promise<() => Promise<string[]>> {
   await app.evaluate(({ shell }) => {

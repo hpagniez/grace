@@ -26,6 +26,7 @@ export const CH = {
   rerun: "history:rerun",
   rerunFailed: "history:rerunFailed",
   runReport: "history:report",
+  exportReport: "history:export",
   clearHistory: "history:clear",
   openRecent: "recent:open",
   removeRecent: "recent:remove",
@@ -70,6 +71,8 @@ export interface Api {
   rerun(id: string): Promise<void>;
   rerunFailed(id: string): Promise<void>;
   openRunReport(id: string): Promise<void>;
+  /** Main asks where to save the run's report as a zip (docs/specs/2026-11-03-export-reports.md). */
+  exportReport(id: string): Promise<void>;
   clearHistory(): Promise<void>;
   /** Both send a folder as saved in the recent list; main refuses any other. */
   openRecent(root: string): Promise<void>;

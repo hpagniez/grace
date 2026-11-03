@@ -51,6 +51,8 @@ export function VirtualList<T, S = undefined>(props: {
   /** When this value changes, the selected row scrolls into view once the rows in view are kept still (R4.7). */
   revealSelectedOn?: unknown;
   onSelect(item: T): void;
+  /** False: the arrow keys, Home, End and the page keys move the focus only; Enter, Space and a click still select. */
+  selectOnMove?: boolean;
   /** The list's own keys; true when handled. */
   onKey?(e: KeyboardEvent, item: T, index: number): boolean;
   /** A right-click or the menu key on a row or inside one; not on the padding around the rows. */
@@ -118,7 +120,7 @@ export function VirtualList<T, S = undefined>(props: {
     flush(); // the row must be drawn to take focus
     rowOf(key)?.focus({ preventScroll: true });
     setKeyboard(key); // a key moved it, whatever :focus-visible guesses
-    props.onSelect(item);
+    if (props.selectOnMove !== false) props.onSelect(item);
   };
 
   const onKeyDown = (e: KeyboardEvent) => {

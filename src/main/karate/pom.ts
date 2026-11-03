@@ -7,17 +7,27 @@ export interface Pom {
   paths: string[] | null;
   /** The `-g` value, as written. */
   configDir: string | null;
-  /** The other keys, in the file's order: Grace does not use them. */
+  /** `output.junitXml`: Karate also writes JUnit XML (docs/specs/2026-11-03-export-reports.md R1). */
+  junitXml: boolean;
+  /** The other keys, in the file's order, `output`'s as `output.<key>`: Grace does not use them. */
   unused: string[];
   /** Why the file could not be read; the other fields are then empty. */
   error: string | null;
 }
 
-export const NO_POM: Pom = { paths: null, configDir: null, unused: [], error: null };
+export const NO_POM: Pom = {
+  paths: null,
+  configDir: null,
+  junitXml: false,
+  unused: [],
+  error: null,
+};
 
 const broken = (error: string): Pom => ({ ...NO_POM, error });
 const strings = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((s) => typeof s === "string");
+const object = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** `<root>/karate-pom.json`, or `NO_POM` when there is none. Never throws. */
 export function readPom(root: string): Pom {
@@ -29,16 +39,26 @@ export function readPom(root: string): Pom {
       ? NO_POM
       : broken((err as Error).message);
   }
-  if (typeof json !== "object" || json === null || Array.isArray(json))
-    return broken("not a JSON object");
-  const { paths, configDir, ...rest } = json as Record<string, unknown>;
+  if (!object(json)) return broken("not a JSON object");
+  const { paths, configDir } = json;
   if (paths !== undefined && !strings(paths)) return broken("paths is not a list of strings");
   if (configDir !== undefined && typeof configDir !== "string")
     return broken("configDir is not a string");
+  // an output that is not an object turns nothing on and is named whole
+  const output = object(json.output) ? json.output : null;
+  const junitXml = output?.junitXml ?? false;
+  if (typeof junitXml !== "boolean") return broken("output.junitXml is not true or false");
+  const named = (k: string) =>
+    k === "output" && output
+      ? Object.keys(output).flatMap((o) => (o === "junitXml" ? [] : [`output.${o}`]))
+      : [k];
   return {
     paths: paths?.length ? paths : null,
     configDir: configDir ?? null,
-    unused: Object.keys(rest),
+    junitXml,
+    unused: Object.keys(json)
+      .filter((k) => k !== "paths" && k !== "configDir")
+      .flatMap(named),
     error: null,
   };
 }

@@ -1,6 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -137,6 +146,17 @@ describe("unpack", () => {
     await unpack(zip, dir);
     expect(existsSync(path.join(dir, "Grace.exe"))).toBe(true);
     expect(existsSync(path.join(dir, "resources", "app.asar"))).toBe(true);
+  });
+
+  // Windows' tar reads its arguments in the ANSI code page: ł would become l, 報 a ?
+  it("unpacks from and into paths outside the ANSI code page (#238)", async () => {
+    const user = path.join(root, "Łukasz 報告");
+    mkdirSync(user);
+    const there = path.join(user, "отчёт.zip");
+    copyFileSync(zip, there);
+    const dir = path.join(user, "staging", "app");
+    await unpack(there, dir);
+    expect(readdirSync(dir).sort()).toEqual(["Grace.exe", "resources"]);
   });
 
   it("rejects a zip without Grace.exe", async () => {
