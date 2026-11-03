@@ -17,6 +17,8 @@ export interface ProjectLayout {
   configDirs: string[];
   /** What the open notice says about karate-pom.json; null when there is nothing to say. */
   pomNotice: string | null;
+  /** karate-pom.json's `output.junitXml`: runs also ask Karate for JUnit XML (docs/specs/2026-11-03-export-reports.md R1). */
+  junitXml: boolean;
 }
 
 const SOURCE = ["src/test/java", "src/test/resources"];
@@ -86,6 +88,7 @@ export function detectLayout(root: string): ProjectLayout {
             root,
           ],
     pomNotice: notice.length ? notice.join(" ") : null,
+    junitXml: pom.junitXml,
   };
 }
 
@@ -198,6 +201,8 @@ export function buildArgs(o: {
   configDir: string | null;
   /** A debug run's listener jar and socket (docs/specs/2026-11-02-step-debugger.md, R2.1). */
   debug?: { jar: string; port: number; token: string } | null;
+  /** Adds Karate's JUnit XML to the formats. */
+  junitXml: boolean;
 }): string[] {
   const { debug } = o;
   return [
@@ -221,7 +226,7 @@ export function buildArgs(o: {
     "-B",
     "false",
     "-f",
-    "html,karate:jsonl",
+    o.junitXml ? "html,karate:jsonl,junit:xml" : "html,karate:jsonl",
     ...(debug ? ["--listener", DEBUG_LISTENER] : []),
     ...(o.env ? ["-e", o.env] : []),
     ...(o.configDir ? ["-g", o.configDir] : []),

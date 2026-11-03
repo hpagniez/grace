@@ -65,6 +65,7 @@ describe("detectLayout", () => {
       configDir: null,
       configDirs: [root, ...both],
       pomNotice: null,
+      junitXml: false,
     });
   });
   it("gradle", () => {
@@ -85,6 +86,7 @@ describe("detectLayout", () => {
       configDir: null,
       configDirs: [root],
       pomNotice: null,
+      junitXml: false,
     });
   });
 
@@ -128,6 +130,11 @@ describe("detectLayout", () => {
   });
 
   describe("karate-pom.json", () => {
+    it("takes output.junitXml", () => {
+      const root = project([]);
+      pom(root, { output: { junitXml: true } });
+      expect(detectLayout(root)).toMatchObject({ junitXml: true, pomNotice: null });
+    });
     it("keeps the paths inside the project and names the others", () => {
       const root = project([], ["tests/a"]);
       pom(root, { paths: ["tests/a", "missing", "..", "classpath:x", "."] });
@@ -306,6 +313,7 @@ describe("buildArgs", () => {
     argFile: null,
     threads: 1,
     configDir: null,
+    junitXml: false,
   };
   const base = [
     "-Xms64m",
@@ -334,6 +342,14 @@ describe("buildArgs", () => {
   it("builds the exact command line", () => {
     expect(buildArgs({ ...o, dryRun: false })).toEqual([...base, "-T", "1", "t1"]);
     expect(buildArgs({ ...o, dryRun: true })).toEqual([...dryBase, "-D", "-T", "1", "t1"]);
+  });
+  it("asks for JUnit XML when told to", () => {
+    expect(buildArgs({ ...o, dryRun: false, junitXml: true })).toEqual([
+      ...base.with(19, "html,karate:jsonl,junit:xml"),
+      "-T",
+      "1",
+      "t1",
+    ]);
   });
   it("adds the debug listener and its socket to a debug run only", () => {
     const debug = { jar: "listener.jar", port: 5005, token: "t" };

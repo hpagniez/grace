@@ -891,7 +891,7 @@ export class Runner {
   ) {
     const { root } = this.project!;
     const { java, jar, listener } = this.o.vendor;
-    const { classpath, configDir } = detectLayout(root);
+    const { classpath, configDir, junitXml } = detectLayout(root);
     const home = this.o.home ?? homedir();
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
@@ -911,6 +911,7 @@ export class Runner {
       argFile,
       threads,
       configDir,
+      junitXml: !dryRun && junitXml, // the dry run's reports are never read
       debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
     return (this.proc = spawnKarate(java, args, root, onLines));

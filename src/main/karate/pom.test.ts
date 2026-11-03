@@ -15,7 +15,13 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-const broken = (error: string) => ({ paths: null, configDir: null, unused: [], error });
+const broken = (error: string) => ({
+  paths: null,
+  configDir: null,
+  junitXml: false,
+  unused: [],
+  error,
+});
 
 describe("readPom", () => {
   it("is empty without a file", () => {
@@ -26,6 +32,7 @@ describe("readPom", () => {
     expect(readPom(project(pom))).toEqual({
       paths: ["tests/a"],
       configDir: "conf",
+      junitXml: false,
       unused: ["env", "dryRun"],
       error: null,
     });
@@ -48,5 +55,28 @@ describe("readPom", () => {
   });
   it("refuses a configDir that is not a string", () => {
     expect(readPom(project('{"configDir":3}'))).toEqual(broken("configDir is not a string"));
+  });
+  it("takes output.junitXml and names output's other keys", () => {
+    const pom = '{"env":"qa","output":{"dir":"x","junitXml":true,"html":false}}';
+    expect(readPom(project(pom))).toMatchObject({
+      junitXml: true,
+      unused: ["env", "output.dir", "output.html"],
+    });
+  });
+  it("reads junitXml false or absent as off", () => {
+    expect(readPom(project('{"output":{"junitXml":false}}'))).toMatchObject({
+      junitXml: false,
+      unused: [],
+    });
+    expect(readPom(project('{"output":{}}'))).toMatchObject({ junitXml: false, unused: [] });
+  });
+  it("names an output that is not an object", () => {
+    for (const text of ['{"output":"x"}', '{"output":[true]}', '{"output":null}'])
+      expect(readPom(project(text))).toMatchObject({ junitXml: false, unused: ["output"] });
+  });
+  it("refuses a junitXml that is not true or false", () => {
+    expect(readPom(project('{"output":{"junitXml":"yes"}}'))).toEqual(
+      broken("output.junitXml is not true or false"),
+    );
   });
 });
