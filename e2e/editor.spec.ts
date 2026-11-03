@@ -57,11 +57,12 @@ test("main refuses what it must not open", async () => {
         ),
       [file, line] as const,
     );
+  // Each refusal follows another notice, so a refusal that does not come fails its check.
   for (const line of [0, 1.5, "12"]) {
+    await ask("C:\\Windows\\win.ini", 1);
+    await expect(notice).toHaveText("Grace opens only files of the open project");
     await ask("tests/basic.feature", line);
     await expect(notice).toHaveText("Invalid request");
   }
-  await ask("C:\\Windows\\win.ini", 1);
-  await expect(notice).toHaveText("Grace opens only files of the open project");
   expect(await opened()).toEqual([]);
 });
