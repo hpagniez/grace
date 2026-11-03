@@ -110,7 +110,7 @@ Find keeps every line on screen and steps through matches, rather than hiding th
 
 ### R5. A line keeps its place
 
-1. The store counts the lines dropped at the cap since the run started (`consoleDropped`), reset with the console when a run starts or the project closes. A line's number is that count plus its index, so it does not change as older lines drop.
+1. The store counts the lines dropped at the cap, and those a new run clears, since the project opened (`consoleDropped`), reset when the project closes. A line's number is that count plus its index, so it does not change as older lines drop, and a new run's lines never take a number an earlier run's line had: nothing held from the last run stays current.
 2. The current match and the current error are held by line number (and, for a match, its place in the line), so they stay on their line while lines arrive and drop.
 3. "The console is visible" (R2.5, R3.1) is checked on the panel's element (`checkVisibility()`), not passed down from `App.tsx`: under the Settings page the project view is `invisible`.
 
