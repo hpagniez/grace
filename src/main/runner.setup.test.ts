@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -43,6 +43,26 @@ describe("Runner project setup", () => {
     expect(last("environment").view).toMatchObject({ env: null, overlays: ["qa"] });
     await runner.run("d:");
     expect(last("runFinished").summary).toMatchObject({ scenarioCount: 1, scenariosPassed: 1 });
+  });
+
+  it("writes JUnit XML when karate-pom.json asks", T, async () => {
+    const { runner, all, last, dataDir } = setup();
+    await runner.open(
+      write({
+        "tests/a.feature": "Feature: a\nScenario: a1\n  * print 'a'\n",
+        "karate-pom.json": '{"output":{"junitXml":true}}',
+      }),
+    );
+    await runner.run("d:");
+    expect(last("runFinished").outcome).toBe("finished");
+    const [project] = readdirSync(path.join(dataDir, "projects"));
+    const projectDir = path.join(dataDir, "projects", project);
+    const [run] = readdirSync(path.join(projectDir, "runs"));
+    expect(readdirSync(path.join(projectDir, "runs", run, "junit-xml"))).toHaveLength(1);
+    // the dry run's folder is kept, so a junit-xml in it would show
+    expect(existsSync(path.join(projectDir, "dryrun", "karate-json"))).toBe(true);
+    expect(existsSync(path.join(projectDir, "dryrun", "junit-xml"))).toBe(false);
+    expect(all("notice").filter((n) => n.message.includes("output"))).toEqual([]);
   });
 
   it("says it only on open", T, async () => {

@@ -1,4 +1,4 @@
-import { Check, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
+import { Check, Download, FileText, History as HistoryIcon, Minus, Play, RotateCcw } from "lucide";
 import { createSignal, For, Show } from "solid-js";
 import {
   resultLabel,
@@ -210,6 +210,16 @@ export function History(props: { state: AppState; api: Api }) {
                         >
                           <Icon icon={FileText} size={14} />
                           Report
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="history-export"
+                          class={ghostSmall}
+                          disabled={locked() || !run.reportAvailable}
+                          onClick={() => void props.api.exportReport(run.id)}
+                        >
+                          <Icon icon={Download} size={14} />
+                          Export
                         </button>
                         <button
                           type="button"

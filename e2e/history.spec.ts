@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
@@ -17,6 +18,8 @@ import {
   SECRET,
   seedRuns,
   stubOpenPath,
+  stubSaveDialog,
+  tempDir,
   test,
 } from "./helpers";
 import type { RunRecord } from "../src/shared/history";
@@ -413,4 +416,61 @@ test("History actions wait for the runner", async () => {
   // the cancelled run on top has no report and no failed test: the seeded run below is the one to check
   for (const action of actions.slice(0, 3)) await expect(action.last()).toBeEnabled();
   await expect(actions[3]).toBeEnabled();
+});
+
+/** The zip's files, unpacked by Windows' tar, as sorted paths with `/`. */
+function unzipped(zip: string): string[] {
+  const dir = tempDir("kk-unzip-");
+  const tar = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  execFileSync(tar, ["-xf", zip, "-C", dir], { windowsHide: true });
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)).replaceAll("\\", "/"))
+    .sort();
+}
+
+test("Export a run's report", async () => {
+  test.setTimeout(120_000);
+  const dir = project("clean");
+  writeFileSync(path.join(dir, "karate-pom.json"), '{"output":{"junitXml":true}}');
+  const userData = emptyProject();
+  const { app, win } = await launch(userData);
+  await openProject(app, dir);
+  await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
+  await runAll(win, 1);
+  await tab(win).click();
+  const [id] = await runIds(win);
+  const exportTop = () => rows(win).first().getByTestId("history-export").click();
+  const out = tempDir("kk-export-");
+
+  // closing the dialog saves nothing and says nothing
+  let calls = await stubSaveDialog(app, null);
+  await exportTop();
+  await expect.poll(calls).toHaveLength(1);
+  const downloads = await app.evaluate(({ app: electronApp }) => electronApp.getPath("downloads"));
+  expect((await calls())[0]).toEqual({
+    parent: true,
+    title: "Export report",
+    defaultPath: path.join(downloads, `${path.basename(dir)}-report-${id}.zip`),
+    filters: [{ name: "Zip archive", extensions: ["zip"] }],
+  });
+  await expect(notice(win)).toBeHidden();
+  expect(readdirSync(out)).toEqual([]);
+
+  const zip = path.join(out, "r.zip");
+  calls = await stubSaveDialog(app, zip);
+  await exportTop();
+  await expect(notice(win)).toHaveText(`Report saved to ${zip}`);
+  const junit = readdirSync(path.join(projectDataDir(userData, dir), "runs", id!, "junit-xml"));
+  expect(junit.length).toBeGreaterThan(0);
+  const files = unzipped(zip);
+  expect(files).toEqual(
+    expect.arrayContaining(["karate-summary.html", ...junit.map((f) => `junit-xml/${f}`)]),
+  );
+  expect(files.filter((f) => f === "run.json" || f.startsWith("karate-json/"))).toEqual([]);
+
+  // main refuses an id that is not a run's, before any dialog
+  await win.evaluate(() => window.api.exportReport("..\\x"));
+  await expect(notice(win)).toHaveText("Invalid request");
+  expect(await calls()).toHaveLength(1);
 });

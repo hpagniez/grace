@@ -35,6 +35,7 @@ function start(dryRun: boolean, onLines: (l: string[]) => void, feature?: string
     argFile: null,
     threads: 1,
     configDir: null,
+    junitXml: false,
   });
   const p = spawnKarate(java, args, root, onLines);
   procs.push(p);

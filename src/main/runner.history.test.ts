@@ -340,7 +340,7 @@ describe("Runner history", () => {
     expect(runner.reportPath()).toBeNull();
   });
 
-  it("runReportPath is null for a cancelled run and for an unknown id", T, async () => {
+  it("no report path or export source for a cancelled run or an unknown id", T, async () => {
     const { runner, all, last, dataDir } = setup();
     const root = fixture("env");
     await runner.open(root);
@@ -357,5 +357,11 @@ describe("Runner history", () => {
     expect(runner.runReportPath(cancelled)).toBeNull();
     expect(runner.runReportPath("20200101-000000-000")).toBeNull();
     expect(runner.runReportPath(`${done}\\..\\${done}`)).toBeNull();
+    expect(runner.exportSource(done)).toEqual({
+      dir: path.join(projectDir(dataDir, root), "runs", done),
+      name: `${path.basename(root)}-report-${done}.zip`,
+    });
+    for (const id of [cancelled, "20200101-000000-000", `${done}\\..\\${done}`])
+      expect(runner.exportSource(id), id).toBeNull();
   });
 });

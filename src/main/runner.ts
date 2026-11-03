@@ -554,6 +554,14 @@ export class Runner {
     return existsSync(report) ? report : null;
   }
 
+  /** The folder and proposed zip name of a listed run's report (export spec R2.3); null if it has none. */
+  exportSource(id: string): { dir: string; name: string } | null {
+    const report = this.runReportPath(id);
+    return report
+      ? { dir: path.dirname(report), name: `${path.basename(this.project!.root)}-report-${id}.zip` }
+      : null;
+  }
+
   async cancel(): Promise<void> {
     if (!this.busy) return;
     // also between two JVMs of one operation: each start checks it (a re-run's switch, then its run)
@@ -889,7 +897,7 @@ export class Runner {
   ) {
     const { root } = this.project!;
     const { java, jar, listener } = this.o.vendor;
-    const { classpath, configDir } = detectLayout(root);
+    const { classpath, configDir, junitXml } = detectLayout(root);
     const home = this.o.home ?? homedir();
     // discovery lists every test; a run gets the filter
     const tags = dryRun ? [] : tagArgs(filter);
@@ -909,6 +917,7 @@ export class Runner {
       argFile,
       threads,
       configDir,
+      junitXml: !dryRun && junitXml, // the dry run's reports are never read
       debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
     return (this.proc = spawnKarate(java, args, root, onLines));
