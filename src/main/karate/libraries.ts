@@ -172,7 +172,7 @@ export const BUILD_COMMAND: Record<BuildLayout, string> = {
   gradle: '"%GRACE_TOOL%" -q --no-daemon --console=plain testClasses',
 };
 
-/** Build from the notice R5.2: `javac.exe` in `%JAVA_HOME%in` or in a PATH folder. */
+/** Build from the notice R5.2: `javac.exe` in `%JAVA_HOME%\bin` or in a PATH folder. */
 export const hasJdk = (env: NodeJS.ProcessEnv) =>
   [
     ...(env.JAVA_HOME ? [path.join(env.JAVA_HOME.replace(/"/g, ""), "bin")] : []),
