@@ -1,6 +1,6 @@
 # Start from the project's pom
 
-Date 2026-11-04. Status: draft. Covers [#228](https://github.com/hpagniez/grace/issues/228). A later slice of [#64](https://github.com/hpagniez/grace/issues/64); builds on [Project setup](2026-11-02-project-setup.md).
+Date 2026-11-04. Status: approved. Covers [#228](https://github.com/hpagniez/grace/issues/228). A later slice of [#64](https://github.com/hpagniez/grace/issues/64); builds on [Project setup](2026-11-02-project-setup.md).
 
 ## Intent
 
@@ -105,7 +105,7 @@ Reading `pom.xml`:
 - My call: a Re-run saves its environment only when it switches to another one, as today; re-running a run in the pom's environment leaves the environment following the pom.
 - My call: a pom filter that is not saved loses the tags a new tree lacks until the next open or Refresh, like a saved filter today; an environment switch does not bring them back.
 - My call: a `karate-pom.json` that cannot be read counts as absent, so `pom.xml`'s `karate.env` applies, as project setup R1.6 treats the file.
-- My call: a value the person chose stays in force for the session even if writing it to `settings.json` failed; Refresh does not replace it.
+- My call: "saved" means written in `settings.json`. A choice whose save failed (the notice already says so) counts as not saved, so Refresh may replace it with the pom's value.
 
 ## Acceptance criteria
 
