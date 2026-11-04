@@ -1,6 +1,6 @@
 # Run properties as environment variables, imported from a secrets file
 
-Date 2026-11-04. Status: draft. Covers [#230](https://github.com/hpagniez/grace/issues/230). Builds on [Environment switcher and run properties](2026-10-25-environment-switcher.md) (#59) and [ADR 0008](../decisions/0008-secret-run-properties-and-java-argument-file.md).
+Date 2026-11-04. Status: approved. Covers [#230](https://github.com/hpagniez/grace/issues/230). Builds on [Environment switcher and run properties](2026-10-25-environment-switcher.md) (#59) and [ADR 0008](../decisions/0008-secret-run-properties-and-java-argument-file.md).
 
 ## Intent
 
@@ -217,9 +217,9 @@ Feature: Run properties as environment variables
     Given "dev" has the secret system property "APP_DB_USER"
     And a file with "db.user=u", "db.password=p", "9lives=x" and "empty="
     When I import it into "dev" as environment variables with no prefix
-    Then it says "Adds 1", "Replaces 0", and skips "9lives: Invalid name" and "empty: Empty value"
+    Then it says "Adds 2", replaces nothing, and skips "9lives: Invalid name" and "empty: Empty value"
     When I type the prefix "APP_"
-    Then it says "Adds 1", "Replaces 1: APP_DB_USER", the preview is "db.user → APP_DB_USER", and skips only "empty: Empty value"
+    Then it says "Adds 2", "Replaces 1: APP_DB_USER", the preview is "db.user → APP_DB_USER", and skips only "empty: Empty value"
     And no value of the file shows in the dialog
 
   Scenario: Two keys with one name
