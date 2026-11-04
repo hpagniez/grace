@@ -1,5 +1,5 @@
 // Shared by main, preload and renderer: keep this file free of Node imports.
-import type { PropertiesEdit } from "./env";
+import type { ImportResult, PropertiesEdit } from "./env";
 import type { AppEvent, DebugCommand, FileStep } from "./events";
 import type { FilterState } from "./tags";
 import type { Theme } from "./theme";
@@ -23,6 +23,7 @@ export const CH = {
   watch: "watch:set",
   env: "env:set",
   properties: "properties:save",
+  importProperties: "properties:import",
   rerun: "history:rerun",
   rerunFailed: "history:rerunFailed",
   runReport: "history:report",
@@ -67,6 +68,8 @@ export interface Api {
   setEnv(name: string | null): Promise<void>;
   /** True once main applied the edit; false if it refused it (a notice says why). */
   saveProperties(edit: PropertiesEdit): Promise<boolean>;
+  /** Main asks for a `.properties` file and reads it once (docs/specs/2026-11-04-env-var-properties.md R4). */
+  importProperties(): Promise<ImportResult>;
   /** The history actions send only the run's folder id, never a path. */
   rerun(id: string): Promise<void>;
   rerunFailed(id: string): Promise<void>;

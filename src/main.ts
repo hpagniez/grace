@@ -24,6 +24,7 @@ import { batched } from "./main/batch";
 import { validPoint, validRequest, vscodeUrl } from "./main/editor";
 import { removeLeftoverRuns } from "./main/history";
 import { removeLeftoverArgFiles } from "./main/karate/argfile";
+import { readPropertiesFile } from "./main/propertiesFile";
 import { isDebugCommand } from "./main/karate/debug";
 import { killOrphan } from "./main/karate/process";
 import { checkRecent } from "./main/recent";
@@ -336,6 +337,21 @@ app.whenReady().then(async () => {
       return;
     }
     await runner.setEnv(name);
+  });
+  handle(CH.importProperties, async () => {
+    const options: OpenDialogOptions = {
+      title: "Import properties",
+      properties: ["openFile"],
+      filters: [
+        { name: "Properties files", extensions: ["properties"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    };
+    const r =
+      win && !win.isDestroyed()
+        ? await dialog.showOpenDialog(win, options)
+        : await dialog.showOpenDialog(options);
+    return r.canceled || !r.filePaths[0] ? null : readPropertiesFile(r.filePaths[0]);
   });
   handle(CH.properties, (e) => {
     const edit = parsePropertiesEdit(e);
