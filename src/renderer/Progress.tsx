@@ -63,7 +63,9 @@ export function Progress(props: { state: AppState }) {
   const neverRan = () => idle() && props.state.history.length === 0;
   // the run view's total is 0 until a run starts: the line counts the tests of the tree
   const tests = () => (props.state.tree ? leaves(props.state.tree).length : 0);
-  const fill = "flex-none transition-[width] duration-300 ease-out motion-reduce:transition-none";
+  // hidden under the stripe: the bar still holds the last run's widths while Grace finds tests or awaits a first result
+  const fill = () =>
+    `flex-none transition-[width] duration-300 ease-out motion-reduce:transition-none${waiting() ? " invisible" : ""}`;
   // A width transition replaced before it has started never moves. Chromium holds one that starts in the same
   // frame as a compositor animation (a status mark that starts spinning) until the compositor starts it, so in
   // a big run the green part, given a new width at nearly every update, could stay at zero while red grew. The
@@ -100,20 +102,20 @@ export function Progress(props: { state: AppState }) {
       >
         <div
           ref={(e) => (segments[0] = e)}
-          class={`${fill} bg-passed`}
+          class={`${fill()} bg-passed`}
           style={`width:${widths()[0]}%`}
         />
         <div
           ref={(e) => (segments[1] = e)}
-          class={`${fill} bg-failed`}
+          class={`${fill()} bg-failed`}
           style={`width:${widths()[1]}%`}
         />
         <div
           ref={(e) => (segments[2] = e)}
-          class={`${fill} bg-cancelled`}
+          class={`${fill()} bg-cancelled`}
           style={`width:${widths()[2]}%`}
         />
-        {/* over the segments: during a Refresh they still show the last run, often a full bar */}
+        {/* alone on the track: the segments are hidden while it shows */}
         <Show when={waiting()}>
           <div
             data-testid="progress-stripe"

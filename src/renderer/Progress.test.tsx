@@ -293,7 +293,7 @@ describe("the bar (R14.1)", () => {
     expect(frames).toHaveLength(0);
   });
 
-  it("keeps the waiting stripe in the running colour, over the segments and still under reduced motion", () => {
+  it("keeps the waiting stripe in the running colour, last in the track and still under reduced motion", () => {
     const { send } = setup();
     send(loaded(2), { type: "busy", busy: true });
     const stripe = screen.getByTestId("progress-stripe");
@@ -301,6 +301,21 @@ describe("the bar (R14.1)", () => {
     expect(stripe.className).toContain("motion-reduce:animate-none");
     expect(stripe.className).toContain("bg-running");
     expect(screen.getByTestId("progress-bar").lastElementChild).toBe(stripe);
+  });
+
+  it("hides the last run's segments while the stripe shows, and shows them again after", () => {
+    const { send } = setup();
+    send(loaded(3), started(2), result(1, "passed"), result(2, "failed"), finished("finished"));
+    const hidden = () => segments().map((s) => s.className.includes("invisible"));
+    expect(hidden()).toEqual([false, false, false]);
+    send({ type: "busy", busy: true }); // a Refresh: the bar still holds the last run
+    expect(hidden()).toEqual([true, true, true]);
+    send({ type: "busy", busy: false });
+    expect(hidden()).toEqual([false, false, false]);
+    send(started(1)); // a new run: hidden until its first result
+    expect(hidden()).toEqual([true, true, true]);
+    send(result(3, "passed"));
+    expect(hidden()).toEqual([false, false, false]);
   });
 
   it("uses no raw palette class and no dark: variant", () => {

@@ -58,7 +58,7 @@ For how to build it:
    - busy with no run active (finding tests), or
    - a run active with no test finished yet (`run.done` is 0).
 2. Otherwise there is no stripe: at the first result, on Cancel, when discovery ends, and when idle.
-3. The stripe is drawn over the green and red segments (changed after the final review, 2026-10-28: drawn behind them, it was hidden during every discovery after a run, as the bar keeps the last run's results).
+3. While the stripe shows, the green and red segments are hidden, so it slides alone on the empty track; they show again when it goes (changed 2026-11-04: drawn over the last run's results, it looked as if it overwrote them. Before, changed after the final review, 2026-10-28: drawn behind them, it was hidden during every discovery after a run, as the bar keeps the last run's results).
 4. With reduced motion asked by the system (`prefers-reduced-motion: reduce`), the stripe shows but does not move.
 
 ### R2. The fill
@@ -118,6 +118,13 @@ Feature: Loading always visible
     Given the stripe shows while finding tests
     When the Runner is no longer busy
     Then the progress bar shows no stripe
+
+  Scenario: The stripe never covers a run's results
+    Given a run finished with 1 test passed and 1 failed
+    When the Runner is busy with no run active
+    Then the progress bar shows the stripe alone, its segments hidden
+    When the Runner is no longer busy
+    Then the segments show again
 
   # R1, R2: runs
 
