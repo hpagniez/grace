@@ -6,7 +6,7 @@ import {
   SquareTerminal,
   type IconNode,
 } from "lucide";
-import { createMemo, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, flush, For, Match, Show, Switch } from "solid-js";
 import type { HttpGroup } from "../shared/http";
 import type { Api } from "../shared/ipc";
 import { Banner } from "./Banner";
@@ -16,13 +16,20 @@ import { ClearHistory, History } from "./History";
 import { callsOf, scopeTests, shownCalls, type CallRef } from "./http";
 import { HttpCalls } from "./HttpCalls";
 import { Icon } from "./Icon";
+import { loadTabOrder, moveTab, saveTabOrder, TAB_IDS, type TabId } from "./panelTabs";
 import { Splitter } from "./Splitter";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
-import { countPill, tab, tabOn } from "./ui";
+import { countPill, tab, tabDrop, tabOn } from "./ui";
 import { Variables } from "./Variables";
 
 type Panel = AppState["panel"];
+
+const TABS: Record<TabId, { icon: IconNode; label: string }> = {
+  console: { icon: SquareTerminal, label: "Console" },
+  history: { icon: HistoryIcon, label: "History" },
+  http: { icon: Globe, label: "HTTP" },
+};
 
 /**
  * One tab: its icon, its label and, when it has one, the count in a pill (R18.2). The pill shows the bare
@@ -35,6 +42,9 @@ function PanelTab(props: {
   count?: number;
   active: boolean;
   show: () => void;
+  /** Set on the three tabs that can be moved: dragged, or marked as the one a dragged tab lands beside. */
+  movable?: boolean;
+  drop?: "left" | "right";
 }) {
   return (
     <button
@@ -42,8 +52,10 @@ function PanelTab(props: {
       role="tab"
       id={`tab-${props.id}`}
       data-testid={`tab-${props.id}`}
+      data-drop={props.drop}
+      draggable={props.movable ? "true" : undefined}
       aria-selected={props.active ? "true" : "false"}
-      class={props.active ? tabOn : tab}
+      class={`${props.active ? tabOn : tab} ${props.drop ? tabDrop[props.drop] : ""}`}
       onClick={props.show}
     >
       <Icon icon={props.icon} size={14} />
@@ -83,6 +95,57 @@ export function BottomPanel(props: {
   const narrowed = createMemo(() => callsOf(scope(), props.state.calls));
   const httpCount = createMemo(() => shownCalls(narrowed(), props.state.httpGroups).length);
   let section: HTMLElement | undefined;
+
+  const [order, setOrder] = createSignal(loadTabOrder()); // read before the first paint
+  const [from, setFrom] = createSignal<TabId>();
+  const [over, setOver] = createSignal<TabId>();
+  /** The tab an event came from, among the three that move; undefined for Variables or the gaps. */
+  const tabOf = (e: Event) => TAB_IDS.find((t) => (e.target as Element).closest(`#tab-${t}`));
+  const place = (id: TabId, to: number) => {
+    const next = moveTab(order(), id, to);
+    if (next === order()) return;
+    setOrder(next);
+    saveTabOrder(next);
+  };
+  /** The side of the tab a dragged tab is over where it will land: it takes that tab's place. */
+  const mark = (id: TabId) =>
+    from() && over() === id && from() !== id
+      ? order().indexOf(from()!) < order().indexOf(id)
+        ? "right"
+        : "left"
+      : undefined;
+  const dragEnd = () => {
+    setFrom(undefined);
+    setOver(undefined);
+  };
+  const dragStart = (e: DragEvent) => {
+    const id = tabOf(e);
+    if (!id) return;
+    e.dataTransfer!.effectAllowed = "move";
+    setFrom(id);
+  };
+  const dragOver = (e: DragEvent) => {
+    const id = tabOf(e);
+    if (!from() || !id) return; // only a tab dragged from here, and only over the three
+    e.preventDefault(); // allows the drop
+    e.dataTransfer!.dropEffect = "move";
+    setOver(id);
+  };
+  const drop = (e: DragEvent) => {
+    const id = tabOf(e);
+    if (from() && id) place(from()!, order().indexOf(id));
+    dragEnd(); // here too: the moved button may never get its dragend
+  };
+  const key = (e: KeyboardEvent) => {
+    const id = tabOf(e);
+    if (!id || !e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    place(id, order().indexOf(id) + (e.key === "ArrowLeft" ? -1 : 1));
+    flush(); // a button moved in the page loses the focus: give it back once it is in its new place
+    (e.target as HTMLElement).focus();
+  };
+
   // Here, not in the Console: its content unmounts while another tab shows, and the search outlives that (R3.12).
   const search = createConsoleSearch({
     lines: () => props.state.console,
@@ -110,30 +173,35 @@ export function BottomPanel(props: {
           role="tablist"
           aria-label="Console, run history and HTTP calls"
           class="-mb-px flex items-center gap-1"
+          onDragStart={dragStart}
+          onDragOver={dragOver}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(undefined);
+          }}
+          onDrop={drop}
+          onDragEnd={dragEnd}
+          onKeyDown={key}
         >
-          <PanelTab
-            id="console"
-            icon={SquareTerminal}
-            label="Console"
-            active={panel() === "console"}
-            show={() => props.showPanel("console")}
-          />
-          <PanelTab
-            id="history"
-            icon={HistoryIcon}
-            label="History"
-            count={props.state.history.length}
-            active={panel() === "history"}
-            show={() => props.showPanel("history")}
-          />
-          <PanelTab
-            id="http"
-            icon={Globe}
-            label="HTTP"
-            count={httpCount()}
-            active={panel() === "http"}
-            show={() => props.showPanel("http")}
-          />
+          <For each={order()}>
+            {(id) => (
+              <PanelTab
+                id={id}
+                icon={TABS[id].icon}
+                label={TABS[id].label}
+                count={
+                  id === "history"
+                    ? props.state.history.length
+                    : id === "http"
+                      ? httpCount()
+                      : undefined
+                }
+                active={panel() === id}
+                show={() => props.showPanel(id)}
+                movable
+                drop={mark(id)}
+              />
+            )}
+          </For>
           <Show when={props.state.run.active && props.state.run.debug}>
             <PanelTab
               id="variables"

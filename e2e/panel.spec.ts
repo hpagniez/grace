@@ -233,3 +233,48 @@ test("Tab moves focus past the splitter", async () => {
   await expect(splitter(win)).not.toBeFocused();
   await expectHeights(win, { panel: 192 });
 });
+
+const tabOrder = (win: Page) =>
+  win.getByRole("tab").evaluateAll((tabs) => tabs.map((t) => t.id.replace("tab-", "")));
+
+test("the tabs can be dragged or moved with Alt+Left and Alt+Right, and their order survives a restart", async () => {
+  const first = await started();
+  const { win } = first;
+  await expect.poll(() => tabOrder(win)).toEqual(["console", "history", "http"]);
+
+  // a real drag of Console over HTTP: the bar shows on HTTP's right, and the drop moves Console there
+  const from = (await win.getByTestId("tab-console").boundingBox())!;
+  const to = (await win.getByTestId("tab-http").boundingBox())!;
+  await win.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await win.mouse.down();
+  await win.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await expect(win.getByTestId("tab-http")).toHaveAttribute("data-drop", "right");
+  await win.mouse.up();
+  await expect.poll(() => tabOrder(win)).toEqual(["history", "http", "console"]);
+  await expect(win.locator("[data-drop]")).toHaveCount(0);
+  await expect(win.getByTestId("tab-console")).toHaveAttribute("aria-selected", "true"); // still the shown tab
+
+  // the keyboard: Alt+Left twice walks Console back to the first place, the third press stops there
+  await win.getByTestId("tab-console").focus();
+  await win.keyboard.press("Alt+ArrowLeft");
+  await expect.poll(() => tabOrder(win)).toEqual(["history", "console", "http"]);
+  await expect(win.getByTestId("tab-console")).toBeFocused();
+  await win.keyboard.press("Alt+ArrowLeft");
+  await expect.poll(() => tabOrder(win)).toEqual(["console", "history", "http"]);
+  await win.keyboard.press("Alt+ArrowLeft");
+  await expect.poll(() => tabOrder(win)).toEqual(["console", "history", "http"]);
+  await win.keyboard.press("Alt+ArrowRight");
+  await expect.poll(() => tabOrder(win)).toEqual(["history", "console", "http"]);
+  await expect(win.getByTestId("tab-console")).toBeFocused();
+  await first.app.close();
+
+  const again = await started(first.userData);
+  await expect.poll(() => tabOrder(again.win)).toEqual(["history", "console", "http"]);
+
+  await again.win.evaluate(() =>
+    localStorage.setItem("grace.panelTabs", '["http","http","console"]'),
+  );
+  await again.win.reload();
+  await expect(splitter(again.win)).toBeVisible();
+  await expect.poll(() => tabOrder(again.win)).toEqual(["console", "history", "http"]);
+});

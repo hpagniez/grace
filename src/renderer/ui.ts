@@ -20,6 +20,12 @@ const tabBase =
   "inline-flex h-8 items-center gap-1.5 border-b-2 px-3 text-sm transition-colors duration-(--duration-fast) ease-standard";
 export const tab = `${tabBase} border-transparent text-muted hover:text-ink`;
 export const tabOn = `${tabBase} border-accent font-medium text-ink`;
+/** The mark on the tab a dragged tab will land beside (reorder panel tabs R2.2): a 2 px accent bar on that side. */
+export const tabDrop = {
+  left: "relative after:absolute after:inset-y-1 after:left-0 after:w-0.5 after:rounded-full after:bg-accent",
+  right:
+    "relative after:absolute after:inset-y-1 after:right-0 after:w-0.5 after:rounded-full after:bg-accent",
+};
 
 export const badge = "inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs font-medium";
 

@@ -1,11 +1,18 @@
-import { cleanup, render, screen, within } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { Globe, History, SquareTerminal } from "lucide";
-import { afterEach, describe, expect, it } from "vitest";
+import { flush } from "solid-js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
+import { TABS_KEY } from "./panelTabs";
 import { initialState, type AppState } from "./reduce";
 import { drawn } from "../../test/drawn";
 
+const showPanel = vi.fn();
+beforeEach(() => {
+  localStorage.clear();
+  showPanel.mockClear();
+});
 afterEach(cleanup);
 
 function show(panel: AppState["panel"], runs = 0, run: Partial<AppState["run"]> = {}) {
@@ -19,7 +26,7 @@ function show(panel: AppState["panel"], runs = 0, run: Partial<AppState["run"]> 
     <BottomPanel
       state={state}
       api={{} as Api}
-      showPanel={() => {}}
+      showPanel={showPanel}
       selectCall={() => {}}
       toggleGroup={() => {}}
       height={192}
@@ -92,5 +99,189 @@ describe("the Variables tab (step debugger R7.4)", () => {
     show("variables", 0, { active: true, debug: true });
     expect(screen.getByTestId("tab-variables").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("variables")).toBeTruthy();
+  });
+});
+
+describe("reordering the tabs (reorder panel tabs)", () => {
+  const order = () => screen.getAllByRole("tab").map((t) => t.id.replace("tab-", ""));
+  const saved = () => localStorage.getItem(TABS_KEY);
+  const tab = (id: string) => screen.getByTestId(`tab-${id}`);
+  const dataTransfer = () => ({ effectAllowed: "", dropEffect: "" });
+  /** Fires one drag event; the flush stands for the browser running each in its own task. */
+  const drag = (
+    type: "dragStart" | "dragOver" | "drop" | "dragEnd" | "dragLeave",
+    id: string,
+    init: object = { dataTransfer: dataTransfer() },
+  ) => {
+    const target = type === "dragLeave" ? screen.getByRole("tablist") : tab(id);
+    const notCancelled = fireEvent[type](target, init);
+    flush();
+    return notCancelled;
+  };
+  /** Starts a drag on `from` and holds it over `over`, as the browser does. */
+  const dragOver = (from: string, over: string) => {
+    drag("dragStart", from);
+    drag("dragOver", over);
+  };
+  const alt = (id: string, key: "ArrowLeft" | "ArrowRight") =>
+    fireEvent.keyDown(tab(id), { key, altKey: true });
+
+  it("starts with Console, History, HTTP", () => {
+    show("console");
+    expect(order()).toEqual(["console", "history", "http"]);
+    expect(saved()).toBeNull();
+  });
+
+  it("reads the saved order before it first paints", () => {
+    localStorage.setItem(TABS_KEY, '["http","console","history"]');
+    show("console");
+    expect(order()).toEqual(["http", "console", "history"]);
+  });
+
+  it.each(["nope", '["history","console"]', '["history","history","http"]', '["a","b","c"]'])(
+    "shows the default order for the unusable %s and leaves it saved",
+    (raw) => {
+      localStorage.setItem(TABS_KEY, raw);
+      show("console");
+      expect(order()).toEqual(["console", "history", "http"]);
+      expect(saved()).toBe(raw);
+    },
+  );
+
+  it("makes the three tabs draggable, and not Variables", () => {
+    show("console", 0, { active: true, debug: true });
+    expect(order()).toEqual(["console", "history", "http", "variables"]);
+    for (const id of ["console", "history", "http"])
+      expect(tab(id).getAttribute("draggable")).toBe("true");
+    expect(tab("variables").hasAttribute("draggable")).toBe(false);
+  });
+
+  it.each([
+    ["console", "http", ["history", "http", "console"]],
+    ["http", "console", ["http", "console", "history"]],
+    ["history", "console", ["history", "console", "http"]],
+  ])("drops %s on %s: the order becomes %j and is saved", (from, onto, want) => {
+    show("console");
+    dragOver(from, onto);
+    drag("drop", onto);
+    expect(order()).toEqual(want);
+    expect(saved()).toBe(JSON.stringify(want));
+  });
+
+  it("marks the side where the dragged tab will land, and nothing over itself", () => {
+    show("console");
+    dragOver("console", "history");
+    expect(tab("history").getAttribute("data-drop")).toBe("right");
+    expect(tab("history").className).toContain("after:bg-accent");
+    expect(tab("console").hasAttribute("data-drop")).toBe(false);
+    drag("dragOver", "console");
+    expect(document.querySelector("[data-drop]")).toBeNull();
+    drag("dragEnd", "console", {});
+    cleanup();
+
+    show("console");
+    dragOver("http", "history");
+    expect(tab("history").getAttribute("data-drop")).toBe("left");
+    expect(tab("history").className).toContain("after:bg-accent");
+  });
+
+  it("allows the drop only over the three tabs", () => {
+    show("console", 0, { active: true, debug: true });
+    drag("dragStart", "console");
+    expect(drag("dragOver", "http")).toBe(false); // cancelled: a drop target
+    expect(drag("dragOver", "variables")).toBe(true);
+    drag("drop", "variables");
+    expect(order()).toEqual(["console", "history", "http", "variables"]);
+  });
+
+  it("changes and saves nothing when a drag ends on itself, outside or with Escape", () => {
+    show("console");
+    dragOver("console", "history");
+    drag("dragLeave", "", { relatedTarget: document.body });
+    expect(document.querySelector("[data-drop]")).toBeNull();
+    drag("dragEnd", "console", {}); // outside the list, or Escape: no drop, only the end
+    drag("dragStart", "console");
+    drag("drop", "console");
+    expect(order()).toEqual(["console", "history", "http"]);
+    expect(saved()).toBeNull();
+    expect(document.querySelector("[data-drop]")).toBeNull();
+  });
+
+  it("keeps the shown tab while it moves tabs", () => {
+    show("console");
+    dragOver("http", "console");
+    drag("drop", "console");
+    alt("history", "ArrowLeft");
+    expect(showPanel).not.toHaveBeenCalled();
+    expect(tab("console").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("ignores what is dragged in from outside", () => {
+    show("console");
+    expect(drag("dragOver", "history")).toBe(true); // not cancelled
+    expect(document.querySelector("[data-drop]")).toBeNull();
+    drag("drop", "history");
+    expect(order()).toEqual(["console", "history", "http"]);
+    expect(saved()).toBeNull();
+  });
+
+  it("moves a focused tab one place with Alt+Right and Alt+Left, keeps its focus, and saves", () => {
+    show("console");
+    tab("console").focus();
+    alt("console", "ArrowRight");
+    expect(order()).toEqual(["history", "console", "http"]);
+    expect(document.activeElement).toBe(tab("console"));
+    expect(saved()).toBe('["history","console","http"]');
+    alt("console", "ArrowRight");
+    expect(order()).toEqual(["history", "http", "console"]);
+    expect(document.activeElement).toBe(tab("console"));
+    alt("console", "ArrowRight"); // the last place
+    expect(order()).toEqual(["history", "http", "console"]);
+    alt("console", "ArrowLeft");
+    expect(order()).toEqual(["history", "console", "http"]);
+    expect(document.activeElement).toBe(tab("console"));
+  });
+
+  it("stops Alt+Left at the first place without saving", () => {
+    show("console");
+    alt("console", "ArrowLeft");
+    expect(order()).toEqual(["console", "history", "http"]);
+    expect(saved()).toBeNull();
+  });
+
+  it("leaves other keys alone", () => {
+    show("console");
+    for (const init of [
+      { key: "ArrowRight" },
+      { key: "ArrowRight", altKey: true, ctrlKey: true },
+      { key: "ArrowRight", altKey: true, shiftKey: true },
+      { key: "ArrowDown", altKey: true },
+    ])
+      expect(fireEvent.keyDown(tab("console"), init)).toBe(true); // not cancelled
+    expect(order()).toEqual(["console", "history", "http"]);
+    expect(saved()).toBeNull();
+  });
+
+  it("does not move Variables with the keys", () => {
+    show("variables", 0, { active: true, debug: true });
+    alt("variables", "ArrowLeft");
+    expect(order()).toEqual(["console", "history", "http", "variables"]);
+    expect(saved()).toBeNull();
+  });
+
+  it("works when storage throws: the default order shows and a move is only forgotten", () => {
+    const broken = () => {
+      throw new Error("denied");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(broken);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(broken);
+    try {
+      show("console");
+      expect(order()).toEqual(["console", "history", "http"]);
+      alt("console", "ArrowRight");
+      expect(order()).toEqual(["history", "console", "http"]);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
