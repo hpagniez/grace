@@ -56,14 +56,14 @@ function treeScript(rootPid) {
   if (!Number.isInteger(rootPid)) throw new TypeError(`not a process id: ${rootPid}`);
   return `${SELECT_TREE}
 function Measure-Tree {
-  $all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name, KernelModeTime, UserModeTime
+  $all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name, KernelModeTime, UserModeTime, CommandLine
   $ids = Select-Tree $all ${rootPid}
   # The raw class holds the same WorkingSetPrivate as the formatted one (Task Manager's Memory column) for a fifth of the cost.
   $private = @{}
   Get-CimInstance Win32_PerfRawData_PerfProc_Process -Filter (($ids | ForEach-Object { "IDProcess=$_" }) -join ' OR ') -Property IDProcess, WorkingSetPrivate |
     ForEach-Object { $private[[int]$_.IDProcess] = [long]$_.WorkingSetPrivate }
   $tree = @($all | Where-Object { $ids.Contains([int]$_.ProcessId) } | ForEach-Object {
-    [pscustomobject]@{ id = [int]$_.ProcessId; parent = [int]$_.ParentProcessId; name = $_.Name; bytes = [long]$private[[int]$_.ProcessId]; cpu = [long]($_.KernelModeTime + $_.UserModeTime) }
+    [pscustomobject]@{ id = [int]$_.ProcessId; parent = [int]$_.ParentProcessId; name = $_.Name; t = $(if ($_.CommandLine -match '--type=([a-z-]+)') { $Matches[1] } else { $_.Name }); bytes = [long]$private[[int]$_.ProcessId]; cpu = [long]($_.KernelModeTime + $_.UserModeTime) }
   })
   ConvertTo-Json -Compress -InputObject $tree
 }
@@ -209,6 +209,7 @@ while ($true) {
   );
 
   let appPeakMB = 0;
+  let atPeak = {};
   let javaPeakMB = 0;
   let sampled = false;
   const meter = cpuMeter();
@@ -220,6 +221,11 @@ while ($true) {
     }
     const s = splitTree(procs);
     meter.add(procs);
+    if (s.app.privateMB > appPeakMB) {
+      const by = {};
+      for (const p of procs) by[p.t] = Math.round(((by[p.t] ?? 0) + p.bytes / 1e6) * 10) / 10;
+      atPeak = by;
+    }
     appPeakMB = Math.max(appPeakMB, s.app.privateMB);
     javaPeakMB = Math.max(javaPeakMB, s.java.privateMB);
     sampled = true;
@@ -239,6 +245,7 @@ while ($true) {
         ps.kill();
         await exited;
       }
+      console.error(`[breakdown] appPeak ${appPeakMB} at ${JSON.stringify(atPeak)}`);
       return { appPeakMB, javaPeakMB, ...meter.total() };
     },
   };
