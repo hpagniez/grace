@@ -97,12 +97,12 @@ This works today and needs nothing new. `gh pr checks <n> --watch --fail-fast` e
 
 ## The recommended setup
 
-1. **Harden and extend the tail of `merge-when-green.yml`** (a follow-up PR, not part of this note):
+1. **Harden and extend the tail of `merge-when-green.yml`** ([#257](https://github.com/hpagniez/grace/issues/257), not part of this note):
    - Retry each `gh` call that follows the merge a few times with a short pause, so a single 502 does not stop the issue closing.
    - For a PR that is already merged, run the tail instead of ending at "it is not open", so "Re-run failed jobs" repairs a failure. Closing an already-closed issue is skipped today; keep that.
    - Add the `Spec:` step: for each issue the PR names with `Closes #N` or `Part of #N` (the second is not in `closingIssuesReferences`, so parse the PR body), if the PR added a file under `docs/specs/`, set the issue's `Spec:` line to that file on `develop`. The workflow already holds `issues: write`.
    - Cost: no extra run, a few seconds more in a job that is billed one minute either way.
-2. **A machine lock** (a follow-up PR): a short `scripts/machine.mjs` that takes an exclusive lock file in the OS temp folder, waits while another process holds it, treats a lock whose process no longer exists as stale, and runs the command it wraps. `npm test`, `npm run e2e` and `npm run bench` go through it, so [AGENTS.md](../../AGENTS.md)'s "never run any two at the same time" becomes a rule the machine enforces. About fifty lines, no dependency, one unit test. Single test files stay outside the lock, as today.
+2. **A machine lock** ([#258](https://github.com/hpagniez/grace/issues/258)): a short `scripts/machine.mjs` that takes an exclusive lock file in the OS temp folder, waits while another process holds it, treats a lock whose process no longer exists as stale, and runs the command it wraps. `npm test`, `npm run e2e` and `npm run bench` go through it, so [AGENTS.md](../../AGENTS.md)'s "never run any two at the same time" becomes a rule the machine enforces. About fifty lines, no dependency, one unit test. Single test files stay outside the lock, as today.
 3. **Leave the rest as it is.** Auto-fix and auto-archive stay on. A session with a follow-up waits for it in the background. `merge-when-green` is still added only when the user asks.
 
 ## What still needs a person
