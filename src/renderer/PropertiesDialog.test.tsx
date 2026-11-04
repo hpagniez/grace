@@ -838,9 +838,8 @@ describe("import from file", () => {
     expect(field("import-preview").textContent).toBe("db.user → APP_DB_USER");
     expect(field("import-summary").textContent).toContain("Adds 1");
     expect(field("import-summary").textContent).toContain("Replaces 1: APP_DB_USER");
-    expect(screen.getAllByTestId("import-skip").map((e) => e.textContent)).toEqual([
-      "empty: Empty value",
-    ]);
+    expect(screen.queryAllByTestId("import-skip")).toHaveLength(0);
+    expect(screen.getByTestId("import-skip-empty").textContent).toBe("1 with no value");
     expect(everything()).not.toContain(SECRET_U);
     expect(everything()).not.toContain(SECRET_P);
     expect(confirm().disabled).toBe(false);
@@ -902,6 +901,23 @@ describe("import from file", () => {
     choose("dev");
     expect(rows()).toHaveLength(0);
     expect(api.saveProperties).not.toHaveBeenCalled();
+  });
+
+  it("keys with no value are counted, not listed: a file that is no .properties file stays unshown", async () => {
+    const { api, load } = setup();
+    load(saved);
+    openDialog();
+    // a token file picked through "All files": each line reads as a key with no value
+    api.importProperties.mockResolvedValueOnce(
+      picked({ ghp_TOKEN1234567890: "", "9lives": "x", "a.b": "1" }, "token.txt"),
+    );
+    await pick();
+    expect(field("import-summary").textContent).toContain("Skips 2:");
+    expect(screen.getAllByTestId("import-skip").map((e) => e.textContent)).toEqual([
+      "9lives: Invalid name",
+    ]);
+    expect(screen.getByTestId("import-skip-empty").textContent).toBe("1 with no value");
+    expect(everything()).not.toContain("ghp_TOKEN1234567890");
   });
 
   it("an import that would pass 500 rows is blocked", async () => {

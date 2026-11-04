@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { MAX_ROWS, PREFIX, type ImportEntry } from "../shared/env";
 import { btn, primary } from "./buttons";
 import { FieldMessage } from "./FieldMessage";
-import { importPlan } from "./importPlan";
+import { EMPTY, importPlan } from "./importPlan";
 import { input } from "./ui";
 
 /**
@@ -45,6 +45,10 @@ export function ImportStep(props: {
     return first && `${first.key} → ${first.name}`;
   };
   const blocked = () => prefixError() !== null || limit() !== null || plan().rows.length === 0;
+  // Counted, not listed: in a file that is no .properties file each line reads as a key with no
+  // value, and that key may be a token.
+  const listed = () => plan().skips.filter((s) => s.reason !== EMPTY);
+  const empty = () => plan().skips.length - listed().length;
 
   return (
     <div data-testid="import-step" class="flex flex-col gap-3">
@@ -110,13 +114,16 @@ export function ImportStep(props: {
         <Show when={plan().skips.length}>
           <p>Skips {plan().skips.length}:</p>
           <ul class="max-h-40 overflow-y-auto text-xs text-muted">
-            <For each={plan().skips}>
+            <For each={listed()}>
               {(s) => (
                 <li data-testid="import-skip">
                   {s.key}: {s.reason}
                 </li>
               )}
             </For>
+            <Show when={empty()}>
+              <li data-testid="import-skip-empty">{empty()} with no value</li>
+            </Show>
           </ul>
         </Show>
       </div>

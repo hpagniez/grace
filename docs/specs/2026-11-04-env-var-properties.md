@@ -85,7 +85,7 @@ The owner's answers to the open points of #230:
    - **Environment**: a choice of the dialog's lists ("All environments", each environment with a list, and the chosen environment), starting on the list that was shown;
    - **Environment variables**, a checkbox, ticked at first; unticked, the keys become system properties named exactly as written;
    - **Prefix**, shown while Environment variables is ticked, empty at first; letters, digits and `_` only, else "Letters, digits and _ only" under it; with it a preview of the first key that can be imported: `db.user → APP_DB_USER`;
-   - what Import will do, updated on every change: "Adds <n>", "Replaces <n>: <name>, <name>, …" for names that already have a row in the chosen list (the same name by R1.5, so `APP_DB_USER` replaces a variable `App_Db_User`), and "Skips <n>:" with one line per skipped key, `<key>: <reason>`, never its value;
+   - what Import will do, updated on every change: "Adds <n>", "Replaces <n>: <name>, <name>, …" for names that already have a row in the chosen list (the same name by R1.5, so `APP_DB_USER` replaces a variable `App_Db_User`), and "Skips <n>:" with one line per skipped key, `<key>: <reason>`, never its value, except the keys skipped for an empty value, counted in one line "<m> with no value": in a file that is no `.properties` file, each line reads as such a key, and it may be a token;
    - **Import** (primary) and **Back**.
 2. A variable's name is the prefix as typed, then the key in upper case with every character other than `A`–`Z`, `0`–`9` and `_` turned into `_`: prefix `APP_` and key `db.user` give `APP_DB_USER`.
 3. A key is skipped, with the first reason that applies: its name breaks its kind's rules (R1.3; "Invalid name", "Reserved name"); its value is empty ("Empty value"); its value breaks the value rules (today's reasons); it maps to the same name as an earlier key ("Same name as <earlier key>").
@@ -104,6 +104,7 @@ The owner's answers to the open points of #230:
 
 - A per-row kind and an import step inside the dialog: the owner's choice (approach 1).
 - `.properties` only; every imported key a secret; the name pattern; the import step as the confirmation: the owner's answers.
+- Keys skipped for an empty value are counted, not listed, so a token file picked through "All files" never shows its line: the owner's choice, after the final review.
 - Environment variables are set on the Karate process's environment ([ADR 0029](../decisions/0029-environment-variable-run-properties.md)).
 - My call: the kind is a checkbox like Secret, not a select: the smallest control, and it reads the same way.
 - My call: one value rule for both kinds. An environment variable could take any Unicode, but the masker's forms assume printable ASCII (`secretForms`), and one rule keeps rows switchable between kinds.
@@ -217,10 +218,16 @@ Feature: Run properties as environment variables
     Given "dev" has the secret system property "APP_DB_USER"
     And a file with "db.user=u", "db.password=p", "9lives=x" and "empty="
     When I import it into "dev" as environment variables with no prefix
-    Then it says "Adds 2", replaces nothing, and skips "9lives: Invalid name" and "empty: Empty value"
+    Then it says "Adds 2", replaces nothing, and skips "9lives: Invalid name" and "1 with no value"
     When I type the prefix "APP_"
-    Then it says "Adds 2", "Replaces 1: APP_DB_USER", the preview is "db.user → APP_DB_USER", and skips only "empty: Empty value"
+    Then it says "Adds 2", "Replaces 1: APP_DB_USER", the preview is "db.user → APP_DB_USER", and skips only "1 with no value"
     And no value of the file shows in the dialog
+
+  Scenario: A file that is no .properties file shows no line of it
+    Given a file "token.txt" whose only line is a token
+    When I import it
+    Then it skips "1 with no value"
+    And the token shows nowhere in the dialog
 
   Scenario: Two keys with one name
     Given a file with "db.user=a" and "db_user=b"

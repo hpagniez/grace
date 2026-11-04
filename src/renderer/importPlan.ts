@@ -6,6 +6,8 @@ import {
   type ImportEntry,
 } from "../shared/env";
 
+export const EMPTY = "Empty value";
+
 export interface ImportPlan {
   /** The rows to add or replace, in file order. */
   rows: { key: string; name: string; value: string }[];
@@ -33,7 +35,7 @@ export function importPlan(
     const first = keys.map((k) => earlier.get(k)).find((k) => k !== undefined);
     const reason =
       nameError(name, o.envVar) ??
-      (value === "" ? "Empty value" : propertyValueError(value)) ??
+      (value === "" ? EMPTY : propertyValueError(value)) ??
       (first !== undefined ? `Same name as ${first}` : null);
     if (reason) {
       plan.skips.push({ key, reason });
