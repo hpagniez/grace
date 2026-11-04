@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import { CircleAlert, CircleCheck, TriangleAlert } from "lucide";
 import { Icon } from "./Icon";
 
@@ -7,11 +8,15 @@ const KIND = {
   error: { tone: "bg-failed-tint text-failed", icon: CircleAlert, role: "alert" },
 } as const;
 
-/** A tinted message with its icon: a success or a warning is a status, an error an alert (spec R20.1). */
+/**
+ * A tinted message with its icon: a success or a warning is a status, an error an alert (spec R20.1). `children`, such
+ * as a button, follow the text.
+ */
 export function Notice(props: {
   kind: "success" | "warning" | "error";
   text: string;
   testid?: string;
+  children?: JSX.Element;
 }) {
   const kind = () => KIND[props.kind];
   return (
@@ -22,6 +27,7 @@ export function Notice(props: {
     >
       <Icon icon={kind().icon} class="mt-0.5" />
       <span class="min-w-0 break-words text-ink">{props.text}</span>
+      {props.children}
     </div>
   );
 }

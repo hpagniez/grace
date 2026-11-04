@@ -40,6 +40,17 @@ describe("Notice", () => {
     expect(text.className).toContain("break-words");
   });
 
+  it("shows its children after the text, in the same box", () => {
+    render(() => (
+      <Notice kind="warning" text="Not built.">
+        <button>Build</button>
+      </Notice>
+    ));
+    const box = screen.getByRole("status");
+    expect(box.textContent).toBe("Not built.Build");
+    expect(box.contains(screen.getByRole("button", { name: "Build" }))).toBe(true);
+  });
+
   it("draws a different icon per kind", () => {
     const shape = (kind: "success" | "warning" | "error") => {
       const { container } = render(() => <Notice kind={kind} text="x" />);

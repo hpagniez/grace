@@ -72,6 +72,11 @@ describe("Banner", () => {
     expect(text("console-state")).toBe("Listing the project's libraries with Maven…");
   });
 
+  it("says when it is building the project's Java code", () => {
+    render(() => <Banner state={opened({ busy: true, listing: "Maven", building: true })} />);
+    expect(text("console-state")).toBe("Building the project's Java code with Maven…");
+  });
+
   it("ends the state line with a cursor that blinks only while Grace works, and reduced motion stills", () => {
     const run = { ...initialState().run, active: true };
     for (const state of [opened({ busy: true }), opened({ busy: true, run })]) {

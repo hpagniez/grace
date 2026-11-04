@@ -6,6 +6,7 @@ const api: Api = {
   ready: () => ipcRenderer.invoke(CH.ready),
   openProject: () => ipcRenderer.invoke(CH.open),
   refresh: () => ipcRenderer.invoke(CH.refresh),
+  build: () => ipcRenderer.invoke(CH.build),
   run: (key) => ipcRenderer.invoke(CH.run, key),
   debug: (key) => ipcRenderer.invoke(CH.debug, key),
   debugCommand: (c) => ipcRenderer.invoke(CH.debugCommand, c),

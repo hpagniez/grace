@@ -50,14 +50,18 @@ import {
   selectionTargets,
   tagArgs,
 } from "./karate/command";
-import { testCodeNotice } from "./karate/compiled";
+import { readBuilt, testCodeNotice, writeBuilt } from "./karate/compiled";
 import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
 import { karateFolders } from "./karate/subfolders";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import {
+  BUILD_COMMAND,
+  buildFailure,
+  type BuildLayout,
   failureReason,
   findTool,
+  hasJdk,
   INIT_SCRIPT,
   isStale,
   keptJars,
@@ -198,8 +202,10 @@ export class Runner {
   /** The operation `guarded` is running, for `dispose` to wait on. */
   private running: Promise<unknown> = Promise.resolve();
   private proc: KarateProcess | null = null;
-  /** The build tool listing the project's libraries, while it runs. */
+  /** The build tool listing the project's libraries, or building its Java code, while it runs. */
   private listing: "Maven" | "Gradle" | null = null;
+  /** The tool in `listing` builds the Java code (build from the notice R3). */
+  private building = false;
   private cancelled = false;
   /** Set by `dispose` alone (`cancel` leaves it): the app is quitting, so a run skips its second walk. */
   private disposing = false;
@@ -284,15 +290,16 @@ export class Runner {
           this.watching = loadProjectWatch(this.o.dataDir, root);
           this.arm();
           this.sendWatch();
+          const code = await this.javaCode(root, layout);
           const notice = [
             skipped.length
               ? `Some saved properties were not loaded and are kept in settings.json: ${skipped.join(", ")}`
               : null,
             detectLayout(root).pomNotice,
             libraries,
-            await testCodeNotice(root, layout),
+            code.said,
           ].filter((n) => n !== null);
-          if (notice.length) this.o.emit({ type: "notice", message: joinNotices(notice) });
+          if (notice.length) this.say(notice, code.build);
           try {
             saveOpenedProject(this.o.dataDir, root);
           } catch (err) {
@@ -373,25 +380,75 @@ export class Runner {
   }
 
   async refresh(): Promise<void> {
-    if (this.project)
-      await this.guarded(async () => {
-        const project = this.project!;
-        const libraries = await this.listLibraries(project.root, project.layout);
-        const start = this.start(
-          project.root,
-          // unreadable: keep every value in force rather than guess
-          savedControls(this.o.dataDir, project.root) ?? { env: true, filter: true, threads: true },
-          this.filter,
-          this.envs,
-          this.threads,
+    const project = this.project;
+    if (project) await this.guarded(() => this.refreshBody(project));
+  }
+
+  private async refreshBody(project: Project): Promise<void> {
+    const libraries = await this.listLibraries(project.root, project.layout);
+    const start = this.start(
+      project.root,
+      // unreadable: keep every value in force rather than guess
+      savedControls(this.o.dataDir, project.root) ?? { env: true, filter: true, threads: true },
+      this.filter,
+      this.envs,
+      this.threads,
+    );
+    if (!(await this.rediscover(project, start.filter, start.envs, start.threads))) return;
+    this.arm(); // karate-pom.json may have changed the feature roots (R2.4)
+    const code = await this.javaCode(project.root, project.layout);
+    const said = [libraries, code.said].filter((n) => n !== null);
+    if (said.length) this.say(said, code.build);
+  }
+
+  /**
+   * Build from the notice: compiles the project's test code with its build tool, then refreshes (R2-R5). Ignored with
+   * no project or a standalone one.
+   */
+  async build(): Promise<void> {
+    const project = this.project;
+    if (!project || project.layout === "standalone") return;
+    const { root, layout } = project;
+    await this.guarded(async () => {
+      const lookup = this.o.lookupEnv ?? process.env;
+      const tool = findTool(root, layout, lookup);
+      const notice = (message: string, build: boolean) =>
+        this.o.emit({ type: "notice", message, ...(build ? { build: true } : {}) });
+      if (!tool) {
+        const why = noToolReason(layout);
+        notice(
+          `Grace could not build the project's Java code with ${TOOL_NAME[layout]}: ${why}.`,
+          false,
         );
-        if (!(await this.rediscover(project, start.filter, start.envs, start.threads))) return;
-        this.arm(); // karate-pom.json may have changed the feature roots (R2.4)
-        const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
-          (n) => n !== null,
-        );
-        if (said.length) this.o.emit({ type: "notice", message: joinNotices(said) });
-      });
+        return;
+      }
+      const started = Date.now();
+      // the person's environment as is: Grace's JRE cannot compile (R2.2)
+      const env = { ...process.env, GRACE_TOOL: tool };
+      const { code, lines } = await this.runTool(root, layout, BUILD_COMMAND[layout], env, true);
+      if (this.cancelled) return notice("Build cancelled.", true);
+      if (code !== 0) return notice(buildFailure(TOOL_NAME[layout], lines, hasJdk(lookup)), true);
+      try {
+        writeBuilt(projectDirOf(this.o.dataDir, root), started);
+      } catch {
+        // shortcut: without the time, a Gradle build that rewrote no class shows the notice again (R4.3)
+      }
+      await this.refreshBody(project);
+    });
+  }
+
+  /** R8's notice with the last Build's time, and whether it offers Build: a build tool is found (R1.1-R1.2). */
+  private async javaCode(root: string, layout: Layout) {
+    const said = await testCodeNotice(root, layout, readBuilt(projectDirOf(this.o.dataDir, root)));
+    const lookup = this.o.lookupEnv ?? process.env;
+    const build =
+      layout !== "standalone" && said !== null && findTool(root, layout, lookup) !== null;
+    return { said, build };
+  }
+
+  /** One notice of `said`, with the Build button when `build`. */
+  private say(said: string[], build: boolean): void {
+    this.o.emit({ type: "notice", message: joinNotices(said), ...(build ? { build: true } : {}) });
   }
 
   /**
@@ -664,7 +721,15 @@ export class Runner {
     const busy: AppEvent[] = [
       { type: "busy", busy: this.busy },
       // only while it runs: a window that just loaded starts with none
-      ...(this.listing ? [{ type: "listing" as const, tool: this.listing }] : []),
+      ...(this.listing
+        ? [
+            {
+              type: "listing" as const,
+              tool: this.listing,
+              ...(this.building ? { build: true as const } : {}),
+            },
+          ]
+        : []),
     ];
     return this.last
       ? [
@@ -991,36 +1056,14 @@ export class Runner {
     const initScript = path.join(dir, "libraries.gradle");
     rmSync(file, { force: true });
     if (layout === "gradle") writeFileSync(initScript, INIT_SCRIPT);
-    const lines: string[] = [];
-    let code: number | null;
-    if (this.cancelled) return null;
-    try {
-      this.proc = spawnKarate(
-        CMD,
-        ["/d", "/s", "/c", `"${TOOL_COMMAND[layout]}"`],
-        root,
-        (l) => lines.push(...l),
-        5000,
-        {
-          env: toolEnv(process.env, {
-            tool,
-            file,
-            initScript,
-            searchPath,
-            jreDir: layout === "maven" ? this.o.vendor.jreDir : null,
-          }),
-          windowsVerbatimArguments: true,
-        },
-      );
-      // after the spawn: a Cancel prompted by this event finds the process to kill
-      this.listing = TOOL_NAME[layout];
-      this.o.emit({ type: "listing", tool: this.listing });
-      code = await this.proc.exit;
-    } finally {
-      this.proc = null;
-      this.listing = null;
-      this.o.emit({ type: "listing", tool: null });
-    }
+    const env = toolEnv(process.env, {
+      tool,
+      file,
+      initScript,
+      searchPath,
+      jreDir: layout === "maven" ? this.o.vendor.jreDir : null,
+    });
+    const { code, lines } = await this.runTool(root, layout, TOOL_COMMAND[layout], env, false);
     if (this.cancelled) return null;
     let text: string | null = null;
     try {
@@ -1032,6 +1075,45 @@ export class Runner {
     if (code !== 0 || text === null) return said(failureReason(lines));
     writeKept(dir, { tool: layout, key, jars: parseLibraries(text, detectLayout(root).classpath) });
     return null;
+  }
+
+  /**
+   * Runs the project's build tool by `cmd.exe /d /s /c` (project libraries R3) as `this.proc`, so Cancel stops it, and
+   * says so with `listing` events: listing the libraries, or building the Java code when `build`. Starts nothing once
+   * cancelled.
+   */
+  private async runTool(
+    root: string,
+    layout: BuildLayout,
+    command: string,
+    env: NodeJS.ProcessEnv,
+    build: boolean,
+  ): Promise<{ code: number | null; lines: string[] }> {
+    const lines: string[] = [];
+    if (this.cancelled) return { code: null, lines };
+    try {
+      this.proc = spawnKarate(
+        CMD,
+        ["/d", "/s", "/c", `"${command}"`],
+        root,
+        (l) => lines.push(...l),
+        5000,
+        {
+          env,
+          windowsVerbatimArguments: true,
+        },
+      );
+      // after the spawn: a Cancel prompted by this event finds the process to kill
+      this.listing = TOOL_NAME[layout];
+      this.building = build;
+      this.o.emit({ type: "listing", tool: this.listing, ...(build ? { build: true } : {}) });
+      return { code: await this.proc.exit, lines };
+    } finally {
+      this.proc = null;
+      this.listing = null;
+      this.building = false;
+      this.o.emit({ type: "listing", tool: null });
+    }
   }
 
   /** Empties and returns `<dataDir>/projects/<hash>/dryrun`, so no file of an earlier dry run is ever read. */

@@ -241,6 +241,14 @@ describe("after a run (R14.2)", () => {
     expect(text("run-outcome")).toBe("Finding tests…");
   });
 
+  it("says when the build tool builds the project's Java code", () => {
+    const { send } = setup();
+    send(loaded(2), { type: "busy", busy: true }, { type: "listing", tool: "Gradle", build: true });
+    expect(text("run-outcome")).toBe("Building the project's Java code with Gradle…");
+    send({ type: "listing", tool: null });
+    expect(text("run-outcome")).toBe("Finding tests…");
+  });
+
   it("shows the run's environment chip, hides it when there is none, and explains it in a tooltip", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { send } = setup();
