@@ -166,6 +166,30 @@ export const TOOL_COMMAND: Record<BuildLayout, string> = {
     '"%GRACE_TOOL%" -q --no-daemon --console=plain --no-configuration-cache --init-script "%GRACE_INIT_SCRIPT%" graceClasspath',
 };
 
+/** Build from the notice R2.1: the plain compile of the test code, the tool's path in a variable as for the listing. */
+export const BUILD_COMMAND: Record<BuildLayout, string> = {
+  maven: '"%GRACE_TOOL%" -B -q test-compile',
+  gradle: '"%GRACE_TOOL%" -q --no-daemon --console=plain testClasses',
+};
+
+/** Build from the notice R5.2: `javac.exe` in `%JAVA_HOME%in` or in a PATH folder. */
+export const hasJdk = (env: NodeJS.ProcessEnv) =>
+  [
+    ...(env.JAVA_HOME ? [path.join(env.JAVA_HOME.replace(/"/g, ""), "bin")] : []),
+    ...folders(env.PATH ?? ""),
+  ].some((d) => existsSync(path.join(d, "javac.exe")));
+
+/**
+ * Build from the notice R5.1–R5.2: javac's first error line (Gradle prints it as javac wrote it), else R6.3's reason;
+ * a full stop unless it ends with a question, and the JDK sentence when there is no JDK.
+ */
+export function buildFailure(tool: "Maven" | "Gradle", lines: string[], jdk: boolean): string {
+  const reason = lines.find((l) => /\.java:\d+: error: /.test(l))?.trim() ?? failureReason(lines);
+  return `Grace could not build the project's Java code with ${tool}: ${reason}${reason.endsWith("?") ? "" : "."}${
+    jdk ? "" : " Building needs a JDK: set JAVA_HOME to one."
+  }`;
+}
+
 /**
  * R2.4: the person's environment as is, Grace's variables, and `jreDir` only when there is no other Java. Gradle gets
  * none (`jreDir` null): it needs a JDK to resolve a Java project's classpath, which the bundled Java is not.

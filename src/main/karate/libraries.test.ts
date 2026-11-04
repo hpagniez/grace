@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  BUILD_COMMAND,
+  buildFailure,
   failureReason,
   findTool,
+  hasJdk,
   isStale,
   keptJars,
   libraryKey,
@@ -282,5 +285,50 @@ describe("failureReason", () => {
     expect(failureReason(["a", "b", ""])).toBe("b");
     expect(failureReason(["x".repeat(400)])).toHaveLength(300);
     expect(failureReason([])).toBe("it stopped with no message");
+  });
+});
+
+describe("building", () => {
+  it("runs the plain compile of the test code", () => {
+    expect(BUILD_COMMAND.maven).toBe('"%GRACE_TOOL%" -B -q test-compile');
+    expect(BUILD_COMMAND.gradle).toBe('"%GRACE_TOOL%" -q --no-daemon --console=plain testClasses');
+  });
+  it("finds a JDK by javac.exe in JAVA_HOME or on PATH", () => {
+    const jdk = folder({ "bin/javac.exe": "", "bin/java.exe": "" });
+    expect(hasJdk({})).toBe(false);
+    expect(hasJdk({ JAVA_HOME: jdk })).toBe(true);
+    expect(hasJdk({ JAVA_HOME: `"${jdk}"` })).toBe(true);
+    expect(hasJdk({ PATH: `x;${path.join(jdk, "bin")}` })).toBe(true);
+    expect(hasJdk({ JAVA_HOME: folder({ "bin/java.exe": "" }) })).toBe(false);
+  });
+  it("names javac's first error before Gradle's cause", () => {
+    expect(
+      buildFailure(
+        "Gradle",
+        [
+          "C:\\p\\Helper.java:3: error: cannot find symbol",
+          "* What went wrong:",
+          "Execution failed for task ':compileTestJava'.",
+          "> Compilation failed; see the compiler error output for details.",
+        ],
+        true,
+      ),
+    ).toBe(
+      "Grace could not build the project's Java code with Gradle: C:\\p\\Helper.java:3: error: cannot find symbol.",
+    );
+  });
+  it("adds no stop after a question and says when a JDK is missing", () => {
+    expect(
+      buildFailure(
+        "Maven",
+        [
+          "[ERROR] COMPILATION ERROR : ",
+          "[ERROR] No compiler is provided in this environment. Perhaps you are running on a JRE rather than a JDK?",
+        ],
+        false,
+      ),
+    ).toBe(
+      "Grace could not build the project's Java code with Maven: No compiler is provided in this environment. Perhaps you are running on a JRE rather than a JDK? Building needs a JDK: set JAVA_HOME to one.",
+    );
   });
 });
