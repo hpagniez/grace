@@ -1,0 +1,15 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: "1"
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      summary: List pets
+      responses:
+        "200":
+          description: ok
+      parameters:
+        - name: limit
+          required: true

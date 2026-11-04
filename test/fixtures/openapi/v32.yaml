@@ -1,0 +1,33 @@
+openapi: 3.2.0
+info:
+  title: Newest
+  version: "3.2"
+paths:
+  /docs:
+    additionalOperations:
+      COPY:
+        summary: Copy a doc
+        responses:
+          "204":
+            description: Copied
+    query:
+      summary: Search the docs
+      parameters:
+        - name: filter
+          in: querystring
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+      responses:
+        "200":
+          description: Found
+    get:
+      responses:
+        "200":
+          description: One doc
+  /other:
+    post:
+      responses:
+        "201":
+          description: Created

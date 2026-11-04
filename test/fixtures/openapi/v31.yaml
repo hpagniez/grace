@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: Modern
+  version: "2.0"
+paths:
+  /things:
+    get:
+      responses:
+        "200":
+          description: Things
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: [string, "null"]
+                    examples: [first, second]
+                  anything: true
+                  nothing: false
+                  size:
+                    type: integer
+                    example: 1
+                    examples: [2]
+                    const: 3
+                    default: 4
+                    enum: [5, 6]
