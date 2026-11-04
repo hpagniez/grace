@@ -266,6 +266,7 @@ app.whenReady().then(async () => {
     await runner.open(r.filePaths[0]);
   });
   handlePath(CH.openRecent, (root) => runner.openRecent(root));
+  handlePath(CH.openSubfolder, (folder) => runner.openSubfolder(folder));
   handlePath(CH.removeRecent, (root) => runner.removeRecent(root));
   handle(CH.close, () => runner.close());
   handle(CH.refresh, () => runner.refresh());

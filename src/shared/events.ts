@@ -89,7 +89,14 @@ export interface RecentEntry {
   exists: boolean;
 }
 export type AppEvent =
-  | { type: "project"; project: Project | null; tree: TestNode | null; error: string | null }
+  | {
+      type: "project";
+      project: Project | null;
+      tree: TestNode | null;
+      error: string | null;
+      /** Folders below the project that look like a Karate project, relative with '/'; only on a tree with no test (docs/specs/2026-11-04-subfolder-offer.md). */
+      subfolders?: string[];
+    }
   | {
       type: "runStarted";
       selection: string;
