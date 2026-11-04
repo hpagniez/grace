@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   expect,
@@ -141,4 +141,26 @@ test("an empty folder offers the Karate project below it", async () => {
   await openFeatures(win);
   await expect(node(win, "one")).toBeVisible({ timeout: 15_000 });
   await expect(node(win, "two")).toBeVisible();
+});
+
+test("the not-built notice builds the project's Java code", async () => {
+  test.setTimeout(120_000);
+  const dir = write(project("maven"), {
+    "src/test/java/common/Helper.java": "class Helper {}",
+    // a stand-in for Maven: lists no library, and test-compile writes the helper's class
+    "mvnw.cmd": [
+      "@echo off",
+      'if defined GRACE_CLASSPATH_FILE (type nul>"%GRACE_CLASSPATH_FILE%" & exit /b 0)',
+      String.raw`mkdir "%~dp0target\test-classes" 2>nul`,
+      String.raw`type nul>"%~dp0target\test-classes\Helper.class"`,
+      "",
+    ].join("\r\n"),
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const notice = win.getByTestId("notice");
+  await expect(notice).toContainText("src/test/java is not built", { timeout: 15_000 });
+  await notice.getByRole("button", { name: "Build", exact: true }).click();
+  await expect(notice).toBeHidden({ timeout: 30_000 });
+  expect(existsSync(path.join(dir, "target", "test-classes", "Helper.class"))).toBe(true);
 });
