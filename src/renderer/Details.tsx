@@ -174,7 +174,8 @@ function GroupStepper(props: { keys: string[]; index: number; reveal(key: string
   );
   return (
     <div data-testid="error-group" class="mt-2 flex items-center gap-1 text-xs text-ink">
-      <span class="mr-1 tabular-nums">
+      {/* Polite: focus stays on Next, so the count is what says the selection moved (R4.4) */}
+      <span aria-live="polite" class="mr-1 tabular-nums">
         {`${props.index + 1} of ${props.keys.length} tests failed with this error`}
       </span>
       <Step name="Previous test with this error" icon={ChevronUp} dir={-1} />
@@ -379,9 +380,12 @@ function Group(props: { node: TestNode; state: AppState; reveal(key: string): vo
                       Go to first
                     </button>
                   </div>
-                  <pre class={`${box} line-clamp-4 break-words whitespace-pre-wrap`}>
-                    {reasonOf(props.state.results[g.keys[0]])}
-                  </pre>
+                  {/* The cut on an unpadded box: a padded one shows the top of line 5 in its padding */}
+                  <div class={box}>
+                    <pre class="line-clamp-4 break-words whitespace-pre-wrap">
+                      {reasonOf(props.state.results[g.keys[0]])}
+                    </pre>
+                  </div>
                 </li>
               )}
             </For>
@@ -415,14 +419,17 @@ export function Details(props: {
   // The call replaces the node while the HTTP tab is up; findCall is null once the call is gone.
   const call = () => (props.state.panel === "http" ? findCall(props.state) : null);
   let aside!: HTMLElement;
-  // Opening a row unmounts the table: focus inside it moves to the row's heading, not the page.
-  const open = (key: string) => {
+  // Opening a row unmounts the table, and Go to first its folder's list: focus inside moves to the test's
+  // heading, not the page.
+  const toHeading = (go: (key: string) => void) => (key: string) => {
     const focused = aside.contains(document.activeElement);
-    props.select(key);
+    go(key);
     if (!focused) return;
     flush();
     aside.querySelector<HTMLElement>("h2")?.focus();
   };
+  const open = toHeading((key) => props.select(key));
+  const goTo = toHeading((key) => props.reveal(key));
   return (
     <aside
       ref={(e) => (aside = e)}
@@ -443,7 +450,7 @@ export function Details(props: {
                 when={n().kind === "scenario" || n().kind === "row"}
                 fallback={
                   <>
-                    <Group node={n()} state={props.state} reveal={props.reveal} />
+                    <Group node={n()} state={props.state} reveal={goTo} />
                     {/* Keyed: another outline gets a new table, at its top; a refresh keeps the place */}
                     <Show when={n().kind === "outline" && n().key} keyed>
                       {(_key) => <Examples outline={n()} state={props.state} select={open} />}

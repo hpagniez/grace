@@ -752,6 +752,13 @@ describe("details: step through a group (#229 R4)", () => {
     );
   });
 
+  it("announces where the selected test sits (review)", () => {
+    mount();
+    pick(A);
+    const live = group()!.querySelector("[aria-live=polite]");
+    expect(live?.textContent).toBe("1 of 3 tests failed with this error");
+  });
+
   it("Previous wraps round", () => {
     mount();
     pick(A);
@@ -912,6 +919,24 @@ describe("details: a folder's failures by error (#229 R5)", () => {
       .getAllByTestId("tree-node")
       .find((n) => n.parentElement!.getAttribute("aria-selected") === "true");
     expect(selected?.dataset.key).toBe(A2);
+  });
+
+  it("Go to first moves the focus to the test's heading (review)", () => {
+    mount();
+    pickRow("d:api");
+    const go = screen.getByRole("button", { name: "Go to first of 3 tests" });
+    go.focus();
+    fireEvent.click(go);
+    flush();
+    expect(document.activeElement).toBe(within(details()).getByRole("heading", { level: 2 }));
+  });
+
+  it("cuts a reason after 4 lines with no padding under the cut (review)", () => {
+    mount();
+    pickRow("d:api");
+    const pre = screen.getAllByTestId("failure-group")[0].querySelector("pre")!;
+    expect(pre.className).toContain("line-clamp-4");
+    expect(pre.className).not.toMatch(/(^|\s)p[ybt]?-\d/);
   });
 
   it("shows no list without a group", () => {
