@@ -17,7 +17,7 @@ import { CallDetails } from "./CallDetails";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { Examples } from "./Examples";
-import { failureGroups, shownLeaves, type FailureGroup } from "./failures";
+import { failureGroups, reasonOf, shownLeaves, type FailureGroup } from "./failures";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
@@ -317,7 +317,7 @@ function Leaf(props: {
   );
 }
 
-function Group(props: { node: TestNode; state: AppState }) {
+function Group(props: { node: TestNode; state: AppState; reveal(key: string): void }) {
   const counts = () => {
     const out: Partial<Record<Status, number>> = {};
     for (const l of leaves(props.node)) {
@@ -329,6 +329,16 @@ function Group(props: { node: TestNode; state: AppState }) {
   // A memo: the badge reads it in several places, and each read would walk the whole group again.
   const status = createMemo(() => deriveStatus(props.node, props.state.statuses));
   const location = () => props.node.file || "/";
+  // Its own failed tests by error, largest first (#229 R5); none during a run. A stable sort keeps tree order.
+  const failures = createMemo(() =>
+    props.state.run.active
+      ? []
+      : failureGroups(
+          shownLeaves(props.node, props.state.filter),
+          props.state.statuses,
+          props.state.results,
+        ).sort((a, b) => b.keys.length - a.keys.length),
+  );
   return (
     <>
       <h2 class="text-lg font-semibold break-words">{props.node.name}</h2>
@@ -351,6 +361,33 @@ function Group(props: { node: TestNode; state: AppState }) {
           )}
         </For>
       </p>
+      <Show when={failures().length > 0}>
+        <section class="flex flex-col gap-2">
+          <h3 class="text-sm font-semibold">Failed with the same error</h3>
+          <ul class="flex flex-col gap-3">
+            <For each={failures()}>
+              {(g) => (
+                <li data-testid="failure-group" class="flex flex-col gap-1">
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="tabular-nums">{`${g.keys.length} tests`}</span>
+                    <button
+                      type="button"
+                      class={ghostSmall}
+                      aria-label={`Go to first of ${g.keys.length} tests`}
+                      onClick={() => props.reveal(g.keys[0])}
+                    >
+                      Go to first
+                    </button>
+                  </div>
+                  <pre class={`${box} line-clamp-4 break-words whitespace-pre-wrap`}>
+                    {reasonOf(props.state.results[g.keys[0]])}
+                  </pre>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      </Show>
     </>
   );
 }
@@ -406,7 +443,7 @@ export function Details(props: {
                 when={n().kind === "scenario" || n().kind === "row"}
                 fallback={
                   <>
-                    <Group node={n()} state={props.state} />
+                    <Group node={n()} state={props.state} reveal={props.reveal} />
                     {/* Keyed: another outline gets a new table, at its top; a refresh keeps the place */}
                     <Show when={n().kind === "outline" && n().key} keyed>
                       {(_key) => <Examples outline={n()} state={props.state} select={open} />}

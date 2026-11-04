@@ -798,3 +798,126 @@ describe("details: step through a group (#229 R4)", () => {
     expect(within(details()).getAllByTestId("breakpoint")).toHaveLength(1);
   });
 });
+
+describe("details: a folder's failures by error (#229 R5)", () => {
+  const scenario = (key: string, file: string, line: number) =>
+    node("scenario", key, key.split("#")[1], { file, line });
+  const [A1, A2, A3, A4] = [1, 2, 3, 4].map((n) => `s:api/a.feature#a${n}`);
+  const [B1, B2] = [1, 2].map((n) => `s:api/b.feature#b${n}`);
+  const Z1 = "s:z.feature#z1";
+  const REASON: Record<string, string> = {
+    [A1]: "503",
+    [A2]: "timeout",
+    [A3]: "503",
+    [A4]: "404",
+    [B1]: "timeout",
+    [B2]: "timeout",
+    [Z1]: "timeout",
+  };
+  const folderTree = (): TestNode =>
+    node("folder", "d:", "p", {
+      file: "",
+      children: [
+        node("folder", "d:api", "api", {
+          file: "api",
+          children: [
+            node("feature", "f:api/a.feature", "a", {
+              file: "api/a.feature",
+              children: [A1, A2, A3, A4].map((k, i) => scenario(k, "api/a.feature", i + 3)),
+            }),
+            node("feature", "f:api/b.feature", "b", {
+              file: "api/b.feature",
+              children: [B1, B2].map((k, i) => scenario(k, "api/b.feature", i + 3)),
+            }),
+          ],
+        }),
+        node("feature", "f:z.feature", "z", {
+          file: "z.feature",
+          children: [scenario(Z1, "z.feature", 3)],
+        }),
+      ],
+    });
+
+  function mount() {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: vi.fn(async () => {}),
+      steps: vi.fn(async () => null),
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    };
+    render(() => <App api={api as unknown as Api} />);
+    const send = (e: AppEvent) => {
+      emit(e);
+      flush();
+    };
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: folderTree(),
+      error: null,
+    });
+    const keys = Object.keys(REASON);
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261104-140000-000",
+      keys,
+      total: keys.length,
+      startedAt: Date.now(),
+      env: null,
+      debug: false,
+    });
+    send({
+      type: "scenarios",
+      updates: keys.map((key) => {
+        const head = `C:/p/${key}.feature:9\nThen status 200\n`;
+        return { key, status: "failed", error: head + REASON[key], reasonAt: head.length };
+      }),
+    });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+  }
+  const pickRow = (key: string) => {
+    const row = screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
+    fireEvent.click(within(row).getAllByRole("button")[1]);
+    flush();
+  };
+  const heading = () => screen.queryByRole("heading", { name: "Failed with the same error" });
+
+  it("lists the folder's groups, largest first", () => {
+    mount();
+    pickRow("d:api");
+    expect(heading()).not.toBeNull();
+    const groups = screen.getAllByTestId("failure-group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0].textContent).toContain("3 tests");
+    expect(groups[0].textContent).toContain("timeout");
+    expect(groups[1].textContent).toContain("2 tests");
+    expect(groups[1].textContent).toContain("503");
+    expect(details().textContent).not.toContain("404");
+  });
+
+  it("Go to first selects the group's first test", () => {
+    mount();
+    pickRow("d:api");
+    fireEvent.click(screen.getByRole("button", { name: "Go to first of 3 tests" }));
+    flush();
+    expect(within(details()).getByRole("heading", { level: 2 }).textContent).toBe("a2");
+    const selected = screen
+      .getAllByTestId("tree-node")
+      .find((n) => n.parentElement!.getAttribute("aria-selected") === "true");
+    expect(selected?.dataset.key).toBe(A2);
+  });
+
+  it("shows no list without a group", () => {
+    mount();
+    pickRow("f:z.feature");
+    expect(within(details()).getByRole("heading", { level: 2 }).textContent).toBe("z");
+    expect(heading()).toBeNull();
+  });
+});
