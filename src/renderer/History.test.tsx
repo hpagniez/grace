@@ -68,6 +68,7 @@ function setup() {
     openRunReport: vi.fn(async (_id: string) => {}),
     exportReport: vi.fn(async (_id: string) => {}),
     clearHistory: vi.fn(async () => {}),
+    trend: vi.fn(async () => []),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);

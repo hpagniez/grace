@@ -295,6 +295,7 @@ app.whenReady().then(async () => {
     if (typeof file === "string" && typeof line === "number") runner.toggleBreakpoint(file, line);
   });
   handle(CH.steps, (key) => (nodeKey(key) ? runner.steps(key) : null));
+  handle(CH.trend, (key) => (key === null || nodeKey(key) ? runner.trend(key) : []));
   const openInEditor = async (file: string, line: number) => {
     const abs = runner.editorFile(file);
     if (!abs) emit({ type: "notice", message: "Grace opens only files of the open project" });

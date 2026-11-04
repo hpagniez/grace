@@ -55,6 +55,10 @@ export function breakpointKeys(tree: TestNode | null, breakpoints: Breakpoint[])
 /** A node's name; Karate gives an unnamed `Scenario:` a null name. */
 export const nodeName = (n: TestNode): string => n.name || `Scenario at line ${n.line}`;
 
+/** A node's label as its tree row shows it: a feature by its file name. */
+export const labelOf = (n: TestNode) =>
+  n.kind === "feature" ? n.file.split("/").pop()! : nodeName(n);
+
 /** Scenarios and rows at or under `n`. */
 export const leaves = (n: TestNode): TestNode[] =>
   n.kind === "scenario" || n.kind === "row" ? [n] : n.children.flatMap(leaves);
