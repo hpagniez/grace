@@ -1,11 +1,21 @@
 // The step debugger in the built app (docs/specs/2026-11-02-step-debugger.md, its e2e scenarios).
 import type { Page } from "@playwright/test";
-import { expect, launch, node, openProject, ourJavaPids, project, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  openFeatures,
+  openProject,
+  ourJavaPids,
+  project,
+  test,
+} from "./helpers";
 
 async function pausedAtLine8() {
   const dir = project("debug");
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "variables")).toBeVisible({ timeout: 15_000 });
   await node(win, "variables").getByRole("button", { name: "variables", exact: true }).click();
   await win.getByRole("button", { name: "Add breakpoint at line 8" }).click();

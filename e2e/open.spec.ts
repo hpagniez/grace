@@ -10,6 +10,7 @@ import {
   nodeByKey,
   openProject,
   project,
+  openFeatures,
   recordOpenDialog,
   saved,
   test,
@@ -31,6 +32,12 @@ async function parentsOfRows(win: Page): Promise<Record<string, string | null>> 
   return parents;
 }
 
+const TEST_ROWS = ["scenario", "outline", "row"]
+  .map((kind) => `[data-testid=tree-node][data-kind=${kind}]`)
+  .join(", ");
+/** The row element of a key: the treeitem, which carries aria-expanded and aria-selected. */
+const item = (win: Page, key: string) => win.locator(`[role=treeitem][data-key="${key}"]`);
+
 test("Open a project and see its tests", async () => {
   const dir = project("clean");
   const { app, win, userData } = await launch();
@@ -48,12 +55,16 @@ test("Open a project and see its tests", async () => {
     await expect(feature).toContainText(`${f}.feature`);
     expect(parents[`f:tests/${f}.feature`]).toBe("d:tests");
     await expect(node(win, `${f}.feature`)).toHaveAttribute("data-key", `f:tests/${f}.feature`);
+    await expect(item(win, `f:tests/${f}.feature`)).toHaveAttribute("aria-expanded", "false");
   }
+  // folders and feature files only, until a feature opens (#224 R1.1)
+  await expect(win.locator(TEST_ROWS)).toHaveCount(0);
+
+  await openFeatures(win);
+  const opened = await parentsOfRows(win);
   const outline = nodeByKey(win, "o:tests/outline.feature#1");
   await expect(outline).toContainText("add <a> and <b>");
-  const outlineRows = Object.keys(parents).filter(
-    (k) => parents[k] === "o:tests/outline.feature#1",
-  );
+  const outlineRows = Object.keys(opened).filter((k) => opened[k] === "o:tests/outline.feature#1");
   expect(outlineRows).toHaveLength(3);
   for (const key of outlineRows)
     await expect(nodeByKey(win, key)).toHaveAttribute("data-kind", "row");
@@ -62,6 +73,26 @@ test("Open a project and see its tests", async () => {
   );
   await expect(win.getByTestId("project-path")).toHaveText(path.resolve(dir));
   await expect(win.getByTestId("project-layout")).toHaveText("Standalone");
+});
+
+test("A feature opens on a click on its name, and as a run in it starts (#224)", async () => {
+  test.setTimeout(90_000);
+  const { app, win } = await launch();
+  await openProject(app, project("clean"));
+  const basic = item(win, "f:tests/basic.feature");
+  await expect(basic).toHaveAttribute("aria-expanded", "false", { timeout: 15_000 });
+  // the row's label is its second button: the chevron, the label, then debug and run
+  await nodeByKey(win, "f:tests/basic.feature").locator("button").nth(1).click();
+  await expect(basic).toHaveAttribute("aria-selected", "true");
+  await expect(basic).toHaveAttribute("aria-expanded", "true");
+  await expect(node(win, "passing hello")).toBeVisible();
+
+  const outline = item(win, "f:tests/outline.feature");
+  await expect(outline).toHaveAttribute("aria-expanded", "false");
+  await nodeByKey(win, "f:tests/outline.feature").getByTestId("run-node").click();
+  await expect(outline).toHaveAttribute("aria-expanded", "true", { timeout: 30_000 });
+  await expect(win.getByTestId("run-outcome")).toHaveText("Finished", { timeout: 60_000 });
+  await expect(outline).toHaveAttribute("aria-expanded", "true"); // it stays open
 });
 
 const TOOLBAR_BUTTONS = {

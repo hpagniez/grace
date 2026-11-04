@@ -10,6 +10,17 @@ export const findNode = (n: TestNode, key: string): TestNode | null => {
   return null;
 };
 
+/**
+ * The key of the feature `key` sits in, read from the key as main builds it (`src/main/karate/tree.ts`): `s:` and `o:`
+ * keys end in `#<section>`. Null for a folder or no key.
+ */
+export const featureOf = (key: string | null): string | null =>
+  key?.startsWith("f:")
+    ? key
+    : key?.startsWith("s:") || key?.startsWith("o:")
+      ? `f:${key.slice(2, key.lastIndexOf("#"))}`
+      : null;
+
 /** The keys of the nodes above `key`, from the root down; empty when `key` is not under `n`. */
 export const ancestors = (n: TestNode, key: string): string[] => {
   for (const c of n.children) {

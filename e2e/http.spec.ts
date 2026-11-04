@@ -5,6 +5,7 @@ import {
   launch,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   openProperties,
   project,
@@ -28,6 +29,7 @@ async function open(sample: "http" | "clean") {
   const dir = project(sample);
   const { app, win, userData } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   const feature = sample === "http" ? "tests/http.feature" : "tests/basic.feature";
   await expect(nodeByKey(win, `f:${feature}`)).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData };

@@ -1,4 +1,13 @@
-import { expect, launch, node, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openFeatures,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 const ROW = (n: number) => `s:tests/outline.feature#1.${n}`;
 
@@ -6,6 +15,7 @@ test("An outline's Examples as a table", async () => {
   test.setTimeout(90_000);
   const { app, win } = await launch();
   await openProject(app, project("clean"));
+  await openFeatures(win);
   const outline = node(win, "add <a> and <b>");
   await expect(outline).toBeVisible({ timeout: 15_000 });
   await outline.getByRole("button", { name: "add <a> and <b>", exact: true }).click();

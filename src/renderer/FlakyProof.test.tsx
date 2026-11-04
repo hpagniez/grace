@@ -8,6 +8,7 @@ import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
 import { drawn } from "../../test/drawn";
+import { openFeatures } from "../../test/openFeatures";
 
 // "now" is Sunday 2026-10-25 15:00 local time; only Date is faked so flush() keeps working
 beforeEach(() => {
@@ -87,6 +88,7 @@ function setup() {
     tree: tree(),
     error: null,
   });
+  openFeatures();
   send({
     type: "environment",
     view: {

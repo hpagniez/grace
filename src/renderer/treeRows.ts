@@ -17,11 +17,11 @@ export interface TreeRow {
 /**
  * The rows a person can scroll to, in order: children of closed nodes left out, and non-matching
  * rows left out under "Hide non-matching" (R2.1). The root itself is not a row. Reads no status,
- * so a run never changes the rows (R2.3).
+ * so a status update never changes the rows (R2.3).
  */
 export function treeRows(
   root: TestNode,
-  closed: ReadonlySet<string>,
+  isOpen: (key: string) => boolean,
   filter: FilterState,
 ): TreeRow[] {
   const hide = filter.hideNonMatching && filterOn(filter);
@@ -33,7 +33,7 @@ export function treeRows(
       : parent.children;
     shown.forEach((node, i) => {
       rows.push({ node, level, setSize: shown.length, posInSet: i + 1, parentKey });
-      if (!closed.has(node.key)) walk(node, level + 1, node.key);
+      if (isOpen(node.key)) walk(node, level + 1, node.key);
     });
   };
   walk(root, 1, null);

@@ -3,7 +3,7 @@
 import type { Page } from "@playwright/test";
 import { cpSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
-import { expect, launch, node, openProject, test } from "./helpers";
+import { expect, launch, node, openFeatures, openProject, test } from "./helpers";
 
 const WIDTH = 1440;
 const HEIGHT = 900;
@@ -38,6 +38,7 @@ for (const theme of ["light", "dark"] as const) {
         [WIDTH, HEIGHT],
       );
       await openProject(app, dir);
+      await openFeatures(win);
       await expect(win.getByTestId("run-all-button")).toBeEnabled({ timeout: 30_000 });
       return win;
     };

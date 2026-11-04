@@ -12,6 +12,7 @@ import {
   launch,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   project,
   projectDataDir,
@@ -83,6 +84,7 @@ async function openSeeded(opts: { report?: boolean } = {}) {
   const ids = seedCoin(userData, dir, opts);
   const { app, win } = await launch(userData);
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "coin")).toBeVisible({ timeout: 15_000 });
   await expect(tab(win)).toHaveText("History (2)");
   return { dir, app, win, userData, ids };
@@ -94,6 +96,7 @@ async function openCoin(heads: boolean) {
   coin(heads);
   const { app, win, userData } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "coin")).toBeVisible({ timeout: 15_000 });
   await trackEvents(win);
   return { dir, coin, app, win, userData };
@@ -183,6 +186,7 @@ test("A fix in the project is not flaky", async () => {
   const dir = project("history");
   const { app, win } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "fixable")).toBeVisible({ timeout: 15_000 });
   await trackEvents(win);
 
@@ -260,6 +264,7 @@ test("Marks survive a restart", async () => {
   // one app per user-data folder: close it before the second starts
   await app.close();
   const { win } = await launch(userData);
+  await openFeatures(win); // a restart starts with the features closed (#224 R1.3)
   await expect(node(win, "coin")).toBeVisible({ timeout: 15_000 });
   await expect(mark(win, "coin")).toBeVisible();
 });
