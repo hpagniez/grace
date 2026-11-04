@@ -78,7 +78,7 @@ Steps before a run (needed to set a breakpoint on a test that has not run): kept
 
 ### R5. Starting a debug run
 
-1. Each tree row with a Run button gets a Debug button just before it, with a bug icon and the tooltip "Debug <name> (Ctrl+Shift+Enter)". Ctrl+Shift+Enter on the selected row does the same; Ctrl+Enter without Shift stays a normal run. Both are disabled as the Run button is.
+1. A tree row with a Run button gets a Debug button just before it, with a bug icon and the tooltip "Debug <name> (Ctrl+Shift+Enter)", while the row is hovered, focused from the keyboard or selected. Every other row keeps its place empty, so nothing moves when it shows; a Debug button on every drawn row put `page.nodes` over its limits (#261). Ctrl+Shift+Enter on the selected row does the same; Ctrl+Enter without Shift stays a normal run. Both are disabled as the Run button is.
 2. A feature row, and a scenario or outline row, shows a small `failed`-coloured dot after its name while one of its lines holds a breakpoint (for a scenario or outline: a line from its own line up to the next test's).
 
 ### R6. The toolbar during a debug run
@@ -99,6 +99,7 @@ Steps before a run (needed to set a breakpoint on a test that has not run): kept
 ## Cost
 
 - Size: `listener.jar`, under 10 KB, in `resources/`. `ecj.jar` (3.4 MB) is a build tool in `vendor/`, never shipped. No npm dependency.
+- Tree: the Debug button exists only on the hovered, focused or selected row, so a drawn row costs one empty element for it, not its button, tooltip wrapper and icon (#261).
 - Idle and normal runs: nothing new. No server, socket or listener exists outside a debug run. Breakpoints are a small set in memory. Reading a test's steps from its feature file happens once per selection of a test that has no run steps, a few KB.
 - Start: no change. The listener is loaded only by a debug run's Java.
 - During a debug run: Java on one thread (the user asked for it). The listener checks each event with one type test and a set lookup per step. Each pause sends the variables once, at most 64 KB per value.

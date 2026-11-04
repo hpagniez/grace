@@ -1713,10 +1713,31 @@ describe("tree: step debugger (R5, R7)", () => {
     },
   });
 
+  it("a Debug button before Run, only on the hovered or selected row", () => {
+    const { load } = setup();
+    load();
+    openFeatures();
+    const name = { name: "Debug passing hello" };
+    const row = rowByKey("s:tests/basic.feature#1");
+    expect(screen.queryByRole("button", name)).toBeNull();
+    expect(screen.queryAllByTestId("debug-node")).toEqual([]); // nothing selected yet
+    fireEvent.pointerEnter(row);
+    flush();
+    expect(screen.getByRole("button", name)).toBeTruthy();
+    fireEvent.pointerLeave(row);
+    flush();
+    expect(screen.queryByRole("button", name)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "passing hello" }));
+    flush();
+    expect(screen.getAllByTestId("debug-node")).toEqual([screen.getByRole("button", name)]);
+  });
+
   it("a Debug button before Run, disabled during a run", () => {
     const { api, send, load } = setup();
     load();
     openFeatures();
+    fireEvent.click(screen.getByRole("button", { name: "passing hello" }));
+    flush();
     const debug = screen.getByRole("button", { name: "Debug passing hello" });
     const run = screen.getByRole("button", { name: "Run passing hello" });
     expect(debug.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

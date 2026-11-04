@@ -130,6 +130,10 @@ function Row(props: {
   // A getter, not `&&` in the prop: the compiler makes that a new memo on every read, and the tooltip
   // reads `pinned` on every scroll.
   const pinned = () => props.keyboardFocused && cut();
+  // The Debug button only on the row in use: hovered, focused from the keyboard or selected (step debugger R5.1).
+  // Every other row keeps its place empty, so nothing moves under the pointer; 8 fewer nodes a row (page.nodes).
+  const [hovered, setHovered] = createSignal(false);
+  const debugShown = () => hovered() || props.keyboardFocused || selected();
   // The buttons are out of the tab order: the row is the tab stop, its keys reach them (R3.2).
   return (
     <div
@@ -140,6 +144,8 @@ function Row(props: {
       data-match={match() ? "true" : "false"}
       // A non-matching row is muted, not faded (R15.2): its status mark too, which sets its own colour.
       class={`group flex h-6 items-center gap-1 rounded-sm pr-1 ${selected() ? "bg-selected shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-hover"} ${match() ? "" : "text-muted [&_[data-status]]:text-muted"}`}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
       <button
         type="button"
@@ -213,19 +219,21 @@ function Row(props: {
         </Show>
       </Show>
       <Show when={match()}>
-        <Tooltip text={`Debug ${label()} (Ctrl+Shift+Enter)`} class="shrink-0" side="left">
-          <button
-            type="button"
-            tabindex={-1}
-            data-testid="debug-node"
-            aria-label={`Debug ${label()}`}
-            class={`${DEBUG} ${selected() ? "text-running" : "text-muted"}`}
-            disabled={props.ctx.state.run.active || props.ctx.state.busy}
-            onClick={() => void props.ctx.api.debug(props.node.key)}
-          >
-            <Icon icon={BUG} size={14} />
-          </button>
-        </Tooltip>
+        <Show when={debugShown()} fallback={<span class="size-6 shrink-0" />}>
+          <Tooltip text={`Debug ${label()} (Ctrl+Shift+Enter)`} class="shrink-0" side="left">
+            <button
+              type="button"
+              tabindex={-1}
+              data-testid="debug-node"
+              aria-label={`Debug ${label()}`}
+              class={`${DEBUG} ${selected() ? "text-running" : "text-muted"}`}
+              disabled={props.ctx.state.run.active || props.ctx.state.busy}
+              onClick={() => void props.ctx.api.debug(props.node.key)}
+            >
+              <Icon icon={BUG} size={14} />
+            </button>
+          </Tooltip>
+        </Show>
         <Tooltip text={`Run ${label()} (Ctrl+Enter)`} class="shrink-0" side="left">
           <button
             type="button"
