@@ -41,11 +41,11 @@ const PLUGINS = ["maven-surefire-plugin", "maven-failsafe-plugin"];
 export function mavenEnv(root: string): string | null {
   let xml: string;
   try {
-    xml = readFileSync(path.join(root, "pom.xml"), "utf8");
+    xml = new TextDecoder().decode(readFileSync(path.join(root, "pom.xml"))); // drops a BOM
   } catch {
     return null;
   }
-  const project = element(xml.replace(/^﻿/, ""));
+  const project = element(xml);
   if (project?.name !== "project") return null;
   const props = new Map(
     (at(project, "properties")?.children ?? []).map((p) => [p.name, p.text.trim()]),
