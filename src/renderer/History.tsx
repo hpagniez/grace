@@ -15,6 +15,7 @@ import { Icon } from "./Icon";
 import type { AppState } from "./reduce";
 import { StatusMark, type MarkStatus } from "./StatusMark";
 import { Tooltip } from "./Tooltip";
+import { Trends } from "./Trends";
 import { chipExcluded, chipIncluded, dialog as dialogStyle } from "./ui";
 
 /** "18s", or "1m 12s" from a minute on; a run under one second is "0s". */
@@ -121,6 +122,7 @@ export function History(props: { state: AppState; api: Api }) {
           />
         }
       >
+        <Trends state={props.state} api={props.api} />
         <table class="w-full text-left text-xs">
           <thead>
             <tr>

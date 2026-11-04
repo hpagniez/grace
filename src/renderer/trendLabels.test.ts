@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TestNode } from "../shared/model";
 import type { TrendPoint } from "../shared/trends";
-import { passRateLabel, trendCaption, trendTip } from "./trends";
+import { passRateLabel, trendCaption, trendTip } from "./trendLabels";
 
 const at = new Date(2026, 10, 4, 14, 32).getTime();
 const now = new Date(2026, 10, 4, 18, 0).getTime();
