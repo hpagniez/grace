@@ -61,8 +61,8 @@ export interface AppState {
    */
   consoleDropped: number;
   run: RunView;
-  /** The last notice from main; `success` reports something done, not a problem. */
-  notice: { text: string; success: boolean } | null;
+  /** The last notice from main; `success` reports something done, not a problem; `build` offers the Build button. */
+  notice: { text: string; success: boolean; build: boolean } | null;
   selected: string | null;
   /** The open project's tag filter, as main holds it; changes only when main says so. */
   filter: FilterState;
@@ -95,8 +95,9 @@ export interface AppState {
   vars: DebugVar[] | null;
   /** The folder main is opening, or null. */
   opening: string | null;
-  /** The build tool main runs to list the project's libraries, or null. */
+  /** The build tool main runs to list the project's libraries, or to build its Java code when `building`; or null. */
   listing: "Maven" | "Gradle" | null;
+  building: boolean;
   /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
   loaded: boolean;
   /** The saved recent folders, newest first; null until main sends them. */
@@ -163,6 +164,7 @@ export function initialState(): AppState {
     vars: null,
     opening: null,
     listing: null,
+    building: false,
     loaded: false,
     recent: null,
     updates: null,
@@ -348,9 +350,10 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "listing":
       s.listing = e.tool;
+      s.building = e.build ?? false;
       break;
     case "notice":
-      s.notice = { text: e.message, success: e.success ?? false };
+      s.notice = { text: e.message, success: e.success ?? false, build: e.build ?? false };
       break;
     case "opening":
       s.opening = e.root;

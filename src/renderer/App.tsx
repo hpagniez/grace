@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
+import { btnSmall } from "./buttons";
 import { Details } from "./Details";
 import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
@@ -30,12 +31,25 @@ export function App(props: { api: Api }) {
   const home = () => !state.project && !state.opening;
   // "Folder not found" and the like arrive as an error with no project: home shows it as a notice
   const notice = () =>
-    state.notice ?? (home() && state.error ? { text: state.error, success: false } : null);
+    state.notice ??
+    (home() && state.error ? { text: state.error, success: false, build: false } : null);
   const noticeBox = () => (
     <Show when={notice()}>
       {(n) => (
         <div class="px-3 py-2">
-          <Notice kind={n().success ? "success" : "warning"} text={n().text} testid="notice" />
+          <Notice kind={n().success ? "success" : "warning"} text={n().text} testid="notice">
+            {/* build from the notice R1: Grace builds the project's Java code only on this click */}
+            <Show when={n().build}>
+              <button
+                type="button"
+                class={`${btnSmall} shrink-0`}
+                disabled={state.busy || state.run.active}
+                onClick={() => void props.api.build()}
+              >
+                Build
+              </button>
+            </Show>
+          </Notice>
         </div>
       )}
     </Show>

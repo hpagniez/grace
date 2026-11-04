@@ -89,6 +89,7 @@ function setup() {
     ready: vi.fn(async () => {}),
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
+    build: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
     steps: vi.fn(async () => null),
     debug: vi.fn(async () => {}),
@@ -670,6 +671,19 @@ describe("main screen", () => {
     expect(button("report-button").disabled).toBe(false);
     send({ type: "notice", message: "Nothing to run" });
     expect(screen.getByTestId("notice").textContent).toBe("Nothing to run");
+  });
+
+  it("offers Build in a notice that asks for it, disabled while busy", () => {
+    const { api, send, load } = setup();
+    load();
+    send({ type: "notice", message: "Not built.", build: true });
+    const build = within(screen.getByTestId("notice")).getByRole("button", { name: "Build" });
+    fireEvent.click(build);
+    expect(api.build).toHaveBeenCalledTimes(1);
+    send({ type: "busy", busy: true });
+    expect((build as HTMLButtonElement).disabled).toBe(true);
+    send({ type: "notice", message: "Other" });
+    expect(within(screen.getByTestId("notice")).queryByRole("button")).toBeNull();
   });
 });
 

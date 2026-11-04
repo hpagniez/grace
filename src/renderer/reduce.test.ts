@@ -244,7 +244,7 @@ describe("reduce", () => {
     s.statuses["gone"] = "failed";
     s.results["gone"] = { durationMillis: 1 };
     s.steps["gone"] = [];
-    s.notice = { text: "x", success: false };
+    s.notice = { text: "x", success: false, build: false };
     apply(s, project());
     expect(s.statuses[keys[0]]).toBe("passed");
     expect(s.statuses["gone"]).toBeUndefined();
@@ -494,9 +494,19 @@ describe("reduce", () => {
   it("notice sets the notice, a warning unless main says it reports a success", () => {
     const s = initialState();
     apply(s, { type: "notice", message: "hi" });
-    expect(s.notice).toEqual({ text: "hi", success: false });
+    expect(s.notice).toEqual({ text: "hi", success: false, build: false });
     apply(s, { type: "notice", message: "Updated to 1.0.0-rc.8.", success: true });
-    expect(s.notice).toEqual({ text: "Updated to 1.0.0-rc.8.", success: true });
+    expect(s.notice).toEqual({ text: "Updated to 1.0.0-rc.8.", success: true, build: false });
+    apply(s, { type: "notice", message: "Not built.", build: true });
+    expect(s.notice).toEqual({ text: "Not built.", success: false, build: true });
+  });
+
+  it("listing says whether the build tool builds the Java code", () => {
+    const s = initialState();
+    apply(s, { type: "listing", tool: "Maven", build: true });
+    expect([s.listing, s.building]).toEqual(["Maven", true]);
+    apply(s, { type: "listing", tool: null });
+    expect([s.listing, s.building]).toEqual([null, false]);
   });
 
   describe("home screen", () => {
