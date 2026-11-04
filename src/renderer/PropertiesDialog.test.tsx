@@ -4,7 +4,7 @@ import { flush } from "solid-js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readDuration } from "../../test/cssTokens";
 import { drawn } from "../../test/drawn";
-import type { EnvView, PropertiesEdit } from "../shared/env";
+import type { EnvView, ImportResult, PropertiesEdit } from "../shared/env";
 import type { AppEvent } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import { App } from "./App";
@@ -50,6 +50,7 @@ function setup() {
     setFilter: vi.fn(async () => {}),
     setEnv: vi.fn(async () => {}),
     saveProperties: vi.fn(async (_edit: PropertiesEdit): Promise<boolean> => true),
+    importProperties: vi.fn(async (): Promise<ImportResult> => null),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -771,6 +772,171 @@ describe("properties dialog", () => {
 
 // The dialog fades out over 100 ms (R5.2): its title, rows and buttons stay until it is gone, and only
 // then does the draft go, so an unsaved secret does not linger in the window's memory.
+describe("import from file", () => {
+  const SECRET_U = "u-secret-1";
+  const SECRET_P = "p-secret-2";
+  const picked = (entries: Record<string, string>, file = "secrets-dev.properties") => ({
+    file,
+    entries: Object.entries(entries).map(([key, value]) => ({ key, value })),
+  });
+  const withDev = (dev: EnvView["properties"]["shared"]): EnvView => ({
+    ...saved,
+    properties: { ...saved.properties, byEnv: { ...saved.properties.byEnv, dev } },
+  });
+  const importButton = () => screen.getByTestId("import-file") as HTMLButtonElement;
+  const step = () => screen.queryByTestId("import-step");
+  const field = (id: string) => screen.getByTestId(id) as HTMLInputElement;
+  const confirm = () => screen.getByTestId("import-confirm") as HTMLButtonElement;
+  const pick = async () => {
+    fireEvent.click(importButton());
+    await settle();
+  };
+  /** Markup, text and every field's value: where a value could show. */
+  const everything = () =>
+    [
+      document.body.innerHTML,
+      ...[...document.querySelectorAll("input, select")].map((e) => (e as HTMLInputElement).value),
+    ].join(" ");
+
+  it("needs secret storage", () => {
+    const { load } = setup();
+    load({ ...saved, secretsAvailable: false });
+    openDialog();
+    expect(importButton().disabled).toBe(true);
+  });
+
+  it("a closed picker changes nothing; a message shows under the buttons", async () => {
+    const { api, load } = setup();
+    load(saved);
+    openDialog();
+    await pick();
+    expect(api.importProperties).toHaveBeenCalledTimes(1);
+    expect(step()).toBeNull();
+    expect(rows()).toHaveLength(1);
+    api.importProperties.mockResolvedValueOnce({ error: "notes.properties has no properties" });
+    await pick();
+    expect(screen.getByTestId("import-error").textContent).toBe(
+      "notes.properties has no properties",
+    );
+    expect(step()).toBeNull();
+  });
+
+  it("shows what it will add, replace and skip, and never a value", async () => {
+    const { api, load } = setup();
+    load(withDev([{ name: "APP_DB_USER", secret: true, state: "set", envVar: true }]));
+    openDialog();
+    choose("dev");
+    api.importProperties.mockResolvedValueOnce(
+      picked({ "db.user": SECRET_U, "db.password": SECRET_P, empty: "" }),
+    );
+    await pick();
+    expect(step()?.textContent).toContain("Import secrets-dev.properties");
+    expect(rows()).toHaveLength(0); // the step takes the list's place
+    expect((screen.getByTestId("import-scope") as HTMLSelectElement).value).toBe("dev");
+    expect(field("import-envvar").checked).toBe(true);
+    expect(field("import-preview").textContent).toBe("db.user → DB_USER");
+    expect(field("import-summary").textContent).toContain("Adds 2");
+    typeIn(field("import-prefix"), "APP_");
+    expect(field("import-preview").textContent).toBe("db.user → APP_DB_USER");
+    expect(field("import-summary").textContent).toContain("Adds 1");
+    expect(field("import-summary").textContent).toContain("Replaces 1: APP_DB_USER");
+    expect(screen.getAllByTestId("import-skip").map((e) => e.textContent)).toEqual([
+      "empty: Empty value",
+    ]);
+    expect(everything()).not.toContain(SECRET_U);
+    expect(everything()).not.toContain(SECRET_P);
+    expect(confirm().disabled).toBe(false);
+    expect(save().disabled).toBe(true); // Save would leave the import behind
+    typeIn(field("import-prefix"), "APP-");
+    expect(screen.getByTestId("import-prefix-error").textContent).toBe(
+      "Letters, digits and _ only",
+    );
+    expect(confirm().disabled).toBe(true);
+    fireEvent.click(field("import-envvar"));
+    flush();
+    expect(screen.queryByTestId("import-prefix")).toBeNull();
+    expect(field("import-summary").textContent).toContain("Adds 2"); // db.user, db.password
+  });
+
+  it("Import puts secret variables in the draft, replacing in place, and Save sends them", async () => {
+    const { api, load } = setup();
+    load(withDev([{ name: "App_Db_User", secret: true, state: "set", envVar: true }]));
+    openDialog();
+    choose("dev");
+    api.importProperties.mockResolvedValueOnce(
+      picked({ "db.user": SECRET_U, "db.password": SECRET_P }),
+    );
+    await pick();
+    typeIn(field("import-prefix"), "APP_");
+    fireEvent.click(confirm());
+    flush();
+    expect(step()).toBeNull();
+    expect(rows().map((_, i) => inRow(i, "prop-name").value)).toEqual([
+      "APP_DB_USER",
+      "APP_DB_PASSWORD",
+    ]);
+    expect(inRow(0, "prop-secret").checked).toBe(true);
+    expect(inRow(0, "prop-envvar").checked).toBe(true);
+    expect(inRow(0, "prop-value").type).toBe("password");
+    fireEvent.click(save());
+    await settle();
+    expect(api.saveProperties.mock.calls[0][0].byEnv.dev).toEqual([
+      { name: "APP_DB_USER", value: SECRET_U, secret: true, envVar: true },
+      { name: "APP_DB_PASSWORD", value: SECRET_P, secret: true, envVar: true },
+    ]);
+  });
+
+  it("imports into the chosen environment's new list, and Cancel drops it all", async () => {
+    const { api, load } = setup();
+    load(saved); // dev is chosen and has no list yet
+    openDialog();
+    api.importProperties.mockResolvedValue(picked({ "db.user": SECRET_U }));
+    await pick();
+    fireEvent.change(screen.getByTestId("import-scope"), { target: { value: "dev" } });
+    flush();
+    fireEvent.click(confirm());
+    flush();
+    expect(scope("dev").getAttribute("aria-current")).toBe("true");
+    expect(rows().map((_, i) => inRow(i, "prop-name").value)).toEqual(["DB_USER"]);
+    fireEvent.click(cancel());
+    afterExit();
+    openDialog();
+    choose("dev");
+    expect(rows()).toHaveLength(0);
+    expect(api.saveProperties).not.toHaveBeenCalled();
+  });
+
+  it("an import that would pass 500 rows is blocked", async () => {
+    const { api, load } = setup();
+    const shared = Array.from({ length: 499 }, (_, i) => ({ name: `p${i}`, value: "1" }));
+    load({ ...saved, properties: { shared, byEnv: {} } });
+    openDialog();
+    api.importProperties.mockResolvedValueOnce(picked({ a: "1", b: "2" }));
+    await pick();
+    expect(screen.getByTestId("import-limit").textContent).toBe("At most 500 properties per list");
+    expect(confirm().disabled).toBe(true);
+  });
+
+  it("Back changes nothing, and closing the dialog drops the step", async () => {
+    const { api, load } = setup();
+    load(saved);
+    openDialog();
+    api.importProperties.mockResolvedValue(picked({ "db.user": SECRET_U }));
+    await pick();
+    fireEvent.click(screen.getByTestId("import-back"));
+    flush();
+    expect(step()).toBeNull();
+    expect(rows().map((_, i) => inRow(i, "prop-name").value)).toEqual(["timeout"]);
+    await pick();
+    expect(step()).not.toBeNull();
+    fireEvent.click(cancel());
+    afterExit();
+    openDialog();
+    expect(step()).toBeNull();
+    expect(everything()).not.toContain(SECRET_U);
+  });
+});
+
 describe("while it fades out", () => {
   it("keeps the content longer than the exit transition lasts", () => {
     expect(EXIT_MS).toBeGreaterThan(readDuration("fast"));

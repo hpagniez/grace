@@ -1,4 +1,4 @@
-import { CircleAlert, Lock, Plus, SlidersHorizontal, Trash2 } from "lucide";
+import { CircleAlert, FileUp, Lock, Plus, SlidersHorizontal, Trash2 } from "lucide";
 import { createMemo, createSignal, createStore, flush, For, onCleanup, Show } from "solid-js";
 import {
   MAX_ENVS,
@@ -7,6 +7,8 @@ import {
   nameKeys,
   propertyValueError,
   validEnvName,
+  type ImportEntry,
+  type ImportResult,
   type PropertiesEdit,
   type RowEdit,
   type RowView,
@@ -17,6 +19,7 @@ import { Cut } from "./Cut";
 import { INVALID_ENV } from "./EnvPicker";
 import { FieldMessage } from "./FieldMessage";
 import { Icon } from "./Icon";
+import { ImportStep } from "./ImportStep";
 import { createNarrow } from "./narrow";
 import type { AppState } from "./reduce";
 import { Tooltip } from "./Tooltip";
@@ -73,6 +76,11 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
   const [scope, setScope] = createSignal("");
   const [newEnv, setNewEnv] = createSignal("");
   const [envError, setEnvError] = createSignal<string | null>(null);
+  /** A picked file's keys while the import step shows; dropped with the draft, as they are secrets. */
+  const [importing, setImporting] = createSignal<{ file: string; entries: ImportEntry[] } | null>(
+    null,
+  );
+  const [importError, setImportError] = createSignal<string | null>(null);
 
   const view = () => props.state.env;
   const locked = () => props.state.run.active || props.state.busy;
@@ -130,6 +138,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setScope("");
     setNewEnv("");
     setEnvError(null);
+    setImporting(null);
+    setImportError(null);
     session++;
     setSaving(false);
     setOpen(true);
@@ -144,6 +154,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     setScope("");
     setNewEnv("");
     setEnvError(null);
+    setImporting(null);
+    setImportError(null);
   };
   const dropLater = () => {
     clearTimeout(exit);
@@ -201,6 +213,38 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     );
     flush();
     list.querySelector<HTMLInputElement>("li:last-child [data-testid=prop-name]")?.focus();
+  };
+
+  /** Main shows the file picker and reads the file; its keys open the import step. */
+  const pickFile = async () => {
+    const mine = session;
+    setImportError(null);
+    let r: ImportResult = null;
+    try {
+      r = await props.api.importProperties();
+    } catch {
+      // main's notice says why
+    }
+    if (mine !== session || !open() || !r) return; // closed meanwhile, or no file picked
+    if ("error" in r) setImportError(r.error);
+    else setImporting(r);
+  };
+  /** Adds secret rows of `kind` to `target`, replacing in place a row of the same name (R5.4). */
+  const runImport = (target: string, envVar: boolean, found: { name: string; value: string }[]) => {
+    if (target !== "" && !ensureList(target)) return;
+    setRows((d) => {
+      for (const { name, value } of found) {
+        const keys = nameKeys(name, envVar);
+        const hit = d.find(
+          (r) => r.scope === target && nameKeys(r.name, r.envVar).some((k) => keys.includes(k)),
+        );
+        const imported = { name, value, secret: true, envVar, saved: null };
+        if (hit) Object.assign(hit, imported); // a saved secret's value is dropped for the new one
+        else d.push({ id: nextId++, scope: target, ...imported });
+      }
+    });
+    setScope(target);
+    setImporting(null);
   };
 
   // Built field by field: a store proxy cannot be structured-cloned, so IPC would throw.
@@ -325,160 +369,197 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
               </button>
             </div>
             <section class="flex min-w-0 flex-1 flex-col gap-2">
-              {/* -mx-1 px-1: room for the focus ring of the first and last column, which the scroll would clip */}
-              <ul ref={(e) => (list = e)} class="-mx-1 max-h-[50vh] overflow-y-auto px-1">
-                <For each={visible()}>
-                  {(row) => (
-                    <li data-testid="property-row" class="flex flex-wrap items-center gap-2 py-1">
-                      <input
-                        data-testid="prop-name"
-                        aria-label="Property name"
-                        autocomplete="off"
-                        spellcheck={false}
-                        class={`${input} w-40 min-w-0`}
-                        value={row.name}
-                        aria-invalid={errors().get(row.id) ? "true" : undefined}
-                        aria-describedby={errors().get(row.id) ? `row-error-${row.id}` : undefined}
-                        onInput={(e) => {
-                          const name = e.currentTarget.value;
-                          patch(row.id, (r) => {
-                            r.name = name;
-                            if (r.saved) forget(r); // main refuses `keep` across a rename
-                          });
-                        }}
-                      />
-                      <Show
-                        when={row.saved}
-                        fallback={
-                          <input
-                            data-testid="prop-value"
-                            aria-label="Property value"
-                            type={row.secret ? "password" : "text"}
-                            autocomplete={row.secret ? "new-password" : "off"}
-                            spellcheck={false}
-                            class={`${input} min-w-0 flex-1`}
-                            value={row.value}
-                            aria-invalid={errors().get(row.id) ? "true" : undefined}
-                            aria-describedby={
-                              errors().get(row.id) ? `row-error-${row.id}` : undefined
-                            }
-                            onInput={(e) => {
-                              const value = e.currentTarget.value;
-                              patch(row.id, (r) => void (r.value = value));
-                            }}
-                          />
-                        }
-                      >
-                        <div class="flex flex-1 items-center gap-2">
-                          <Show
-                            when={row.saved === "set"}
-                            fallback={
-                              <FieldMessage kind="warning" testid="prop-unreadable">
-                                Can't be read, enter it again
-                              </FieldMessage>
-                            }
-                          >
-                            <span
-                              data-testid="prop-dots"
-                              aria-hidden="true"
-                              class="tracking-widest"
-                            >
-                              ••••••••
-                            </span>
-                            <span class="sr-only">Saved secret</span>
-                          </Show>
-                          <button
-                            type="button"
-                            data-testid="prop-replace"
-                            class={btn}
-                            disabled={!available()}
-                            onClick={(e) => {
-                              const item = e.currentTarget.closest("li")!;
-                              patch(row.id, forget);
-                              flush();
-                              item
-                                .querySelector<HTMLInputElement>("[data-testid=prop-value]")
-                                ?.focus();
-                            }}
-                          >
-                            Replace
-                          </button>
-                        </div>
-                      </Show>
-                      <label class="flex h-6 items-center gap-1 text-sm">
+              <Show when={importing()}>
+                {(imp) => (
+                  <ImportStep
+                    file={imp().file}
+                    entries={imp().entries}
+                    scopes={scopes()}
+                    scope={scope()}
+                    existing={(s) =>
+                      rows
+                        .filter((r) => r.scope === s)
+                        .map((r) => ({ name: r.name, envVar: r.envVar }))
+                    }
+                    canAddList={(s) => s === "" || lists().includes(s) || lists().length < MAX_ENVS}
+                    onImport={runImport}
+                    onBack={() => setImporting(null)}
+                  />
+                )}
+              </Show>
+              <Show when={!importing()}>
+                {/* -mx-1 px-1: room for the focus ring of the first and last column, which the scroll would clip */}
+                <ul ref={(e) => (list = e)} class="-mx-1 max-h-[50vh] overflow-y-auto px-1">
+                  <For each={visible()}>
+                    {(row) => (
+                      <li data-testid="property-row" class="flex flex-wrap items-center gap-2 py-1">
                         <input
-                          type="checkbox"
-                          data-testid="prop-envvar"
-                          class="accent-accent"
-                          checked={row.envVar}
-                          onChange={(e) => {
-                            const on = e.currentTarget.checked;
-                            patch(row.id, (r) => void (r.envVar = on)); // the value stays (R1.2)
-                          }}
-                        />
-                        Env variable
-                      </label>
-                      <label class="flex h-6 items-center gap-1 text-sm">
-                        <input
-                          type="checkbox"
-                          data-testid="prop-secret"
-                          class="accent-accent"
-                          checked={row.secret}
-                          disabled={!available() && !row.secret}
-                          onChange={(e) => {
-                            const on = e.currentTarget.checked;
+                          data-testid="prop-name"
+                          aria-label="Property name"
+                          autocomplete="off"
+                          spellcheck={false}
+                          class={`${input} w-40 min-w-0`}
+                          value={row.name}
+                          aria-invalid={errors().get(row.id) ? "true" : undefined}
+                          aria-describedby={
+                            errors().get(row.id) ? `row-error-${row.id}` : undefined
+                          }
+                          onInput={(e) => {
+                            const name = e.currentTarget.value;
                             patch(row.id, (r) => {
-                              r.secret = on;
-                              if (!on && r.saved) forget(r);
+                              r.name = name;
+                              if (r.saved) forget(r); // main refuses `keep` across a rename
                             });
                           }}
                         />
-                        Secret
-                      </label>
-                      <Tooltip text={`Delete ${row.name || "property"}`} side="left">
-                        <button
-                          type="button"
-                          data-testid="prop-delete"
-                          aria-label={`Delete ${row.name || "property"}`}
-                          class={btnIconSmall}
-                          onClick={() =>
-                            setRows(
-                              (d) =>
-                                void d.splice(
-                                  d.findIndex((r) => r.id === row.id),
-                                  1,
-                                ),
-                            )
+                        <Show
+                          when={row.saved}
+                          fallback={
+                            <input
+                              data-testid="prop-value"
+                              aria-label="Property value"
+                              type={row.secret ? "password" : "text"}
+                              autocomplete={row.secret ? "new-password" : "off"}
+                              spellcheck={false}
+                              class={`${input} min-w-0 flex-1`}
+                              value={row.value}
+                              aria-invalid={errors().get(row.id) ? "true" : undefined}
+                              aria-describedby={
+                                errors().get(row.id) ? `row-error-${row.id}` : undefined
+                              }
+                              onInput={(e) => {
+                                const value = e.currentTarget.value;
+                                patch(row.id, (r) => void (r.value = value));
+                              }}
+                            />
                           }
                         >
-                          <Icon icon={Trash2} />
-                        </button>
-                      </Tooltip>
-                      <Show when={errors().get(row.id)}>
-                        <FieldMessage
-                          kind="error"
-                          id={`row-error-${row.id}`}
-                          testid="row-error"
-                          class="w-full"
-                        >
-                          {errors().get(row.id)}
-                        </FieldMessage>
-                      </Show>
-                      <Show when={shortSecret(row)}>
-                        <FieldMessage kind="hint" testid="row-hint" class="w-full">
-                          Too short to hide in the console
-                        </FieldMessage>
-                      </Show>
-                    </li>
-                  )}
-                </For>
-              </ul>
-              <div>
-                <button type="button" data-testid="add-property" class={btn} onClick={addRow}>
-                  <Icon icon={Plus} />
-                  Add property
-                </button>
-              </div>
+                          <div class="flex flex-1 items-center gap-2">
+                            <Show
+                              when={row.saved === "set"}
+                              fallback={
+                                <FieldMessage kind="warning" testid="prop-unreadable">
+                                  Can't be read, enter it again
+                                </FieldMessage>
+                              }
+                            >
+                              <span
+                                data-testid="prop-dots"
+                                aria-hidden="true"
+                                class="tracking-widest"
+                              >
+                                ••••••••
+                              </span>
+                              <span class="sr-only">Saved secret</span>
+                            </Show>
+                            <button
+                              type="button"
+                              data-testid="prop-replace"
+                              class={btn}
+                              disabled={!available()}
+                              onClick={(e) => {
+                                const item = e.currentTarget.closest("li")!;
+                                patch(row.id, forget);
+                                flush();
+                                item
+                                  .querySelector<HTMLInputElement>("[data-testid=prop-value]")
+                                  ?.focus();
+                              }}
+                            >
+                              Replace
+                            </button>
+                          </div>
+                        </Show>
+                        <label class="flex h-6 items-center gap-1 text-sm">
+                          <input
+                            type="checkbox"
+                            data-testid="prop-envvar"
+                            class="accent-accent"
+                            checked={row.envVar}
+                            onChange={(e) => {
+                              const on = e.currentTarget.checked;
+                              patch(row.id, (r) => void (r.envVar = on)); // the value stays (R1.2)
+                            }}
+                          />
+                          Env variable
+                        </label>
+                        <label class="flex h-6 items-center gap-1 text-sm">
+                          <input
+                            type="checkbox"
+                            data-testid="prop-secret"
+                            class="accent-accent"
+                            checked={row.secret}
+                            disabled={!available() && !row.secret}
+                            onChange={(e) => {
+                              const on = e.currentTarget.checked;
+                              patch(row.id, (r) => {
+                                r.secret = on;
+                                if (!on && r.saved) forget(r);
+                              });
+                            }}
+                          />
+                          Secret
+                        </label>
+                        <Tooltip text={`Delete ${row.name || "property"}`} side="left">
+                          <button
+                            type="button"
+                            data-testid="prop-delete"
+                            aria-label={`Delete ${row.name || "property"}`}
+                            class={btnIconSmall}
+                            onClick={() =>
+                              setRows(
+                                (d) =>
+                                  void d.splice(
+                                    d.findIndex((r) => r.id === row.id),
+                                    1,
+                                  ),
+                              )
+                            }
+                          >
+                            <Icon icon={Trash2} />
+                          </button>
+                        </Tooltip>
+                        <Show when={errors().get(row.id)}>
+                          <FieldMessage
+                            kind="error"
+                            id={`row-error-${row.id}`}
+                            testid="row-error"
+                            class="w-full"
+                          >
+                            {errors().get(row.id)}
+                          </FieldMessage>
+                        </Show>
+                        <Show when={shortSecret(row)}>
+                          <FieldMessage kind="hint" testid="row-hint" class="w-full">
+                            Too short to hide in the console
+                          </FieldMessage>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+                <div class="flex gap-2">
+                  <button type="button" data-testid="add-property" class={btn} onClick={addRow}>
+                    <Icon icon={Plus} />
+                    Add property
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="import-file"
+                    class={btn}
+                    disabled={!available()}
+                    onClick={() => void pickFile()}
+                  >
+                    <Icon icon={FileUp} />
+                    Import from file…
+                  </button>
+                </div>
+                <Show when={importError()}>
+                  <FieldMessage kind="error" testid="import-error">
+                    {importError()}
+                  </FieldMessage>
+                </Show>
+              </Show>
               <Show when={!available()}>
                 <FieldMessage kind="warning" testid="secrets-unavailable">
                   Secret storage is not available on this system
@@ -496,7 +577,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
               type="button"
               data-testid="save-properties"
               class={primaryDialog}
-              disabled={saving() || [...errors().values()].some(Boolean)}
+              disabled={saving() || importing() !== null || [...errors().values()].some(Boolean)}
               onClick={() => void save()}
             >
               {saving() ? "Saving…" : "Save"}
