@@ -239,6 +239,30 @@ describe("details: a test", () => {
     ]);
   });
 
+  it("shows a step's comments above it, muted, as written (step comments R2)", () => {
+    const { send, select, finished } = setup();
+    finished();
+    send({
+      type: "steps",
+      key: BAD,
+      steps: [
+        step("path 'a'", "passed"),
+        step("method get", "failed", { comments: ["# why", "# where from"] }),
+      ],
+    });
+    select("broken");
+    const rows = screen.getAllByTestId("step");
+    expect(within(rows[0]).queryByTestId("step-comments")).toBeNull();
+    const comments = within(rows[1]).getByTestId("step-comments");
+    expect([...comments.children].map((c) => c.textContent)).toEqual(["# why", "# where from"]);
+    expect(comments.className).toContain("text-muted");
+    expect(comments.className).toContain("font-mono");
+    // above the step: the comments come before the step's text in the row
+    expect(rows[1].textContent!.indexOf("# where from")).toBeLessThan(
+      rows[1].textContent!.indexOf("method get"),
+    );
+  });
+
   it("toggles a step's log with a ghost button and a chevron that turns", () => {
     const { send, select, finished } = setup();
     finished();
@@ -448,7 +472,13 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
   const fromFile = [
     { keyword: "*", text: "def base = 1", line: 4, background: true },
     { keyword: "*", text: "def name = 'grace'", line: 7, background: false },
-    { keyword: "*", text: "def user = { id: 7 }", line: 8, background: false },
+    {
+      keyword: "*",
+      text: "def user = { id: 7 }",
+      line: 8,
+      background: false,
+      comments: ["# the user"],
+    },
   ];
   const pausedAt = (line: number, depth = 0, file = "tests/x.feature"): AppEvent => ({
     type: "debugPaused",
@@ -511,6 +541,7 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
     const rows = screen.getAllByTestId("step");
     expect(rows[2].dataset.paused).toBe("");
     expect(rows[2].textContent).toContain("Paused");
+    expect(within(rows[2]).getByTestId("step-comments").textContent).toBe("# the user");
     expect(rows[1].dataset.paused).toBeUndefined();
     send(pausedAt(5, 1, "called.feature"));
     expect(screen.getAllByTestId("step").some((r) => r.dataset.paused === "")).toBe(false);

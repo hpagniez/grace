@@ -55,6 +55,13 @@ function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paus
       data-paused={props.paused ? "" : undefined}
       class={props.paused ? `-mx-2 rounded-md px-2 py-1 ${TINT.running}` : "py-1"}
     >
+      <Show when={props.step.comments}>
+        {(comments) => (
+          <div data-testid="step-comments" class="ml-6 font-mono text-xs break-words text-muted">
+            <For each={comments()}>{(line) => <p>{line}</p>}</For>
+          </div>
+        )}
+      </Show>
       <div class="flex min-h-6 items-center gap-2 text-sm">
         <Tooltip text={breakpoint()} side="right">
           <button
