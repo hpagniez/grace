@@ -15,6 +15,18 @@ const basic = () => {
 };
 
 describe("extractSteps", () => {
+  it("shows a step with no keyword by its text alone (#229 R1.3)", () => {
+    const ev = readAllEvents(path.resolve("test/fixtures/events/run-http-config-fail.jsonl")).find(
+      (e) => e.type === "FEATURE_EXIT" && e.data.callDepth === 0,
+    )!;
+    const [step, ...rest] = extractSteps(ev.data)[0].steps;
+    expect(rest).toEqual([]);
+    expect(step).toMatchObject({ keyword: "*", line: 0, status: "failed" });
+    expect(step.text).toMatch(
+      /^Scenario execution failed: Config evaluation failed: karate-config\.js/,
+    );
+  });
+
   it("returns one entry per scenario, by refId", () => {
     expect(basic().map((s) => s.refId)).toEqual(["[1:7]", "[2:15]", "[3:22]", "[4:28]"]);
   });
