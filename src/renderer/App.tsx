@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
+import { ConfigBanner } from "./ConfigBanner";
 import { Details } from "./Details";
 import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
@@ -77,6 +78,7 @@ export function App(props: { api: Api }) {
                 <Progress state={state} />
                 <FilterBar state={state} api={props.api} />
                 <Show when={!settingsOpen()}>{noticeBox()}</Show>
+                <ConfigBanner state={state} api={props.api} />
                 <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
                   <div class="flex min-h-0 w-1/2 flex-col">
                     <Tree state={state} select={select} api={props.api} />
