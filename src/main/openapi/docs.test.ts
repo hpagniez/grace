@@ -275,7 +275,6 @@ describe("Docs.target", () => {
         "C:/x.yaml",
         "C:\\x.yaml#/A",
         "\\\\host\\share\\x.yaml",
-        "ftp://a.test/x.yaml",
       ]) {
         const e = await failure(() => docs.target(ref, spec, from));
         expect(format(e), ref).toBe(
@@ -283,6 +282,17 @@ describe("Docs.target", () => {
         );
       }
       expect(readFile).not.toHaveBeenCalled();
+    });
+
+    it("says a scheme it does not read is not a path or an http URL, not a local file", async () => {
+      const docs = make();
+      const spec = await docs.load(`${base}/dir/spec.yaml`);
+      const from = { label: spec.label, line: 4 };
+      for (const ref of ["ftp://a.test/x.yaml", "data:text/plain,a"]) {
+        expect(format(await failure(() => docs.target(ref, spec, from))), ref).toBe(
+          `${base}/dir/spec.yaml:4: $ref ${ref} is not a file path or an http or https URL`,
+        );
+      }
     });
   });
 });

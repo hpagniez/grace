@@ -58,7 +58,7 @@ export function parseText(
   text: string,
   label: string,
 ): { document: Document; root: Node | null; lines: LineCounter } {
-  text = text.replace(/^﻿/, "");
+  text = text.replace(/^\uFEFF/, "");
   if (/^\s*[{[]/.test(text)) {
     try {
       JSON.parse(text);
@@ -227,8 +227,10 @@ export class Docs {
     }
     const url = new URL(location, holder.uri);
     if (/^https?:$/.test(url.protocol)) return url.href;
-    if (holder.remote) throw refuse();
-    if (url.protocol === "file:") return url.href;
+    if (url.protocol === "file:") {
+      if (holder.remote) throw refuse();
+      return url.href;
+    }
     throw new ImportError(at, `$ref ${ref} is not a file path or an http or https URL`);
   }
 
