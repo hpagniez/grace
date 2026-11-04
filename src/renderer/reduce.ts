@@ -47,6 +47,8 @@ export interface AppState {
   project: Project | null;
   tree: TestNode | null;
   error: string | null;
+  /** The folders the last `project` event offered (sub-folder offer R3). */
+  subfolders: string[];
   statuses: Record<string, Status>;
   results: Record<string, { durationMillis?: number; error?: string }>;
   steps: Record<string, Step[]>;
@@ -136,6 +138,7 @@ export function initialState(): AppState {
     project: null,
     tree: null,
     error: null,
+    subfolders: [],
     statuses: {},
     results: {},
     steps: {},
@@ -220,6 +223,7 @@ export function reduce(s: AppState, e: AppEvent): void {
       s.project = e.project;
       s.tree = e.tree;
       s.error = e.error;
+      s.subfolders = e.subfolders ?? [];
       s.notice = null;
       s.loaded = true;
       break;
