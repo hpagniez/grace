@@ -196,7 +196,7 @@ Feature: Import an OpenAPI spec to feature files
   Scenario: Import a local file from a folder's menu
     When the person right-clicks the folder "api" and picks "Import OpenAPI here…"
     And chooses the file "petstore.yaml"
-    Then the dialog shows "Petstore 1.0.0" and "3 operations in 2 features"
+    Then the dialog shows "Petstore 1.0.0" and "4 operations in 2 features"
     And the folder "api/petstore/"
     And the files "pets.feature" and "store.feature", neither marked "Exists"
     When the person clicks "Generate 2 files"
