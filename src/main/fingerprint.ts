@@ -7,7 +7,7 @@ import path from "node:path";
 /** Folder names, lower case, whose content is tool state, not the project, wherever they are. */
 export const SKIPPED_DIRS: readonly string[] = [".git", "node_modules", ".gradle"];
 /** Output folders, lower case: skipped only beside a build file, so a test folder of that name counts. */
-const OUTPUT_DIRS: readonly string[] = ["target", "build"];
+export const OUTPUT_DIRS: readonly string[] = ["target", "build"];
 const BUILD_FILES: readonly string[] = ["pom.xml", "build.gradle", "build.gradle.kts"];
 export const MAX_FILES = 50_000;
 export const WALK_TIMEOUT_MS = 2_000;
