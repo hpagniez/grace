@@ -157,97 +157,102 @@ function Row(props: {
         {/* A swap, not a rotate: a transform on every open row makes each hit test undo it. */}
         <Icon icon={props.open ? ChevronDown : ChevronRight} size={14} />
       </button>
-      <Tooltip text={mark() === "paused" ? "Paused" : STATUS_LABEL[status()]} side="right">
-        <StatusMark status={mark()} />
-      </Tooltip>
-      <Show when={kindIcon()}>
-        <Icon icon={kindIcon()!} size={14} class="text-muted" />
-      </Show>
-      {/* A keyboard user reads a cut label as a mouse user does (R4.10). */}
-      <Tooltip
-        text={cut() ? full() : undefined}
-        class="min-w-0 flex-1"
-        side="over"
-        pinned={pinned()}
-      >
-        <button
-          ref={(e) => (labelEl = e)}
-          type="button"
-          tabindex={-1}
-          class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
-          onClick={() => {
-            props.ctx.select(props.node.key);
-            if (isFeature() && !props.open) props.toggle(); // a click opens a feature, never closes it (#224 R2.1)
-          }}
+      {/* One insert, not one per child: each dynamic child beside another leaves a comment node in the DOM (page.nodes). */}
+      {[
+        <Tooltip text={mark() === "paused" ? "Paused" : STATUS_LABEL[status()]} side="right">
+          <StatusMark status={mark()} />
+        </Tooltip>,
+        <Show when={kindIcon()}>
+          <Icon icon={kindIcon()!} size={14} class="text-muted" />
+        </Show>,
+        // A keyboard user reads a cut label as a mouse user does (R4.10).
+        <Tooltip
+          text={cut() ? full() : undefined}
+          class="min-w-0 flex-1"
+          side="over"
+          pinned={pinned()}
         >
-          {label()}
-          <Show when={title()}>
-            <span class="ml-2 text-xs text-muted">{title()}</span>
+          <button
+            ref={(e) => (labelEl = e)}
+            type="button"
+            tabindex={-1}
+            class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
+            onClick={() => {
+              props.ctx.select(props.node.key);
+              if (isFeature() && !props.open) props.toggle(); // a click opens a feature, never closes it (#224 R2.1)
+            }}
+          >
+            {[
+              label(),
+              <Show when={title()}>
+                <span class="ml-2 text-xs text-muted">{title()}</span>
+              </Show>,
+            ]}
+          </button>
+        </Tooltip>,
+        <Show when={props.breakpoint}>
+          <span
+            data-testid="breakpoint-dot"
+            role="img"
+            aria-label="Has breakpoints"
+            class="size-2 shrink-0 rounded-full bg-failed"
+          />
+        </Show>,
+        <For each={props.node.tags}>{(tag) => <span class={TAG}>{tag}</span>}</For>,
+        <Show when={flaky()}>
+          <Show
+            when={isTest(props.node)}
+            fallback={
+              <span data-testid="flaky-count" class={FLAKY}>
+                <Icon icon={Shuffle} size={14} />
+                {flaky()}
+              </span>
+            }
+          >
+            <Tooltip text={FLAKY_TITLE} class="shrink-0" side="left">
+              <span
+                data-testid="flaky-mark"
+                role="img" // aria-label names only an element with a role
+                aria-label={FLAKY_TITLE}
+                class={FLAKY}
+              >
+                <Icon icon={Shuffle} size={14} />
+                flaky
+              </span>
+            </Tooltip>
           </Show>
-        </button>
-      </Tooltip>
-      <Show when={props.breakpoint}>
-        <span
-          data-testid="breakpoint-dot"
-          role="img"
-          aria-label="Has breakpoints"
-          class="size-2 shrink-0 rounded-full bg-failed"
-        />
-      </Show>
-      <For each={props.node.tags}>{(tag) => <span class={TAG}>{tag}</span>}</For>
-      <Show when={flaky()}>
-        <Show
-          when={isTest(props.node)}
-          fallback={
-            <span data-testid="flaky-count" class={FLAKY}>
-              <Icon icon={Shuffle} size={14} />
-              {flaky()}
-            </span>
-          }
-        >
-          <Tooltip text={FLAKY_TITLE} class="shrink-0" side="left">
-            <span
-              data-testid="flaky-mark"
-              role="img" // aria-label names only an element with a role
-              aria-label={FLAKY_TITLE}
-              class={FLAKY}
-            >
-              <Icon icon={Shuffle} size={14} />
-              flaky
-            </span>
-          </Tooltip>
-        </Show>
-      </Show>
-      <Show when={match()}>
-        <Show when={debugShown()} fallback={<span class="size-6 shrink-0" />}>
-          <Tooltip text={`Debug ${label()} (Ctrl+Shift+Enter)`} class="shrink-0" side="left">
+        </Show>,
+        <Show when={match()}>
+          <Show when={debugShown()} fallback={<span class="size-6 shrink-0" />}>
+            <Tooltip text={`Debug ${label()} (Ctrl+Shift+Enter)`} class="shrink-0" side="left">
+              <button
+                type="button"
+                tabindex={-1}
+                data-testid="debug-node"
+                aria-label={`Debug ${label()}`}
+                class={`${DEBUG} ${selected() ? "text-running" : "text-muted"}`}
+                disabled={props.ctx.state.run.active || props.ctx.state.busy}
+                onClick={() => void props.ctx.api.debug(props.node.key)}
+              >
+                <Icon icon={BUG} size={14} />
+              </button>
+            </Tooltip>
+          </Show>
+          <Tooltip text={`Run ${label()} (Ctrl+Enter)`} class="shrink-0" side="left">
             <button
               type="button"
               tabindex={-1}
-              data-testid="debug-node"
-              aria-label={`Debug ${label()}`}
-              class={`${DEBUG} ${selected() ? "text-running" : "text-muted"}`}
+              data-testid="run-node"
+              aria-label={`Run ${label()}`}
+              class={`${RUN} ${selected() ? "text-passed" : "text-muted"}`}
               disabled={props.ctx.state.run.active || props.ctx.state.busy}
-              onClick={() => void props.ctx.api.debug(props.node.key)}
+              onClick={() => void props.ctx.api.run(props.node.key)}
             >
-              <Icon icon={BUG} size={14} />
+              <Icon icon={Play} size={14} />
             </button>
           </Tooltip>
-        </Show>
-        <Tooltip text={`Run ${label()} (Ctrl+Enter)`} class="shrink-0" side="left">
-          <button
-            type="button"
-            tabindex={-1}
-            data-testid="run-node"
-            aria-label={`Run ${label()}`}
-            class={`${RUN} ${selected() ? "text-passed" : "text-muted"}`}
-            disabled={props.ctx.state.run.active || props.ctx.state.busy}
-            onClick={() => void props.ctx.api.run(props.node.key)}
-          >
-            <Icon icon={Play} size={14} />
-          </button>
-        </Tooltip>
-      </Show>
+        </Show>,
+      ]}
     </div>
   );
 }

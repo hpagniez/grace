@@ -1732,6 +1732,23 @@ describe("tree: step debugger (R5, R7)", () => {
     expect(screen.getAllByTestId("debug-node")).toEqual([screen.getByRole("button", name)]);
   });
 
+  it("draws no comment or empty text node in a row (page.nodes, #261)", () => {
+    const { load } = setup();
+    load();
+    openFeatures();
+    fireEvent.click(screen.getByRole("button", { name: "passing hello" }));
+    flush();
+    const empty = screen.getAllByTestId("tree-node").flatMap((row) => {
+      const walk = document.createTreeWalker(row, NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_TEXT);
+      const found: Node[] = [];
+      while (walk.nextNode())
+        if (walk.currentNode.nodeType === Node.COMMENT_NODE || !walk.currentNode.textContent)
+          found.push(walk.currentNode);
+      return found;
+    });
+    expect(empty).toEqual([]);
+  });
+
   it("a Debug button before Run, disabled during a run", () => {
     const { api, send, load } = setup();
     load();

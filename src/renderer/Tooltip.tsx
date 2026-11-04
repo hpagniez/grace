@@ -1,5 +1,13 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, createUniqueId, flush, onCleanup, Show } from "solid-js";
+import {
+  children,
+  createEffect,
+  createSignal,
+  createUniqueId,
+  flush,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { placeTip, type Side } from "./placeTip";
 
 const DELAY = 500; // the pointer must rest this long on the target
@@ -68,6 +76,7 @@ export function Tooltip(props: {
   pinned?: boolean;
 }) {
   const id = createUniqueId();
+  const target = children(() => props.children);
   const [open, setOpen] = createSignal(false);
   let wrap!: HTMLSpanElement;
   let tip: HTMLDivElement | undefined;
@@ -214,23 +223,26 @@ export function Tooltip(props: {
       onFocusIn={(e) => keyboardFocus(e.target) && show()}
       onFocusOut={hide}
     >
-      {props.children}
-      <Show when={open()}>
-        <div
-          ref={(e) => {
-            tip = e;
-            // Native listeners: Solid's own run at the document, after a row's native ones.
-            for (const type of ["click", "dblclick"]) e.addEventListener(type, keepHere);
-            e.addEventListener("click", onTipClick);
-          }}
-          popover="manual"
-          role="tooltip"
-          id={id}
-          class={tipClass}
-        >
-          {props.text}
-        </div>
-      </Show>
+      {/* One insert, not two side by side: each would leave a comment node in the DOM, 2 a tooltip (page.nodes). */}
+      {[
+        target,
+        <Show when={open()}>
+          <div
+            ref={(e) => {
+              tip = e;
+              // Native listeners: Solid's own run at the document, after a row's native ones.
+              for (const type of ["click", "dblclick"]) e.addEventListener(type, keepHere);
+              e.addEventListener("click", onTipClick);
+            }}
+            popover="manual"
+            role="tooltip"
+            id={id}
+            class={tipClass}
+          >
+            {props.text}
+          </div>
+        </Show>,
+      ]}
     </span>
   );
 }
