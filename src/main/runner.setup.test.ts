@@ -26,7 +26,6 @@ const POM_PROJECT = {
   "karate-pom.json": JSON.stringify({
     paths: ["tests/a", "missing"],
     configDir: "conf",
-    env: "qa",
     dryRun: true,
   }),
 };
@@ -37,7 +36,7 @@ describe("Runner project setup", () => {
     await runner.open(write(POM_PROJECT));
     expect(leafKeys(last("project").tree!)).toEqual(["s:tests/a/a.feature#1"]);
     expect(last("notice").message).toBe(
-      "Grace does not use these karate-pom.json settings: env, dryRun. " +
+      "Grace does not use these karate-pom.json settings: dryRun. " +
         "These karate-pom.json paths are not folders or files in the project: missing.",
     );
     expect(last("environment").view).toMatchObject({ env: null, overlays: ["qa"] });

@@ -70,6 +70,7 @@ import {
 } from "./karate/libraries";
 import { CMD, spawnKarate, within, type KarateProcess } from "./karate/process";
 import { RunState } from "./karate/run-state";
+import { pomStart } from "./karate/pom";
 import { fileSteps } from "./karate/steps";
 import {
   buildTree,
@@ -93,9 +94,11 @@ import {
   loadProjectWatch,
   loadRecentProjects,
   removeRecentProject,
+  savedControls,
   saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
+  saveProjectProperties,
   saveProjectThreads,
   saveProjectWatch,
   skippedProperties,
@@ -261,12 +264,13 @@ export class Runner {
         const skipped = skippedProperties(this.o.dataDir, root);
         const { layout } = detectLayout(root);
         const libraries = await this.listLibraries(root, layout);
-        opened = await this.rediscover(
-          { root, layout },
+        const start = this.start(
+          root,
           loadProjectFilter(this.o.dataDir, root),
           loadProjectEnv(this.o.dataDir, root),
           loadProjectThreads(this.o.dataDir, root),
         );
+        opened = await this.rediscover({ root, layout }, start.filter, start.envs, start.threads);
         if (!opened) this.report = report;
         else {
           this.sendBreakpoints([]); // another project's lines mean nothing here
@@ -357,7 +361,8 @@ export class Runner {
       await this.guarded(async () => {
         const project = this.project!;
         const libraries = await this.listLibraries(project.root, project.layout);
-        if (!(await this.rediscover(project, this.filter, this.envs, this.threads))) return;
+        const start = this.start(project.root, this.filter, this.envs, this.threads);
+        if (!(await this.rediscover(project, start.filter, start.envs, start.threads))) return;
         this.arm(); // karate-pom.json may have changed the feature roots (R2.4)
         const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
           (n) => n !== null,
@@ -491,7 +496,7 @@ export class Runner {
     };
     this.envs = { ...this.envs, properties };
     try {
-      saveProjectEnv(this.o.dataDir, this.project.root, this.envs);
+      saveProjectProperties(this.o.dataDir, this.project.root, properties);
     } catch (err) {
       this.o.emit({
         type: "notice",
@@ -754,6 +759,20 @@ export class Runner {
   }
 
   /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
+  /**
+   * Open and Refresh (docs/specs/2026-11-04-pom-defaults.md R1): each control's value when saved, else the
+   * pom's, else Grace's default.
+   */
+  private start(root: string, filter: FilterState, envs: EnvSettings, threads: number) {
+    const saved = savedControls(this.o.dataDir, root);
+    const pom = pomStart(root);
+    return {
+      filter: saved.filter ? filter : { ...NO_FILTER, include: [], exclude: [], ...pom.filter },
+      envs: saved.env ? envs : { ...envs, env: pom.env },
+      threads: saved.threads ? threads : (pom.threads ?? 1),
+    };
+  }
+
   private storeFilter(f: FilterState) {
     this.filter = f;
     try {
@@ -868,8 +887,11 @@ export class Runner {
         pruned &&
         (pruned.include.length !== filter.include.length ||
           pruned.exclude.length !== filter.exclude.length)
-      )
-        this.storeFilter(pruned);
+      ) {
+        // a filter from the pom stays unsaved (docs/specs/2026-11-04-pom-defaults.md R1.2)
+        if (savedControls(this.o.dataDir, project.root).filter) this.storeFilter(pruned);
+        else this.filter = pruned;
+      }
       this.sendFilter();
       this.sendThreads();
       const { configDirs, featureRoots } = detectLayout(project.root);
