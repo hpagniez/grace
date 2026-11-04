@@ -104,7 +104,7 @@ The owner's answers to the open points of #230:
 
 - A per-row kind and an import step inside the dialog: the owner's choice (approach 1).
 - `.properties` only; every imported key a secret; the name pattern; the import step as the confirmation: the owner's answers.
-- Environment variables are set on the Karate process's environment ([ADR 0028](../decisions/0028-environment-variable-run-properties.md)).
+- Environment variables are set on the Karate process's environment ([ADR 0029](../decisions/0029-environment-variable-run-properties.md)).
 - My call: the kind is a checkbox like Secret, not a select: the smallest control, and it reads the same way.
 - My call: one value rule for both kinds. An environment variable could take any Unicode, but the masker's forms assume printable ASCII (`secretForms`), and one rule keeps rows switchable between kinds.
 - My call: no extra reserved names (`PATH`, `SystemRoot` and the like). Setting one is the person's choice, as in a shell; Grace starts Java by its full path.
