@@ -268,10 +268,27 @@ describe("Runner project libraries", () => {
       it("offers Build in a joined notice", T, async () => {
         const { runner, last } = setup();
         const root = withHelper();
-        writeFileSync(path.join(root, "karate-pom.json"), JSON.stringify({ env: "qa" }));
+        writeFileSync(path.join(root, "karate-pom.json"), JSON.stringify({ dryRun: true }));
         await runner.open(root);
-        expect(last("notice").message).toContain(NOT_BUILT);
-        expect(last("notice").build).toBe(true);
+        expect(last("notice")).toEqual({
+          type: "notice",
+          message: `Grace does not use these karate-pom.json settings: dryRun. ${NOT_BUILT}`,
+          build: true,
+        });
+      });
+
+      it("offers Build after the libraries' failure on Refresh", T, async () => {
+        const { runner, last } = setup();
+        const root = withHelper();
+        await runner.open(root);
+        stubTool(root, "mvnw.cmd", "echo [ERROR] Could not resolve dependencies\r\nexit /b 1");
+        touch(root);
+        await runner.refresh();
+        expect(last("notice")).toEqual({
+          type: "notice",
+          message: `Grace could not list the project's libraries with Maven: Could not resolve dependencies. Grace uses the libraries it listed before. ${NOT_BUILT}`,
+          build: true,
+        });
       });
 
       it("builds with test-compile, then refreshes", T, async () => {
