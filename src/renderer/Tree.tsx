@@ -27,7 +27,7 @@ import {
   failedAt,
   featureOf,
   leaves,
-  nodeName,
+  labelOf,
   STATUS_LABEL,
 } from "./nodes";
 import { Notice } from "./Notice";
@@ -63,7 +63,6 @@ const BUG: IconNode = [
 
 const isTest = (n: TestNode) => n.kind === "scenario" || n.kind === "row";
 // Users navigate by file: a feature shows its file name; its Feature title follows, muted.
-const labelOf = (n: TestNode) => (n.kind === "feature" ? n.file.split("/").pop()! : nodeName(n));
 // A folder, feature or outline matches when a test under it does; with the filter off all match.
 const matches = (n: TestNode, f: FilterState) => !filterOn(f) || matchingLeaves(n, f).length > 0;
 /** What a row's flaky chip says, or null: it counts the tests the tag filter hides too, as flakiness is not about tags. */
