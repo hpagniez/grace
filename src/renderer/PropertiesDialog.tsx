@@ -226,8 +226,19 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
       // main's notice says why
     }
     if (mine !== session || !open() || !r) return; // closed meanwhile, or no file picked
-    if ("error" in r) setImportError(r.error);
-    else setImporting(r);
+    if ("error" in r) {
+      setImportError(r.error);
+      return;
+    }
+    setImporting(r);
+    flush();
+    dialog.querySelector<HTMLElement>("[data-testid=import-scope]")?.focus(); // the button is gone
+  };
+  /** Closes the import step; focus goes back to the button that opened it. */
+  const endImport = () => {
+    setImporting(null);
+    flush();
+    dialog.querySelector<HTMLElement>("[data-testid=import-file]")?.focus();
   };
   /** Adds secret rows of `kind` to `target`, replacing in place a row of the same name (R5.4). */
   const runImport = (target: string, envVar: boolean, found: { name: string; value: string }[]) => {
@@ -244,7 +255,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
       }
     });
     setScope(target);
-    setImporting(null);
+    endImport();
   };
 
   // Built field by field: a store proxy cannot be structured-cloned, so IPC would throw.
@@ -383,7 +394,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                     }
                     canAddList={(s) => s === "" || lists().includes(s) || lists().length < MAX_ENVS}
                     onImport={runImport}
-                    onBack={() => setImporting(null)}
+                    onBack={endImport}
                   />
                 )}
               </Show>

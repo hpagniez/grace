@@ -770,8 +770,6 @@ describe("properties dialog", () => {
   });
 });
 
-// The dialog fades out over 100 ms (R5.2): its title, rows and buttons stay until it is gone, and only
-// then does the draft go, so an unsaved secret does not linger in the window's memory.
 describe("import from file", () => {
   const SECRET_U = "u-secret-1";
   const SECRET_P = "p-secret-2";
@@ -917,6 +915,22 @@ describe("import from file", () => {
     expect(confirm().disabled).toBe(true);
   });
 
+  it("moves focus into the step and back to the button that opened it", async () => {
+    const { api, load } = setup();
+    load(saved);
+    openDialog();
+    api.importProperties.mockResolvedValue(picked({ "db.user": SECRET_U }));
+    await pick();
+    expect(document.activeElement).toBe(screen.getByTestId("import-scope"));
+    fireEvent.click(screen.getByTestId("import-back"));
+    flush();
+    expect(document.activeElement).toBe(importButton());
+    await pick();
+    fireEvent.click(confirm());
+    flush();
+    expect(document.activeElement).toBe(importButton());
+  });
+
   it("Back changes nothing, and closing the dialog drops the step", async () => {
     const { api, load } = setup();
     load(saved);
@@ -937,6 +951,8 @@ describe("import from file", () => {
   });
 });
 
+// The dialog fades out over 100 ms (R5.2): its title, rows and buttons stay until it is gone, and only
+// then does the draft go, so an unsaved secret does not linger in the window's memory.
 describe("while it fades out", () => {
   it("keeps the content longer than the exit transition lasts", () => {
     expect(EXIT_MS).toBeGreaterThan(readDuration("fast"));
