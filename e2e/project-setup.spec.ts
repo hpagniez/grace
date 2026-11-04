@@ -121,3 +121,24 @@ test("jars in .karate/ext are on the classpath", async () => {
   libJar(path.join(dir, ".karate", "ext"));
   await runsWithTheLibrary(dir);
 });
+
+test("an empty folder offers the Karate project below it", async () => {
+  test.setTimeout(120_000);
+  // another tool's pom.xml at the root, the Karate project in karate/ (#232)
+  const dir = write(tempDir("kk-sub-"), {
+    "pom.xml": "<project/>",
+    "karate/karate-config.js": "function fn() { return {}; }",
+    "karate/tests/basic.feature":
+      "Feature: basic\nScenario: one\n  * print 1\nScenario: two\n  * print 2\n",
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await expect(win.getByTestId("tree-message")).toHaveText("No feature files found", {
+    timeout: 15_000,
+  });
+  await win.getByRole("button", { name: "Open karate/", exact: true }).click();
+  await expect(win.getByTestId("project-name")).toHaveText("karate", { timeout: 15_000 });
+  await openFeatures(win);
+  await expect(node(win, "one")).toBeVisible({ timeout: 15_000 });
+  await expect(node(win, "two")).toBeVisible();
+});

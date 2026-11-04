@@ -22,6 +22,7 @@ import {
   saveProperties,
   scopeItem,
   SECRET,
+  tempDir,
   test,
 } from "./helpers";
 
@@ -161,6 +162,44 @@ test("A secret is used but never shown", async () => {
   await expect(row.getByTestId("prop-replace")).toBeVisible();
   await expect(row.getByTestId("prop-value")).toHaveCount(0);
   expect(await everything()).not.toContain(SECRET);
+});
+
+test("Import a secrets file and run with it", async () => {
+  test.setTimeout(90_000);
+  const { app, win, userData, dir } = await openEnvWith("qa");
+  const file = path.join(tempDir("kk-import-"), "secrets-qa.properties");
+  const text = `# kept out of the repository\napi.token=${SECRET}\n`;
+  writeFileSync(file, text);
+  await app.evaluate(({ dialog }, f) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [f] })) as never;
+  }, file);
+
+  await openProperties(win);
+  await win.getByTestId("import-file").click();
+  await expect(win.getByTestId("import-step")).toContainText("Import secrets-qa.properties");
+  await win.getByTestId("import-scope").selectOption("qa");
+  await win.getByTestId("import-prefix").fill("APP_");
+  await expect(win.getByTestId("import-preview")).toHaveText("api.token → APP_API_TOKEN");
+  await win.getByTestId("import-confirm").click();
+  await saveProperties(win);
+  await expect
+    .poll(() => saved(userData, dir)?.properties?.byEnv?.qa)
+    .toEqual([{ name: "APP_API_TOKEN", secret: expect.any(String), envVar: true }]);
+  expect(readFileSync(path.join(userData, "settings.json"), "utf8")).not.toContain(SECRET);
+  expect(readFileSync(file, "utf8")).toBe(text);
+
+  await runAlways(win);
+  await expect(consoleText(win)).toContainText("APP_API_TOKEN = ****");
+  const everything = await win.evaluate(() =>
+    [
+      document.documentElement.outerHTML,
+      document.body.innerText,
+      ...[...document.querySelectorAll("input, textarea")].map(
+        (e) => (e as HTMLInputElement).value,
+      ),
+    ].join("\n"),
+  );
+  expect(everything).not.toContain(SECRET);
 });
 
 test("A secret stays off the command line and out of the settings file", async () => {

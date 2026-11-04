@@ -98,6 +98,7 @@ function setup() {
     setFilter: vi.fn(async () => {}),
     setEnv: vi.fn(async () => {}),
     saveProperties: vi.fn(async () => true),
+    openSubfolder: vi.fn(async (_folder: string) => {}),
     onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
   };
   render(() => <App api={api as unknown as Api} />);
@@ -564,6 +565,31 @@ describe("main screen", () => {
     expect(failed.textContent).toBe("bad syntax");
     expect(failed.getAttribute("role")).toBe("alert"); // a Notice of kind error
     expect(failed.className).toContain("bg-failed-tint");
+  });
+
+  it("offers the folders below an empty project", () => {
+    const { send, api } = setup();
+    const empty = {
+      type: "project" as const,
+      project: { root: "D:/p", layout: "maven" as const },
+      tree: node("folder", "d:", "p"),
+      error: null,
+    };
+    send({ ...empty, subfolders: ["karate", "tests/api"] });
+    const offer = (name: string) => screen.getByRole("button", { name }) as HTMLButtonElement;
+    const area = screen.getByTestId("tree-message").parentElement!;
+    expect(area.contains(offer("Open karate/"))).toBe(true);
+    expect(area.textContent!.indexOf("under the project folder.")).toBeLessThan(
+      area.textContent!.indexOf("Open karate/"),
+    );
+    fireEvent.click(offer("Open tests/api/"));
+    expect(api.openSubfolder).toHaveBeenCalledWith("tests/api");
+    send({ type: "busy", busy: true });
+    expect(offer("Open karate/").disabled).toBe(true);
+    expect(offer("Open tests/api/").disabled).toBe(true);
+    send({ type: "busy", busy: false });
+    send(empty);
+    expect(screen.queryAllByRole("button", { name: /^Open .*\/$/ })).toEqual([]);
   });
 
   it("shows steps once they arrive, with their log on demand", () => {

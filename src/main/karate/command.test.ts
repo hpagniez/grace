@@ -487,6 +487,18 @@ describe("childEnv", () => {
     expect(childEnv(env)).toEqual({ PATH: "p" });
     expect(Object.keys(env)).toHaveLength(5);
   });
+  it("sets each variable, replacing one of the same name in any case; a later one wins", () => {
+    expect(childEnv({ PATH: "p", app_x: "m" }, [{ name: "APP_X", value: "g" }])).toEqual({
+      PATH: "p",
+      APP_X: "g",
+    });
+    expect(
+      childEnv({}, [
+        { name: "APP_X", value: "a" },
+        { name: "app_x", value: "b" },
+      ]),
+    ).toEqual({ app_x: "b" });
+  });
   it("strips KARATE_ENV and karate_config_dir", () => {
     expect(childEnv({ PATH: "p", KARATE_ENV: "prod", karate_config_dir: "x" })).toEqual({
       PATH: "p",

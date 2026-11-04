@@ -40,6 +40,7 @@ import {
 import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import {
   buildArgs,
+  childEnv,
   detectLayout,
   extensionJars,
   lineTargets,
@@ -52,6 +53,7 @@ import {
 import { testCodeNotice } from "./karate/compiled";
 import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
+import { karateFolders } from "./karate/subfolders";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import {
   failureReason,
@@ -75,6 +77,7 @@ import {
   buildTree,
   findNode,
   leafIndex,
+  leafKeys,
   parentOf,
   parseRefId,
   resolveNode,
@@ -308,6 +311,16 @@ export class Runner {
     await this.open(root);
   }
 
+  /** Opens a folder the last tree offered (sub-folder offer R4); refused if it was not offered. */
+  async openSubfolder(folder: string): Promise<void> {
+    const offered = this.last?.project && this.last.subfolders?.includes(folder);
+    if (!offered) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await this.open(path.join(this.last!.project!.root, folder));
+  }
+
   /** Drops a folder of the recent list; refused if not listed. Allowed while busy: it touches only settings.json. */
   removeRecent(root: string): void {
     if (!loadRecentProjects(this.o.dataDir).includes(root)) {
@@ -476,13 +489,14 @@ export class Runner {
       return false;
     }
     const stored = (scope: string | null, rows: RowEdit[]): StoredRow[] =>
-      rows.map((r) =>
-        "keep" in r
+      rows.map((r) => ({
+        ...("keep" in r
           ? { name: r.name, secret: cipher(scope, r.name)! }
           : r.secret
             ? { name: r.name, secret: secrets.encrypt(r.value) }
-            : { name: r.name, value: r.value },
-      );
+            : { name: r.name, value: r.value }),
+        ...(r.envVar ? { envVar: true as const } : {}),
+      }));
     const properties: StoredLists = {
       shared: stored(null, edit.shared),
       byEnv: Object.fromEntries(
@@ -707,6 +721,7 @@ export class Runner {
             name: r.name,
             secret: true,
             state: this.readSecret(r.secret) !== null ? "set" : "unreadable",
+            ...(r.envVar ? { envVar: true } : {}),
           }
         : r;
     return {
@@ -917,7 +932,8 @@ export class Runner {
    * spec R2–R6). Returns the notice of a failure; null when listed, still good, standalone or cancelled.
    */
   private async listLibraries(root: string, layout: Layout): Promise<string | null> {
-    if (layout === "standalone") return null;
+    // nowhere to look for tests: nothing could use the libraries (sub-folder offer R5)
+    if (layout === "standalone" || detectLayout(root).featureRoots.length === 0) return null;
     const dir = projectDirOf(this.o.dataDir, root);
     const key = libraryKey(root, layout);
     const kept = readKept(dir);
@@ -998,6 +1014,7 @@ export class Runner {
     argFile: string | null,
     filter: FilterState, // required: a run that forgot it would run unfiltered
     threads: number, // required: a run that forgot it would run on one thread
+    vars: PlainRow[], // set on Java's environment; none for a dry run
     debug: { port: number; token: string } | null = null,
   ) {
     const { root } = this.project!;
@@ -1025,7 +1042,9 @@ export class Runner {
       junitXml: !dryRun && junitXml, // the dry run's reports are never read
       debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
-    return (this.proc = spawnKarate(java, args, root, onLines));
+    return (this.proc = spawnKarate(java, args, root, onLines, undefined, {
+      env: childEnv(process.env, vars),
+    }));
   }
 
   /** Dry run on all feature roots with `env`; emits and returns the new tree, or null on error. */
@@ -1050,6 +1069,7 @@ export class Runner {
         null,
         NO_FILTER,
         this.threads, // buildArgs passes 1 on a dry run
+        [], // dry runs do not execute config (environment switcher R2)
       );
       const code = await proc.exit;
       this.proc = null;
@@ -1068,8 +1088,17 @@ export class Runner {
         }
       }
     }
+    const subfolders =
+      tree && !error && leafKeys(tree).length === 0 ? await karateFolders(project.root) : [];
+    if (this.cancelled) return null; // cancelled during the walk: keep the last tree
     this.tree = tree;
-    this.publish({ type: "project", project, tree, error });
+    this.publish({
+      type: "project",
+      project,
+      tree,
+      error,
+      ...(subfolders.length ? { subfolders } : {}),
+    });
     return tree;
   }
 
@@ -1081,9 +1110,14 @@ export class Runner {
     const { properties } = this.envs;
     const rows: PlainRow[] = [];
     const secrets: string[] = [];
+    // The environment's own variables go last: one that replaced a shared property sits at that
+    // property's place, and must still win over a shared variable differing only in case (R2.1).
+    const late: PlainRow[] = [];
+    const sharedRows = new Set<StoredRow>(properties.shared);
     for (const r of effectiveRows(properties.shared, properties.byEnv, env)) {
+      const to = r.envVar && !sharedRows.has(r) ? late : rows;
       if (!("secret" in r)) {
-        rows.push(r);
+        to.push(r);
         continue;
       }
       const value = this.readSecret(r.secret);
@@ -1095,10 +1129,10 @@ export class Runner {
         });
         return null;
       }
-      rows.push({ name: r.name, value });
+      to.push({ name: r.name, value, ...(r.envVar ? { envVar: true } : {}) });
       secrets.push(value);
     }
-    return { rows, secrets };
+    return { rows: [...rows, ...late], secrets };
   }
 
   /**
@@ -1268,7 +1302,9 @@ export class Runner {
     }
     this.report = null;
     const projectDir = this.projectDir();
-    const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
+    const vars = props.rows.filter((r) => r.envVar);
+    const sysProps = props.rows.filter((r) => !r.envVar);
+    const argFile = sysProps.length ? path.join(projectDir, "run-args.txt") : null;
     const targetFile = o.targetFile ? path.join(projectDir, "run-targets.txt") : null;
     const mask = makeMasker(props.secrets);
     const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
@@ -1279,7 +1315,7 @@ export class Runner {
     let ended = false; // the run reached its end events, so it gets a run.json
     let oom = false; // Java printed an OutOfMemoryError
     try {
-      if (argFile) writeArgFile(argFile, props.rows);
+      if (argFile) writeArgFile(argFile, sysProps);
       if (targetFile) writeTargetFile(targetFile, o.targets); // if it cannot be written, nothing runs
       const state = new RunState(
         tree,
@@ -1373,6 +1409,7 @@ export class Runner {
         argFile,
         filter,
         threads,
+        vars,
         session,
       );
       try {

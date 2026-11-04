@@ -5,6 +5,9 @@ import {
   editErrors,
   effectiveRows,
   envTagValues,
+  envVarFromKey,
+  envVarNameError,
+  nameError,
   parsePropertiesEdit,
   propertyNameError,
   propertyValueError,
@@ -230,6 +233,73 @@ describe("editErrors", () => {
     expect(editErrors(e, has)).toEqual([
       "All environments: api: No saved secret to keep",
       "qa: token: No saved secret to keep",
+    ]);
+  });
+});
+
+describe("environment variables", () => {
+  const variable = (name: string, value = "v") => ({ name, value, secret: false, envVar: true });
+
+  it("follow their own name rule", () => {
+    expect(envVarNameError("APP_X")).toBeNull();
+    expect(envVarNameError("_x9")).toBeNull();
+    for (const bad of ["db.user", "9A", "", "a-b", "A".repeat(201)])
+      expect(envVarNameError(bad)).toBe("Invalid name");
+  });
+
+  it("cannot be one Grace strips from Karate's environment, in any case", () => {
+    for (const name of [
+      "KARATE_OPTIONS",
+      "karate_env",
+      "Karate_Config_Dir",
+      "java_tool_options",
+      "JDK_JAVA_OPTIONS",
+      "_JAVA_OPTIONS",
+    ])
+      expect(envVarNameError(name)).toBe("Reserved name");
+  });
+
+  it("the kind picks the rule", () => {
+    expect(nameError("db.user", false)).toBeNull();
+    expect(nameError("db.user", true)).toBe("Invalid name");
+    expect(nameError("java.home", false)).toBe("Reserved name");
+  });
+
+  it("names a key: the prefix, then the key in upper case with other characters as _", () => {
+    expect(envVarFromKey("APP_", "db.user")).toBe("APP_DB_USER");
+    expect(envVarFromKey("", "café-x")).toBe("CAF__X");
+    expect(envVarFromKey("p", "a b")).toBe("pA_B");
+  });
+
+  it("an edit keeps the kind and refuses a malformed one", () => {
+    expect(parsePropertiesEdit(edit([variable("A")]))?.shared[0]).toEqual(variable("A"));
+    expect(parsePropertiesEdit(edit([{ ...keep("A"), envVar: true }]))?.shared[0]).toEqual({
+      ...keep("A"),
+      envVar: true,
+    });
+    expect(
+      parsePropertiesEdit({ shared: [{ ...plain("A", "1"), envVar: "yes" }], byEnv: {} }),
+    ).toBeNull();
+  });
+
+  it("are checked by their rule on save", () => {
+    expect(editErrors(edit([variable("java_tool_options")]), noSecrets)).toEqual([
+      "All environments: java_tool_options: Reserved name",
+    ]);
+    expect(editErrors(edit([variable("db.user")]), noSecrets)).toEqual([
+      "All environments: db.user: Invalid name",
+    ]);
+  });
+
+  it("two variables that differ only in case are duplicates; a property beside them is not", () => {
+    expect(editErrors(edit([variable("App_Token"), variable("APP_TOKEN")]), noSecrets)).toEqual([
+      "All environments: APP_TOKEN: Duplicate name",
+    ]);
+    expect(editErrors(edit([variable("APP_TOKEN"), plain("app_token", "1")]), noSecrets)).toEqual(
+      [],
+    );
+    expect(editErrors(edit([plain("X", "1"), variable("X")]), noSecrets)).toEqual([
+      "All environments: X: Duplicate name",
     ]);
   });
 });

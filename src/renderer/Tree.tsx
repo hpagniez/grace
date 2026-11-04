@@ -27,6 +27,7 @@ import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
 import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { findingText } from "./bannerText";
+import { btnSmall } from "./buttons";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import {
@@ -430,6 +431,22 @@ export function Tree(props: Ctx) {
             <p class="text-xs text-muted">
               Grace looks for .feature files under the project folder.
             </p>
+            <Show when={props.state.subfolders.length > 0}>
+              <div class="flex flex-wrap justify-center gap-2">
+                <For each={props.state.subfolders}>
+                  {(folder) => (
+                    <button
+                      type="button"
+                      class={btnSmall}
+                      disabled={props.state.busy}
+                      onClick={() => void props.api.openSubfolder(folder)}
+                    >
+                      Open {folder}/
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
           </EmptyState>
         </div>
       </Match>

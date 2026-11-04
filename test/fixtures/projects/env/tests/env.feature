@@ -4,6 +4,7 @@ Scenario: always
   * print 'karate.env =', karate.env
   * print 'timeout =', karate.properties['timeout']
   * print 'api.token =', karate.properties['api.token']
+  * print 'APP_API_TOKEN =', java.lang.System.getenv('APP_API_TOKEN')
 
 @env=qa
 Scenario: qa only

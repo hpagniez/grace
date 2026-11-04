@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { propertyNameError, propertyValueError, validEnvName } from "../shared/env";
+import { nameError, propertyValueError, validEnvName } from "../shared/env";
 import { NO_FILTER, parseFilterState, type FilterState } from "../shared/tags";
 import { parseTheme, type Theme } from "../shared/theme";
 import { validThreads } from "../shared/threads";
@@ -189,8 +189,10 @@ export function saveProjectFilter(dataDir: string, root: string, f: FilterState)
   });
 }
 
-/** A saved property: a plain value, or a secret as base64 ciphertext. */
-export type StoredRow = { name: string; value: string } | { name: string; secret: string };
+/** A saved property: a plain value, or a secret as base64 ciphertext; `envVar` only on an environment variable. */
+export type StoredRow = ({ name: string; value: string } | { name: string; secret: string }) & {
+  envVar?: true;
+};
 
 export interface StoredLists {
   shared: StoredRow[];
@@ -207,14 +209,20 @@ export const emptyEnvSettings = (): EnvSettings => ({
   properties: { shared: [], byEnv: {} },
 });
 
-/** A row needs a valid name and exactly one of a plain value that Java can take or a non-empty secret. */
+/**
+ * A row needs a name its kind allows and exactly one of a plain value that Java can take or a non-empty
+ * secret. Its kind is `envVar: true` or absent (a system property).
+ */
 function parseStoredRow(x: unknown): StoredRow | null {
   if (!isObject(x)) return null;
-  const { name, value, secret } = x;
-  if (typeof name !== "string" || propertyNameError(name)) return null;
+  const { name, value, secret, envVar } = x;
+  if (envVar !== undefined && envVar !== true) return null;
+  if (typeof name !== "string" || nameError(name, envVar === true)) return null;
+  const kind = envVar ? { envVar: true as const } : {};
   if (typeof value === "string" && secret === undefined)
-    return propertyValueError(value) ? null : { name, value };
-  if (typeof secret === "string" && secret !== "" && value === undefined) return { name, secret };
+    return propertyValueError(value) ? null : { name, value, ...kind };
+  if (typeof secret === "string" && secret !== "" && value === undefined)
+    return { name, secret, ...kind };
   return null;
 }
 
