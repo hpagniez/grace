@@ -73,11 +73,11 @@ export function Trends(props: { state: AppState; api: Api }) {
       </Cut>
       <div class="mt-1 flex gap-3">
         <div class="flex w-36 shrink-0 flex-col gap-1 tabular-nums">
-          <span data-testid="trends-pass-label" class="flex h-6 items-center">
+          <span data-testid="trends-pass-label" class="block h-6 leading-6 whitespace-nowrap">
             <span class="text-muted">{"Pass rate "}</span>
             {newest() ? passRateLabel(newest()!) : ""}
           </span>
-          <span data-testid="trends-time-label" class="flex h-6 items-center">
+          <span data-testid="trends-time-label" class="block h-6 leading-6 whitespace-nowrap">
             <span class="text-muted">{"Time per test "}</span>
             {newest()?.meanMillis != null ? formatMillis(newest()!.meanMillis!) : ""}
           </span>
