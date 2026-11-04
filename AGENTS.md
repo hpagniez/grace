@@ -169,6 +169,7 @@ Spec: [docs/specs/2026-10-29-premium-ui.md](docs/specs/2026-10-29-premium-ui.md)
 - Icons only through `Icon` with `lucide` icon data. Statuses only through `StatusMark`.
 - Tooltips only through `Tooltip`, or `Cut` for text that may be cut. In a row, set `side` so a one-line tooltip stays on its row; a click on any tooltip closes it.
 - A dialog keeps its content through its 100 ms exit (`--duration-fast`), then drops it.
+- Two dynamic children side by side (`{x}`, `<Show>`, `<For>`, a component) leave a comment node each in the DOM, for good. In a list row or a component drawn many times, put them in one array insert (`{[<Show>…</Show>, label()]}`) ([#261](https://github.com/hpagniez/grace/issues/261)).
 
 ## Karate integration rules
 

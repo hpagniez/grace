@@ -88,11 +88,14 @@ export function FilterBar(props: { state: AppState; api: Api }) {
         disabled={locked()}
         onClick={() => void props.api.setFilter(cycleTag(plain(), p.tag))}
       >
-        {/* A state shows by shape as well as colour (spec R7.3): an unfiltered tag has no icon. */}
-        <Show when={stateOf(p.tag) !== "off"}>
-          <Icon icon={stateOf(p.tag) === "include" ? Check : Minus} size={14} />
-        </Show>
-        {`@${p.tag}`}
+        {/* A state shows by shape as well as colour (spec R7.3): an unfiltered tag has no icon. One insert, not
+        two side by side, which would leave comment nodes in the DOM (page.nodes). */}
+        {[
+          <Show when={stateOf(p.tag) !== "off"}>
+            <Icon icon={stateOf(p.tag) === "include" ? Check : Minus} size={14} />
+          </Show>,
+          `@${p.tag}`,
+        ]}
       </button>
     </Tooltip>
   );
