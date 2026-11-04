@@ -1,4 +1,13 @@
-import { expect, launch, node, nodeByKey, openProject, project, test } from "./helpers";
+import {
+  expect,
+  launch,
+  node,
+  nodeByKey,
+  openFeatures,
+  openProject,
+  project,
+  test,
+} from "./helpers";
 
 test("Failure details", async () => {
   const dir = project("clean");
@@ -6,6 +15,7 @@ test("Failure details", async () => {
   await openProject(app, dir);
   const feature = nodeByKey(win, "f:tests/basic.feature");
   await expect(feature).toBeVisible({ timeout: 15_000 });
+  await openFeatures(win);
   // Before a run, the steps and their comments come from the file (step comments R1.2)
   const comment = "# expected greeting is wrong on purpose";
   await node(win, "failing match")

@@ -327,25 +327,62 @@ export function skippedProperties(dataDir: string, root: string): string[] {
 }
 
 /**
- * Saves the environment and the lists. The rows of the file that the rules of today reject stay after
- * the new rows of their list while that list exists, so a newer rule never erases them.
+ * Saves the environment, `(none)` as null (docs/specs/2026-11-04-pom-defaults.md R1.3), and the lists.
  */
 export function saveProjectEnv(dataDir: string, root: string, s: EnvSettings): void {
   updateEntry(dataDir, root, (e) => {
-    if (s.env === null) delete e.env;
-    else e.env = s.env;
-    const old = isObject(e.properties) ? e.properties : {};
-    const oldByEnv = isObject(old.byEnv) ? old.byEnv : {};
-    e.properties = {
-      shared: [...s.properties.shared, ...rejectedRows(old.shared)],
-      byEnv: Object.fromEntries(
-        Object.entries(s.properties.byEnv).map(([env, rows]) => [
-          env,
-          [...rows, ...rejectedRows(Object.hasOwn(oldByEnv, env) ? oldByEnv[env] : null)],
-        ]),
-      ),
-    };
+    e.env = s.env;
+    putProperties(e, s.properties);
   });
+}
+
+/** Saves the lists only: the environment stays as saved, or unsaved (R1.2). */
+export function saveProjectProperties(dataDir: string, root: string, p: StoredLists): void {
+  updateEntry(dataDir, root, (e) => putProperties(e, p));
+}
+
+/**
+ * The rows of the file that the rules of today reject stay after the new rows of their list while that
+ * list exists, so a newer rule never erases them.
+ */
+function putProperties(e: Record<string, unknown>, p: StoredLists): void {
+  const old = isObject(e.properties) ? e.properties : {};
+  const oldByEnv = isObject(old.byEnv) ? old.byEnv : {};
+  e.properties = {
+    shared: [...p.shared, ...rejectedRows(old.shared)],
+    byEnv: Object.fromEntries(
+      Object.entries(p.byEnv).map(([env, rows]) => [
+        env,
+        [...rows, ...rejectedRows(Object.hasOwn(oldByEnv, env) ? oldByEnv[env] : null)],
+      ]),
+    ),
+  };
+}
+
+export interface SavedControls {
+  env: boolean;
+  filter: boolean;
+  threads: boolean;
+}
+
+/**
+ * Which of the environment, the tag filter and the thread count the project has saved (R1.1); null when
+ * settings.json cannot be read, so the caller decides. Never throws.
+ */
+export function savedControls(dataDir: string, root: string): SavedControls | null {
+  try {
+    const e = savedEntry(dataDir, root);
+    if (!isObject(e)) return { env: false, filter: false, threads: false };
+    return {
+      env:
+        Object.hasOwn(e, "env") &&
+        (e.env === null || (typeof e.env === "string" && validEnvName(e.env))),
+      filter: parseFilterState(e) !== null,
+      threads: validThreads(e.threads),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**

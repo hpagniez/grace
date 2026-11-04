@@ -52,11 +52,31 @@ export class RunState {
           update.status = d.skipped ? "notRun" : d.passed ? "passed" : "failed";
           update.durationMillis = d.durationMillis;
           if (typeof d.durationMillis === "number") this.duration.set(key, d.durationMillis);
-          if (update.status === "failed" && d.error) update.error = d.error;
+          if (update.status === "failed" && d.error) {
+            update.error = d.error;
+            // Karate's errorReason is its error less the place, the step's comment and its text (#229 R2.1)
+            if (typeof d.errorReason === "string" && d.error.endsWith(d.errorReason))
+              update.reasonAt = d.error.length - d.errorReason.length;
+          }
         }
         this.status.set(key, update.status);
         updates.set(key, update);
       } else if (type === "FEATURE_EXIT") {
+        // A failed karate-config.js sends no SCENARIO_EXIT: only this result says the test failed (#229 R1.1).
+        for (const sc of d.scenarioResults ?? []) {
+          const key = sc.failed === true ? this.keyOf(d.relativePath, sc.refId) : null;
+          const now = key && this.status.get(key);
+          if (!key || now === "passed" || now === "failed") continue;
+          const update: ScenarioUpdate = {
+            key,
+            status: "failed",
+            durationMillis: sc.durationMillis,
+          };
+          if (typeof sc.error === "string") Object.assign(update, { error: sc.error, reasonAt: 0 });
+          if (typeof sc.durationMillis === "number") this.duration.set(key, sc.durationMillis);
+          this.status.set(key, "failed");
+          updates.set(key, update);
+        }
         // Karate's log format is not a contract: a feature whose calls cannot be read loses them, not the run its progress.
         let calls = new Map<string, HttpCall[]>();
         try {

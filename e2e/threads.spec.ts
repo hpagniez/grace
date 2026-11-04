@@ -100,12 +100,13 @@ test("Re-run failed uses the current count", async () => {
   await expectRow(win, userData, dir, 1, 2);
 });
 
-test("The box overrides a karate-pom.json", async () => {
+test("The box starts from karate-pom.json and the person's count wins", async () => {
   test.setTimeout(120_000);
   const { dir, win, userData } = await openClean({ threads: 3 });
   await expect(box(win)).toBeEnabled();
-  await expect(box(win)).toHaveValue("1");
+  await expect(box(win)).toHaveValue("3");
 
+  await setThreads(win, "1");
   await runAll(win, 1);
   await expectRow(win, userData, dir, 0, 1);
 });

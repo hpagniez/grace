@@ -433,10 +433,10 @@ describe("Runner project libraries", () => {
   it("joins the open notice", T, async () => {
     const { runner, last } = setup();
     const root = project();
-    writeFileSync(path.join(root, "karate-pom.json"), JSON.stringify({ env: "qa" }));
+    writeFileSync(path.join(root, "karate-pom.json"), JSON.stringify({ dryRun: true }));
     await runner.open(root);
     expect(last("notice").message).toBe(
-      "Grace does not use these karate-pom.json settings: env. Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven wrapper to the project.",
+      "Grace does not use these karate-pom.json settings: dryRun. Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven wrapper to the project.",
     );
   });
 

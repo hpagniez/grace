@@ -7,19 +7,9 @@ import {
   openFeatures,
   openProject,
   project,
+  stubVsCode,
   test,
 } from "./helpers";
-
-/** Makes Windows' `vscode://` handler `name` ("" for none) and records the links handed to it. */
-async function stubVsCode(app: ElectronApplication, name: string) {
-  await app.evaluate(({ app: electronApp, shell }, name) => {
-    const opened: string[] = [];
-    (globalThis as { opened?: string[] }).opened = opened;
-    shell.openExternal = async (url: string) => void opened.push(url);
-    electronApp.getApplicationNameForProtocol = () => name;
-  }, name);
-  return () => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
-}
 
 type Menus = { menus?: { items: { label: string; click(): void }[] }[] };
 

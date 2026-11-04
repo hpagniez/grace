@@ -11,7 +11,16 @@ import {
   Shuffle,
   type IconNode,
 } from "lucide";
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { FLAKY_TITLE } from "../shared/flaky";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
@@ -283,17 +292,23 @@ export function Tree(props: Ctx) {
   const withBreakpoints = createMemo(() =>
     breakpointKeys(props.state.tree, props.state.breakpoints),
   );
-  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1). The cue
-  // changes with the rows it opens, not with the pause: the list would look for the row before it is there.
-  const [pauses, setPauses] = createSignal(0);
+  // A pause, or a step through a group in Details (#229 R4.3), opens the rows above the test; the list then
+  // scrolls to it, the selected row (R7.1). The cue changes with the rows it opens, not with the pause: the list
+  // would look for the row before it is there.
+  const [shown, setShown] = createSignal(0);
+  const show = (key: string | null) => {
+    const tree = props.state.tree;
+    if (key === null || !tree) return;
+    for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
+    setShown((n) => n + 1);
+  };
   createEffect(
     () => [props.state.paused?.key ?? null, props.state.run.pauses] as const,
-    ([key]) => {
-      const tree = props.state.tree;
-      if (key === null || !tree) return;
-      for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
-      setPauses((n) => n + 1);
-    },
+    ([key]) => show(key),
+  );
+  createEffect(
+    () => props.state.reveals,
+    () => show(untrack(() => props.state.selected)),
   );
   // A run opens the feature it started in, and each feature where one of its tests fails, once (#224 R3). The rows
   // still read no status: they change only when a feature opens (R4.3).
@@ -379,7 +394,7 @@ export function Tree(props: Ctx) {
             void props.api.editorMenu(place.file, place.line, e.clientX, e.clientY);
           }}
           // By value: main sends the filter in force again after every refresh, which must not scroll (R4.7).
-          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${pauses()}`}
+          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${shown()}`}
           ref={(h) => (list = h)}
         >
           {(r, _index, keyboardFocused, row) => (

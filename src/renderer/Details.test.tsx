@@ -352,7 +352,7 @@ describe("details: a group during a run", () => {
       set((draft) => reduce(draft, e));
       flush();
     };
-    render(() => <Details state={state} api={{} as Api} select={() => {}} />);
+    render(() => <Details state={state} api={{} as Api} select={() => {}} reveal={() => {}} />);
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },
@@ -506,7 +506,9 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
       steps: vi.fn(async () => fromFile),
       toggleBreakpoint: vi.fn(async () => {}),
     };
-    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
+    render(() => (
+      <Details state={state} api={api as unknown as Api} select={() => {}} reveal={() => {}} />
+    ));
     send(project);
     set((draft) => void (draft.selected = leafNode.key));
     flush();
@@ -570,7 +572,9 @@ describe("details: open in VS Code (open-in-editor R1, R2)", () => {
       flush();
     };
     const api = { steps: vi.fn(async () => null), openInEditor: vi.fn(async () => {}) };
-    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
+    render(() => (
+      <Details state={state} api={api as unknown as Api} select={() => {}} reveal={() => {}} />
+    ));
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },
@@ -638,5 +642,307 @@ describe("details: open in VS Code (open-in-editor R1, R2)", () => {
     fail(error);
     expect(inError()).toHaveLength(0);
     expect(screen.getByTestId("details-error").textContent).toBe(error);
+  });
+});
+
+describe("details: step through a group (#229 R4)", () => {
+  const [A, B, C, D] = [1, 2, 3, 4].map((n) => `s:tests/g.feature#${n}`);
+  const NAMES = ["alpha", "beta", "gamma", "delta"];
+  const REASON = "expected status: 200, actual: 503";
+  const failure = (line: number, reason = REASON) => {
+    const head = `C:/p/tests/g.feature:${line}\nThen status 200\n`;
+    return { error: head + reason, reasonAt: head.length };
+  };
+  const groupTree = (): TestNode =>
+    node("folder", "d:", "p", {
+      file: "",
+      children: [
+        node("feature", "f:tests/g.feature", "g", {
+          file: "tests/g.feature",
+          children: [A, B, C, D].map((key, i) =>
+            node("scenario", key, NAMES[i], { file: "tests/g.feature", line: 3 * i + 3 }),
+          ),
+        }),
+      ],
+    });
+
+  function mount() {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: vi.fn(async () => {}),
+      steps: vi.fn(async () => null),
+      toggleBreakpoint: vi.fn(async () => {}),
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    };
+    render(() => <App api={api as unknown as Api} />);
+    const send = (e: AppEvent) => {
+      emit(e);
+      flush();
+    };
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: groupTree(),
+      error: null,
+    });
+    openFeatures();
+    const run = (keys: string[]) =>
+      send({
+        type: "runStarted",
+        selection: "d:",
+        runId: `20261104-12000${keys.length}-000`,
+        keys,
+        total: keys.length,
+        startedAt: Date.now(),
+        env: null,
+        debug: false,
+      });
+    run([A, B, C, D]);
+    send({
+      type: "scenarios",
+      updates: [
+        { key: A, status: "failed", ...failure(5) },
+        { key: B, status: "failed", ...failure(8) },
+        { key: C, status: "failed", ...failure(11) },
+        { key: D, status: "passed" },
+      ],
+    });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    return { send, run };
+  }
+  const rowOf = (key: string) =>
+    screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
+  const pick = (key: string) => {
+    fireEvent.click(within(rowOf(key)).getByText(NAMES[[A, B, C, D].indexOf(key)]));
+    flush();
+  };
+  const selectedKey = () =>
+    screen
+      .getAllByTestId("tree-node")
+      .find((n) => n.parentElement!.getAttribute("aria-selected") === "true")?.dataset.key;
+  const group = () => screen.queryByTestId("error-group");
+  const press = (name: string) => {
+    const b = screen.getByRole("button", { name });
+    b.focus();
+    fireEvent.click(b);
+    flush();
+  };
+
+  it("says where the test sits in its group", () => {
+    mount();
+    pick(A);
+    expect(group()!.textContent).toBe("1 of 3 tests failed with this error");
+    expect(screen.getByTestId("details-error").textContent).toBe(failure(5).error);
+  });
+
+  it("Next selects the next test and keeps the focus", () => {
+    mount();
+    pick(A);
+    press("Next test with this error");
+    expect(selectedKey()).toBe(B);
+    expect(group()!.textContent).toBe("2 of 3 tests failed with this error");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next test with this error" }),
+    );
+  });
+
+  it("announces where the selected test sits (review)", () => {
+    mount();
+    pick(A);
+    const live = group()!.querySelector("[aria-live=polite]");
+    expect(live?.textContent).toBe("1 of 3 tests failed with this error");
+  });
+
+  it("Previous wraps round", () => {
+    mount();
+    pick(A);
+    press("Previous test with this error");
+    expect(selectedKey()).toBe(C);
+  });
+
+  it("a lone failure has no stepping", () => {
+    const { send, run } = mount();
+    run([D]);
+    send({ type: "scenarios", updates: [{ key: D, status: "failed", ...failure(14, "boom") }] });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    pick(D);
+    expect(screen.getByTestId("details-error")).toBeTruthy();
+    expect(group()).toBeNull();
+  });
+
+  it("no stepping while a run goes on", () => {
+    const { run } = mount();
+    run([D]);
+    pick(A);
+    expect(screen.getByTestId("details-error")).toBeTruthy();
+    expect(group()).toBeNull();
+  });
+
+  it("has no breakpoint dot on a step below line 1 (#229 R1.4)", () => {
+    const { send } = mount();
+    pick(A);
+    send({
+      type: "steps",
+      key: A,
+      steps: [
+        step("Scenario execution failed: boom", "failed", { keyword: "*", line: 0 }),
+        step("ok", "passed"),
+      ],
+    });
+    expect(within(details()).getAllByTestId("step")).toHaveLength(2);
+    expect(within(details()).getAllByTestId("breakpoint")).toHaveLength(1);
+  });
+});
+
+describe("details: a folder's failures by error (#229 R5)", () => {
+  const scenario = (key: string, file: string, line: number) =>
+    node("scenario", key, key.split("#")[1], { file, line });
+  const [A1, A2, A3, A4] = [1, 2, 3, 4].map((n) => `s:api/a.feature#a${n}`);
+  const [B1, B2] = [1, 2].map((n) => `s:api/b.feature#b${n}`);
+  const Z1 = "s:z.feature#z1";
+  const REASON: Record<string, string> = {
+    [A1]: "503",
+    [A2]: "timeout",
+    [A3]: "503",
+    [A4]: "404",
+    [B1]: "timeout",
+    [B2]: "timeout",
+    [Z1]: "timeout",
+  };
+  const folderTree = (): TestNode =>
+    node("folder", "d:", "p", {
+      file: "",
+      children: [
+        node("folder", "d:api", "api", {
+          file: "api",
+          children: [
+            node("feature", "f:api/a.feature", "a", {
+              file: "api/a.feature",
+              children: [A1, A2, A3, A4].map((k, i) => scenario(k, "api/a.feature", i + 3)),
+            }),
+            node("feature", "f:api/b.feature", "b", {
+              file: "api/b.feature",
+              children: [B1, B2].map((k, i) => scenario(k, "api/b.feature", i + 3)),
+            }),
+          ],
+        }),
+        node("feature", "f:z.feature", "z", {
+          file: "z.feature",
+          children: [scenario(Z1, "z.feature", 3)],
+        }),
+      ],
+    });
+
+  function mount() {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: vi.fn(async () => {}),
+      steps: vi.fn(async () => null),
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    };
+    render(() => <App api={api as unknown as Api} />);
+    const send = (e: AppEvent) => {
+      emit(e);
+      flush();
+    };
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: folderTree(),
+      error: null,
+    });
+    const keys = Object.keys(REASON);
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261104-140000-000",
+      keys,
+      total: keys.length,
+      startedAt: Date.now(),
+      env: null,
+      debug: false,
+    });
+    send({
+      type: "scenarios",
+      updates: keys.map((key) => {
+        const head = `C:/p/${key}.feature:9\nThen status 200\n`;
+        return { key, status: "failed", error: head + REASON[key], reasonAt: head.length };
+      }),
+    });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+  }
+  const pickRow = (key: string) => {
+    const row = screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
+    fireEvent.click(within(row).getAllByRole("button")[1]);
+    flush();
+  };
+  const heading = () => screen.queryByRole("heading", { name: "Failed with the same error" });
+
+  it("lists the folder's groups, largest first", () => {
+    mount();
+    pickRow("d:api");
+    expect(heading()).not.toBeNull();
+    const groups = screen.getAllByTestId("failure-group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0].textContent).toContain("3 tests");
+    expect(groups[0].textContent).toContain("timeout");
+    expect(groups[1].textContent).toContain("2 tests");
+    expect(groups[1].textContent).toContain("503");
+    expect(details().textContent).not.toContain("404");
+  });
+
+  it("Go to first selects the group's first test", () => {
+    mount();
+    pickRow("d:api");
+    fireEvent.click(screen.getByRole("button", { name: "Go to first of 3 tests" }));
+    flush();
+    expect(within(details()).getByRole("heading", { level: 2 }).textContent).toBe("a2");
+    const selected = screen
+      .getAllByTestId("tree-node")
+      .find((n) => n.parentElement!.getAttribute("aria-selected") === "true");
+    expect(selected?.dataset.key).toBe(A2);
+  });
+
+  it("Go to first moves the focus to the test's heading (review)", () => {
+    mount();
+    pickRow("d:api");
+    const go = screen.getByRole("button", { name: "Go to first of 3 tests" });
+    go.focus();
+    fireEvent.click(go);
+    flush();
+    expect(document.activeElement).toBe(within(details()).getByRole("heading", { level: 2 }));
+  });
+
+  it("cuts a reason after 4 lines with no padding under the cut (review)", () => {
+    mount();
+    pickRow("d:api");
+    const pre = screen.getAllByTestId("failure-group")[0].querySelector("pre")!;
+    expect(pre.className).toContain("line-clamp-4");
+    expect(pre.className).not.toMatch(/(^|\s)p[ybt]?-\d/);
+  });
+
+  it("shows no list without a group", () => {
+    mount();
+    pickRow("f:z.feature");
+    expect(within(details()).getByRole("heading", { level: 2 }).textContent).toBe("z");
+    expect(heading()).toBeNull();
   });
 });
