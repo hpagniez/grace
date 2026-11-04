@@ -20,6 +20,7 @@ const api: Api = {
   setWatch: (on) => ipcRenderer.invoke(CH.watch, on),
   setEnv: (name) => ipcRenderer.invoke(CH.env, name),
   saveProperties: (edit) => ipcRenderer.invoke(CH.properties, edit),
+  importProperties: () => ipcRenderer.invoke(CH.importProperties),
   rerun: (id) => ipcRenderer.invoke(CH.rerun, id),
   rerunFailed: (id) => ipcRenderer.invoke(CH.rerunFailed, id),
   openRunReport: (id) => ipcRenderer.invoke(CH.runReport, id),

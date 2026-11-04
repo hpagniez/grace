@@ -36,6 +36,40 @@ const RESERVED_PREFIXES = ["java.", "jdk.", "sun."];
 
 export const validEnvName = (name: string): boolean => ENV_NAME.test(name);
 
+/** Variables Grace removes from Karate's environment, as they override the app's values; a run property must not set them. */
+export const STRIPPED_ENV_VARS: readonly string[] = [
+  "KARATE_OPTIONS",
+  "KARATE_ENV",
+  "KARATE_CONFIG_DIR",
+  "JAVA_TOOL_OPTIONS",
+  "JDK_JAVA_OPTIONS",
+  "_JAVA_OPTIONS",
+];
+const ENV_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,199}$/;
+
+export function envVarNameError(name: string): string | null {
+  if (!ENV_VAR_NAME.test(name)) return "Invalid name";
+  return STRIPPED_ENV_VARS.includes(name.toUpperCase()) ? "Reserved name" : null;
+}
+
+/** The name rule of a row's kind: an environment variable's, or a system property's. */
+export const nameError = (name: string, envVar: boolean): string | null =>
+  envVar ? envVarNameError(name) : propertyNameError(name);
+
+/**
+ * Two rows of a list clash when these intersect: the same name, or two environment variables
+ * that differ only in letter case, which Windows sees as one.
+ */
+export const nameKeys = (name: string, envVar: boolean): string[] =>
+  envVar ? [name, `\0${name.toUpperCase()}`] : [name];
+
+/** An imported key's variable name: the prefix as typed, then the key in upper case, other characters as `_`. */
+export const envVarFromKey = (prefix: string, key: string): string =>
+  prefix + key.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+
+/** What an import prefix may hold. */
+export const PREFIX = /^[A-Za-z0-9_]*$/;
+
 export function propertyNameError(name: string): string | null {
   if (!PROPERTY_NAME.test(name)) return "Invalid name";
   const lower = name.toLowerCase();
@@ -54,6 +88,8 @@ export function propertyValueError(value: string): string | null {
 export interface PlainRow {
   name: string;
   value: string;
+  /** Set on the Karate process's environment rather than passed as `-D`. */
+  envVar?: boolean;
 }
 
 /** A saved secret as the window sees it: never its value. */
@@ -61,6 +97,7 @@ export interface SecretRowView {
   name: string;
   secret: true;
   state: "set" | "unreadable";
+  envVar?: boolean;
 }
 
 export type RowView = PlainRow | SecretRowView;
@@ -81,8 +118,8 @@ export interface EnvView {
 
 /** A row sent by the window: a new value, or `keep` for a saved secret whose value stays. */
 export type RowEdit =
-  | { name: string; value: string; secret: boolean }
-  | { name: string; secret: true; keep: true };
+  | { name: string; value: string; secret: boolean; envVar?: boolean }
+  | { name: string; secret: true; keep: true; envVar?: boolean };
 
 export interface PropertiesEdit {
   shared: RowEdit[];
@@ -91,11 +128,14 @@ export interface PropertiesEdit {
 
 const parseRow = (x: unknown): RowEdit | null => {
   if (typeof x !== "object" || x === null) return null;
-  const { name, value, secret, keep } = x as Record<string, unknown>;
+  const { name, value, secret, keep, envVar } = x as Record<string, unknown>;
   if (typeof name !== "string" || name.length > MAX_NAME_LENGTH) return null;
-  if (keep !== undefined) return keep === true && secret === true ? { name, secret, keep } : null;
+  if (envVar !== undefined && typeof envVar !== "boolean") return null;
+  const kind = envVar === undefined ? {} : { envVar };
+  if (keep !== undefined)
+    return keep === true && secret === true ? { name, secret, keep, ...kind } : null;
   if (typeof value !== "string" || value.length > MAX_VALUE_LENGTH) return null;
-  return typeof secret === "boolean" ? { name, value, secret } : null;
+  return typeof secret === "boolean" ? { name, value, secret, ...kind } : null;
 };
 
 const parseRows = (x: unknown): RowEdit[] | null => {
@@ -130,16 +170,17 @@ export function editErrors(
   const check = (scope: string | null, rows: RowEdit[]) => {
     const seen = new Set<string>();
     for (const row of rows) {
+      const keys = nameKeys(row.name, row.envVar === true);
       const reasons = [
-        propertyNameError(row.name),
-        seen.has(row.name) ? "Duplicate name" : null,
+        nameError(row.name, row.envVar === true),
+        keys.some((k) => seen.has(k)) ? "Duplicate name" : null,
         "keep" in row
           ? storedSecrets(scope, row.name)
             ? null
             : "No saved secret to keep"
           : propertyValueError(row.value),
       ];
-      seen.add(row.name);
+      for (const k of keys) seen.add(k);
       for (const reason of reasons)
         if (reason) errors.push(`${scope ?? "All environments"}: ${row.name}: ${reason}`);
     }
@@ -166,3 +207,12 @@ export const envTagValues = (tags: string[]): string[] =>
   tags.flatMap((t) => (/^(?:env|envnot)=(.*)$/.exec(t)?.[1] ?? "").split(",").filter(validEnvName));
 
 export const sortedUnique = (lists: string[][]): string[] => [...new Set(lists.flat())].sort();
+
+/** A key of an imported `.properties` file, with its value. */
+export interface ImportEntry {
+  key: string;
+  value: string;
+}
+
+/** Main's answer to Import from file…: the file's name and keys, a message, or null when no file was picked. */
+export type ImportResult = { file: string; entries: ImportEntry[] } | { error: string } | null;

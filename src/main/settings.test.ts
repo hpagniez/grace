@@ -394,6 +394,38 @@ describe("settings", () => {
       });
     });
 
+    it("an environment variable row keeps its kind; a row without one is a system property", () => {
+      const data = tmp();
+      const variable = { name: "APP_X", secret: "c2VjcmV0", envVar: true as const };
+      const plainVar = { name: "LOG_LEVEL", value: "debug", envVar: true as const };
+      const old = { name: "timeout", value: "5000" };
+      writeEntry(data, { properties: { shared: [old, variable, plainVar], byEnv: {} } });
+      expect(loadProjectEnv(data, "x").properties.shared).toEqual([old, variable, plainVar]);
+      saveProjectEnv(data, "x", loadProjectEnv(data, "x"));
+      expect(loadProjectEnv(data, "x").properties.shared).toEqual([old, variable, plainVar]);
+    });
+
+    it("a malformed kind, or a name its kind refuses, is named and kept, not loaded", () => {
+      const data = tmp();
+      const settings = path.join(data, "settings.json");
+      const malformed = { name: "A", value: "1", envVar: "yes" };
+      const dotted = { name: "db.user", value: "1", envVar: true };
+      const off = { name: "B", value: "1", envVar: false };
+      writeEntry(data, { properties: { shared: [malformed, dotted, off], byEnv: {} } });
+      expect(loadProjectEnv(data, "x").properties.shared).toEqual([]);
+      expect(skippedProperties(data, "x")).toEqual([
+        "All environments: A",
+        "All environments: db.user",
+        "All environments: B",
+      ]);
+      saveProjectEnv(data, "x", loadProjectEnv(data, "x"));
+      expect(JSON.parse(readFileSync(settings, "utf8")).projects.x.properties.shared).toEqual([
+        malformed,
+        dotted,
+        off,
+      ]);
+    });
+
     it("skippedProperties never throws", () => {
       const data = tmp();
       expect(skippedProperties(data, "x")).toEqual([]);

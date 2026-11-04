@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanUp,
   vendor,
@@ -18,15 +18,37 @@ import {
 } from "../../test/runner";
 import type { PropertiesEdit, RowEdit } from "../shared/env";
 import { fakeSecretBox } from "./secrets";
+import { spawnKarate } from "./karate/process";
 import { loadProjectEnv, saveProjectEnv } from "./settings";
 
-afterEach(cleanUp);
+// Pass-through: a test reads each Java start's arguments and environment.
+vi.mock("./karate/process", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./karate/process")>();
+  return { ...mod, spawnKarate: vi.fn(mod.spawnKarate) };
+});
+const starts = () =>
+  vi.mocked(spawnKarate).mock.calls.map(([, args, , , , extra]) => ({
+    dry: args.includes("-D"),
+    args,
+    env: extra?.env ?? {},
+  }));
+
+afterEach(() => {
+  vi.mocked(spawnKarate).mockClear();
+  return cleanUp();
+});
 
 describe("Runner properties", () => {
   const SECRET = "s3cret-token-123";
   const plain = (name: string, value: string): RowEdit => ({ name, value, secret: false });
   const secret = (name: string, value: string): RowEdit => ({ name, value, secret: true });
   const keep = (name: string): RowEdit => ({ name, secret: true, keep: true });
+  const variable = (name: string, value: string, isSecret = false): RowEdit => ({
+    name,
+    value,
+    secret: isSecret,
+    envVar: true,
+  });
   const argFile = (dataDir: string, root: string) =>
     path.join(
       dataDir,
@@ -82,6 +104,111 @@ describe("Runner properties", () => {
     const logs = all("steps").flatMap((e) => e.steps.map((s) => s.log ?? ""));
     expect(logs.some((l) => l.includes("api.token = ****"))).toBe(true);
     expect(JSON.stringify(events)).not.toContain(SECRET);
+  });
+
+  it(
+    "an environment variable reaches the run, masked, and stays out of run-args.txt",
+    T,
+    async () => {
+      const { runner, events, last } = setup();
+      await runner.open(fixture("env"));
+      await runner.setEnv("qa");
+      runner.saveProperties({
+        shared: [],
+        byEnv: { qa: [variable("APP_API_TOKEN", SECRET, true)] },
+      });
+      expect(last("environment").view.properties.byEnv.qa).toEqual([
+        { name: "APP_API_TOKEN", secret: true, state: "set", envVar: true },
+      ]);
+      await runner.run(byName(last("project").tree!, "always").key);
+      expect(printed(events).some((l) => l.includes("APP_API_TOKEN = ****"))).toBe(true);
+      expect(JSON.stringify(events)).not.toContain(SECRET);
+      const run = starts().find((s) => !s.dry)!;
+      expect(run.env.APP_API_TOKEN).toBe(SECRET);
+      expect(run.args.some((a) => a.endsWith("run-args.txt"))).toBe(false);
+    },
+  );
+
+  it("both kinds in one run", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    runner.saveProperties({
+      shared: [],
+      byEnv: { qa: [plain("timeout", "9000"), variable("APP_API_TOKEN", "v")] },
+    });
+    await runner.run(byName(last("project").tree!, "always").key);
+    const lines = printed(events);
+    expect(lines.some((l) => l.includes("timeout = 9000"))).toBe(true);
+    expect(lines.some((l) => l.includes("APP_API_TOKEN = v"))).toBe(true);
+    expect(
+      starts()
+        .find((s) => !s.dry)!
+        .args.some((a) => a.endsWith("run-args.txt")),
+    ).toBe(true);
+  });
+
+  it("the machine's variable is replaced in any case", T, async () => {
+    const { runner, events, last } = setup();
+    // Node keeps the first of two keys that differ only in case, upper case first: the machine's must go
+    process.env.APP_API_TOKEN = "machine";
+    try {
+      await runner.open(fixture("env"));
+      runner.saveProperties({ shared: [variable("app_api_token", "grace")], byEnv: {} });
+      await runner.run(byName(last("project").tree!, "always").key);
+    } finally {
+      delete process.env.APP_API_TOKEN;
+    }
+    expect(printed(events).some((l) => l.includes("APP_API_TOKEN = grace"))).toBe(true);
+  });
+
+  it("the environment's variable wins over a shared one in another case", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    runner.saveProperties({
+      shared: [variable("APP_API_TOKEN", "shared")],
+      byEnv: { qa: [variable("app_api_token", "qa")] },
+    });
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("APP_API_TOKEN = qa"))).toBe(true);
+  });
+
+  it("the environment's variable wins even where it replaces a shared property", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    // qa's APP_API_TOKEN takes the place of the shared property of that name, before app_api_token
+    runner.saveProperties({
+      shared: [plain("APP_API_TOKEN", "p"), variable("app_api_token", "shared")],
+      byEnv: { qa: [variable("APP_API_TOKEN", "qa")] },
+    });
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("APP_API_TOKEN = qa"))).toBe(true);
+  });
+
+  it("the kind is saved, and switching it keeps the secret", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = fixture("env");
+    await runner.open(root);
+    runner.saveProperties({ shared: [secret("API_TOKEN", SECRET)], byEnv: {} });
+    const [before] = loadProjectEnv(dataDir, root).properties.shared;
+    runner.saveProperties({ shared: [{ ...keep("API_TOKEN"), envVar: true }], byEnv: {} });
+    expect(loadProjectEnv(dataDir, root).properties.shared).toEqual([{ ...before, envVar: true }]);
+    expect(last("environment").view.properties.shared).toEqual([
+      { name: "API_TOKEN", secret: true, state: "set", envVar: true },
+    ]);
+  });
+
+  it("dry runs get no environment variables", T, async () => {
+    const { runner, last } = setup();
+    await runner.open(fixture("env"));
+    runner.saveProperties({ shared: [variable("APP_API_TOKEN", "v")], byEnv: {} });
+    await runner.run(byName(last("project").tree!, "always").key);
+    const dry = starts().filter((s) => s.dry);
+    expect(dry.length).toBeGreaterThan(0);
+    for (const s of dry) expect(s.env.APP_API_TOKEN).toBeUndefined();
+    expect(starts().find((s) => !s.dry)!.env.APP_API_TOKEN).toBe("v");
   });
 
   it("settings never hold the plain secret", T, async () => {
