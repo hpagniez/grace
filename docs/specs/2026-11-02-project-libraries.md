@@ -121,9 +121,9 @@ Tried on a Maven project with `org.xerial:sqlite-jdbc` 3.54.1.0 and a scenario t
 
 Added after the Checks: a helper never compiled fails with Karate's `Java.type: class not found: …`, and one edited since its last build with `… is not a function`, neither of which says the project needs building. The owner chose a notice.
 
-1. On open and on Refresh, for a Maven or Gradle project whose `src/test/java` holds `.java` files (in any sub-folder), Grace compares file times with the build's compiled test folder: Maven `target/test-classes`, Gradle `build/classes/java/test`.
+1. On open and on Refresh, for a Maven or Gradle project whose `src/test/java` holds `.java` files (in any sub-folder) other than JUnit runners, Grace compares file times with the build's compiled test folder: Maven `target/test-classes`, Gradle `build/classes/java/test`. A JUnit runner is a `.java` file that imports JUnit (`org.junit`) or Karate's JUnit module (`com.intuit.karate.junit…`, `io.karatelabs.junit…`): Grace runs the features itself and never loads it, so it needs no build ([#236](https://github.com/hpagniez/grace/issues/236)).
 2. When that folder holds no `.class` file (it is missing, or empty): `The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.`
-3. When a `.java` file is newer than the newest `.class` file: `The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.`
+3. When a `.java` file other than a runner is newer than the newest `.class` file: `The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running.`
 4. Gradle projects read `gradle testClasses` where Maven projects read `mvn test-compile`. Standalone projects get neither.
 5. On open the text joins the open notice, last. On Refresh it joins the libraries' notice, after it, or shows alone. Environment switches and runs never check.
 6. Grace starts no process and changes no file. A `git checkout` that touches file times can show the second text until the next build.
@@ -135,7 +135,7 @@ Added after the Checks: a helper never compiled fails with Karate's `Java.type: 
 - **Open or Refresh, build files unchanged:** hash up to seven small files and check that each listed jar exists (about 30 to 100 file checks): a few milliseconds, no process.
 - **Build files changed (first open, a dependency added):** one build JVM for the time it takes, then nothing left running. Measured: Maven 16 s the first time with downloads, 3 s after, for 30 jars. Expected for Gradle with `--no-daemon`: about 10 to 30 s and 300 to 700 MB, more the first time its wrapper downloads Gradle (Checks). The dry run waits for it.
 - **Runs:** a longer `-cp`. The JVM opens a jar only when it looks up a class or resource there; Karate's lookups at the classpath root may open each jar once (Checks).
-- **Open or Refresh, Java code check (R8):** one asynchronous walk of `src/test/java` and of the compiled test folder, reading the time of each `.java` and `.class` file: a few milliseconds for a few hundred files, no process.
+- **Open or Refresh, Java code check (R8):** one asynchronous walk of `src/test/java` and of the compiled test folder, reading each `.java` file and the time of each `.class` file: a few milliseconds for a few hundred files, no process.
 - **Disk:** `libraries.json`, a few KB per project.
 - **Size:** the Gradle init script, under 1 KB. No dependency.
 - **Bench:** the bench project is standalone with no extension folder; its numbers do not move.
@@ -234,6 +234,11 @@ Feature: Project libraries
     When DbHelper.java changes
     And I refresh
     Then the notice says "The project's Java code in src/test/java changed since its last build: build it again (mvn test-compile) before running."
+
+  Scenario: A JUnit runner needs no build
+    Given a Maven project whose only Java code is src/test/java/examples/ExamplesTest.java, a Karate JUnit runner, and no target/test-classes
+    When I open it
+    Then no notice shows
 
   Scenario: Standalone projects run no tool
     Given a standalone project
