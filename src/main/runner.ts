@@ -16,6 +16,7 @@ import {
 import type { AppEvent, Breakpoint, DebugCommand, FileStep, Project } from "../shared/events";
 import { toEntry, type RunRecord, type StoredTest } from "../shared/history";
 import type { Layout, TestNode } from "../shared/model";
+import type { TrendPoint } from "../shared/trends";
 import {
   matches,
   matchingLeaves,
@@ -28,6 +29,7 @@ import { THREADS_ERROR, validThreads } from "../shared/threads";
 import { projectFile } from "./editor";
 import { projectFingerprint } from "./fingerprint";
 import { findFlaky } from "./flaky";
+import { findTrend } from "./trends";
 import {
   clearHistory as removeRuns,
   createRunDir,
@@ -562,6 +564,11 @@ export class Runner {
   }
 
   /** A scenario's or row's steps as its feature file has them (R4.1); null for any other node or an unreadable file. */
+  /** The trend of `key` (the whole tree when null) on the environment picked now; none with no project. */
+  trend(key: string | null): TrendPoint[] {
+    return findTrend(this.listed(), this.tree, key, this.envs.env);
+  }
+
   steps(key: string): FileStep[] | null {
     const node = this.tree && findNode(this.tree, key);
     if (!node || (node.kind !== "scenario" && node.kind !== "row")) return null;

@@ -3,6 +3,7 @@ import type { ImportResult, PropertiesEdit } from "./env";
 import type { AppEvent, DebugCommand, FileStep } from "./events";
 import type { FilterState } from "./tags";
 import type { Theme } from "./theme";
+import type { TrendPoint } from "./trends";
 import type { Channel } from "./updates";
 
 export const CH = {
@@ -29,6 +30,7 @@ export const CH = {
   runReport: "history:report",
   exportReport: "history:export",
   clearHistory: "history:clear",
+  trend: "history:trend",
   openRecent: "recent:open",
   openSubfolder: "project:openSubfolder",
   removeRecent: "recent:remove",
@@ -78,6 +80,8 @@ export interface Api {
   /** Main asks where to save the run's report as a zip (docs/specs/2026-11-03-export-reports.md). */
   exportReport(id: string): Promise<void>;
   clearHistory(): Promise<void>;
+  /** The trend of a tree node, null for the whole tree, over the stored runs of the picked environment (docs/specs/2026-11-04-trends.md). */
+  trend(key: string | null): Promise<TrendPoint[]>;
   /** Both send a folder as saved in the recent list; main refuses any other. */
   openRecent(root: string): Promise<void>;
   /** Sends a folder as the last `project` event offered it; main refuses any other. */
