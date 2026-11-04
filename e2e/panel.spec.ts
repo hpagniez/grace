@@ -248,6 +248,8 @@ test("the tabs can be dragged or moved with Alt+Left and Alt+Right, and their or
   await win.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await win.mouse.down();
   await win.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  // Playwright's drag sends each dragover one move late, so a nudge delivers the one over HTTP
+  await win.mouse.move(to.x + to.width / 2 + 2, to.y + to.height / 2, { steps: 2 });
   await expect(win.getByTestId("tab-http")).toHaveAttribute("data-drop", "right");
   await win.mouse.up();
   await expect.poll(() => tabOrder(win)).toEqual(["history", "http", "console"]);
