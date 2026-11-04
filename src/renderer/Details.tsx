@@ -1,14 +1,23 @@
-import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, MousePointerClick } from "lucide";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  CircleAlert,
+  ExternalLink,
+  LoaderCircle,
+  MousePointerClick,
+} from "lucide";
 import { createEffect, createMemo, createSignal, flush, For, Show } from "solid-js";
 import type { FileStep, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
-import { ghostSmall } from "./buttons";
+import { btnIconSmall, ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { Examples } from "./Examples";
+import { failureGroups, reasonOf, shownLeaves, type FailureGroup } from "./failures";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
@@ -63,20 +72,23 @@ function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paus
         )}
       </Show>
       <div class="flex min-h-6 items-center gap-2 text-sm">
-        <Tooltip text={breakpoint()} side="right">
-          <button
-            type="button"
-            data-testid="breakpoint"
-            aria-label={breakpoint()}
-            class="group flex size-4 shrink-0 items-center justify-center rounded-full"
-            onClick={() => props.toggle()}
-          >
-            <span
-              aria-hidden="true"
-              class={`size-2.5 rounded-full border border-failed ${props.on ? "bg-failed" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}
-            />
-          </button>
-        </Tooltip>
+        {/* Karate's synthetic step of a failed config has line 0: no breakpoint there (#229 R1.4) */}
+        <Show when={props.step.line >= 1} fallback={<span class="size-4 shrink-0" />}>
+          <Tooltip text={breakpoint()} side="right">
+            <button
+              type="button"
+              data-testid="breakpoint"
+              aria-label={breakpoint()}
+              class="group flex size-4 shrink-0 items-center justify-center rounded-full"
+              onClick={() => props.toggle()}
+            >
+              <span
+                aria-hidden="true"
+                class={`size-2.5 rounded-full border border-failed ${props.on ? "bg-failed" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}
+              />
+            </button>
+          </Tooltip>
+        </Show>
         <Show when={props.step.status}>
           {(status) => (
             <Tooltip text={MARK[stepMark(status())].label}>
@@ -149,8 +161,38 @@ function ErrorText(props: { error: string; api: Api }) {
   );
 }
 
-function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
+/** Previous and Next through the tests that failed with the same error, wrapping round (#229 R4). */
+function GroupStepper(props: { keys: string[]; index: number; reveal(key: string): void }) {
+  const go = (dir: number) =>
+    props.reveal(props.keys[(props.index + dir + props.keys.length) % props.keys.length]);
+  const Step = (p: { name: string; icon: typeof ChevronUp; dir: number }) => (
+    <Tooltip text={p.name}>
+      <button type="button" class={btnIconSmall} aria-label={p.name} onClick={() => go(p.dir)}>
+        <Icon icon={p.icon} size={14} />
+      </button>
+    </Tooltip>
+  );
+  return (
+    <div data-testid="error-group" class="mt-2 flex items-center gap-1 text-xs text-ink">
+      {/* Polite: focus stays on Next, so the count is what says the selection moved (R4.4) */}
+      <span aria-live="polite" class="mr-1 tabular-nums">
+        {`${props.index + 1} of ${props.keys.length} tests failed with this error`}
+      </span>
+      <Step name="Previous test with this error" icon={ChevronUp} dir={-1} />
+      <Step name="Next test with this error" icon={ChevronDown} dir={1} />
+    </div>
+  );
+}
+
+function Leaf(props: {
+  node: TestNode;
+  state: AppState;
+  api: Api;
+  groups: FailureGroup[];
+  reveal(key: string): void;
+}) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
+  const group = () => props.groups.find((g) => g.keys.includes(props.node.key));
   const result = () => props.state.results[props.node.key];
   const runSteps = () => props.state.steps[props.node.key];
   // Before its feature finishes, a test shows its steps as the file has them, to set breakpoints on (R4.1)
@@ -232,6 +274,15 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
           >
             <ErrorText error={result()!.error!} api={props.api} />
           </pre>
+          <Show when={group()}>
+            {(g) => (
+              <GroupStepper
+                keys={g().keys}
+                index={g().keys.indexOf(props.node.key)}
+                reveal={props.reveal}
+              />
+            )}
+          </Show>
         </div>
       </Show>
       <Show
@@ -267,7 +318,7 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
   );
 }
 
-function Group(props: { node: TestNode; state: AppState }) {
+function Group(props: { node: TestNode; state: AppState; reveal(key: string): void }) {
   const counts = () => {
     const out: Partial<Record<Status, number>> = {};
     for (const l of leaves(props.node)) {
@@ -279,6 +330,16 @@ function Group(props: { node: TestNode; state: AppState }) {
   // A memo: the badge reads it in several places, and each read would walk the whole group again.
   const status = createMemo(() => deriveStatus(props.node, props.state.statuses));
   const location = () => props.node.file || "/";
+  // Its own failed tests by error, largest first (#229 R5); none during a run. A stable sort keeps tree order.
+  const failures = createMemo(() =>
+    props.state.run.active
+      ? []
+      : failureGroups(
+          shownLeaves(props.node, props.state.filter),
+          props.state.statuses,
+          props.state.results,
+        ).sort((a, b) => b.keys.length - a.keys.length),
+  );
   return (
     <>
       <h2 class="text-lg font-semibold break-words">{props.node.name}</h2>
@@ -301,11 +362,56 @@ function Group(props: { node: TestNode; state: AppState }) {
           )}
         </For>
       </p>
+      <Show when={failures().length > 0}>
+        <section class="flex flex-col gap-2">
+          <h3 class="text-sm font-semibold">Failed with the same error</h3>
+          <ul class="flex flex-col gap-3">
+            <For each={failures()}>
+              {(g) => (
+                <li data-testid="failure-group" class="flex flex-col gap-1">
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="tabular-nums">{`${g.keys.length} tests`}</span>
+                    <button
+                      type="button"
+                      class={ghostSmall}
+                      aria-label={`Go to first of ${g.keys.length} tests`}
+                      onClick={() => props.reveal(g.keys[0])}
+                    >
+                      Go to first
+                    </button>
+                  </div>
+                  {/* The cut on an unpadded box: a padded one shows the top of line 5 in its padding */}
+                  <div class={box}>
+                    <pre class="line-clamp-4 break-words whitespace-pre-wrap">
+                      {reasonOf(props.state.results[g.keys[0]])}
+                    </pre>
+                  </div>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      </Show>
     </>
   );
 }
 
-export function Details(props: { state: AppState; api: Api; select(key: string): void }) {
+export function Details(props: {
+  state: AppState;
+  api: Api;
+  select(key: string): void;
+  reveal(key: string): void;
+}) {
+  // Found when a run ends, never during one (#229 R3.2): one pass over the tree's tests, nothing while idle.
+  const groups = createMemo(() =>
+    props.state.run.active || !props.state.tree
+      ? []
+      : failureGroups(
+          shownLeaves(props.state.tree, props.state.filter),
+          props.state.statuses,
+          props.state.results,
+        ),
+  );
   const node = () =>
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
@@ -313,14 +419,17 @@ export function Details(props: { state: AppState; api: Api; select(key: string):
   // The call replaces the node while the HTTP tab is up; findCall is null once the call is gone.
   const call = () => (props.state.panel === "http" ? findCall(props.state) : null);
   let aside!: HTMLElement;
-  // Opening a row unmounts the table: focus inside it moves to the row's heading, not the page.
-  const open = (key: string) => {
+  // Opening a row unmounts the table, and Go to first its folder's list: focus inside moves to the test's
+  // heading, not the page.
+  const toHeading = (go: (key: string) => void) => (key: string) => {
     const focused = aside.contains(document.activeElement);
-    props.select(key);
+    go(key);
     if (!focused) return;
     flush();
     aside.querySelector<HTMLElement>("h2")?.focus();
   };
+  const open = toHeading((key) => props.select(key));
+  const goTo = toHeading((key) => props.reveal(key));
   return (
     <aside
       ref={(e) => (aside = e)}
@@ -341,7 +450,7 @@ export function Details(props: { state: AppState; api: Api; select(key: string):
                 when={n().kind === "scenario" || n().kind === "row"}
                 fallback={
                   <>
-                    <Group node={n()} state={props.state} />
+                    <Group node={n()} state={props.state} reveal={goTo} />
                     {/* Keyed: another outline gets a new table, at its top; a refresh keeps the place */}
                     <Show when={n().kind === "outline" && n().key} keyed>
                       {(_key) => <Examples outline={n()} state={props.state} select={open} />}
@@ -349,7 +458,13 @@ export function Details(props: { state: AppState; api: Api; select(key: string):
                   </>
                 }
               >
-                <Leaf node={n()} state={props.state} api={props.api} />
+                <Leaf
+                  node={n()}
+                  state={props.state}
+                  api={props.api}
+                  groups={groups()}
+                  reveal={props.reveal}
+                />
               </Show>
             )}
           </Show>

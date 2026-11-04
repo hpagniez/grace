@@ -10,6 +10,7 @@ export const CH = {
   ready: "app:ready",
   open: "project:open",
   refresh: "project:refresh",
+  build: "project:build",
   run: "run:start",
   debug: "run:debug",
   debugCommand: "debug:command",
@@ -50,6 +51,8 @@ export interface Api {
   ready(): Promise<void>;
   openProject(): Promise<void>;
   refresh(): Promise<void>;
+  /** Builds the project's Java code, then refreshes (docs/specs/2026-11-04-build-from-notice.md). */
+  build(): Promise<void>;
   run(key: string): Promise<void>;
   /** A run on one thread with the step debugger (docs/specs/2026-11-02-step-debugger.md). */
   debug(key: string): Promise<void>;

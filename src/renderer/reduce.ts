@@ -50,7 +50,8 @@ export interface AppState {
   /** The folders the last `project` event offered (sub-folder offer R3). */
   subfolders: string[];
   statuses: Record<string, Status>;
-  results: Record<string, { durationMillis?: number; error?: string }>;
+  /** `reasonAt`: where Karate's reason starts in `error` (#229 R2.1). */
+  results: Record<string, { durationMillis?: number; error?: string; reasonAt?: number }>;
   steps: Record<string, Step[]>;
   /** Each test's HTTP calls, in run order; cleared exactly as `steps` is. */
   calls: Record<string, HttpCall[]>;
@@ -61,9 +62,11 @@ export interface AppState {
    */
   consoleDropped: number;
   run: RunView;
-  /** The last notice from main; `success` reports something done, not a problem. */
-  notice: { text: string; success: boolean } | null;
+  /** The last notice from main; `success` reports something done, not a problem; `build` offers the Build button. */
+  notice: { text: string; success: boolean; build: boolean } | null;
   selected: string | null;
+  /** Counts the selections the tree must show: it opens the rows above the selected test and scrolls to it (#229 R4.3). */
+  reveals: number;
   /** The open project's tag filter, as main holds it; changes only when main says so. */
   filter: FilterState;
   /** The open project's environment and run properties, as main holds them; null with no project. */
@@ -95,8 +98,9 @@ export interface AppState {
   vars: DebugVar[] | null;
   /** The folder main is opening, or null. */
   opening: string | null;
-  /** The build tool main runs to list the project's libraries, or null. */
+  /** The build tool main runs to list the project's libraries, or to build its Java code when `building`; or null. */
   listing: "Maven" | "Gradle" | null;
+  building: boolean;
   /** Main has said what is open or opening; until then the window cannot tell home from a folder opening. */
   loaded: boolean;
   /** The saved recent folders, newest first; null until main sends them. */
@@ -148,6 +152,7 @@ export function initialState(): AppState {
     run: idleRun(),
     notice: null,
     selected: null,
+    reveals: 0,
     filter: noFilter(),
     env: null,
     threads: null,
@@ -163,6 +168,7 @@ export function initialState(): AppState {
     vars: null,
     opening: null,
     listing: null,
+    building: false,
     loaded: false,
     recent: null,
     updates: null,
@@ -260,6 +266,7 @@ export function reduce(s: AppState, e: AppEvent): void {
         const r = s.results[u.key] ?? {};
         if (u.durationMillis !== undefined) r.durationMillis = u.durationMillis;
         if (u.error !== undefined) r.error = u.error;
+        if (u.reasonAt !== undefined) r.reasonAt = u.reasonAt;
         s.results[u.key] = r;
         if (u.status === "interrupted" && before !== "interrupted") s.run.interrupted++;
         if (!final && (u.status === "passed" || u.status === "failed")) {
@@ -348,9 +355,10 @@ export function reduce(s: AppState, e: AppEvent): void {
       break;
     case "listing":
       s.listing = e.tool;
+      s.building = e.build ?? false;
       break;
     case "notice":
-      s.notice = { text: e.message, success: e.success ?? false };
+      s.notice = { text: e.message, success: e.success ?? false, build: e.build ?? false };
       break;
     case "opening":
       s.opening = e.root;

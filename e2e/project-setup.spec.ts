@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   expect,
@@ -33,7 +33,6 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
     "karate-pom.json": JSON.stringify({
       paths: ["tests/a"],
       configDir: "conf",
-      env: "qa",
       dryRun: true,
     }),
   });
@@ -44,7 +43,7 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
   await expect(nodeByKey(win, "f:tests/a/a.feature")).toBeVisible({ timeout: 15_000 });
   await expect(nodeByKey(win, "f:tests/b/b.feature")).toHaveCount(0);
   await expect(win.getByTestId("notice")).toHaveText(
-    "Grace does not use these karate-pom.json settings: env, dryRun.",
+    "Grace does not use these karate-pom.json settings: dryRun.",
   );
   await expect(win.getByTestId("env-input")).toHaveAttribute("placeholder", "(none)");
   await expect
@@ -57,6 +56,54 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
 
   await win.getByTestId("run-all-button").click();
   await expect(node(win, "a1")).toHaveAttribute("data-status", "passed", { timeout: 60_000 });
+});
+
+test("karate-pom.json starts the environment, filter and thread count", async () => {
+  test.setTimeout(120_000);
+  // fast passes only in qa; the other two must not run
+  const dir = write(tempDir("kk-pom-start-"), {
+    "a.feature":
+      "Feature: a\n@smoke\nScenario: fast\n  * match cfg == 'qa'\n" +
+      "@smoke @slow\nScenario: slow\n  * print 'slow'\nScenario: plain\n  * print 'plain'\n",
+    "karate-config.js": "function fn() { return { cfg: 'base' }; }",
+    "karate-config-qa.js": "function fn() { return { cfg: 'qa' }; }",
+    "karate-pom.json": JSON.stringify({ env: "qa", tags: ["@smoke", "~@slow"], threads: 3 }),
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await openFeatures(win);
+
+  await expect(node(win, "fast")).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByTestId("env-input")).toHaveValue("qa");
+  const chip = (tag: string) => win.locator(`[data-testid=tag-chip][data-tag="${tag}"]`);
+  await expect(chip("smoke")).toHaveAttribute("data-state", "include");
+  await expect(chip("slow")).toHaveAttribute("data-state", "exclude");
+  await expect(win.getByTestId("threads-input")).toHaveValue("3");
+  await expect(win.getByTestId("notice")).toHaveCount(0);
+
+  await win.getByTestId("run-all-button").click();
+  await expect(node(win, "fast")).toHaveAttribute("data-status", "passed", { timeout: 60_000 });
+  // slow and plain: dimmed rows, by key as they have no Run button
+  for (const key of ["s:a.feature#2", "s:a.feature#3"]) {
+    await expect(nodeByKey(win, key)).toHaveAttribute("data-match", "false");
+    await expect(nodeByKey(win, key)).not.toHaveAttribute("data-status", /passed|failed/);
+  }
+});
+
+test("Maven's karate.env starts the environment", async () => {
+  test.setTimeout(120_000);
+  const dir = write(project("maven"), {
+    "pom.xml":
+      "<project><modelVersion>4.0.0</modelVersion><groupId>x</groupId><artifactId>x</artifactId><version>1</version>" +
+      "<properties><karate.env>dev</karate.env></properties><build><plugins><plugin>" +
+      "<artifactId>maven-surefire-plugin</artifactId><configuration><systemPropertyVariables>" +
+      "<karate.env>${karate.env}</karate.env></systemPropertyVariables></configuration>" +
+      "</plugin></plugins></build></project>",
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await openFeatures(win);
+  await expect(win.getByTestId("env-input")).toHaveValue("dev", { timeout: 15_000 });
 });
 
 test("Maven's compiled output is on the classpath", async () => {
@@ -141,4 +188,26 @@ test("an empty folder offers the Karate project below it", async () => {
   await openFeatures(win);
   await expect(node(win, "one")).toBeVisible({ timeout: 15_000 });
   await expect(node(win, "two")).toBeVisible();
+});
+
+test("the not-built notice builds the project's Java code", async () => {
+  test.setTimeout(120_000);
+  const dir = write(project("maven"), {
+    "src/test/java/common/Helper.java": "class Helper {}",
+    // a stand-in for Maven: lists no library, and test-compile writes the helper's class
+    "mvnw.cmd": [
+      "@echo off",
+      'if defined GRACE_CLASSPATH_FILE (type nul>"%GRACE_CLASSPATH_FILE%" & exit /b 0)',
+      String.raw`mkdir "%~dp0target\test-classes" 2>nul`,
+      String.raw`type nul>"%~dp0target\test-classes\Helper.class"`,
+      "",
+    ].join("\r\n"),
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  const notice = win.getByTestId("notice");
+  await expect(notice).toContainText("src/test/java is not built", { timeout: 15_000 });
+  await notice.getByRole("button", { name: "Build", exact: true }).click();
+  await expect(notice).toBeHidden({ timeout: 30_000 });
+  expect(existsSync(path.join(dir, "target", "test-classes", "Helper.class"))).toBe(true);
 });

@@ -71,6 +71,8 @@ export interface ScenarioUpdate {
   status: Status;
   durationMillis?: number;
   error?: string;
+  /** Where Karate's reason starts in `error` (#229 R2.1); none: the whole error is the reason. */
+  reasonAt?: number;
 }
 export interface Summary {
   scenarioCount: number;
@@ -124,7 +126,8 @@ export type AppEvent =
       summary: Summary | null;
       reportAvailable: boolean;
     }
-  | { type: "notice"; message: string; success?: boolean }
+  /** `build`: the notice offers the Build button (docs/specs/2026-11-04-build-from-notice.md R1). */
+  | { type: "notice"; message: string; success?: boolean; build?: true }
   /** The open project's tag filter, as main holds and applies it. */
   | { type: "filter"; filter: FilterState }
   /** The open project's thread count, as main holds it and passes to every run. */
@@ -139,8 +142,11 @@ export type AppEvent =
   | { type: "flaky"; tests: FlakyTest[] }
   /** The Runner is discovering or running; only Cancel makes sense meanwhile. */
   | { type: "busy"; busy: boolean }
-  /** The build tool Grace is running to list the project's libraries, or null when it is done. */
-  | { type: "listing"; tool: "Maven" | "Gradle" | null }
+  /**
+   * The build tool Grace is running to list the project's libraries, or to build its Java code when `build`; null when
+   * it is done.
+   */
+  | { type: "listing"; tool: "Maven" | "Gradle" | null; build?: true }
   /** The folder main is opening, or null. Sent around each open and in every replay. */
   | { type: "opening"; root: string | null }
   /** The saved recent folders, newest first, each checked for existence. */

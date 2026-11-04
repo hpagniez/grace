@@ -270,6 +270,7 @@ app.whenReady().then(async () => {
   handlePath(CH.removeRecent, (root) => runner.removeRecent(root));
   handle(CH.close, () => runner.close());
   handle(CH.refresh, () => runner.refresh());
+  handle(CH.build, () => runner.build());
   const nodeKey = (key: unknown): key is string =>
     typeof key === "string" && key.length <= 1000 && /^[dfos]:/.test(key);
   handle(CH.run, async (key) => {

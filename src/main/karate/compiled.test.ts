@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { testCodeNotice } from "./compiled";
+import { readBuilt, testCodeNotice, writeBuilt } from "./compiled";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -109,5 +109,29 @@ describe("testCodeNotice", () => {
   it("says nothing for a standalone project", async () => {
     const root = project({ "src/test/java/a/Helper.java": 10 });
     expect(await testCodeNotice(root, "standalone")).toBeNull();
+  });
+});
+
+describe("the last Build", () => {
+  const ms = (at: number) => (Date.UTC(2020, 0, 1) / 1000 + at) * 1000;
+  it("counts sources older than the last Build as built", async () => {
+    const root = project({
+      "src/test/java/a/Helper.java": 200,
+      "target/test-classes/a/Helper.class": 100,
+    });
+    expect(await testCodeNotice(root, "maven", ms(300))).toBeNull();
+    expect(await testCodeNotice(root, "maven", ms(150))).toBe(CHANGED("mvn test-compile"));
+  });
+  it("never counts a project with no class as built", async () => {
+    const root = project({ "src/test/java/a/Helper.java": 200 });
+    expect(await testCodeNotice(root, "maven", ms(300))).toBe(NOT_BUILT("mvn test-compile"));
+  });
+  it("keeps the time in built.json", () => {
+    const dir = path.join(project({}), "data");
+    expect(readBuilt(dir)).toBeNull();
+    writeBuilt(dir, 1234);
+    expect(readBuilt(dir)).toBe(1234);
+    writeFileSync(path.join(dir, "built.json"), '{"at":"x"}');
+    expect(readBuilt(dir)).toBeNull();
   });
 });

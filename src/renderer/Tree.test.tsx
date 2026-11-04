@@ -89,6 +89,7 @@ function setup() {
     ready: vi.fn(async () => {}),
     openProject: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
+    build: vi.fn(async () => {}),
     run: vi.fn(async () => {}),
     steps: vi.fn(async () => null),
     debug: vi.fn(async () => {}),
@@ -670,6 +671,19 @@ describe("main screen", () => {
     expect(button("report-button").disabled).toBe(false);
     send({ type: "notice", message: "Nothing to run" });
     expect(screen.getByTestId("notice").textContent).toBe("Nothing to run");
+  });
+
+  it("offers Build in a notice that asks for it, disabled while busy", () => {
+    const { api, send, load } = setup();
+    load();
+    send({ type: "notice", message: "Not built.", build: true });
+    const build = within(screen.getByTestId("notice")).getByRole("button", { name: "Build" });
+    fireEvent.click(build);
+    expect(api.build).toHaveBeenCalledTimes(1);
+    send({ type: "busy", busy: true });
+    expect((build as HTMLButtonElement).disabled).toBe(true);
+    send({ type: "notice", message: "Other" });
+    expect(within(screen.getByTestId("notice")).queryByRole("button")).toBeNull();
   });
 });
 
@@ -1848,5 +1862,83 @@ describe("tree: open in VS Code (open-in-editor-from-tree R1, R2)", () => {
     for (const e of failed("boom")) send(e);
     fireEvent.contextMenu(screen.getByText("failing match"));
     expect(api.editorMenu).toHaveBeenCalledWith("tests/x.feature", 14, 0, 0);
+  });
+});
+
+describe("tree: reveal a test from Details (#229 R4.3)", () => {
+  it("reveal opens a closed feature", () => {
+    const { send } = setup();
+    const leaf = (key: string, name: string, file: string): TestNode => ({
+      key,
+      kind: "scenario",
+      name,
+      file,
+      line: 3,
+      refId: "[1:3]",
+      tags: [],
+      children: [],
+    });
+    const feature = (file: string, kids: TestNode[]): TestNode => ({
+      key: `f:${file}`,
+      kind: "feature",
+      name: file,
+      file,
+      line: null,
+      refId: null,
+      tags: [],
+      children: kids,
+    });
+    const [A1, B1] = ["s:tests/a.feature#1", "s:tests/b.feature#1"];
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: {
+        key: "d:",
+        kind: "folder",
+        name: "p",
+        file: "",
+        line: null,
+        refId: null,
+        tags: [],
+        children: [
+          feature("tests/a.feature", [leaf(A1, "one", "tests/a.feature")]),
+          feature("tests/b.feature", [leaf(B1, "two", "tests/b.feature")]),
+        ],
+      },
+      error: null,
+    });
+    send({
+      type: "runStarted",
+      selection: "d:",
+      runId: "20261104-130000-000",
+      keys: [A1, B1],
+      total: 2,
+      startedAt: Date.now(),
+      env: null,
+      debug: false,
+    });
+    send({
+      type: "scenarios",
+      updates: [
+        { key: A1, status: "failed", error: "C:/p/a.feature:4\nboom", reasonAt: 17 },
+        { key: B1, status: "failed", error: "C:/p/b.feature:4\nboom", reasonAt: 17 },
+      ],
+    });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    // the run opened both features; the person closes b.feature
+    fireEvent.click(screen.getByRole("button", { name: "Collapse b.feature" }));
+    flush();
+    expect(screen.getAllByTestId("tree-node").some((n) => n.dataset.key === B1)).toBe(false);
+    fireEvent.click(within(rowByKey(A1)).getByText("one"));
+    flush();
+    fireEvent.click(screen.getByRole("button", { name: "Next test with this error" }));
+    flush();
+    expect(rowByKey(B1).parentElement!.getAttribute("aria-selected")).toBe("true");
   });
 });

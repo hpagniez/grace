@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppEvent, ScenarioUpdate } from "../../shared/events";
+import type { TestNode } from "../../shared/model";
 import { matchingLeaves, NO_FILTER } from "../../shared/tags";
 import { readAllEvents } from "./events";
 import { RunState } from "./run-state";
@@ -255,5 +256,114 @@ describe("RunState", () => {
       state.finish(3, false, false);
       expect([...state.results().values()][0]).toEqual({ status: "notRun" });
     });
+  });
+});
+
+describe("RunState: config failures and Karate's reason (#229)", () => {
+  const leaf = (key: string, kind: TestNode["kind"], refId: string, name: string): TestNode => ({
+    key,
+    kind,
+    name,
+    file: "tests/shared.feature",
+    line: 7,
+    refId,
+    tags: [],
+    children: [],
+  });
+  const FIRST = "s:tests/shared.feature#1";
+  const SECOND = "s:tests/shared.feature#2";
+  const ROW = "s:tests/shared.feature#3.1";
+  const shared: TestNode = {
+    key: "d:",
+    kind: "folder",
+    name: "p",
+    file: "",
+    line: null,
+    refId: null,
+    tags: [],
+    children: [
+      {
+        key: "f:tests/shared.feature",
+        kind: "feature",
+        name: "shared",
+        file: "tests/shared.feature",
+        line: null,
+        refId: null,
+        tags: [],
+        children: [
+          leaf(FIRST, "scenario", "[1:7]", "first"),
+          leaf(SECOND, "scenario", "[2:10]", "second"),
+          leaf(ROW, "row", "[3.1:15]", "row 1"),
+        ],
+      },
+    ],
+  };
+  const configState = () => new RunState(shared, leafKeys(shared));
+
+  it("fails the tests whose config failed", () => {
+    const state = new RunState(shared, [FIRST, SECOND]);
+    const updates = updatesOf(state.apply(events("run-http-config-fail.jsonl")));
+    expect(updates.map((u) => [u.key, u.status, u.durationMillis, u.reasonAt])).toEqual([
+      [FIRST, "failed", 0, 0],
+      [SECOND, "failed", 0, 0],
+    ]);
+    for (const u of updates)
+      expect(u.error).toMatch(/^Config evaluation failed: karate-config\.js - js failed:/);
+    const out = state.finish(1, false, true);
+    expect(out.some((e) => e.type === "notice")).toBe(false);
+    expect(state.results().get(FIRST)?.status).toBe("failed");
+    expect(state.results().get(SECOND)?.status).toBe("failed");
+  });
+
+  it("fails an outline row whose config failed", () => {
+    const exit = {
+      type: "FEATURE_EXIT",
+      timeStamp: 1,
+      threadId: "thread-1",
+      data: {
+        relativePath: "tests/shared.feature",
+        callDepth: 0,
+        scenarioResults: [
+          {
+            refId: "[3.1:15]",
+            failed: true,
+            error: "Config evaluation failed: karate-config.js - boom",
+            durationMillis: 0,
+            stepResults: [],
+          },
+        ],
+      },
+    };
+    expect(updatesOf(configState().apply([exit]))).toEqual([
+      {
+        key: ROW,
+        status: "failed",
+        durationMillis: 0,
+        error: "Config evaluation failed: karate-config.js - boom",
+        reasonAt: 0,
+      },
+    ]);
+  });
+
+  it("does not fail a test twice across batches", () => {
+    const state = newState();
+    const failed = events("run-clean.jsonl")
+      .flatMap((e) => updatesOf(state.apply([e])))
+      .filter((u) => u.key === "s:tests/basic.feature#2" && u.status === "failed");
+    expect(failed).toHaveLength(1);
+  });
+
+  it("sends where Karate's reason starts", () => {
+    const failed = updatesOf(newState().apply(events("run-clean.jsonl"))).find(
+      (u) => u.status === "failed",
+    )!;
+    expect(failed.error!.slice(failed.reasonAt)).toBe(
+      "match failed: EQUALS\n  $ | not equal (STRING:STRING)\n  'hello'\n  'goodbye'\n",
+    );
+    const exit = events("run-clean.jsonl").find(
+      (e) => e.type === "SCENARIO_EXIT" && e.data.callDepth === 0 && !e.data.passed,
+    )!;
+    const odd = { ...exit, data: { ...exit.data, errorReason: "not its tail" } };
+    expect(updatesOf(newState().apply([odd]))[0]).not.toHaveProperty("reasonAt");
   });
 });

@@ -1,6 +1,8 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import type { Api } from "../shared/ipc";
 import { BottomPanel } from "./BottomPanel";
+import { btnSmall } from "./buttons";
+import { ConfigBanner } from "./ConfigBanner";
 import { Details } from "./Details";
 import { FilterBar } from "./FilterBar";
 import { Home } from "./Home";
@@ -17,7 +19,7 @@ import { createAppStore } from "./store";
 import { sheet } from "./ui";
 
 export function App(props: { api: Api }) {
-  const { state, select, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
+  const { state, select, reveal, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
     createAppStore(props.api);
   onCleanup(dispose);
   // index.html's startup screen stays until main says what is open, so home never flashes
@@ -30,12 +32,25 @@ export function App(props: { api: Api }) {
   const home = () => !state.project && !state.opening;
   // "Folder not found" and the like arrive as an error with no project: home shows it as a notice
   const notice = () =>
-    state.notice ?? (home() && state.error ? { text: state.error, success: false } : null);
+    state.notice ??
+    (home() && state.error ? { text: state.error, success: false, build: false } : null);
   const noticeBox = () => (
     <Show when={notice()}>
       {(n) => (
         <div class="px-3 py-2">
-          <Notice kind={n().success ? "success" : "warning"} text={n().text} testid="notice" />
+          <Notice kind={n().success ? "success" : "warning"} text={n().text} testid="notice">
+            {/* build from the notice R1: Grace builds the project's Java code only on this click */}
+            <Show when={n().build}>
+              <button
+                type="button"
+                class={`${btnSmall} shrink-0`}
+                disabled={state.busy || state.run.active}
+                onClick={() => void props.api.build()}
+              >
+                Build
+              </button>
+            </Show>
+          </Notice>
         </div>
       )}
     </Show>
@@ -77,12 +92,13 @@ export function App(props: { api: Api }) {
                 <Progress state={state} />
                 <FilterBar state={state} api={props.api} />
                 <Show when={!settingsOpen()}>{noticeBox()}</Show>
+                <ConfigBanner state={state} api={props.api} />
                 <main ref={(e) => (main = e)} class="flex min-h-30 flex-1">
                   <div class="flex min-h-0 w-1/2 flex-col">
                     <Tree state={state} select={select} api={props.api} />
                   </div>
                   <div class="flex min-h-0 w-1/2 flex-col">
-                    <Details state={state} api={props.api} select={select} />
+                    <Details state={state} api={props.api} select={select} reveal={reveal} />
                   </div>
                 </main>
                 <BottomPanel

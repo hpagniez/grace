@@ -31,7 +31,7 @@ Every scenario, every failed step and every HTTP call, in one window.
 Karate Labs sells its GUI runners. The Karate engine is open source, and its command line already does what a runner needs: it finds the tests, runs them in parallel, writes a live event stream and an HTML report. Grace is a desktop app on top of that command line.
 
 - **Free, MIT licence.** No account, no licence key, no trial, no telemetry.
-- **Nothing else to install.** A Java 21 runtime and the Karate jar ship inside the zip. Grace never uses the Java on your machine.
+- **Nothing else to install.** A Java 21 runtime and the Karate jar ship inside the zip. Grace runs your tests on its own Java; only your project's build tool, when Grace lists your libraries or builds your Java code, uses the Java on your machine.
 - **Your project stays clean.** Run output, history and reports go to Grace's own data folder, not into your project.
 
 ## Features
@@ -41,7 +41,7 @@ Karate Labs sells its GUI runners. The Karate engine is open source, and its com
 <td width="50%" valign="top">
 
 **Test tree**<br>
-Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw` or `gradlew`, else the Maven or Gradle found on PATH, in `MAVEN_HOME`, `M2_HOME` or `GRADLE_HOME`, or the Maven that IntelliJ IDEA bundles), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. When the opened folder has no test, Grace offers the folders up to 3 levels below it that look like a Karate project. Arrow keys move through it, and it stays fast with 10,000 tests.
+Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw` or `gradlew`, else the Maven or Gradle found on PATH, in `MAVEN_HOME`, `M2_HOME` or `GRADLE_HOME`, or the Maven that IntelliJ IDEA bundles), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. When the project's Java code in `src/test/java` is not built, Grace says so, and its Build button runs `test-compile` or `testClasses` with that same build. When the opened folder has no test, Grace offers the folders up to 3 levels below it that look like a Karate project. Arrow keys move through it, and it stays fast with 10,000 tests.
 
 </td>
 <td width="50%" valign="top">
