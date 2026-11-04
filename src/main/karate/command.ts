@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
+import { STRIPPED_ENV_VARS } from "../../shared/env";
 import type { Layout, TestNode } from "../../shared/model";
 import { filterOn, matchingLeaves, NO_FILTER, type TagFilter } from "../../shared/tags";
 import { DEBUG_LISTENER } from "./debug";
@@ -256,18 +257,21 @@ export function buildArgs(o: {
   ];
 }
 
-const STRIPPED = [
-  "karate_options",
-  "karate_env",
-  "karate_config_dir",
-  "java_tool_options",
-  "jdk_java_options",
-  "_java_options",
-];
-
-/** Windows env keys come in any case, so compare lower-cased. Does not mutate `env`. */
-export function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(
-    Object.entries(env).filter(([k]) => !STRIPPED.includes(k.toLowerCase())),
+/**
+ * `env` without the variables Grace strips, then with each of `vars` set, replacing one of the same name in any
+ * letter case: Windows sees one variable. A later one wins. Windows env keys come in any case, so compare upper-cased.
+ * Does not mutate `env`.
+ */
+export function childEnv(
+  env: NodeJS.ProcessEnv,
+  vars: { name: string; value: string }[] = [],
+): NodeJS.ProcessEnv {
+  const out = Object.fromEntries(
+    Object.entries(env).filter(([k]) => !STRIPPED_ENV_VARS.includes(k.toUpperCase())),
   );
+  for (const { name, value } of vars) {
+    for (const k of Object.keys(out)) if (k.toUpperCase() === name.toUpperCase()) delete out[k];
+    out[name] = value;
+  }
+  return out;
 }
