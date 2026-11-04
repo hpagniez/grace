@@ -150,13 +150,14 @@ describe("Runner properties", () => {
 
   it("the machine's variable is replaced in any case", T, async () => {
     const { runner, events, last } = setup();
-    process.env.app_api_token = "machine";
+    // Node keeps the first of two keys that differ only in case, upper case first: the machine's must go
+    process.env.APP_API_TOKEN = "machine";
     try {
       await runner.open(fixture("env"));
-      runner.saveProperties({ shared: [variable("APP_API_TOKEN", "grace")], byEnv: {} });
+      runner.saveProperties({ shared: [variable("app_api_token", "grace")], byEnv: {} });
       await runner.run(byName(last("project").tree!, "always").key);
     } finally {
-      delete process.env.app_api_token;
+      delete process.env.APP_API_TOKEN;
     }
     expect(printed(events).some((l) => l.includes("APP_API_TOKEN = grace"))).toBe(true);
   });
@@ -166,7 +167,20 @@ describe("Runner properties", () => {
     await runner.open(fixture("env"));
     await runner.setEnv("qa");
     runner.saveProperties({
-      shared: [variable("app_api_token", "shared")],
+      shared: [variable("APP_API_TOKEN", "shared")],
+      byEnv: { qa: [variable("app_api_token", "qa")] },
+    });
+    await runner.run(byName(last("project").tree!, "always").key);
+    expect(printed(events).some((l) => l.includes("APP_API_TOKEN = qa"))).toBe(true);
+  });
+
+  it("the environment's variable wins even where it replaces a shared property", T, async () => {
+    const { runner, events, last } = setup();
+    await runner.open(fixture("env"));
+    await runner.setEnv("qa");
+    // qa's APP_API_TOKEN takes the place of the shared property of that name, before app_api_token
+    runner.saveProperties({
+      shared: [plain("APP_API_TOKEN", "p"), variable("app_api_token", "shared")],
       byEnv: { qa: [variable("APP_API_TOKEN", "qa")] },
     });
     await runner.run(byName(last("project").tree!, "always").key);

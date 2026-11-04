@@ -1088,9 +1088,14 @@ export class Runner {
     const { properties } = this.envs;
     const rows: PlainRow[] = [];
     const secrets: string[] = [];
+    // The environment's own variables go last: one that replaced a shared property sits at that
+    // property's place, and must still win over a shared variable differing only in case (R2.1).
+    const late: PlainRow[] = [];
+    const sharedRows = new Set<StoredRow>(properties.shared);
     for (const r of effectiveRows(properties.shared, properties.byEnv, env)) {
+      const to = r.envVar && !sharedRows.has(r) ? late : rows;
       if (!("secret" in r)) {
-        rows.push(r);
+        to.push(r);
         continue;
       }
       const value = this.readSecret(r.secret);
@@ -1102,10 +1107,10 @@ export class Runner {
         });
         return null;
       }
-      rows.push({ name: r.name, value, ...(r.envVar ? { envVar: true } : {}) });
+      to.push({ name: r.name, value, ...(r.envVar ? { envVar: true } : {}) });
       secrets.push(value);
     }
-    return { rows, secrets };
+    return { rows: [...rows, ...late], secrets };
   }
 
   /**
