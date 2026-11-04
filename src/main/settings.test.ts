@@ -474,7 +474,7 @@ describe("settings", () => {
       saveProjectProperties(data, "x", env.properties);
       const entry = JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8")).projects.x;
       expect(Object.hasOwn(entry, "env")).toBe(false);
-      expect(savedControls(data, "x").env).toBe(false);
+      expect(savedControls(data, "x")?.env).toBe(false);
     });
 
     it("the empty settings are a fresh object each call", () => {
@@ -502,14 +502,14 @@ describe("settings", () => {
     it("an env Grace does not take is not saved", () => {
       const data = tmp();
       writeFileSync(path.join(data, "settings.json"), '{"projects":{"x":{"env":"x y"}}}');
-      expect(savedControls(data, "x").env).toBe(false);
+      expect(savedControls(data, "x")?.env).toBe(false);
     });
-    it("none when the file cannot be read", () => {
+    it("unknown when the file cannot be read", () => {
       const data = tmp();
       saveProjectThreads(data, "x", 2);
       readFails.code = "EBUSY";
       try {
-        expect(savedControls(data, "x")).toEqual(none);
+        expect(savedControls(data, "x")).toBeNull();
       } finally {
         readFails.code = null;
       }

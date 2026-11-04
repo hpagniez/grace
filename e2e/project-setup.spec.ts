@@ -83,8 +83,11 @@ test("karate-pom.json starts the environment, filter and thread count", async ()
 
   await win.getByTestId("run-all-button").click();
   await expect(node(win, "fast")).toHaveAttribute("data-status", "passed", { timeout: 60_000 });
-  for (const name of ["slow", "plain"])
-    await expect(node(win, name)).not.toHaveAttribute("data-status", /passed|failed/);
+  // slow and plain: dimmed rows, by key as they have no Run button
+  for (const key of ["s:a.feature#2", "s:a.feature#3"]) {
+    await expect(nodeByKey(win, key)).toHaveAttribute("data-match", "false");
+    await expect(nodeByKey(win, key)).not.toHaveAttribute("data-status", /passed|failed/);
+  }
 });
 
 test("Maven's karate.env starts the environment", async () => {

@@ -103,6 +103,7 @@ import {
   saveProjectWatch,
   skippedProperties,
   type EnvSettings,
+  type SavedControls,
   type StoredLists,
   type StoredRow,
 } from "./settings";
@@ -266,6 +267,8 @@ export class Runner {
         const libraries = await this.listLibraries(root, layout);
         const start = this.start(
           root,
+          // unreadable: none saved, as the loaders read it
+          savedControls(this.o.dataDir, root) ?? { env: false, filter: false, threads: false },
           loadProjectFilter(this.o.dataDir, root),
           loadProjectEnv(this.o.dataDir, root),
           loadProjectThreads(this.o.dataDir, root),
@@ -361,7 +364,14 @@ export class Runner {
       await this.guarded(async () => {
         const project = this.project!;
         const libraries = await this.listLibraries(project.root, project.layout);
-        const start = this.start(project.root, this.filter, this.envs, this.threads);
+        const start = this.start(
+          project.root,
+          // unreadable: keep every value in force rather than guess
+          savedControls(this.o.dataDir, project.root) ?? { env: true, filter: true, threads: true },
+          this.filter,
+          this.envs,
+          this.threads,
+        );
         if (!(await this.rediscover(project, start.filter, start.envs, start.threads))) return;
         this.arm(); // karate-pom.json may have changed the feature roots (R2.4)
         const said = [libraries, await testCodeNotice(project.root, project.layout)].filter(
@@ -758,13 +768,17 @@ export class Runner {
     for (const e of this.historyEvents()) this.o.emit(e);
   }
 
-  /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
   /**
-   * Open and Refresh (docs/specs/2026-11-04-pom-defaults.md R1): each control's value when saved, else the
+   * Open and Refresh (docs/specs/2026-11-04-pom-defaults.md R1): each control's value when `saved`, else the
    * pom's, else Grace's default.
    */
-  private start(root: string, filter: FilterState, envs: EnvSettings, threads: number) {
-    const saved = savedControls(this.o.dataDir, root);
+  private start(
+    root: string,
+    saved: SavedControls,
+    filter: FilterState,
+    envs: EnvSettings,
+    threads: number,
+  ) {
     const pom = pomStart(root);
     return {
       filter: saved.filter ? filter : { ...NO_FILTER, include: [], exclude: [], ...pom.filter },
@@ -773,6 +787,7 @@ export class Runner {
     };
   }
 
+  /** Applies `f` even if it cannot be saved: a disk error must not undo the change. */
   private storeFilter(f: FilterState) {
     this.filter = f;
     try {
@@ -889,7 +904,7 @@ export class Runner {
           pruned.exclude.length !== filter.exclude.length)
       ) {
         // a filter from the pom stays unsaved (docs/specs/2026-11-04-pom-defaults.md R1.2)
-        if (savedControls(this.o.dataDir, project.root).filter) this.storeFilter(pruned);
+        if (savedControls(this.o.dataDir, project.root)?.filter !== false) this.storeFilter(pruned);
         else this.filter = pruned;
       }
       this.sendFilter();

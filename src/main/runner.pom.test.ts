@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -97,7 +97,7 @@ describe("Runner starts from the pom (docs/specs/2026-11-04-pom-defaults.md)", (
         byEnv: {},
       }),
     ).toBe(true);
-    expect(savedControls(first.dataDir, root).env).toBe(false);
+    expect(savedControls(first.dataDir, root)?.env).toBe(false);
     await first.runner.dispose();
     withPom({ env: "dev" }, root);
     const second = setup(first.dataDir);
@@ -110,7 +110,7 @@ describe("Runner starts from the pom (docs/specs/2026-11-04-pom-defaults.md)", (
     const root = withPom({ tags: ["~@gone"] });
     await runner.open(root);
     expect(last("filter").filter).toEqual(NO_FILTER);
-    expect(savedControls(dataDir, root).filter).toBe(false);
+    expect(savedControls(dataDir, root)?.filter).toBe(false);
   });
 
   it("a change in the filter bar saves the whole filter shown", T, async () => {
@@ -130,6 +130,20 @@ describe("Runner starts from the pom (docs/specs/2026-11-04-pom-defaults.md)", (
     withPom({ env: "dev", threads: 4 }, root);
     await runner.refresh();
     expect(last("environment").view.env).toBe("dev");
+    expect(last("threads").count).toBe(2);
+  });
+
+  it("Refresh keeps the controls in force when settings.json cannot be read", T, async () => {
+    const { runner, last, dataDir } = setup();
+    const root = withPom({ env: "qa" });
+    await runner.open(root);
+    runner.setThreads(2);
+    const settings = path.join(dataDir, "settings.json");
+    rmSync(settings);
+    mkdirSync(settings); // reading it now fails with EISDIR
+    withPom({ env: "dev", threads: 4 }, root);
+    await runner.refresh();
+    expect(last("environment").view.env).toBe("qa");
     expect(last("threads").count).toBe(2);
   });
 

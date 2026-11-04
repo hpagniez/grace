@@ -351,14 +351,17 @@ function putProperties(e: Record<string, unknown>, p: StoredLists): void {
   };
 }
 
-/** Which of the environment, the tag filter and the thread count the project has saved (R1.1). Never throws. */
 export interface SavedControls {
   env: boolean;
   filter: boolean;
   threads: boolean;
 }
 
-export function savedControls(dataDir: string, root: string): SavedControls {
+/**
+ * Which of the environment, the tag filter and the thread count the project has saved (R1.1); null when
+ * settings.json cannot be read, so the caller decides. Never throws.
+ */
+export function savedControls(dataDir: string, root: string): SavedControls | null {
   try {
     const e = savedEntry(dataDir, root);
     if (!isObject(e)) return { env: false, filter: false, threads: false };
@@ -370,7 +373,7 @@ export function savedControls(dataDir: string, root: string): SavedControls {
       threads: validThreads(e.threads),
     };
   } catch {
-    return { env: false, filter: false, threads: false };
+    return null;
   }
 }
 
