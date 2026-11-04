@@ -33,7 +33,6 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
     "karate-pom.json": JSON.stringify({
       paths: ["tests/a"],
       configDir: "conf",
-      env: "qa",
       dryRun: true,
     }),
   });
@@ -44,7 +43,7 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
   await expect(nodeByKey(win, "f:tests/a/a.feature")).toBeVisible({ timeout: 15_000 });
   await expect(nodeByKey(win, "f:tests/b/b.feature")).toHaveCount(0);
   await expect(win.getByTestId("notice")).toHaveText(
-    "Grace does not use these karate-pom.json settings: env, dryRun.",
+    "Grace does not use these karate-pom.json settings: dryRun.",
   );
   await expect(win.getByTestId("env-input")).toHaveAttribute("placeholder", "(none)");
   await expect
@@ -57,6 +56,51 @@ test("karate-pom.json gives the tests and the config, and a notice names the res
 
   await win.getByTestId("run-all-button").click();
   await expect(node(win, "a1")).toHaveAttribute("data-status", "passed", { timeout: 60_000 });
+});
+
+test("karate-pom.json starts the environment, filter and thread count", async () => {
+  test.setTimeout(120_000);
+  // fast passes only in qa; the other two must not run
+  const dir = write(tempDir("kk-pom-start-"), {
+    "a.feature":
+      "Feature: a\n@smoke\nScenario: fast\n  * match cfg == 'qa'\n" +
+      "@smoke @slow\nScenario: slow\n  * print 'slow'\nScenario: plain\n  * print 'plain'\n",
+    "karate-config.js": "function fn() { return { cfg: 'base' }; }",
+    "karate-config-qa.js": "function fn() { return { cfg: 'qa' }; }",
+    "karate-pom.json": JSON.stringify({ env: "qa", tags: ["@smoke", "~@slow"], threads: 3 }),
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await openFeatures(win);
+
+  await expect(node(win, "fast")).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByTestId("env-input")).toHaveValue("qa");
+  const chip = (tag: string) => win.locator(`[data-testid=tag-chip][data-tag="${tag}"]`);
+  await expect(chip("smoke")).toHaveAttribute("data-state", "include");
+  await expect(chip("slow")).toHaveAttribute("data-state", "exclude");
+  await expect(win.getByTestId("threads-input")).toHaveValue("3");
+  await expect(win.getByTestId("notice")).toHaveCount(0);
+
+  await win.getByTestId("run-all-button").click();
+  await expect(node(win, "fast")).toHaveAttribute("data-status", "passed", { timeout: 60_000 });
+  for (const name of ["slow", "plain"])
+    await expect(node(win, name)).not.toHaveAttribute("data-status", /passed|failed/);
+});
+
+test("Maven's karate.env starts the environment", async () => {
+  test.setTimeout(120_000);
+  const dir = write(project("maven"), {
+    "pom.xml":
+      "<project><modelVersion>4.0.0</modelVersion><groupId>x</groupId><artifactId>x</artifactId><version>1</version>" +
+      "<properties><karate.env>dev</karate.env></properties><build><plugins><plugin>" +
+      "<artifactId>maven-surefire-plugin</artifactId><configuration><systemPropertyVariables>" +
+      "<karate.env>${karate.env}</karate.env></systemPropertyVariables></configuration>" +
+      "</plugin></plugins></build></project>",
+  });
+  const { app, win } = await launch();
+  await openProject(app, dir);
+  await openFeatures(win);
+  await expect(win.getByTestId("env-input")).toHaveValue("dev", { timeout: 15_000 });
 });
 
 test("Maven's compiled output is on the classpath", async () => {
