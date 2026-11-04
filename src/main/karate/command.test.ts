@@ -202,7 +202,7 @@ describe("detectLayout", () => {
       expect(detectLayout(root)).toMatchObject({
         configDir: "conf",
         configDirs: [path.join(root, "conf"), root],
-        pomNotice: "Grace does not use these karate-pom.json settings: env.",
+        pomNotice: null,
       });
     });
     it("resolves a classpath: configDir under each source folder", () => {
@@ -215,9 +215,9 @@ describe("detectLayout", () => {
     });
     it("says both, settings first", () => {
       const root = project([]);
-      pom(root, { threads: 3, paths: ["gone"], tags: ["@a"] });
+      pom(root, { threads: 64, paths: ["gone"], dryRun: true });
       expect(detectLayout(root).pomNotice).toBe(
-        "Grace does not use these karate-pom.json settings: threads, tags. " +
+        "Grace does not use these karate-pom.json settings: threads 64, dryRun. " +
           "These karate-pom.json paths are not folders or files in the project: gone.",
       );
     });
