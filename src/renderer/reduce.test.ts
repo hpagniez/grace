@@ -679,3 +679,17 @@ describe("watch", () => {
     expect(s.watch).toBe(false);
   });
 });
+
+describe("reduce: Karate's reason (#229 R2.1)", () => {
+  it("keeps where the reason starts, until the test runs again", () => {
+    const s = initialState();
+    apply(s, project(), started([keys[0]]));
+    apply(s, {
+      type: "scenarios",
+      updates: [{ key: keys[0], status: "failed", error: "C:/x:1\nboom", reasonAt: 7 }],
+    });
+    expect(s.results[keys[0]]).toEqual({ error: "C:/x:1\nboom", reasonAt: 7 });
+    apply(s, started([keys[0]]));
+    expect(s.results[keys[0]]).toBeUndefined();
+  });
+});

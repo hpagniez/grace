@@ -48,7 +48,8 @@ export interface AppState {
   tree: TestNode | null;
   error: string | null;
   statuses: Record<string, Status>;
-  results: Record<string, { durationMillis?: number; error?: string }>;
+  /** `reasonAt`: where Karate's reason starts in `error` (#229 R2.1). */
+  results: Record<string, { durationMillis?: number; error?: string; reasonAt?: number }>;
   steps: Record<string, Step[]>;
   /** Each test's HTTP calls, in run order; cleared exactly as `steps` is. */
   calls: Record<string, HttpCall[]>;
@@ -256,6 +257,7 @@ export function reduce(s: AppState, e: AppEvent): void {
         const r = s.results[u.key] ?? {};
         if (u.durationMillis !== undefined) r.durationMillis = u.durationMillis;
         if (u.error !== undefined) r.error = u.error;
+        if (u.reasonAt !== undefined) r.reasonAt = u.reasonAt;
         s.results[u.key] = r;
         if (u.status === "interrupted" && before !== "interrupted") s.run.interrupted++;
         if (!final && (u.status === "passed" || u.status === "failed")) {
