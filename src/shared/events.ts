@@ -71,6 +71,8 @@ export interface ScenarioUpdate {
   status: Status;
   durationMillis?: number;
   error?: string;
+  /** Where Karate's reason starts in `error` (#229 R2.1); none: the whole error is the reason. */
+  reasonAt?: number;
 }
 export interface Summary {
   scenarioCount: number;

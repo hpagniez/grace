@@ -8,7 +8,8 @@ export function extractSteps(
     refId: sc.refId,
     steps: (sc.stepResults ?? []).map((r: Record<string, any>): Step => ({
       keyword: r.step.prefix,
-      text: `${r.step.keyword} ${r.step.text}`,
+      // Karate's synthetic step (a failed config) has no keyword (#229 R1.3)
+      text: r.step.keyword ? `${r.step.keyword} ${r.step.text}` : r.step.text,
       line: r.step.line,
       status: r.result.status,
       millis: r.result.millis,
