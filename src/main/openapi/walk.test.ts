@@ -178,11 +178,15 @@ webhooks:
   hook:
     $ref: other.yaml
 paths:
+  x-paths-note:
+    $ref: gone-paths.yaml
   /a:
     get:
       x-internal:
         $ref: elsewhere.yaml
       responses:
+        x-hook:
+          $ref: gone-responses.yaml
         "200":
           description: ok
           content:
@@ -224,6 +228,114 @@ paths:
       types: ["object"],
       properties: { copy: { types: ["string"] } },
     });
+  });
+});
+
+describe("aliases", () => {
+  it("resolves thousands of them without reading the document again for each", async () => {
+    const count = 2000;
+    const pathItem = (i: number) => `  /p${i}:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: ${i % 2 ? "*s" : '{$ref: "#/components/schemas/S"}'}
+`;
+    const text = `${HEAD}x-defs:
+  s: &s
+    type: string
+paths:
+${Array.from({ length: count }, (_, i) => pathItem(i)).join("")}components:
+  schemas:
+    S: *s
+`;
+    const started = performance.now();
+    const api = apiOf(await readText(text));
+    // A margin for a loaded machine: a scan of the document per alias takes about 28 s here.
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(api.operations).toHaveLength(count);
+    // A `$ref` to `S` and the alias `*s` both name the same node, so they give the same schema.
+    const [byRef, byAlias] = api.operations.map((o) => o.success!.body!.schema!);
+    expect(byRef).toMatchObject({ types: ["string"] });
+    expect(byRef).toBe(byAlias);
+  });
+
+  it("takes an aliased scalar for the scalar it names", async () => {
+    const text = withSchema(
+      `                type: *t
+                format: *f
+                required: [*id]
+                properties:
+                  id:
+                    type: string
+`,
+      `${HEAD}x-defs:
+  t: &t object
+  f: &f binary
+  id: &id id
+`,
+    );
+    expect(successSchema(apiOf(await readText(text)))).toMatchObject({
+      types: ["object"],
+      format: "binary",
+      required: ["id"],
+    });
+  });
+
+  it("leaves out a sample that contains itself and keeps the others", async () => {
+    const text = `${HEAD}paths:
+  /a:
+    get:
+      parameters:
+        - name: q
+          in: query
+          example: &p
+            self: *p
+          examples:
+            ok:
+              value: fine
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              example: &m [*m]
+              examples:
+                loop:
+                  value: &l
+                    again: *l
+                fine:
+                  value: 7
+              schema:
+                type: object
+                example: &a
+                  x: *a
+                default: 5
+`;
+    const api = apiOf(await readText(text));
+    const op = api.operations[0]!;
+    expect(op.params[0]!.samples).toEqual(["fine"]);
+    expect(op.success!.body!.samples).toEqual([7]);
+    expect(successSchema(api).samples).toEqual([5]);
+    expect(() => JSON.stringify(api)).not.toThrow();
+  });
+});
+
+describe("info", () => {
+  it("reads a scalar title and version as written", async () => {
+    const text =
+      'openapi: 3.0.3\ninfo:\n  title: 42\n  version: 1.0\npaths:\n  /a:\n    get:\n      responses:\n        "200":\n          description: ok\n';
+    expect(apiOf(await readText(text))).toMatchObject({ title: "42", version: "1.0" });
+  });
+
+  it("refuses a title or version that is not a scalar, or is empty", async () => {
+    const text = "openapi: 3.0.3\ninfo:\n  title: [a]\n  version:\npaths: {}\n";
+    expect(errorsOf(await readText(text))).toEqual([
+      `${SPEC}:3: info title must be a scalar`,
+      `${SPEC}:4: info has no version`,
+    ]);
   });
 });
 

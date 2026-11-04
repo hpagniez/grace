@@ -10,9 +10,12 @@ import {
   isSeq,
   LineCounter,
   parseDocument,
+  visit,
+  type Alias,
   type Document,
   type Node,
 } from "yaml";
+import { toJS } from "yaml/util";
 import { displayUrl, fetchText, MAX_BYTES, type Fetch } from "./fetch";
 
 const MAX_DOCS = 100;
@@ -114,10 +117,66 @@ async function readLimited(path: string): Promise<string> {
   return readFile(path, "utf8");
 }
 
+/** What a document's anchors give, found once: `Alias.resolve` alone reads the whole document on every call. */
+interface Anchors {
+  /** Every anchored node and every alias, in document order: yaml's `aliasResolveCache`. */
+  nodes: Node[];
+  /** The node each alias names: the last node with its anchor before it. */
+  named: Map<Alias, Node | undefined>;
+}
+const anchorsOf = new WeakMap<Document, Anchors>();
+
+function anchors(document: Document): Anchors {
+  let found = anchorsOf.get(document);
+  if (!found) {
+    const nodes: Node[] = [];
+    visit(document, {
+      Node: (_key, node) => {
+        if (isAlias(node) || node.anchor) nodes.push(node);
+      },
+    });
+    const latest = new Map<string, Node>();
+    const named = new Map<Alias, Node | undefined>();
+    for (const node of nodes) {
+      if (isAlias(node)) named.set(node, latest.get(node.source));
+      else latest.set(node.anchor!, node);
+    }
+    found = { nodes, named };
+    anchorsOf.set(document, found);
+  }
+  return found;
+}
+
+const aliasTarget = (doc: Doc, alias: Alias) => anchors(doc.document).named.get(alias);
+
+/** `n`, or the node it names when it is an alias; `null` for nothing. */
+export function resolveAlias(doc: Doc, n: unknown): Node | null {
+  return isAlias(n) ? (aliasTarget(doc, n) ?? null) : ((n as Node | null | undefined) ?? null);
+}
+
+/**
+ * A node's plain data, `undefined` for nothing. Throws a ReferenceError when aliases expand past
+ * yaml's limit. A value can contain itself (`&a {x: *a}`). The anchors are handed to yaml found
+ * once, so a call does not read the document again.
+ */
+export function toPlain(doc: Doc, node: Node | null | undefined): unknown {
+  const target = resolveAlias(doc, node);
+  if (!target) return undefined;
+  return toJS(target, "", {
+    anchors: new Map(),
+    aliasResolveCache: anchors(doc.document).nodes,
+    doc: doc.document,
+    keep: true,
+    mapAsMap: false,
+    mapKeyWarned: false,
+    maxAliasCount: 100,
+  });
+}
+
 /** The node a JSON pointer names, `null` for a null value, `undefined` for nothing. An alias is the node it names. */
 function follow(doc: Doc, pointer: string): Node | null | undefined {
   if (pointer !== "" && !pointer.startsWith("/")) return undefined;
-  const named = (n: Node | null | undefined) => (isAlias(n) ? n.resolve(doc.document) : n);
+  const named = (n: Node | null | undefined) => (isAlias(n) ? aliasTarget(doc, n) : n);
   let node = named(doc.root);
   try {
     for (const segment of pointer === "" ? [] : pointer.slice(1).split("/")) {

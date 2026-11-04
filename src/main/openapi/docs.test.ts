@@ -174,6 +174,26 @@ describe("Docs.target", () => {
     expect(js((await docs.target("#/use/type", doc, at)).node)).toBe("object");
   });
 
+  it("names the last anchor before the alias, and nothing for an anchor not set yet", async () => {
+    const { docs, doc } = await memory("first: *x\na: &x 1\nb: *x\nc: &x 2\nd: *x\n");
+    const value = async (ref: string) => js((await docs.target(ref, doc, at)).node);
+    expect(await value("#/b")).toBe(1);
+    expect(await value("#/d")).toBe(2);
+    const e = await failure(() => docs.target("#/first", doc, at));
+    expect(e.message).toBe("$ref #/first points at nothing");
+  });
+
+  it("resolves thousands of aliases without reading the document again for each", async () => {
+    const count = 2000;
+    const pad = Array.from({ length: 20_000 }, (_, i) => i).join(", ");
+    const aliases = Array.from({ length: count }, (_, i) => `k${i}: *s\n`).join("");
+    const { docs, doc } = await memory(`s: &s\n  type: object\npad: [${pad}]\n${aliases}`);
+    const started = performance.now();
+    for (let i = 0; i < count; i++) await docs.target(`#/k${i}`, doc, at);
+    // A margin for a loaded machine: a scan of the document per alias takes about 6 s here.
+    expect(performance.now() - started).toBeLessThan(2500);
+  });
+
   it("refuses a pointer that points at nothing, at the $ref's line", async () => {
     const { docs, doc } = await memory("x: 2\nlist: [zero]\n");
     for (const ref of ["#/nope", "#/x/deeper", "#/list/1", "#/list/x", "#nope"]) {

@@ -2,8 +2,16 @@
 // Errors are collected rather than thrown, so the person sees all of them; only a wrong version stops the walk.
 
 import { pathToFileURL } from "node:url";
-import { isAlias, isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap } from "yaml";
-import { Docs, format, ImportError, type Doc, type Loc } from "./docs";
+import { isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap } from "yaml";
+import {
+  Docs,
+  format,
+  ImportError,
+  resolveAlias as named,
+  toPlain,
+  type Doc,
+  type Loc,
+} from "./docs";
 import type { Fetch } from "./fetch";
 import type { Api, Body, Operation, Param, Schema } from "./model";
 
@@ -24,8 +32,28 @@ const entry = (map: YAMLMap, key: string): Pair | undefined =>
   map.items.find((p) => isScalar(p.key) && String(p.key.value) === key);
 const val = (p: Pair | undefined) => p?.value as N;
 const keyOf = (p: Pair) => p.key as N;
-const text = (n: unknown) => (isScalar(n) && typeof n.value === "string" ? n.value : undefined);
+/** The scalar a node is, an alias to one included. */
+const scalar = (doc: Doc, n: unknown) => {
+  const s = named(doc, n);
+  return isScalar(s) ? s : undefined;
+};
+const text = (doc: Doc, n: unknown) => {
+  const v = scalar(doc, n)?.value;
+  return typeof v === "string" ? v : undefined;
+};
 const keyText = (p: Pair) => String(isScalar(p.key) ? p.key.value : "");
+/** `x-` keys are extensions, not data the import reads (R3.3), wherever the spec allows them. */
+const isExtension = (p: Pair) => keyText(p).startsWith("x-");
+
+/** Whether a value contains itself, as `&a {x: *a}` does: `JSON.stringify` would throw on it. */
+function cyclic(value: unknown, ancestors = new Set<object>()): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  if (ancestors.has(value)) return true;
+  ancestors.add(value);
+  const found = Object.values(value).some((v) => cyclic(v, ancestors));
+  ancestors.delete(value);
+  return found;
+}
 const pick = (bodies: Body[]) => bodies.find((b) => b.json) ?? bodies[0] ?? null;
 
 const emptySchema = (): Schema => ({
@@ -90,14 +118,19 @@ class Walker {
     this.errors.push(new ImportError(this.at(doc, ...nodes), reason));
   }
 
-  /** A node's plain data. A `$ref` key in it is data (R3.3). */
-  private plain(doc: Doc, node: N): unknown {
+  /**
+   * Adds a node's plain data to `into`. A `$ref` key in it is data (R3.3). A value that contains
+   * itself is left out, as if absent: the generator would write it with `JSON.stringify`.
+   */
+  private add(into: unknown[], doc: Doc, node: N) {
+    let value: unknown;
     try {
-      return named(doc, node)?.toJS(doc.document);
-    } catch {
-      this.fail(doc, "too many aliases", node);
-      return undefined;
+      value = toPlain(doc, node);
+    } catch (e) {
+      this.fail(doc, e instanceof Error ? e.message : "too many aliases", node);
+      return;
     }
+    if (value !== undefined && !cyclic(value)) into.push(value);
   }
 
   async run(root: Doc): Promise<Api> {
@@ -106,18 +139,18 @@ class Walker {
     this.checkVersion(root, map);
     const infoPair = entry(map, "info");
     const info = named(root, val(infoPair));
+    // R4.1: any scalar, as written (`version: 1.0` is "1.0"); an empty value is none.
     const field = (name: string) => {
       const pair = isMap(info) ? entry(info, name) : undefined;
-      const value = text(val(pair));
-      if (value === undefined) {
-        const reason = !isMap(info)
-          ? "info must be a mapping"
-          : pair
-            ? `info ${name} must be a string`
-            : `info has no ${name}`;
-        this.fail(root, reason, val(pair), infoPair && keyOf(infoPair), map);
-      }
-      return value ?? "";
+      const value = scalar(root, val(pair));
+      if (value && value.value !== null) return value.source ?? String(value.value);
+      const reason = !isMap(info)
+        ? "info must be a mapping"
+        : pair && !value
+          ? `info ${name} must be a scalar`
+          : `info has no ${name}`;
+      this.fail(root, reason, val(pair), infoPair && keyOf(infoPair), map);
+      return "";
     };
     const title = field("title");
     const version = field("version");
@@ -127,7 +160,8 @@ class Walker {
     const pathsPair = entry(map, "paths");
     const paths = named(root, val(pathsPair));
     if (pathsPair && !isMap(paths)) this.fail(root, "paths must be a mapping", val(pathsPair));
-    if (isMap(paths)) for (const pair of paths.items) await this.pathItem(root, pair, operations);
+    for (const pair of isMap(paths) ? paths.items : [])
+      if (!isExtension(pair)) await this.pathItem(root, pair, operations);
     if (operations.length === 0 && this.errors.length === 0)
       this.fail(root, "No operation to generate", pathsPair && keyOf(pathsPair), map);
 
@@ -135,9 +169,9 @@ class Walker {
     const listed = named(root, val(entry(map, "tags")));
     for (const item of isSeq(listed) ? listed.items : []) {
       const tag = named(root, item as N);
-      const name = isMap(tag) ? text(val(entry(tag, "name"))) : undefined;
-      if (name !== undefined && !tags.has(name))
-        tags.set(name, text(val(entry(tag as YAMLMap, "description"))) ?? null);
+      const name = isMap(tag) ? text(root, val(entry(tag, "name"))) : undefined;
+      if (isMap(tag) && name !== undefined && !tags.has(name))
+        tags.set(name, text(root, val(entry(tag, "description"))) ?? null);
     }
     for (const op of operations) if (op.tag !== null && !tags.has(op.tag)) tags.set(op.tag, null);
     return {
@@ -159,11 +193,11 @@ class Walker {
       );
     const field = entry(map, "openapi");
     if (!field) throw new ImportError(this.at(doc, map), "Not an OpenAPI spec: no openapi field");
-    const v = val(field);
-    const minor = /^3\.([012])\.\d+/.exec(text(v) ?? "")?.[1];
+    const v = named(doc, val(field));
+    const minor = /^3\.([012])\.\d+/.exec(text(doc, v) ?? "")?.[1];
     if (minor === undefined) {
       // A number such as `3.0` shows as it was written.
-      const shown = isScalar(v) ? v.source || String(v.value) : JSON.stringify(this.plain(doc, v));
+      const shown = isScalar(v) ? v.source || String(v.value) : isSeq(v) ? "a list" : "a mapping";
       throw new ImportError(
         this.at(doc, v, map),
         `OpenAPI ${shown} is not supported: ${SUPPORTED}`,
@@ -176,14 +210,14 @@ class Walker {
   private server(doc: Doc, root: YAMLMap): string | null {
     const servers = named(doc, val(entry(root, "servers")));
     const first = named(doc, (isSeq(servers) ? servers.items[0] : undefined) as N);
-    const raw = isMap(first) ? text(val(entry(first, "url"))) : undefined;
+    const raw = isMap(first) ? text(doc, val(entry(first, "url"))) : undefined;
     if (!isMap(first) || raw === undefined) return null;
     const variables = named(doc, val(entry(first, "variables")));
     const url =
       raw.replace(/\{([^}]*)\}/g, (all, name: string) => {
         const variable = isMap(variables) ? named(doc, val(entry(variables, name))) : null;
         const fallback = isMap(variable)
-          ? this.plain(doc, val(entry(variable, "default")))
+          ? scalar(doc, val(entry(variable, "default")))?.value
           : undefined;
         return typeof fallback === "string" || typeof fallback === "number"
           ? String(fallback)
@@ -218,7 +252,7 @@ class Walker {
         const ref = isMap(here) ? entry(here, "$ref") : undefined;
         if (!here || !ref) return { node: here, doc };
         const at = this.at(doc, val(ref), here);
-        const target = text(val(ref));
+        const target = text(doc, val(ref));
         if (target === undefined) throw new ImportError(at, "$ref must be a string");
         if (seen.has(here)) throw new ImportError(at, `$ref ${target} leads back to itself`);
         seen.add(here);
@@ -289,8 +323,8 @@ class Walker {
     return {
       method,
       path: route,
-      tag: (isSeq(tags) ? text(named(doc, tags.items[0] as N)) : undefined) ?? null,
-      summary: text(val(entry(op, "summary"))) ?? null,
+      tag: (isSeq(tags) ? text(doc, tags.items[0] as N) : undefined) ?? null,
+      summary: text(doc, val(entry(op, "summary"))) ?? null,
       params: [...params.values()],
       body,
       success: ok ?? (range && { code: "2XX", body: range.body }) ?? null,
@@ -315,13 +349,14 @@ class Walker {
         this.fail(paramDoc, "parameter must be a mapping", param);
         continue;
       }
-      const name = text(val(entry(param, "name")));
+      const name = text(paramDoc, val(entry(param, "name")));
       const place = entry(param, "in");
+      const where = text(paramDoc, val(place)) ?? "";
       if (name === undefined) {
         this.fail(paramDoc, "parameter has no name", param);
       } else if (!place) {
         this.fail(paramDoc, `parameter ${name} has no in`, param);
-      } else if (!places.includes(text(val(place)) ?? "")) {
+      } else if (!places.includes(where)) {
         this.fail(
           paramDoc,
           `parameter ${name}: in must be one of ${places.join(", ")}`,
@@ -329,11 +364,11 @@ class Walker {
         );
       } else {
         const schema = entry(param, "schema");
-        const required = val(entry(param, "required"));
         out.push({
           name,
-          in: text(val(place)) as Param["in"],
-          required: text(val(place)) === "path" || (isScalar(required) && required.value === true),
+          in: where as Param["in"],
+          required:
+            where === "path" || scalar(paramDoc, val(entry(param, "required")))?.value === true,
           samples: this.examples(paramDoc, param),
           schema: schema ? await this.schema(val(schema), paramDoc) : null,
         });
@@ -366,6 +401,7 @@ class Walker {
     }
     const out: { code: string; body: Body | null }[] = [];
     for (const p of map.items) {
+      if (isExtension(p)) continue;
       const found = await this.deref(val(p), doc);
       if (!found) continue;
       if (!isMap(found.node)) {
@@ -409,12 +445,12 @@ class Walker {
   private examples(doc: Doc, owner: YAMLMap): unknown[] {
     const out: unknown[] = [];
     const one = entry(owner, "example");
-    if (one) out.push(this.plain(doc, val(one)));
+    if (one) this.add(out, doc, val(one));
     const many = named(doc, val(entry(owner, "examples")));
     for (const p of isMap(many) ? many.items : []) {
       const example = named(doc, val(p));
       const value = isMap(example) ? entry(example, "value") : undefined;
-      if (value) out.push(this.plain(doc, val(value)));
+      if (value) this.add(out, doc, val(value));
     }
     return out;
   }
@@ -435,17 +471,12 @@ class Walker {
     // `true` and `false` mean anything and nothing: every field stays empty.
     if (this.minor >= 1 && isScalar(node) && typeof node.value === "boolean") return;
     if (!isMap(node)) return this.fail(doc, "a schema must be a mapping", node);
-    const flag = (key: string) => {
-      const v = val(entry(node, key));
-      return isScalar(v) && v.value === true;
-    };
+    const flag = (key: string) => scalar(doc, val(entry(node, key)))?.value === true;
 
     const type = entry(node, "type");
     if (type) {
       const t = named(doc, val(type));
-      const types = (isSeq(t) && this.minor >= 1 ? t.items : [t]).map((x) =>
-        text(named(doc, x as N)),
-      );
+      const types = (isSeq(t) && this.minor >= 1 ? t.items : [t]).map((x) => text(doc, x as N));
       if (types.length === 0 || types.some((x) => !TYPES.includes(x ?? "")))
         this.fail(doc, `type must be one of ${TYPES.join(", ")}`, val(type));
       else {
@@ -456,14 +487,14 @@ class Walker {
     out.nullable ||= flag("nullable");
     out.readOnly = flag("readOnly");
     out.writeOnly = flag("writeOnly");
-    out.format = text(val(entry(node, "format"))) ?? null;
-    const minimum = val(entry(node, "minimum"));
-    out.minimum = isScalar(minimum) && typeof minimum.value === "number" ? minimum.value : null;
+    out.format = text(doc, val(entry(node, "format"))) ?? null;
+    const minimum = scalar(doc, val(entry(node, "minimum")))?.value;
+    out.minimum = typeof minimum === "number" ? minimum : null;
 
     const required = entry(node, "required");
     if (required) {
       const list = named(doc, val(required));
-      const names = isSeq(list) ? list.items.map(text) : [undefined];
+      const names = isSeq(list) ? list.items.map((x) => text(doc, x as N)) : [undefined];
       if (names.some((x) => x === undefined))
         this.fail(doc, "required must be a list of strings", val(required));
       else out.required = names as string[];
@@ -496,25 +527,18 @@ class Walker {
     }
 
     // R5.5's order: example, the items of examples (3.1), const, default, the first of enum.
+    const samples: unknown[] = [];
     const take = (key: string) => {
       const pair = entry(node, key);
-      return pair ? [this.plain(doc, val(pair))] : [];
+      if (pair) this.add(samples, doc, val(pair));
     };
+    take("example");
     const examples = named(doc, val(entry(node, "examples")));
+    for (const x of isSeq(examples) ? examples.items : []) this.add(samples, doc, x as N);
+    take("const");
+    take("default");
     const choices = named(doc, val(entry(node, "enum")));
-    out.samples = [
-      ...take("example"),
-      ...(isSeq(examples) ? examples.items.map((x) => this.plain(doc, x as N)) : []),
-      ...take("const"),
-      ...take("default"),
-      ...(isSeq(choices) && choices.items.length > 0
-        ? [this.plain(doc, choices.items[0] as N)]
-        : []),
-    ];
+    if (isSeq(choices) && choices.items.length > 0) this.add(samples, doc, choices.items[0] as N);
+    out.samples = samples;
   }
-}
-
-/** The node an alias names, else the node itself. */
-function named(doc: Doc, n: unknown): Node | null {
-  return isAlias(n) ? (n.resolve(doc.document) ?? null) : ((n as Node | null | undefined) ?? null);
 }

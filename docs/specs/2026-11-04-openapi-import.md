@@ -77,7 +77,7 @@ The owner's answers:
 
 Each failed check is an error of R3.5 at the line of the value it names. Only what R3.3 reaches is checked.
 
-1. `info` is a mapping with a string `title` and a string `version`.
+1. `info` is a mapping with a scalar `title` and a scalar `version`, read as written (`version: 1.0` is "1.0").
 2. `paths`, when present, is a mapping whose keys start with `/`; each path item and each operation is a mapping.
 3. A parameter is a mapping with a string `name` and `in` one of `query`, `header`, `path`, `cookie` (and `querystring` from 3.2). A path parameter in a path's `{…}` template exists for each name, on the path item or the operation.
 4. A schema is a mapping (or, from 3.1, `true` or `false`). Its `type`, when present, is one of `string`, `number`, `integer`, `boolean`, `array`, `object`, `null` (or, from 3.1, an array of them); `properties` is a mapping; `items` is a schema; `required` is an array of strings; `allOf`, `oneOf` and `anyOf` are arrays of schemas.
