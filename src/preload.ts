@@ -26,6 +26,7 @@ const api: Api = {
   exportReport: (id) => ipcRenderer.invoke(CH.exportReport, id),
   clearHistory: () => ipcRenderer.invoke(CH.clearHistory),
   openRecent: (root) => ipcRenderer.invoke(CH.openRecent, root),
+  openSubfolder: (folder) => ipcRenderer.invoke(CH.openSubfolder, folder),
   removeRecent: (root) => ipcRenderer.invoke(CH.removeRecent, root),
   closeProject: () => ipcRenderer.invoke(CH.close),
   checkUpdates: () => ipcRenderer.invoke(CH.checkUpdates),

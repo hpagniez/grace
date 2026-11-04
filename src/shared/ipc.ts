@@ -29,6 +29,7 @@ export const CH = {
   exportReport: "history:export",
   clearHistory: "history:clear",
   openRecent: "recent:open",
+  openSubfolder: "project:openSubfolder",
   removeRecent: "recent:remove",
   close: "project:close",
   checkUpdates: "updates:check",
@@ -76,6 +77,8 @@ export interface Api {
   clearHistory(): Promise<void>;
   /** Both send a folder as saved in the recent list; main refuses any other. */
   openRecent(root: string): Promise<void>;
+  /** Sends a folder as the last `project` event offered it; main refuses any other. */
+  openSubfolder(folder: string): Promise<void>;
   removeRecent(root: string): Promise<void>;
   /** Closes the open project and goes back to the home screen. */
   closeProject(): Promise<void>;

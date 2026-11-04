@@ -52,6 +52,7 @@ import {
 import { testCodeNotice } from "./karate/compiled";
 import { DebugSession, type ListenerPause } from "./karate/debug";
 import { featureTagEnvs, overlayEnvs } from "./karate/environments";
+import { karateFolders } from "./karate/subfolders";
 import { JsonlTail, readAllEvents } from "./karate/events";
 import {
   failureReason,
@@ -75,6 +76,7 @@ import {
   buildTree,
   findNode,
   leafIndex,
+  leafKeys,
   parentOf,
   parseRefId,
   resolveNode,
@@ -306,6 +308,16 @@ export class Runner {
       return;
     }
     await this.open(root);
+  }
+
+  /** Opens a folder the last tree offered (sub-folder offer R4); refused if it was not offered. */
+  async openSubfolder(folder: string): Promise<void> {
+    const offered = this.last?.project && this.last.subfolders?.includes(folder);
+    if (!offered) {
+      this.o.emit({ type: "notice", message: "Invalid request" });
+      return;
+    }
+    await this.open(path.join(this.last!.project!.root, folder));
   }
 
   /** Drops a folder of the recent list; refused if not listed. Allowed while busy: it touches only settings.json. */
@@ -917,7 +929,8 @@ export class Runner {
    * spec R2–R6). Returns the notice of a failure; null when listed, still good, standalone or cancelled.
    */
   private async listLibraries(root: string, layout: Layout): Promise<string | null> {
-    if (layout === "standalone") return null;
+    // nowhere to look for tests: nothing could use the libraries (sub-folder offer R5)
+    if (layout === "standalone" || detectLayout(root).featureRoots.length === 0) return null;
     const dir = projectDirOf(this.o.dataDir, root);
     const key = libraryKey(root, layout);
     const kept = readKept(dir);
@@ -1068,8 +1081,17 @@ export class Runner {
         }
       }
     }
+    const subfolders =
+      tree && !error && leafKeys(tree).length === 0 ? await karateFolders(project.root) : [];
+    if (this.cancelled) return null; // cancelled during the walk: keep the last tree
     this.tree = tree;
-    this.publish({ type: "project", project, tree, error });
+    this.publish({
+      type: "project",
+      project,
+      tree,
+      error,
+      ...(subfolders.length ? { subfolders } : {}),
+    });
     return tree;
   }
 
