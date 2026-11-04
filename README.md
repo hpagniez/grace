@@ -41,7 +41,7 @@ Karate Labs sells its GUI runners. The Karate engine is open source, and its com
 <td width="50%" valign="top">
 
 **Test tree**<br>
-Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw` or `gradlew`, else the Maven or Gradle found on PATH, in `MAVEN_HOME`, `M2_HOME` or `GRADLE_HOME`, or the Maven that IntelliJ IDEA bundles), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. When the opened folder has no test, Grace offers the folders up to 3 levels below it that look like a Karate project. Arrow keys move through it, and it stays fast with 10,000 tests.
+Folders, features, scenarios and each row of an outline's examples, found by a Karate dry run. Maven and Gradle projects with their compiled classes, standalone folders, and Karate CLI projects with a `karate-pom.json`. A Maven or Gradle project's libraries come from its own build (`mvnw` or `gradlew`, else the Maven or Gradle found on PATH, in `MAVEN_HOME`, `M2_HOME` or `GRADLE_HOME`, or the Maven that IntelliJ IDEA bundles), and jars in `.karate/ext/` or `~/.karate/ext/` are on the classpath, as with the Karate CLI. When the opened folder has no test, Grace offers the folders up to 3 levels below it that look like a Karate project. A new project starts from the environment, tags and threads in its `karate-pom.json`, or the `karate.env` of its `pom.xml`. The tree opens with only its folders: a feature opens when you click it or when its tests run. Arrow keys move through it, and it stays fast with 10,000 tests.
 
 </td>
 <td width="50%" valign="top">
@@ -55,13 +55,13 @@ The whole suite, a folder, a feature, one scenario or one example row. Cancel a 
 <td valign="top">
 
 **Tags**<br>
-Click a tag to include it, click again to exclude it. Dim or hide the tests that do not match. Saved per project.
+Click a tag to include it, click again to exclude it. Dim or hide the tests that do not match. Saved per project. With many tags, the filter bar keeps to one line and folds the rest.
 
 </td>
 <td valign="top">
 
 **Environments and secrets**<br>
-Switch `karate.env` and set run properties per environment. Secret values are encrypted with your Windows account.
+Switch `karate.env` and set run properties per environment, as Java system properties or as environment variables of the run. Import a `.properties` secrets file once, so it can leave your repository. Secret values are encrypted with your Windows account.
 
 </td>
 </tr>
@@ -75,7 +75,7 @@ Switch `karate.env` and set run properties per environment. Secret values are en
 <td valign="top">
 
 **Live progress and console**<br>
-Pass or fail on every node as the run goes, a progress bar, and Karate's log with errors and warnings in colour.
+Pass or fail on every node as the run goes, a progress bar, and Karate's log with errors and warnings in colour. Search the log and step through its errors.
 
 </td>
 </tr>
@@ -83,7 +83,7 @@ Pass or fail on every node as the run goes, a progress bar, and Karate's log wit
 <td valign="top">
 
 **Failure details**<br>
-The error, the file and line, and every step with its time and log.
+The error, the file and line, and every step with its time, log and the `#` comments above it. An outline's examples as a table with each row's result. A failed `karate-config.js` is said once, and failures that share an error are grouped so you can step through them. Open the test or its failure in VS Code.
 
 </td>
 <td valign="top">
@@ -97,7 +97,7 @@ Every call of the run, grouped by status class. Headers, bodies as pretty JSON o
 <td valign="top">
 
 **History and reports**<br>
-The last 20 runs of each project. Open Karate's HTML report of any of them, re-run a run on its environment and tags, or re-run only what failed.
+The last 20 runs of each project. Open Karate's HTML report of any of them, save it as a zip (with JUnit XML when `karate-pom.json` asks for it), re-run a run on its environment and tags, or re-run only what failed.
 
 </td>
 <td valign="top">
@@ -117,7 +117,21 @@ Grace checks for a new version at startup. Update in one click, or let Grace upd
 <td valign="top">
 
 **Made for long sessions**<br>
-Grace uses next to no CPU while it waits. During a run, Java works at below-normal priority with a 2 GB memory cap and spends little CPU compiling itself, so your IDE and browser stay responsive. A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, and a window that opens where you left it.
+Grace uses next to no CPU while it waits. During a run, Java works at below-normal priority with a 2 GB memory cap and spends little CPU compiling itself, so your IDE and browser stay responsive. A home screen with your recent folders, light and dark themes that follow Windows or your choice, resizable panels, bottom tabs you can reorder, and a window that opens where you left it.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Step debugger**<br>
+Set breakpoints on steps, start a debug run from any row, and when it pauses read the scenario's variables. Continue, step over or step into a called feature.
+
+</td>
+<td valign="top">
+
+**Watch mode**<br>
+Turn on **Watch** and each saved `.feature` file runs its tests that match your filter again. A save during a run waits for it to end. Saved per project.
 
 </td>
 </tr>
@@ -186,7 +200,10 @@ flowchart LR
 
 Next on the list:
 
-- **Step debugger**: breakpoints on steps, step over, inspect variables ([#65](https://github.com/hpagniez/grace/issues/65)).
+- **Trends**: pass rate and time per test over the stored runs ([#93](https://github.com/hpagniez/grace/issues/93)).
+- **Called features in Details**: the steps of a called feature under the step that called it ([#234](https://github.com/hpagniez/grace/issues/234)).
+- **Build from Grace**: build a project's Java test code from the "not built" notice ([#233](https://github.com/hpagniez/grace/issues/233)).
+- **Import OpenAPI**: generate features from an OpenAPI spec ([#69](https://github.com/hpagniez/grace/issues/69)).
 - **More project setup**: multi-module Maven and Gradle projects ([#64](https://github.com/hpagniez/grace/issues/64)).
 
 The full backlog is one [issue](https://github.com/hpagniez/grace/issues) per feature, on the [Grace project](https://github.com/users/hpagniez/projects/2) board.
