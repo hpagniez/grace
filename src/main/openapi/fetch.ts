@@ -9,7 +9,10 @@ export interface FetchLimits {
   maxRedirects: number;
 }
 
-const LIMITS: FetchLimits = { timeoutMs: 30_000, maxBytes: 10 * 1024 * 1024, maxRedirects: 5 };
+/** The size of one document, fetched or read (R2.3, R3.1). */
+export const MAX_BYTES = 10 * 1024 * 1024;
+
+const LIMITS: FetchLimits = { timeoutMs: 30_000, maxBytes: MAX_BYTES, maxRedirects: 5 };
 
 const isHttp = (url: string) => URL.canParse(url) && /^https?:$/.test(new URL(url).protocol);
 

@@ -1,0 +1,26 @@
+openapi: 3.0.3
+info:
+  title: Split
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: One pet
+          content:
+            application/json:
+              schema:
+                $ref: "schemas/pet.yaml#/Pet"
+        default:
+          description: An error
+          content:
+            application/json:
+              schema:
+                $ref: "schemas/error.json#/Error"
