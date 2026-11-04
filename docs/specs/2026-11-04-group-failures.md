@@ -1,6 +1,6 @@
 # Say once when the config fails, and group failures that share an error
 
-Date 2026-11-04. Status: draft. Covers [#229](https://github.com/hpagniez/grace/issues/229).
+Date 2026-11-04. Status: approved. Covers [#229](https://github.com/hpagniez/grace/issues/229).
 
 ## Intent
 
