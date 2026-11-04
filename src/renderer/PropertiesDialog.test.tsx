@@ -577,6 +577,65 @@ describe("properties dialog", () => {
     expect(edit.byEnv.qa[1]).toEqual({ name: "api.token", value: "plain", secret: false });
   });
 
+  it("Env variable is shown, picks the name rule, and Save sends it", async () => {
+    const { api, load } = setup();
+    load({
+      ...saved,
+      properties: { shared: [{ name: "LOG_LEVEL", value: "debug", envVar: true }], byEnv: {} },
+    });
+    openDialog();
+    expect(inRow(0, "prop-envvar").checked).toBe(true);
+    const i = addRow("db.user");
+    expect(inRow(i, "prop-envvar").checked).toBe(false);
+    expect(errorOf(i)).toBeUndefined();
+    fireEvent.click(inRow(i, "prop-envvar"));
+    flush();
+    expect(errorOf(i)).toBe("Invalid name");
+    expect(save().disabled).toBe(true);
+    typeIn(inRow(i, "prop-name"), "DB_USER");
+    expect(errorOf(i)).toBeUndefined();
+    fireEvent.click(save());
+    await settle();
+    expect(api.saveProperties).toHaveBeenLastCalledWith({
+      shared: [
+        { name: "LOG_LEVEL", value: "debug", secret: false, envVar: true },
+        { name: "DB_USER", value: "v", secret: false, envVar: true },
+      ],
+      byEnv: {},
+    });
+  });
+
+  it("two variables that differ only in case are duplicates; a property beside them is not", () => {
+    const { load } = setup();
+    load({ ...saved, properties: { shared: [], byEnv: {} } });
+    openDialog();
+    for (const name of ["App_Token", "APP_TOKEN", "app_token"]) addRow(name);
+    fireEvent.click(inRow(0, "prop-envvar"));
+    fireEvent.click(inRow(1, "prop-envvar"));
+    flush();
+    expect(errorOf(0)).toBe("Duplicate name");
+    expect(errorOf(1)).toBe("Duplicate name");
+    expect(errorOf(2)).toBeUndefined();
+  });
+
+  it("ticking Env variable on a saved secret keeps it", async () => {
+    const { api, load } = setup();
+    load({
+      ...saved,
+      properties: { shared: [{ name: "API_TOKEN", secret: true, state: "set" }], byEnv: {} },
+    });
+    openDialog();
+    fireEvent.click(inRow(0, "prop-envvar"));
+    flush();
+    expect(within(rows()[0]).getByTestId("prop-dots")).toBeTruthy();
+    expect(errorOf(0)).toBeUndefined();
+    fireEvent.click(save());
+    await settle();
+    expect(api.saveProperties.mock.calls[0][0].shared).toEqual([
+      { name: "API_TOKEN", secret: true, keep: true, envVar: true },
+    ]);
+  });
+
   it("payload is structured-cloneable", async () => {
     const { api, load } = setup();
     load(saved);

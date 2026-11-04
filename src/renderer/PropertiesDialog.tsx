@@ -3,7 +3,8 @@ import { createMemo, createSignal, createStore, flush, For, onCleanup, Show } fr
 import {
   MAX_ENVS,
   MAX_ROWS,
-  propertyNameError,
+  nameError,
+  nameKeys,
   propertyValueError,
   validEnvName,
   type PropertiesEdit,
@@ -28,6 +29,8 @@ interface Row {
   name: string;
   value: string;
   secret: boolean;
+  /** Set on Karate's environment rather than passed as `-D`. */
+  envVar: boolean;
   /**
    * Set while the row still stands for a saved secret, whose value only main holds. Replacing,
    * renaming or unticking Secret ends it: the row then needs a value of its own.
@@ -48,6 +51,7 @@ const rowsOf = (scope: string, list: RowView[]): Row[] =>
     name: r.name,
     value: "secret" in r ? "" : r.value,
     secret: "secret" in r,
+    envVar: r.envVar === true,
     saved: "secret" in r ? r.state : null,
   }));
 
@@ -81,9 +85,9 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
   const visible = () => rows.filter((r) => r.scope === scope());
 
   const errors = createMemo(() => {
-    const key = (r: Row) => `${r.scope}\0${r.name}`;
+    const keys = (r: Row) => nameKeys(r.name, r.envVar).map((k) => `${r.scope}\0${k}`);
     const count = new Map<string, number>();
-    rows.forEach((r) => count.set(key(r), (count.get(key(r)) ?? 0) + 1));
+    rows.forEach((r) => keys(r).forEach((k) => count.set(k, (count.get(k) ?? 0) + 1)));
     const place = new Map<string, number>(); // rows of each list so far
     return new Map(
       rows.map((r) => {
@@ -91,8 +95,8 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
         return [
           r.id,
           (place.get(r.scope)! > MAX_ROWS ? `At most ${MAX_ROWS} properties per list` : null) ??
-            (r.name === "" ? "Enter a name" : propertyNameError(r.name)) ??
-            (count.get(key(r))! > 1 ? "Duplicate name" : null) ??
+            (r.name === "" ? "Enter a name" : nameError(r.name, r.envVar)) ??
+            (keys(r).some((k) => count.get(k)! > 1) ? "Duplicate name" : null) ??
             (r.saved
               ? null
               : r.secret && r.value === ""
@@ -191,6 +195,7 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
           name: "",
           value: "",
           secret: false,
+          envVar: false,
           saved: null,
         }),
     );
@@ -203,11 +208,12 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
     const of = (s: string) =>
       rows
         .filter((r) => r.scope === s)
-        .map((r): RowEdit =>
-          r.saved
+        .map((r): RowEdit => ({
+          ...(r.saved
             ? { name: r.name, secret: true, keep: true }
-            : { name: r.name, value: r.value, secret: r.secret },
-        );
+            : { name: r.name, value: r.value, secret: r.secret }),
+          ...(r.envVar ? { envVar: true } : {}),
+        }));
     return { shared: of(""), byEnv: Object.fromEntries(lists().map((e) => [e, of(e)])) };
   };
 
@@ -399,6 +405,19 @@ export function PropertiesDialog(props: { state: AppState; api: Api }) {
                           </button>
                         </div>
                       </Show>
+                      <label class="flex h-6 items-center gap-1 text-sm">
+                        <input
+                          type="checkbox"
+                          data-testid="prop-envvar"
+                          class="accent-accent"
+                          checked={row.envVar}
+                          onChange={(e) => {
+                            const on = e.currentTarget.checked;
+                            patch(row.id, (r) => void (r.envVar = on)); // the value stays (R1.2)
+                          }}
+                        />
+                        Env variable
+                      </label>
                       <label class="flex h-6 items-center gap-1 text-sm">
                         <input
                           type="checkbox"
