@@ -40,6 +40,7 @@ import {
 import { writeArgFile, writeTargetFile } from "./karate/argfile";
 import {
   buildArgs,
+  childEnv,
   detectLayout,
   extensionJars,
   lineTargets,
@@ -476,13 +477,14 @@ export class Runner {
       return false;
     }
     const stored = (scope: string | null, rows: RowEdit[]): StoredRow[] =>
-      rows.map((r) =>
-        "keep" in r
+      rows.map((r) => ({
+        ...("keep" in r
           ? { name: r.name, secret: cipher(scope, r.name)! }
           : r.secret
             ? { name: r.name, secret: secrets.encrypt(r.value) }
-            : { name: r.name, value: r.value },
-      );
+            : { name: r.name, value: r.value }),
+        ...(r.envVar ? { envVar: true as const } : {}),
+      }));
     const properties: StoredLists = {
       shared: stored(null, edit.shared),
       byEnv: Object.fromEntries(
@@ -707,6 +709,7 @@ export class Runner {
             name: r.name,
             secret: true,
             state: this.readSecret(r.secret) !== null ? "set" : "unreadable",
+            ...(r.envVar ? { envVar: true } : {}),
           }
         : r;
     return {
@@ -998,6 +1001,7 @@ export class Runner {
     argFile: string | null,
     filter: FilterState, // required: a run that forgot it would run unfiltered
     threads: number, // required: a run that forgot it would run on one thread
+    vars: PlainRow[], // set on Java's environment; none for a dry run
     debug: { port: number; token: string } | null = null,
   ) {
     const { root } = this.project!;
@@ -1025,7 +1029,9 @@ export class Runner {
       junitXml: !dryRun && junitXml, // the dry run's reports are never read
       debug: debug && { jar: listener, port: debug.port, token: debug.token },
     });
-    return (this.proc = spawnKarate(java, args, root, onLines));
+    return (this.proc = spawnKarate(java, args, root, onLines, undefined, {
+      env: childEnv(process.env, vars),
+    }));
   }
 
   /** Dry run on all feature roots with `env`; emits and returns the new tree, or null on error. */
@@ -1050,6 +1056,7 @@ export class Runner {
         null,
         NO_FILTER,
         this.threads, // buildArgs passes 1 on a dry run
+        [], // dry runs do not execute config (environment switcher R2)
       );
       const code = await proc.exit;
       this.proc = null;
@@ -1095,7 +1102,7 @@ export class Runner {
         });
         return null;
       }
-      rows.push({ name: r.name, value });
+      rows.push({ name: r.name, value, ...(r.envVar ? { envVar: true } : {}) });
       secrets.push(value);
     }
     return { rows, secrets };
@@ -1268,7 +1275,9 @@ export class Runner {
     }
     this.report = null;
     const projectDir = this.projectDir();
-    const argFile = props.rows.length ? path.join(projectDir, "run-args.txt") : null;
+    const vars = props.rows.filter((r) => r.envVar);
+    const sysProps = props.rows.filter((r) => !r.envVar);
+    const argFile = sysProps.length ? path.join(projectDir, "run-args.txt") : null;
     const targetFile = o.targetFile ? path.join(projectDir, "run-targets.txt") : null;
     const mask = makeMasker(props.secrets);
     const emit = (e: AppEvent) => this.o.emit(maskEvent(e, mask));
@@ -1279,7 +1288,7 @@ export class Runner {
     let ended = false; // the run reached its end events, so it gets a run.json
     let oom = false; // Java printed an OutOfMemoryError
     try {
-      if (argFile) writeArgFile(argFile, props.rows);
+      if (argFile) writeArgFile(argFile, sysProps);
       if (targetFile) writeTargetFile(targetFile, o.targets); // if it cannot be written, nothing runs
       const state = new RunState(
         tree,
@@ -1373,6 +1382,7 @@ export class Runner {
         argFile,
         filter,
         threads,
+        vars,
         session,
       );
       try {
