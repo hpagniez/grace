@@ -18,10 +18,12 @@ import {
   loadWindowState,
   RECENT_LIMIT,
   removeRecentProject,
+  savedControls,
   saveAppearance,
   saveOpenedProject,
   saveProjectEnv,
   saveProjectFilter,
+  saveProjectProperties,
   saveProjectThreads,
   saveProjectWatch,
   saveUpdateSettings,
@@ -437,12 +439,12 @@ describe("settings", () => {
       expect(loadProjectEnv(data, "x").properties.shared.map((r) => r.name)).toEqual(["a", "b"]);
     });
 
-    it("env null is omitted from the file", () => {
+    it("env null is saved as null", () => {
       const data = tmp();
       saveProjectEnv(data, "x", env);
       saveProjectEnv(data, "x", { ...env, env: null });
       const entry = JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8")).projects.x;
-      expect(Object.hasOwn(entry, "env")).toBe(false);
+      expect(entry.env).toBeNull();
       expect(entry.properties).toEqual(env.properties);
       expect(loadProjectEnv(data, "x").env).toBeNull();
     });
@@ -459,11 +461,58 @@ describe("settings", () => {
       }
     });
 
+    it("saveProjectProperties writes the lists and keeps the environment", () => {
+      const data = tmp();
+      saveProjectEnv(data, "x", env);
+      const properties = { shared: [{ name: "a", value: "1" }], byEnv: {} };
+      saveProjectProperties(data, "x", properties);
+      expect(loadProjectEnv(data, "x")).toEqual({ env: "qa", properties });
+    });
+
+    it("saveProjectProperties on a fresh entry writes no environment", () => {
+      const data = tmp();
+      saveProjectProperties(data, "x", env.properties);
+      const entry = JSON.parse(readFileSync(path.join(data, "settings.json"), "utf8")).projects.x;
+      expect(Object.hasOwn(entry, "env")).toBe(false);
+      expect(savedControls(data, "x").env).toBe(false);
+    });
+
     it("the empty settings are a fresh object each call", () => {
       const e = emptyEnvSettings();
       e.properties.shared.push({ name: "a", value: "1" });
       e.properties.byEnv.qa = [];
       expect(emptyEnvSettings()).toEqual({ env: null, properties: { shared: [], byEnv: {} } });
+    });
+  });
+
+  describe("saved controls", () => {
+    const none = { env: false, filter: false, threads: false };
+    it("none on an empty data folder", () => {
+      expect(savedControls(tmp(), "x")).toEqual(none);
+    });
+    it("each control on its own", () => {
+      const data = tmp();
+      saveProjectThreads(data, "x", 2);
+      expect(savedControls(data, "x")).toEqual({ ...none, threads: true });
+      saveProjectFilter(data, "x", { ...NO_FILTER, include: [], exclude: [] });
+      expect(savedControls(data, "x")).toEqual({ ...none, threads: true, filter: true });
+      saveProjectEnv(data, "x", emptyEnvSettings());
+      expect(savedControls(data, "x")).toEqual({ env: true, filter: true, threads: true });
+    });
+    it("an env Grace does not take is not saved", () => {
+      const data = tmp();
+      writeFileSync(path.join(data, "settings.json"), '{"projects":{"x":{"env":"x y"}}}');
+      expect(savedControls(data, "x").env).toBe(false);
+    });
+    it("none when the file cannot be read", () => {
+      const data = tmp();
+      saveProjectThreads(data, "x", 2);
+      readFails.code = "EBUSY";
+      try {
+        expect(savedControls(data, "x")).toEqual(none);
+      } finally {
+        readFails.code = null;
+      }
     });
   });
 
