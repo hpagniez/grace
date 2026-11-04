@@ -13,6 +13,7 @@ import {
   launch,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   project,
   test,
@@ -58,6 +59,7 @@ const send = (app: ElectronApplication, event: unknown) =>
 /** Opens a sample project and waits for the node `key` of its tree. */
 async function open(app: ElectronApplication, win: Page, dir: string, key: string) {
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, key)).toBeVisible({ timeout: 15_000 });
 }
 

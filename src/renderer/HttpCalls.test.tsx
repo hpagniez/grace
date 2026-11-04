@@ -11,6 +11,7 @@ import { callName, GROUP_TINT } from "./HttpCalls";
 import { TINT } from "./ui";
 import { scrollToShow } from "./virtual";
 import { drawn } from "../../test/drawn";
+import { openFeatures } from "../../test/openFeatures";
 
 afterEach(() => {
   cleanup();
@@ -97,6 +98,7 @@ function setup(calls: Record<string, HttpCall[]> = ALL) {
     flush();
   };
   send({ type: "project", project: { root: "D:/p", layout: "standalone" }, tree, error: null });
+  openFeatures();
   for (const [key, list] of Object.entries(calls)) send({ type: "calls", key, calls: list });
   return { send };
 }

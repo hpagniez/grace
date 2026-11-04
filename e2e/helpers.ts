@@ -283,6 +283,18 @@ export const node = (win: Page, name: string) =>
     .getByTestId("tree-node")
     .filter({ has: win.getByRole("button", { name: `Run ${name}`, exact: true }) });
 
+/**
+ * Opens every closed feature in the tree by its chevron, the lowest first so each stays drawn: a project opens with
+ * its features closed (#224). Waits for the tree to show a feature first.
+ */
+export async function openFeatures(win: Page) {
+  await expect(win.locator("[data-testid=tree-node][data-kind=feature]").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const closed = win.getByRole("button", { name: /^Expand .+\.feature$/ });
+  while ((await closed.count()) > 0) await closed.last().click();
+}
+
 /** The tree row with this key. */
 export const nodeByKey = (win: Page, key: string) =>
   win.locator(`[data-testid=tree-node][data-key="${key}"]`);
@@ -386,6 +398,7 @@ export async function openEnv(extraEnv?: Record<string, string>) {
   const dir = project("env");
   const { app, win, userData } = await launch(undefined, extraEnv);
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "always")).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData };
 }

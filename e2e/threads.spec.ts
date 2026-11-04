@@ -6,6 +6,7 @@ import {
   launch,
   node,
   nodeByKey,
+  openFeatures,
   openProject,
   project,
   ranThreads,
@@ -24,6 +25,7 @@ async function openClean(pom?: object) {
   if (pom) writeFileSync(path.join(dir, "karate-pom.json"), JSON.stringify(pom));
   const { app, win, userData } = await launch();
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(nodeByKey(win, "f:tests/basic.feature")).toBeVisible({ timeout: 15_000 });
   return { dir, app, win, userData };
 }

@@ -20,7 +20,15 @@ import { filterOn, matchingLeaves, type FilterState } from "../shared/tags";
 import { findingText } from "./bannerText";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
-import { ancestors, breakpointKeys, failedAt, leaves, nodeName, STATUS_LABEL } from "./nodes";
+import {
+  ancestors,
+  breakpointKeys,
+  failedAt,
+  featureOf,
+  leaves,
+  nodeName,
+  STATUS_LABEL,
+} from "./nodes";
 import { Notice } from "./Notice";
 import type { AppState } from "./reduce";
 import { StatusMark } from "./StatusMark";
@@ -151,7 +159,10 @@ function Row(props: {
           type="button"
           tabindex={-1}
           class={`h-6 min-w-0 flex-1 truncate rounded-sm text-left text-sm ${INSET}`}
-          onClick={() => props.ctx.select(props.node.key)}
+          onClick={() => {
+            props.ctx.select(props.node.key);
+            if (isFeature() && !props.open) props.toggle(); // a click opens a feature, never closes it (#224 R2.1)
+          }}
         >
           {label()}
           <Show when={title()}>
@@ -226,34 +237,79 @@ function Row(props: {
 export function Tree(props: Ctx) {
   const loading = () => !props.state.project || !props.state.tree;
   const root = createMemo(() => props.state.project?.root);
-  // The closed rows by key: a refresh keeps them, another project starts with everything open (R2.2).
-  const [closed, setClosed] = createSignal<ReadonlySet<string>>(() => {
+  // The rows turned from where they start, by key: a feature starts closed, every other row open. A refresh keeps
+  // them; another project starts afresh (#224 R1).
+  const [turned, setTurned] = createSignal<ReadonlySet<string>>(() => {
     root();
     return new Set<string>();
   });
-  const toggle = (key: string) =>
-    setClosed((c) => {
-      const next = new Set(c);
-      if (!next.delete(key)) next.add(key);
+  const startsOpen = (key: string) => !key.startsWith("f:");
+  const isOpen = (key: string) => startsOpen(key) !== turned().has(key);
+  const setOpen = (key: string, open: boolean) =>
+    setTurned((t) => {
+      const next = new Set(t);
+      if (open === startsOpen(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-  // Reads no status, so a run never redraws a row (R2.3).
-  const rows = createMemo(() =>
-    props.state.tree ? treeRows(props.state.tree, closed(), props.state.filter) : [],
-  );
+  // The run in progress, or the last: the features it may no longer open, and how many failed keys it has read.
+  let run = { id: null as string | null, done: new Set<string>(), read: 0 };
+  const toggle = (key: string) => {
+    // a feature the person closes during a run stays closed until it ends (#224 R3.5)
+    if (isOpen(key) && props.state.run.active) run.done.add(key);
+    setOpen(key, !isOpen(key));
+  };
+  // Reads no status, so a status update never redraws a row (R2.3). A row that stays as it was keeps its object, so
+  // a feature that opens draws only its own rows: a run opens features while it goes (#224 R4.3).
+  let built = new Map<string, TreeRow>();
+  const rows = createMemo(() => {
+    const next = props.state.tree ? treeRows(props.state.tree, isOpen, props.state.filter) : [];
+    const kept = next.map((r) => {
+      const old = built.get(r.node.key);
+      return old &&
+        old.node === r.node &&
+        old.level === r.level &&
+        old.setSize === r.setSize &&
+        old.posInSet === r.posInSet &&
+        old.parentKey === r.parentKey
+        ? old
+        : r;
+    });
+    built = new Map(kept.map((r) => [r.node.key, r]));
+    return kept;
+  });
   let list: VirtualListHandle | undefined;
   const withBreakpoints = createMemo(() =>
     breakpointKeys(props.state.tree, props.state.breakpoints),
   );
-  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1)
+  // A pause opens the rows above the paused test; the list then scrolls to it, the selected row (R7.1). The cue
+  // changes with the rows it opens, not with the pause: the list would look for the row before it is there.
+  const [pauses, setPauses] = createSignal(0);
   createEffect(
-    () => props.state.paused?.key ?? null,
-    (key) => {
+    () => [props.state.paused?.key ?? null, props.state.run.pauses] as const,
+    ([key]) => {
       const tree = props.state.tree;
       if (key === null || !tree) return;
-      const above = ancestors(tree, key);
-      if (above.some((a) => closed().has(a)))
-        setClosed((c) => new Set([...c].filter((k) => !above.includes(k))));
+      for (const a of ancestors(tree, key)) if (!isOpen(a)) setOpen(a, true);
+      setPauses((n) => n + 1);
+    },
+  );
+  // A run opens the feature it started in, and each feature where one of its tests fails, once (#224 R3). The rows
+  // still read no status: they change only when a feature opens (R4.3).
+  createEffect(
+    () => [props.state.run.runId, props.state.run.failedKeys.length] as const,
+    ([id, failed]) => {
+      if (id === null) return;
+      const open = (feature: string | null) => {
+        if (feature === null || run.done.has(feature)) return;
+        run.done.add(feature);
+        if (!isOpen(feature)) setOpen(feature, true);
+      };
+      if (id !== run.id) {
+        run = { id, done: new Set(), read: 0 };
+        open(featureOf(props.state.run.selection));
+      }
+      for (; run.read < failed; run.read++) open(featureOf(props.state.run.failedKeys[run.read]));
     },
   );
 
@@ -270,7 +326,7 @@ export function Tree(props: Ctx) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return false;
     const kids = row.node.children.length > 0;
-    const open = kids && !closed().has(key);
+    const open = kids && isOpen(key);
     if (e.key === "ArrowRight") {
       const child = rows()[index + 1]; // an open row's first child follows it
       if (kids && !open) toggle(key);
@@ -306,7 +362,7 @@ export function Tree(props: Ctx) {
               "aria-setsize": r.setSize,
               "aria-posinset": r.posInSet,
               "aria-expanded":
-                n.children.length > 0 ? (closed().has(n.key) ? "false" : "true") : undefined,
+                n.children.length > 0 ? (isOpen(n.key) ? "true" : "false") : undefined,
               "aria-selected": props.state.selected === n.key ? "true" : "false",
               "aria-label": rowName(labelOf(n), row.status(), row.flaky(), n.tags),
               "aria-keyshortcuts": "Control+Enter Control+Shift+Enter",
@@ -322,13 +378,13 @@ export function Tree(props: Ctx) {
             void props.api.editorMenu(place.file, place.line, e.clientX, e.clientY);
           }}
           // By value: main sends the filter in force again after every refresh, which must not scroll (R4.7).
-          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${props.state.run.pauses}`}
+          revealSelectedOn={`${JSON.stringify(props.state.filter)} ${pauses()}`}
           ref={(h) => (list = h)}
         >
           {(r, _index, keyboardFocused, row) => (
             <Row
               node={r.node}
-              open={!closed().has(r.node.key)}
+              open={isOpen(r.node.key)}
               toggle={() => toggle(r.node.key)}
               keyboardFocused={keyboardFocused()}
               status={row.status()}

@@ -54,7 +54,7 @@ const keys = (rows: ReturnType<typeof treeRows>) => rows.map((r) => r.node.key);
 
 describe("treeRows", () => {
   it("lists every node but the root in tree order, with its level and place among its siblings", () => {
-    const rows = treeRows(tree(), new Set(), NO_FILTER);
+    const rows = treeRows(tree(), () => true, NO_FILTER);
     expect(keys(rows)).toEqual([
       "d:tests",
       "f:tests/basic.feature",
@@ -71,7 +71,7 @@ describe("treeRows", () => {
   });
 
   it("leaves out the children of a closed node but keeps the node", () => {
-    const rows = treeRows(tree(), new Set(["f:tests/basic.feature"]), NO_FILTER);
+    const rows = treeRows(tree(), (key) => key !== "f:tests/basic.feature", NO_FILTER);
     expect(keys(rows)).toEqual([
       "d:tests",
       "f:tests/basic.feature",
@@ -83,7 +83,7 @@ describe("treeRows", () => {
   });
 
   it("leaves out non-matching rows under Hide non-matching, and counts only the shown siblings", () => {
-    const rows = treeRows(tree(), new Set(), {
+    const rows = treeRows(tree(), () => true, {
       include: ["smoke"],
       exclude: [],
       hideNonMatching: true,
@@ -94,7 +94,7 @@ describe("treeRows", () => {
   });
 
   it("keeps every row when the filter only dims", () => {
-    const rows = treeRows(tree(), new Set(), {
+    const rows = treeRows(tree(), () => true, {
       include: ["smoke"],
       exclude: [],
       hideNonMatching: false,

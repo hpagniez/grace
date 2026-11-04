@@ -10,6 +10,7 @@ import type { FilterState } from "../shared/tags";
 import { readAllEvents } from "../main/karate/events";
 import { buildTree } from "../main/karate/tree";
 import { App } from "./App";
+import { openFeatures } from "../../test/openFeatures";
 
 // The clean sample: 9 tests, tags @slow (2), @smoke (4), @wip (2); outline.feature has none.
 const clean = () =>
@@ -50,6 +51,7 @@ function setup() {
       error: null,
     });
     send({ type: "filter", filter });
+    openFeatures();
   };
   return { api, send, load };
 }

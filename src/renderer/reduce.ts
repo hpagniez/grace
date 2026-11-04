@@ -38,6 +38,10 @@ export interface RunView {
   debug: boolean;
   /** The debug run's pauses so far: the tree scrolls to the paused test on each. */
   pauses: number;
+  /** The key the run started from: the tree's root for Run all and a rerun of the failed tests. */
+  selection: string | null;
+  /** The run's tests that failed, in the order they did; the tree opens their features (#224 R3.3). */
+  failedKeys: string[];
 }
 export interface AppState {
   project: Project | null;
@@ -123,6 +127,8 @@ const idleRun = (): RunView => ({
   env: null,
   debug: false,
   pauses: 0,
+  selection: null,
+  failedKeys: [],
 });
 
 export function initialState(): AppState {
@@ -227,6 +233,7 @@ export function reduce(s: AppState, e: AppEvent): void {
         runId: e.runId,
         env: e.env,
         debug: e.debug,
+        selection: e.selection,
       };
       s.paused = null;
       s.vars = null;
@@ -254,7 +261,10 @@ export function reduce(s: AppState, e: AppEvent): void {
         if (!final && (u.status === "passed" || u.status === "failed")) {
           s.run.done++;
           if (u.status === "passed") s.run.passed++;
-          else s.run.failed++;
+          else {
+            s.run.failed++;
+            s.run.failedKeys.push(u.key);
+          }
         }
       }
       break;

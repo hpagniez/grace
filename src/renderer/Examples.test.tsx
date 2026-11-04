@@ -6,6 +6,7 @@ import type { Api } from "../shared/ipc";
 import type { TestNode } from "../shared/model";
 import { App } from "./App";
 import { exampleColumns } from "./Examples";
+import { openFeatures } from "../../test/openFeatures";
 
 const F = "tests/o.feature";
 const OUTLINE = `o:${F}#1`;
@@ -74,6 +75,7 @@ function setup(t: TestNode = tree()) {
       error: null,
     });
   project(t);
+  openFeatures();
   const select = (name: string) => {
     fireEvent.click(within(screen.getByTestId("tree")).getByText(name));
     flush();

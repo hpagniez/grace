@@ -10,6 +10,7 @@ import {
   node,
   openEnv,
   openEnvWith,
+  openFeatures,
   openProject,
   openProperties,
   openWithSecret,
@@ -258,6 +259,7 @@ test("An unreadable secret blocks runs", async () => {
   );
   const { app, win } = await launch(userData);
   await openProject(app, dir);
+  await openFeatures(win);
   await expect(node(win, "always")).toBeVisible({ timeout: 15_000 });
   await expect(input(win)).toHaveValue("qa");
 
@@ -285,6 +287,7 @@ test("Settings survive a restart", async () => {
   await app.close();
   const { win } = await launch(userData);
   await expect(input(win)).toHaveValue("qa", { timeout: 15_000 });
+  await openFeatures(win); // a restart starts with the features closed (#224 R1.3)
   await expect(node(win, "qa only")).toBeVisible();
 
   await openProperties(win);
