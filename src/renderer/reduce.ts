@@ -63,6 +63,8 @@ export interface AppState {
   /** The last notice from main; `success` reports something done, not a problem. */
   notice: { text: string; success: boolean } | null;
   selected: string | null;
+  /** Counts the selections the tree must show: it opens the rows above the selected test and scrolls to it (#229 R4.3). */
+  reveals: number;
   /** The open project's tag filter, as main holds it; changes only when main says so. */
   filter: FilterState;
   /** The open project's environment and run properties, as main holds them; null with no project. */
@@ -146,6 +148,7 @@ export function initialState(): AppState {
     run: idleRun(),
     notice: null,
     selected: null,
+    reveals: 0,
     filter: noFilter(),
     env: null,
     threads: null,

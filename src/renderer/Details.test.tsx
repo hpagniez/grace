@@ -352,7 +352,7 @@ describe("details: a group during a run", () => {
       set((draft) => reduce(draft, e));
       flush();
     };
-    render(() => <Details state={state} api={{} as Api} select={() => {}} />);
+    render(() => <Details state={state} api={{} as Api} select={() => {}} reveal={() => {}} />);
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },
@@ -506,7 +506,9 @@ describe("details: steps and breakpoints (step debugger R4, R7)", () => {
       steps: vi.fn(async () => fromFile),
       toggleBreakpoint: vi.fn(async () => {}),
     };
-    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
+    render(() => (
+      <Details state={state} api={api as unknown as Api} select={() => {}} reveal={() => {}} />
+    ));
     send(project);
     set((draft) => void (draft.selected = leafNode.key));
     flush();
@@ -570,7 +572,9 @@ describe("details: open in VS Code (open-in-editor R1, R2)", () => {
       flush();
     };
     const api = { steps: vi.fn(async () => null), openInEditor: vi.fn(async () => {}) };
-    render(() => <Details state={state} api={api as unknown as Api} select={() => {}} />);
+    render(() => (
+      <Details state={state} api={api as unknown as Api} select={() => {}} reveal={() => {}} />
+    ));
     send({
       type: "project",
       project: { root: "D:/p", layout: "standalone" },
@@ -638,5 +642,159 @@ describe("details: open in VS Code (open-in-editor R1, R2)", () => {
     fail(error);
     expect(inError()).toHaveLength(0);
     expect(screen.getByTestId("details-error").textContent).toBe(error);
+  });
+});
+
+describe("details: step through a group (#229 R4)", () => {
+  const [A, B, C, D] = [1, 2, 3, 4].map((n) => `s:tests/g.feature#${n}`);
+  const NAMES = ["alpha", "beta", "gamma", "delta"];
+  const REASON = "expected status: 200, actual: 503";
+  const failure = (line: number, reason = REASON) => {
+    const head = `C:/p/tests/g.feature:${line}\nThen status 200\n`;
+    return { error: head + reason, reasonAt: head.length };
+  };
+  const groupTree = (): TestNode =>
+    node("folder", "d:", "p", {
+      file: "",
+      children: [
+        node("feature", "f:tests/g.feature", "g", {
+          file: "tests/g.feature",
+          children: [A, B, C, D].map((key, i) =>
+            node("scenario", key, NAMES[i], { file: "tests/g.feature", line: 3 * i + 3 }),
+          ),
+        }),
+      ],
+    });
+
+  function mount() {
+    let emit: (e: AppEvent) => void = () => {};
+    const api = {
+      ready: vi.fn(async () => {}),
+      steps: vi.fn(async () => null),
+      toggleBreakpoint: vi.fn(async () => {}),
+      onEvent: (cb: (e: AppEvent) => void) => ((emit = cb), () => {}),
+    };
+    render(() => <App api={api as unknown as Api} />);
+    const send = (e: AppEvent) => {
+      emit(e);
+      flush();
+    };
+    send({
+      type: "project",
+      project: { root: "D:/p", layout: "standalone" },
+      tree: groupTree(),
+      error: null,
+    });
+    openFeatures();
+    const run = (keys: string[]) =>
+      send({
+        type: "runStarted",
+        selection: "d:",
+        runId: `20261104-12000${keys.length}-000`,
+        keys,
+        total: keys.length,
+        startedAt: Date.now(),
+        env: null,
+        debug: false,
+      });
+    run([A, B, C, D]);
+    send({
+      type: "scenarios",
+      updates: [
+        { key: A, status: "failed", ...failure(5) },
+        { key: B, status: "failed", ...failure(8) },
+        { key: C, status: "failed", ...failure(11) },
+        { key: D, status: "passed" },
+      ],
+    });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    return { send, run };
+  }
+  const rowOf = (key: string) =>
+    screen.getAllByTestId("tree-node").find((n) => n.dataset.key === key)!;
+  const pick = (key: string) => {
+    fireEvent.click(within(rowOf(key)).getByText(NAMES[[A, B, C, D].indexOf(key)]));
+    flush();
+  };
+  const selectedKey = () =>
+    screen
+      .getAllByTestId("tree-node")
+      .find((n) => n.parentElement!.getAttribute("aria-selected") === "true")?.dataset.key;
+  const group = () => screen.queryByTestId("error-group");
+  const press = (name: string) => {
+    const b = screen.getByRole("button", { name });
+    b.focus();
+    fireEvent.click(b);
+    flush();
+  };
+
+  it("says where the test sits in its group", () => {
+    mount();
+    pick(A);
+    expect(group()!.textContent).toBe("1 of 3 tests failed with this error");
+    expect(screen.getByTestId("details-error").textContent).toBe(failure(5).error);
+  });
+
+  it("Next selects the next test and keeps the focus", () => {
+    mount();
+    pick(A);
+    press("Next test with this error");
+    expect(selectedKey()).toBe(B);
+    expect(group()!.textContent).toBe("2 of 3 tests failed with this error");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next test with this error" }),
+    );
+  });
+
+  it("Previous wraps round", () => {
+    mount();
+    pick(A);
+    press("Previous test with this error");
+    expect(selectedKey()).toBe(C);
+  });
+
+  it("a lone failure has no stepping", () => {
+    const { send, run } = mount();
+    run([D]);
+    send({ type: "scenarios", updates: [{ key: D, status: "failed", ...failure(14, "boom") }] });
+    send({
+      type: "runFinished",
+      outcome: "finished",
+      exitCode: 1,
+      summary: null,
+      reportAvailable: false,
+    });
+    pick(D);
+    expect(screen.getByTestId("details-error")).toBeTruthy();
+    expect(group()).toBeNull();
+  });
+
+  it("no stepping while a run goes on", () => {
+    const { run } = mount();
+    run([D]);
+    pick(A);
+    expect(screen.getByTestId("details-error")).toBeTruthy();
+    expect(group()).toBeNull();
+  });
+
+  it("has no breakpoint dot on a step below line 1 (#229 R1.4)", () => {
+    const { send } = mount();
+    pick(A);
+    send({
+      type: "steps",
+      key: A,
+      steps: [
+        step("Scenario execution failed: boom", "failed", { keyword: "*", line: 0 }),
+        step("ok", "passed"),
+      ],
+    });
+    expect(within(details()).getAllByTestId("step")).toHaveLength(2);
+    expect(within(details()).getAllByTestId("breakpoint")).toHaveLength(1);
   });
 });

@@ -7,6 +7,8 @@ import { initialState, reduce, type AppState } from "./reduce";
 export function createAppStore(api: Api): {
   state: AppState;
   select(key: string): void;
+  /** Selects a test the tree may not show: the tree opens the rows above it and scrolls to it. */
+  reveal(key: string): void;
   showPanel(panel: AppState["panel"]): void;
   selectCall(ref: CallRef): void;
   toggleGroup(g: HttpGroup | "all"): void;
@@ -23,6 +25,12 @@ export function createAppStore(api: Api): {
       setState((draft) => {
         draft.selected = key;
         draft.selectedCall = null; // a tree click gives the details pane back
+      }),
+    reveal: (key) =>
+      setState((draft) => {
+        draft.selected = key;
+        draft.selectedCall = null;
+        draft.reveals++;
       }),
     showPanel: (panel) =>
       setState((draft) => {

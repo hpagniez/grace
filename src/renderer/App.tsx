@@ -17,7 +17,7 @@ import { createAppStore } from "./store";
 import { sheet } from "./ui";
 
 export function App(props: { api: Api }) {
-  const { state, select, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
+  const { state, select, reveal, showPanel, selectCall, toggleGroup, dismissPrompt, dispose } =
     createAppStore(props.api);
   onCleanup(dispose);
   // index.html's startup screen stays until main says what is open, so home never flashes
@@ -82,7 +82,7 @@ export function App(props: { api: Api }) {
                     <Tree state={state} select={select} api={props.api} />
                   </div>
                   <div class="flex min-h-0 w-1/2 flex-col">
-                    <Details state={state} api={props.api} select={select} />
+                    <Details state={state} api={props.api} select={select} reveal={reveal} />
                   </div>
                 </main>
                 <BottomPanel

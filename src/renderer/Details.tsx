@@ -1,14 +1,23 @@
-import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, MousePointerClick } from "lucide";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  CircleAlert,
+  ExternalLink,
+  LoaderCircle,
+  MousePointerClick,
+} from "lucide";
 import { createEffect, createMemo, createSignal, flush, For, Show } from "solid-js";
 import type { FileStep, Step } from "../shared/events";
 import type { Api } from "../shared/ipc";
 import type { Status, TestNode } from "../shared/model";
 import { deriveStatus } from "../shared/status";
-import { ghostSmall } from "./buttons";
+import { btnIconSmall, ghostSmall } from "./buttons";
 import { CallDetails } from "./CallDetails";
 import { Cut } from "./Cut";
 import { EmptyState } from "./EmptyState";
 import { Examples } from "./Examples";
+import { failureGroups, shownLeaves, type FailureGroup } from "./failures";
 import { FlakyProof } from "./FlakyProof";
 import { findCall } from "./http";
 import { Icon } from "./Icon";
@@ -63,20 +72,23 @@ function StepRow(props: { step: ShownStep; on: boolean; toggle: () => void; paus
         )}
       </Show>
       <div class="flex min-h-6 items-center gap-2 text-sm">
-        <Tooltip text={breakpoint()} side="right">
-          <button
-            type="button"
-            data-testid="breakpoint"
-            aria-label={breakpoint()}
-            class="group flex size-4 shrink-0 items-center justify-center rounded-full"
-            onClick={() => props.toggle()}
-          >
-            <span
-              aria-hidden="true"
-              class={`size-2.5 rounded-full border border-failed ${props.on ? "bg-failed" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}
-            />
-          </button>
-        </Tooltip>
+        {/* Karate's synthetic step of a failed config has line 0: no breakpoint there (#229 R1.4) */}
+        <Show when={props.step.line >= 1} fallback={<span class="size-4 shrink-0" />}>
+          <Tooltip text={breakpoint()} side="right">
+            <button
+              type="button"
+              data-testid="breakpoint"
+              aria-label={breakpoint()}
+              class="group flex size-4 shrink-0 items-center justify-center rounded-full"
+              onClick={() => props.toggle()}
+            >
+              <span
+                aria-hidden="true"
+                class={`size-2.5 rounded-full border border-failed ${props.on ? "bg-failed" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}
+              />
+            </button>
+          </Tooltip>
+        </Show>
         <Show when={props.step.status}>
           {(status) => (
             <Tooltip text={MARK[stepMark(status())].label}>
@@ -149,8 +161,37 @@ function ErrorText(props: { error: string; api: Api }) {
   );
 }
 
-function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
+/** Previous and Next through the tests that failed with the same error, wrapping round (#229 R4). */
+function GroupStepper(props: { keys: string[]; index: number; reveal(key: string): void }) {
+  const go = (dir: number) =>
+    props.reveal(props.keys[(props.index + dir + props.keys.length) % props.keys.length]);
+  const Step = (p: { name: string; icon: typeof ChevronUp; dir: number }) => (
+    <Tooltip text={p.name}>
+      <button type="button" class={btnIconSmall} aria-label={p.name} onClick={() => go(p.dir)}>
+        <Icon icon={p.icon} size={14} />
+      </button>
+    </Tooltip>
+  );
+  return (
+    <div data-testid="error-group" class="mt-2 flex items-center gap-1 text-xs text-ink">
+      <span class="mr-1 tabular-nums">
+        {`${props.index + 1} of ${props.keys.length} tests failed with this error`}
+      </span>
+      <Step name="Previous test with this error" icon={ChevronUp} dir={-1} />
+      <Step name="Next test with this error" icon={ChevronDown} dir={1} />
+    </div>
+  );
+}
+
+function Leaf(props: {
+  node: TestNode;
+  state: AppState;
+  api: Api;
+  groups: FailureGroup[];
+  reveal(key: string): void;
+}) {
   const status = () => props.state.statuses[props.node.key] ?? "notRun";
+  const group = () => props.groups.find((g) => g.keys.includes(props.node.key));
   const result = () => props.state.results[props.node.key];
   const runSteps = () => props.state.steps[props.node.key];
   // Before its feature finishes, a test shows its steps as the file has them, to set breakpoints on (R4.1)
@@ -232,6 +273,15 @@ function Leaf(props: { node: TestNode; state: AppState; api: Api }) {
           >
             <ErrorText error={result()!.error!} api={props.api} />
           </pre>
+          <Show when={group()}>
+            {(g) => (
+              <GroupStepper
+                keys={g().keys}
+                index={g().keys.indexOf(props.node.key)}
+                reveal={props.reveal}
+              />
+            )}
+          </Show>
         </div>
       </Show>
       <Show
@@ -305,7 +355,22 @@ function Group(props: { node: TestNode; state: AppState }) {
   );
 }
 
-export function Details(props: { state: AppState; api: Api; select(key: string): void }) {
+export function Details(props: {
+  state: AppState;
+  api: Api;
+  select(key: string): void;
+  reveal(key: string): void;
+}) {
+  // Found when a run ends, never during one (#229 R3.2): one pass over the tree's tests, nothing while idle.
+  const groups = createMemo(() =>
+    props.state.run.active || !props.state.tree
+      ? []
+      : failureGroups(
+          shownLeaves(props.state.tree, props.state.filter),
+          props.state.statuses,
+          props.state.results,
+        ),
+  );
   const node = () =>
     props.state.selected && props.state.tree
       ? findNode(props.state.tree, props.state.selected)
@@ -349,7 +414,13 @@ export function Details(props: { state: AppState; api: Api; select(key: string):
                   </>
                 }
               >
-                <Leaf node={n()} state={props.state} api={props.api} />
+                <Leaf
+                  node={n()}
+                  state={props.state}
+                  api={props.api}
+                  groups={groups()}
+                  reveal={props.reveal}
+                />
               </Show>
             )}
           </Show>
