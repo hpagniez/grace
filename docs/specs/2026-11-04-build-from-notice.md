@@ -1,6 +1,6 @@
 # Build the project's Java code from the not-built notice
 
-Date 2026-11-04. Status: draft. Covers [#233](https://github.com/hpagniez/grace/issues/233). Reopens a non-goal of [Project libraries](2026-11-02-project-libraries.md) and amends its R8.6.
+Date 2026-11-04. Status: approved. Covers [#233](https://github.com/hpagniez/grace/issues/233). Reopens a non-goal of [Project libraries](2026-11-02-project-libraries.md) and amends its R8.6.
 
 ## Intent
 
