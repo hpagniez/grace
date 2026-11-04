@@ -11,6 +11,8 @@ export interface FetchLimits {
 
 const LIMITS: FetchLimits = { timeoutMs: 30_000, maxBytes: 10 * 1024 * 1024, maxRedirects: 5 };
 
+const isHttp = (url: string) => URL.canParse(url) && /^https?:$/.test(new URL(url).protocol);
+
 /** A URL as shown to the person: no user info, no query, no fragment. */
 export function displayUrl(url: string): string {
   if (!URL.canParse(url)) return url;
@@ -34,6 +36,8 @@ export async function fetchText(
   let current = url;
   try {
     for (let redirects = 0; ; redirects++) {
+      // Every URL we request, the first included: Electron's net.fetch would also open file: URLs.
+      if (!isHttp(current)) throw new Error(`${displayUrl(current)} is not an http or https URL`);
       const res = await fetch(current, { redirect: "manual", signal: both });
       const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
       if (location !== null) {
@@ -41,8 +45,11 @@ export async function fetchText(
         if (redirects === limits.maxRedirects)
           throw new Error(`${displayUrl(url)} redirects more than 5 times`);
         const next = URL.canParse(location, current) ? new URL(location, current) : null;
-        if (next?.protocol !== "http:" && next?.protocol !== "https:") {
+        if (!next || !isHttp(next.href)) {
           throw new Error(`${displayUrl(current)} redirects to a URL that is not http or https`);
+        }
+        if (next.username || next.password) {
+          throw new Error(`${displayUrl(current)} redirects to a URL with a user name or password`);
         }
         current = next.href;
         continue;
@@ -54,8 +61,9 @@ export async function fetchText(
       return { text: await readText(res, limits.maxBytes, current), url: current };
     }
   } catch (e) {
-    // A timeout and the caller's own abort both reject with an abort error: only the first is ours to word.
-    if (timeout.aborted && !signal.aborted) {
+    // The timeout and the caller's abort both reject with an abort error; only the timeout's is ours to word.
+    const abort = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    if (abort && timeout.aborted && !signal.aborted) {
       throw new Error(`${displayUrl(current)} did not answer within 30 seconds`);
     }
     throw e;

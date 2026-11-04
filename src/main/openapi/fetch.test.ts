@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { urlError } from "../../shared/openapi";
-import { displayUrl, fetchText } from "./fetch";
+import { displayUrl, fetchText, type Fetch } from "./fetch";
 
 const BAD_URL = "Enter an http or https URL";
 const CREDENTIALS = "Remove the user name and password from the URL";
@@ -54,6 +54,12 @@ describe("fetchText", () => {
       res.writeHead(status, { location });
       res.end();
     };
+  // The exact message, so a changed or a longer text fails.
+  const rejection = (p: Promise<unknown>) =>
+    p.then(
+      () => "resolved",
+      (e: Error) => e.message,
+    );
   const run = (path: string, limits?: Parameters<typeof fetchText>[3]) =>
     fetchText(base + path, fetch, new AbortController().signal, limits);
 
@@ -98,20 +104,53 @@ describe("fetchText", () => {
     expect((await run("/s1")).url).toBe(`${base}/s6`);
     for (let i = 1; i <= 6; i++) routes[`/r${i}`] = redirect(302, `/r${i + 1}`);
     routes["/r7"] = ok("done");
-    await expect(run("/r1")).rejects.toThrow(`${base}/r1 redirects more than 5 times`);
+    expect(await rejection(run("/r1"))).toBe(`${base}/r1 redirects more than 5 times`);
     expect(hits).not.toContain("/r7");
   });
 
   it("refuses a redirect to a URL that is not http or https", async () => {
-    routes["/start"] = redirect(302, "file:///C:/x");
-    await expect(run("/start")).rejects.toThrow(
-      `${base}/start redirects to a URL that is not http or https`,
-    );
-    expect(hits).toEqual(["/start"]);
+    for (const target of ["file:///C:/x", "ftp://a.test/x"]) {
+      routes["/start"] = redirect(302, target);
+      expect(await rejection(run("/start"))).toBe(
+        `${base}/start redirects to a URL that is not http or https`,
+      );
+    }
+    expect(hits).toEqual(["/start", "/start"]);
+  });
+
+  it("refuses a redirect to a URL with a user name or password, unseen", async () => {
+    const target = base.replace("http://", "http://user:secret@");
+    for (const location of [`${target}/y`, `${base.replace("http://", "http://user@")}/y`]) {
+      routes["/start"] = redirect(302, location);
+      expect(await rejection(run("/start"))).toBe(
+        `${base}/start redirects to a URL with a user name or password`,
+      );
+    }
+    expect(hits).toEqual(["/start", "/start"]);
+  });
+
+  it("never fetches a first URL that is not http or https", async () => {
+    const spy = vi.fn<Fetch>();
+    for (const url of ["file:///C:/x.yaml?a=1", "ftp://a.test/x", "a.test/x", ""]) {
+      const shown = url.startsWith("file:") ? "file:///C:/x.yaml" : url;
+      expect(await rejection(fetchText(url, spy, new AbortController().signal))).toBe(
+        `${shown} is not an http or https URL`,
+      );
+    }
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("reports a status other than 2xx", async () => {
-    await expect(run("/x?token=1")).rejects.toThrow(`${base}/x answered 404`);
+    expect(await rejection(run("/x?token=1"))).toBe(`${base}/x answered 404`);
+  });
+
+  it("reports a 3xx without a Location as its status", async () => {
+    routes["/multi"] = (_, res) => {
+      res.statusCode = 300;
+      res.end();
+    };
+    expect(await rejection(run("/multi"))).toBe(`${base}/multi answered 300`);
+    expect(hits).toEqual(["/multi"]);
   });
 
   it("refuses a body past 10 MB, streamed", async () => {
@@ -129,7 +168,7 @@ describe("fetchText", () => {
       };
       write();
     };
-    await expect(run("/big")).rejects.toThrow(`${base}/big is larger than 10 MB`);
+    expect(await rejection(run("/big"))).toBe(`${base}/big is larger than 10 MB`);
   });
 
   it("accepts a body of exactly the limit and refuses one byte more", async () => {
@@ -137,14 +176,34 @@ describe("fetchText", () => {
     routes["/over"] = ok("123456");
     const limits = { timeoutMs: 5000, maxBytes: 5, maxRedirects: 5 };
     expect((await run("/exact", limits)).text).toBe("12345");
-    await expect(run("/over", limits)).rejects.toThrow("is larger than 10 MB");
+    expect(await rejection(run("/over", limits))).toBe(`${base}/over is larger than 10 MB`);
   });
 
   it("gives up when the server never answers", async () => {
     routes["/hang"] = () => {};
-    await expect(run("/hang", { timeoutMs: 200, maxBytes: 1024, maxRedirects: 5 })).rejects.toThrow(
+    const limits = { timeoutMs: 200, maxBytes: 1024, maxRedirects: 5 };
+    expect(await rejection(run("/hang", limits))).toBe(
       `${base}/hang did not answer within 30 seconds`,
     );
+  });
+
+  it("keeps its own errors when the timer has already fired", async () => {
+    const limits = { timeoutMs: 20, maxBytes: 5, maxRedirects: 5 };
+    const late =
+      (response: Response): Fetch =>
+      async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        return response;
+      };
+    const signal = new AbortController().signal;
+    expect(
+      await rejection(
+        fetchText("http://a.test/x", late(new Response(null, { status: 404 })), signal, limits),
+      ),
+    ).toBe("http://a.test/x answered 404");
+    expect(
+      await rejection(fetchText("http://a.test/y", late(new Response("123456")), signal, limits)),
+    ).toBe("http://a.test/y is larger than 10 MB");
   });
 
   it("rejects with an AbortError when the caller aborts", async () => {
