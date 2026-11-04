@@ -13,7 +13,9 @@ import { passRateLabel, trendCaption, trendTip } from "./trendLabels";
  * tab shows; it asks main one request at a time (R5).
  */
 export function Trends(props: { state: AppState; api: Api }) {
-  const [points, setPoints] = createSignal<TrendPoint[] | null>(null);
+  /** The last answer and the selection it is for: the caption names what the columns show. */
+  const [shown, setShown] = createSignal<{ key: string | null; points: TrendPoint[] } | null>(null);
+  const points = () => shown()?.points ?? null;
   let live = true;
   let busy = false;
   let again = false;
@@ -25,8 +27,9 @@ export function Trends(props: { state: AppState; api: Api }) {
       return;
     }
     busy = true;
+    const key = wanted;
     void props.api
-      .trend(wanted)
+      .trend(key)
       .catch(() => null)
       .then((p) => {
         busy = false;
@@ -34,7 +37,7 @@ export function Trends(props: { state: AppState; api: Api }) {
         if (again) {
           again = false;
           ask(); // this answer is for an older request: dropped
-        } else if (p) setPoints(p);
+        } else setShown({ key, points: p ?? [] }); // no answer: no columns rather than another selection's
       });
   };
   createEffect(
@@ -47,7 +50,10 @@ export function Trends(props: { state: AppState; api: Api }) {
   );
   onCleanup(() => (live = false));
 
-  const caption = () => trendCaption(props.state.tree, props.state.selected);
+  const caption = () => {
+    const s = shown();
+    return trendCaption(props.state.tree, s ? s.key : props.state.selected);
+  };
   const newest = () => points()?.at(-1);
   const maxMillis = () => Math.max(0, ...(points() ?? []).map((p) => p.meanMillis ?? 0));
   const scroll = (id: string) =>

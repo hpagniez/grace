@@ -18,7 +18,10 @@ function resolver(tree: TestNode): (t: StoredTest) => TestNode | null {
   const byIdentity = new Map<string, TestNode[]>();
   const walk = (n: TestNode) => {
     byKey.set(n.key, n);
-    byIdentity.set(identity(n), [...(byIdentity.get(identity(n)) ?? []), n]);
+    const id = identity(n);
+    const same = byIdentity.get(id);
+    if (same) same.push(n);
+    else byIdentity.set(id, [n]);
     n.children.forEach(walk);
   };
   walk(tree);

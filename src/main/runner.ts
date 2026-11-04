@@ -563,12 +563,12 @@ export class Runner {
     );
   }
 
-  /** A scenario's or row's steps as its feature file has them (R4.1); null for any other node or an unreadable file. */
   /** The trend of `key` (the whole tree when null) on the environment picked now; none with no project. */
   trend(key: string | null): TrendPoint[] {
     return findTrend(this.listed(), this.tree, key, this.envs.env);
   }
 
+  /** A scenario's or row's steps as its feature file has them (R4.1); null for any other node or an unreadable file. */
   steps(key: string): FileStep[] | null {
     const node = this.tree && findNode(this.tree, key);
     if (!node || (node.kind !== "scenario" && node.kind !== "row")) return null;

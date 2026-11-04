@@ -152,6 +152,66 @@ describe("Trends", () => {
     expect(trend).toHaveBeenCalledTimes(2);
   });
 
+  it("names the selection of the answer it draws", async () => {
+    const { trend, answer } = deferred();
+    const { load } = setup(trend);
+    load("a");
+    showHistory();
+    await answer(0, [point("all")]);
+    fromTree("create user");
+    // the suite's columns are still drawn: so is its caption
+    expect(screen.getByTestId("trends-caption").textContent).toBe("All tests");
+    expect(strip()!.getAttribute("aria-label")).toBe("Trend of All tests");
+    await answer(1, [point("one", { total: 1, passed: 1, failed: 0 })]);
+    expect(screen.getByTestId("trends-caption").textContent).toBe("create user");
+  });
+
+  it("drops the old columns when main gives no answer", async () => {
+    const trend = vi.fn(async (key: string | null) => {
+      if (key !== null) throw new Error("no answer");
+      return [point("all")];
+    });
+    const { load } = setup(trend);
+    load("a");
+    showHistory();
+    await settle();
+    expect(columns()).toHaveLength(1);
+    fromTree("create user");
+    await settle();
+    expect(columns()).toHaveLength(0);
+    expect(screen.getByTestId("trends-caption").textContent).toBe("create user");
+    expect(screen.getByTestId("trends-none")).toBeTruthy();
+  });
+
+  it("leaves with the history and asks nothing more", async () => {
+    const { api, load } = setup();
+    load("a");
+    showHistory();
+    await settle();
+    load();
+    await settle();
+    expect(strip()).toBeNull();
+    expect(api.trend).toHaveBeenCalledOnce();
+  });
+
+  it("asks again when the environment changes", async () => {
+    const { api, load, send } = setup();
+    const view = (env: string | null) => ({
+      env,
+      suggestions: [],
+      overlays: [],
+      properties: { shared: [], byEnv: {} },
+      secretsAvailable: true,
+    });
+    send({ type: "environment", view: view(null) });
+    load("a");
+    showHistory();
+    await settle();
+    send({ type: "environment", view: view("qa") });
+    await settle();
+    expect(api.trend).toHaveBeenCalledTimes(2);
+  });
+
   it("asks again when the history changes", async () => {
     const { api, load } = setup();
     load("a");
@@ -192,6 +252,10 @@ describe("Trends", () => {
     const [a, b, c] = columns();
     expect(within(a).getByTestId("trend-passed").style.flexGrow).toBe("3");
     expect(within(a).getByTestId("trend-failed").style.flexGrow).toBe("1");
+    // failed on top, passed on the baseline
+    expect(within(a).getByTestId("trend-failed").nextElementSibling).toBe(
+      within(a).getByTestId("trend-passed"),
+    );
     expect(within(b).queryByTestId("trend-failed")).toBeNull();
     expect(within(b).getByTestId("trend-time").style.height).toBe("100%");
     expect(within(a).getByTestId("trend-time").style.height).toBe("25%");
