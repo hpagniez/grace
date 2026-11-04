@@ -65,8 +65,12 @@ export async function karateFolders(root: string, limits = SUBFOLDER_LIMITS): Pr
         if (depth > 0 && (await isProject(dir, entries))) {
           found.push(rel);
           if (found.length >= limits.found) return;
-        } else if (depth < limits.depth)
-          next.push(...folders(entries).map((n) => (rel ? `${rel}/${n}` : n)));
+        } else if (depth < limits.depth) {
+          // a build's own sources are that project's, not another one (#232 review)
+          const build = entries.some((e) => e.isFile() && BUILD_FILES.includes(lower(e)));
+          const below = folders(entries).filter((n) => !(build && n.toLowerCase() === "src"));
+          next.push(...below.map((n) => (rel ? `${rel}/${n}` : n)));
+        }
       }
       level = next;
     }

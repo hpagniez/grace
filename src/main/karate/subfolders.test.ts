@@ -75,6 +75,12 @@ describe("karateFolders", () => {
     expect(await karateFolders(root)).toEqual(["karate"]);
   });
 
+  it("does not offer the sources of a folder with a build file", async () => {
+    expect(await karateFolders(write(["pom.xml", "src/test/java/karate-config.js"]))).toEqual([]);
+    const root = write(["app/build.gradle", "app/src/test/resources/karate-config.js"]);
+    expect(await karateFolders(root)).toEqual([]);
+  });
+
   it("ignores a marker that is a folder", async () => {
     const root = write(["x/karate-config.js/", "y/pom.xml", "y/src/test"]);
     expect(await karateFolders(root)).toEqual([]);

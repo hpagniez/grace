@@ -45,7 +45,7 @@ When the opened folder holds no test, Grace should look a little way down for fo
 1. Folders 1 to 3 levels below the project's folder; a folder directly in it is level 1. The project's folder itself is never offered.
 2. A folder looks like a Karate project when it holds `karate-pom.json` or `karate-config.js`, or holds `pom.xml`, `build.gradle` or `build.gradle.kts` beside a `src/test` folder with a `.feature` file anywhere under it.
 3. Grace does not look inside a folder it offers.
-4. Grace skips folders whose name, in any case, is in `SKIPPED_DIRS`, `target` or `build`, at any level and under `src/test` too. It follows no link or junction.
+4. Grace skips folders whose name, in any case, is in `SKIPPED_DIRS`, `target` or `build`, at any level and under `src/test` too, and the `src` folder beside a build file, the project's own included. It follows no link or junction.
 5. Grace stops at 10 folders found, after reading 2,000 folders, or after 2 seconds, and offers what it found by then. A folder it cannot read is skipped.
 6. The folders are ordered by level, then by name.
 
@@ -89,6 +89,7 @@ By the owner:
 The builder's calls, open to the owner's correction:
 
 - At most 10 folders, 2,000 folders read, 2 seconds (R2.5): the same time bound as the fingerprint walk. More than 10 Karate projects in one repository is a multi-module case this spec leaves out.
+- The `src` folder beside a build file is never looked in (R2.4): a Maven project's own `src/test/java/karate-config.js` would otherwise offer `src/test/java/` when its tests are all `@ignore` or tagged for another environment.
 - `target` and `build` are skipped everywhere, not only beside a build file as the fingerprint does (R2.4): compiled copies such as `target/test-classes/karate-config.js` would otherwise look like projects.
 - The walk also runs after an environment switch or Refresh that comes back empty (R1.1): one code path for every discovery, and it costs only when there is no test.
 - A dry run that failed shows its error and no offer (R1.2): the folder has tests Karate could not read, so the fix is in the folder, not below it.
