@@ -148,7 +148,7 @@ Turn on **Watch** and each saved `.feature` file runs its tests that match your 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/history-dark.png">
-  <img src="docs/images/history-light.png" alt="The History tab: two runs with their threads, what ran, the result and the duration, each with Report, Re-run and Re-run failed buttons">
+  <img src="docs/images/history-light.png" alt="The History tab: two runs with their threads, what ran, the result and the duration, each with Report, Export, Re-run and Re-run failed buttons">
 </picture>
 
 ## Get started
