@@ -19,7 +19,7 @@ GPUI can be made accessible and tested through its accessibility tree, at no mea
 
 **First pass** (prototype at `9569e1c`, before GPUI Kit, [tree.txt](tree.txt)): only buttons and tree-row names were in the tree. No text, no statuses, no states, no focus. Clicking Run all through AT-SPI already ran Karate.
 
-**Second pass** (the GPUI Kit prototype at `73bcdf1`, with the accessibility props the other thread added, then this branch's changes, [tree-kit.txt](tree-kit.txt)):
+**Second pass** (the GPUI Kit prototype at `b093c69`, with the accessibility props added for #270, then this branch's changes, [tree-kit.txt](tree-kit.txt)):
 
 | | Exposed now | Still missing |
 |---|---|---|

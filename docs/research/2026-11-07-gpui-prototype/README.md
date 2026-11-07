@@ -50,7 +50,7 @@ Built on [GPUI Kit](https://github.com/longbridge/gpui-component) (`gpui-compone
 - **The console follows its end** unless you scrolled up.
 - **Bottom tabs:** Console, History (one row per finished run), and HTTP (method, status, URL, time and feature of every call, read from the step logs in `FEATURE_EXIT` events, as `http.ts` does).
 - **The progress bar** split into passed and failed.
-- **Accessibility props** that [#269](https://github.com/hpagniez/grace/issues/269)'s AT-SPI dump found missing: rows carry their status, level, expanded and selected state. The progress bar is a `ProgressIndicator` with its value, and the summary is a `Status`.
+- **Accessibility props** that [#269](https://github.com/hpagniez/grace/issues/269)'s AT-SPI dump found missing: rows carry their status and selected state, the progress bar is a `ProgressIndicator` with its value, and the summary is a `Status`. Level and expanded are set too, but they don't reach AT-SPI ([below](#tests)).
 
 ![The MVP after Run all, light theme](screens/mvp-light.png)
 
@@ -71,7 +71,15 @@ What is still missing compared with Grace: the step debugger, the report, settin
 - 5 headless UI tests. New ones: typing in the filter box narrows the tree, and Cancel opens a dialog without cancelling.
 - The port of `run.spec.ts`, which now also checks the History row.
 
-The accessibility thread ([PR #272](https://github.com/hpagniez/grace/pull/272)) read the morning's tree through AT-SPI on Linux: buttons and rows can be found and pressed from outside, which is the start of a Playwright replacement, but text, states and focus were missing. The props above fill part of that; a disabled state and live announcements need a small custom element.
+**Accessibility and an e2e test through it** ([a11y-linux/](a11y-linux/README.md), #269's Linux half):
+
+- **The e2e test passes through the accessibility tree.** [a11y-linux/e2e_run_all.py](a11y-linux/e2e_run_all.py) ports `run.spec.ts` "Run all with live progress" to AT-SPI, with the real Karate. It uses roles, names, descriptions, values and announcements, with no pixels and no coordinates. It passed 3 runs of 3, in about 11 s each, so it can replace Playwright for flows like this one. It can only check what was put in the tree by hand, though, and nothing fails when a label is forgotten.
+- **Announcements work**, through a 90-line element ([src/a11y.rs](src/a11y.rs)), because GPUI's `div` has no live region. A screen reader hears "Running 9 tests", then "Run failed: 8 passed, 1 failed".
+- **It costs nothing measurable.** On the 2,000-test project, with accessibility on and a client listening to every event, memory, CPU and run time all stayed inside the rounds' spread.
+- **Two gaps depend on GPUI's pinned AccessKit AT-SPI adapter (0.19)**, and Grace cannot fix them itself:
+  - A disabled button reads as enabled. AccessKit 0.21 fixes this, but GPUI has to move to it.
+  - A tree row's open state and depth are set but not passed on. The chevron is therefore a button named "Open" or "Close".
+
 
 ## The morning's prototype
 
@@ -187,7 +195,7 @@ What would replace Vitest and Playwright, tried in the prototype ([tests](src/ma
 | Vitest `*.test.ts`: logic in Node | `cargo test`: plain `#[test]` functions | 4 tests of `karate.rs` on the repo's own fixtures (`test/fixtures/events/dryrun-clean.jsonl`, `1-normal-run-failure.jsonl`): the tree, keys, a live file read in two halves, the dry run's arguments |
 | Vitest + Testing Library `*.test.tsx`: a component in jsdom | `#[gpui::test]` with `TestAppContext` and `VisualTestContext`: the real view, laid out and hit-tested on GPUI's test platform, no pixels and no window. Elements are found by `debug_selector` (the `data-testid` of GPUI), events are simulated, actions are dispatched, and the clock is fake | 2 tests: statuses roll up from fed events; closing a folder hides its rows |
 | Playwright `_electron` e2e: the built app, the real Karate | The same `#[gpui::test]`, with the real Karate and `allow_parking`. It drives the whole app headless: click, wait for events, assert. What it does not cover is the real platform: the window, GPU, fonts, the native folder picker | 1 test, the port of `run.spec.ts` "Run all with live progress": 9 tests, 8 passed, 1 failed, `basic.feature` failed. It finishes in about 10 s |
-| Playwright on the packaged exe | Nothing equivalent. Driving a real GPUI window from outside goes through the OS accessibility API (Windows UI Automation, through AccessKit), for example with FlaUI or the `uiautomation` crate. It sees only what has a role and a label | Not tried: no accessibility bus in this container |
+| Playwright on the packaged exe | Nothing equivalent. Driving a real GPUI window from outside goes through the OS accessibility API (Windows UI Automation, through AccessKit), for example with FlaUI or the `uiautomation` crate. It sees only what has a role and a label | Tried in the evening on Linux through AT-SPI: a port of the Run all e2e test passes ([a11y-linux/](a11y-linux/README.md)) |
 | The bench's CDP probes (`page.*`, click to paint, frames) | Probes built into the app behind a flag, as `GRACE_PROBE` here | First frame, tree shown, run start and end, frames |
 | Screenshots (`npm run screens:readme`) | A screenshot of the real window from outside, or GPUI's own `screen-capture` feature | `import -window root` under Xvfb |
 
