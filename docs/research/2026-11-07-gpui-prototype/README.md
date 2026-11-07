@@ -164,7 +164,7 @@ Sub-issues of #152:
 - [#269](https://github.com/hpagniez/grace/issues/269) (could): check the accessibility tree, and try one e2e test through UI Automation.
 - [#270](https://github.com/hpagniez/grace/issues/270) (could): add text input, selectable text and dialogs with GPUI Kit, in Grace's look.
 
-Independent of the decision: [#271](https://github.com/hpagniez/grace/issues/271) (could) ships only the `en-US` Chromium locale, a size cut on Electron.
+Grace already ships only the `en-US` Chromium locale ([#150](https://github.com/hpagniez/grace/issues/150), PR #206: 12.6 MB less zipped, 50.6 MB less unpacked), and the measured package above includes that cut. #271 was closed as its duplicate.
 
 If #267 ends in a go, a decision record superseding ADR 0001, 0004 and 0005 comes first, then a spec and a migration plan.
 
