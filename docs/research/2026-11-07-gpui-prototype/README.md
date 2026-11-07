@@ -6,10 +6,10 @@ This follows the [desk study](../2026-11-07-gpui.md). It is a reference only: no
 
 ## Verdict, after the complete MVP (same day, evening)
 
-On Linux, the complete MVP with the idle patch is lighter than Grace on every measure except smoothness without a GPU. It idles at zero, like an empty Electron window. That changes the morning's verdict: idle CPU was the reason for a no-go that did not depend on the platform, and on Linux it is gone. Two weak points remain, and neither is decided here:
+On Linux, the complete MVP with the idle patch is lighter than Grace on every measure except smoothness without a GPU. With the patch it idles at zero, like an empty Electron window; without it, at Grace's own 220 to 230 ms a minute. That changes the morning's verdict: idle CPU was the reason for a no-go that did not depend on the platform, and on Linux it is gone. Two weak points remain, and neither is decided here:
 
 1. **Smoothness needs a GPU.** GPUI redraws the whole window every frame, and llvmpipe rasterises it on the CPU here.
-2. **The idle fix is a patch to GPUI.** Grace would have to carry it in its own fork, because upstream has no such change. The Windows half is written but has never run.
+2. **The idle fix is a patch to GPUI, and is now optional.** [ADR 0030](../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md) ([#276](https://github.com/hpagniez/grace/issues/276)) replaced "idle costs nothing" with two rules: no wake-ups while the window is minimised or hidden, and a CPU budget (the `idle.cpu.shown` limit) while it is shown. Unpatched, the MVP idles shown at 220 ms a minute, as Grace does today (230 ms), well inside that budget, so the shown half of the patch is no longer required. The hidden half still matters. On X11, GPUI already drops its refresh timer while a window is hidden. On Windows, read but not run, the vsync thread keeps waking on every vsync while the window is minimised, which the new rule does not allow; the Windows patch is what fixes it ([patches/](patches/README.md)). Minimised and hidden were not measured on this machine (Xvfb has no window manager), so #267 has to measure them. Rather than keep a fork of a pre-1.0 framework, the better path is to offer the patch upstream to Zed, whose macOS backend already pauses this way; nothing has been opened there yet. The patch also cut the app's CPU during Run all from 3,470 ms to 2,630 ms, a gain that upstreaming would keep.
 
 Grace ships on Windows, so a migration still needs the Windows measurement (#267, parked for now). Until then: **no-go for a migration, but GPUI is now a serious candidate, not a curiosity.**
 
@@ -168,7 +168,7 @@ Neither app is at zero, and GPUI cannot get there without a change to GPUI.
 - **GPUI on Windows** (read, not run): `gpui_windows/src/platform.rs` starts a `VSyncProvider` thread that loops on `DwmFlush` for as long as the app lives. On every vsync it calls `RedrawWindow(.., RDW_INVALIDATE)` on every visible, non-minimised window. That is 60 to 120 wake-ups a second, plus a `WM_PAINT` each time, in which GPUI checks for a change before it draws. Minimised, the thread keeps waking on every vsync but posts nothing. This matches the 0.86 % of a core that [egoist/mygo #1006](https://github.com/egoist/mygo/pull/1006) read for an idle GPUI window on Windows.
 - **Electron:** the 0.23 s a minute is Chromium's own work for a page of about 2,300 nodes, as the [idle CPU note](../2026-10-31-idle-cpu-shown.md) found on Windows.
 
-ADR 0023 says no timer runs while no run is going. With GPUI, Grace would have to carry a patch that stops the refresh loop while nothing is dirty, or get one upstream. Zed's own idle CPU depends on the same loop.
+ADR 0023 says no timer runs while no run is going. With GPUI, Grace would have to carry a patch that stops the refresh loop while nothing is dirty, or get one upstream. Zed's own idle CPU depends on the same loop. (Since then, [ADR 0030](../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md) allows a CPU budget while the window is shown, and keeps zero only while it is minimised or hidden: see the verdict above.)
 
 ### Fluidity
 
@@ -241,7 +241,7 @@ Grace on Electron (left) and the prototype (right), the 2,000-test project after
 Sub-issues of #152:
 
 - [#267](https://github.com/hpagniez/grace/issues/267) (should): build the prototype for Windows and measure it on the reference machine, with the GPU and without it, and both floors. A one-command script is ready in [measure/windows/](measure/windows/README.md), not yet run; parked for now.
-- [#268](https://github.com/hpagniez/grace/issues/268) (could): stop GPUI's refresh loop while nothing changes. Done for X11 the same day ([patches/](patches/README.md)); the Windows patch is written, not run.
+- [#268](https://github.com/hpagniez/grace/issues/268) (could): stop GPUI's refresh loop while nothing changes. Done for X11 the same day ([patches/](patches/README.md)); the Windows patch is written, not run. Optional since [ADR 0030](../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md), except the Windows part that stops wake-ups while minimised; to be offered upstream to Zed rather than kept as a fork.
 - [#269](https://github.com/hpagniez/grace/issues/269) (could): check the accessibility tree, and try one e2e test through UI Automation.
 - [#270](https://github.com/hpagniez/grace/issues/270) (could): add text input, selectable text and dialogs with GPUI Kit, in Grace's look. Done the same evening ([above](#what-the-mvp-adds-270)).
 

@@ -2,7 +2,9 @@
 
 Date 2026-11-07. The same cloud Linux machine as the [prototype](../README.md): Intel Xeon at 2.10 GHz, 4 vCPU, no GPU, Ubuntu 24.04, Xvfb at 1920 x 1080, Mesa llvmpipe. `gpui-pre` 0.3.11, Rust 1.97.
 
-The prototype found that an idle GPUI window never stops working: on X11 a timer wakes the main thread at the screen's refresh rate for as long as the window is visible, and on Windows a `VSyncProvider` thread invalidates every visible window on every vsync. That breaks [ADR 0023](../../../decisions/0023-run-lightly-as-a-release-requirement.md)'s rule that idle costs nothing. These two patches stop the loop while nothing changes and restart it on the next notify, input, animation frame or throttled retry.
+The prototype found that an idle GPUI window never stops working: on X11 a timer wakes the main thread at the screen's refresh rate for as long as the window is visible, and on Windows a `VSyncProvider` thread invalidates every visible window on every vsync. That broke the rule of the time that idle costs nothing ([ADR 0023](../../../decisions/0023-run-lightly-as-a-release-requirement.md)). These two patches stop the loop while nothing changes and restart it on the next notify, input, animation frame or throttled retry.
+
+Since [ADR 0030](../../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md), a shown window may spend a small CPU budget, and only wake-ups while it is minimised or hidden are ruled out. The patches are therefore optional: the X11 one only lowers a cost that is within budget, and only the Windows part that stops the vsync thread while every window is minimised or hidden is still needed. The plan is to offer them upstream to Zed, whose macOS backend already pauses this way, instead of keeping a fork.
 
 ## Result
 
