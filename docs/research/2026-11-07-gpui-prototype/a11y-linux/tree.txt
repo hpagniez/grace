@@ -1,0 +1,15 @@
+[application] 'grace-gpui'  [] 
+  [frame] ''  ['focusable', 'enabled', 'sensitive', 'showing', 'visible'] box=-1,-1 -1x-1
+    [embedded] 'Grace'  ['enabled', 'sensitive', 'showing', 'visible'] box=0,0 1400x900
+      [push button] '−'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=1037,8 38x33
+      [push button] '+'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=1100,8 38x33
+      [push button] 'Open…'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=1146,8 78x33
+      [push button] 'Cancel'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=1232,8 74x33
+      [push button] 'Run all'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=1314,8 74x33
+      [tree item] 'proj'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=0,98 110x24
+        [push button] 'Run'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=83,98 19x23
+      [tree item] 'tests'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=0,122 134x24
+        [push button] 'Run'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=107,122 19x23
+      [tree item] 'tags.feature'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=0,146 353x24
+        [push button] 'Run'  ['enabled', 'sensitive', 'showing', 'visible'] actions=click box=326,146 19x23
+nodes printed 14
