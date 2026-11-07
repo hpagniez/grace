@@ -26,7 +26,7 @@ What should the idle rule ask for?
 
 Chosen: option 2, by the owner ([#276](https://github.com/hpagniez/grace/issues/276)).
 
-- While no run is going and the window is minimised or hidden, Grace does not wake: no timer, poll, animation or redraw. The bench measures it as `idle.cpu.minimised`.
+- While no run is going and the window is minimised or hidden (on another desktop, or closed to the tray), nothing in Grace wakes it: no timer, poll, animation or redraw, its own or the engine's. What the runtime still does on its own (Chromium's threads wake about once a second when Grace is minimised on Linux, measured in [#275](https://github.com/hpagniez/grace/pull/275)) stays within the `idle.cpu.minimised` limit, which the bench measures minimised.
 - While no run is going and the window is shown, Grace stays within a small CPU budget: the `idle.cpu.shown` limit in `bench/limits.json`. Code Grace writes still adds no timer, poll or animation of its own while idle; the budget is room for the engine's housekeeping, not for features.
 - Every design spec's `## Cost` section says how the feature keeps to both.
 - No limit in `bench/limits.json` changes. A later change to either limit follows ADR 0023: down by an ordinary commit, up only through a new decision record.
