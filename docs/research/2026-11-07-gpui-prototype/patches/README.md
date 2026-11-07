@@ -4,7 +4,18 @@ Date 2026-11-07. The same cloud Linux machine as the [prototype](../README.md): 
 
 The prototype found that an idle GPUI window never stops working: on X11 a timer wakes the main thread at the screen's refresh rate for as long as the window is visible, and on Windows a `VSyncProvider` thread invalidates every visible window on every vsync. That broke the rule of the time that idle costs nothing ([ADR 0023](../../../decisions/0023-run-lightly-as-a-release-requirement.md)). These two patches stop the loop while nothing changes and restart it on the next notify, input, animation frame or throttled retry.
 
-Since [ADR 0030](../../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md), a shown window may spend a small CPU budget, and only wake-ups while it is minimised or hidden are ruled out. The patches are therefore optional: the X11 one only lowers a cost that is within budget, and only the Windows part that stops the vsync thread while every window is minimised or hidden is still needed. The plan is to offer them upstream to Zed, whose macOS backend already pauses this way, instead of keeping a fork.
+Since [ADR 0030](../../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md), a shown window may spend a small CPU budget, and only wake-ups while it is minimised or hidden are ruled out. The patches are therefore optional: the X11 one only lowers a cost that is within budget, and only the Windows part that stops the vsync thread while every window is minimised or hidden is still needed. The plan is to get the fix upstream rather than keep a fork; see [Upstream](#upstream).
+
+## Upstream
+
+Searched in zed-industries/zed on 2026-11-07. Both halves are already reported or proposed there, so Grace adds nothing new by opening its own:
+
+- **X11:** draft PR [zed#66449](https://github.com/zed-industries/zed/pull/66449) (2026-11-03, no review yet) does what the Linux patch here does: it implements `frame_waker` and `schedule_frame` for X11, drops the refresh timer after idle refreshes and restarts it through a calloop ping.
+- **Windows, minimised:** issue [zed#66221](https://github.com/zed-industries/zed/issues/66221) (2026-10-27, open, needs triage) reports that a minimised GPUI window keeps redrawing on every vsync, about 3 % of a core, and proposes skipping hidden windows in `VSyncProvider`. That is the part ADR 0030 still needs. Related: [zed#58048](https://github.com/zed-industries/zed/issues/58048) (laptop fans while the screen is off) and draft PR [zed#63438](https://github.com/zed-industries/zed/pull/63438) (park the vsync thread while the display is off).
+- **Windows, shown:** PR [zed#63182](https://github.com/zed-industries/zed/pull/63182) made Windows frame scheduling demand-driven, as the Windows patch here does. A maintainer closed it on 2026-09-17, unmerged, saying they plan to do it differently in-house.
+- **Wayland:** already fixed upstream by [zed#60690](https://github.com/zed-industries/zed/pull/60690), merged 2026-08-21.
+
+So the useful upstream steps are a comment with these measurements on zed#66449 and zed#66221, not a new issue or PR. Nothing has been posted there.
 
 ## Result
 
