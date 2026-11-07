@@ -2,6 +2,7 @@
 //! filter them by text and tag, pick an environment and a thread count, Run all or one node with live progress, cancel
 //! after a confirm dialog, the selected test's details, and Console, History and HTTP tabs. Built on GPUI Kit with
 //! Grace's look (IBM Plex, Lucide, the two themes). Not part of the build. See ../README.md.
+mod a11y;
 mod karate;
 mod look;
 mod properties;
@@ -85,6 +86,8 @@ struct Grace {
     tree_probed: bool,
     /// With GRACE_PROBE: when the tree's rows were laid out, once per frame that draws the tree (the frame probe).
     frames: Vec<Instant>,
+    /// What a screen reader announces: set when a run starts and ends (a11y.rs).
+    announcement: SharedString,
 
     filter: Entity<InputState>,
     filter_text: String,
@@ -165,6 +168,7 @@ impl Grace {
             first_frame: false,
             tree_probed: false,
             frames: vec![],
+            announcement: SharedString::default(),
             filter,
             filter_text: String::new(),
             tags: vec![],
@@ -419,6 +423,7 @@ impl Grace {
         self.run_started = Some(Instant::now());
         self.run_secs = 0.0;
         self.phase = Phase::Running;
+        self.announcement = format!("Running {} tests", tests.len()).into();
         let at_end = self.console_at_end();
         let env = self.env.clone();
         self.log(format!(
@@ -518,6 +523,7 @@ impl Grace {
                         }
                     }
                     self.log(format!("Run {outcome}: {} passed, {} failed (exit {code:?}).", self.passed, self.failed));
+                    self.announcement = format!("Run {outcome}: {} passed, {} failed", self.passed, self.failed).into();
                     let secs = self.run_started.map(|s| s.elapsed().as_secs_f32()).unwrap_or(0.0);
                     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     self.history.insert(
@@ -1016,7 +1022,8 @@ impl Render for Grace {
                                     .w(px(14.))
                                     .text_color(p.muted)
                                     .when(has_kids, |d| {
-                                        d.child(Icon::new(if open { IconName::ChevronDown } else { IconName::ChevronRight }).small())
+                                        // AccessKit's AT-SPI adapter has no expand action, so the chevron is a button (#269).
+                                        d.role(Role::Button).aria_label(if open { "Close" } else { "Open" }).child(Icon::new(if open { IconName::ChevronDown } else { IconName::ChevronRight }).small())
                                     })
                                     .on_click(cx.listener(move |g, _, _, cx| {
                                         cx.stop_propagation();
@@ -1066,6 +1073,15 @@ impl Render for Grace {
             .text_sm()
             .child(self.toolbar(&p, cx))
             .child(self.progress(&p))
+            .child(a11y::live(
+                div()
+                    .id("announcement")
+                    .role(Role::Status)
+                    // No label until the first run: AccessKit announces a live node's name as soon as it appears.
+                    .when(!self.announcement.is_empty(), |d| d.aria_label(self.announcement.clone()))
+                    .size_0(),
+                gpui::accesskit::Live::Polite,
+            ))
             .child(self.tag_bar(&p, cx))
             .child(
                 div()
