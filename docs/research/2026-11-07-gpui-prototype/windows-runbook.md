@@ -106,7 +106,7 @@ Record the lines in `results\windows-hidden-idle.md`, one table per app, the sam
 
 - **Gate (ADR 0030):** minimised and on another desktop, GPUI uses under 125 ms of CPU in 60 s (the `idle.cpu.minimised` limit) and under 5 wake-ups a second, summed over its threads.
 - **Expected:** GPUI unpatched fails while minimised. Its vsync thread keeps calling `DwmFlush` for as long as the app lives (zed-industries/zed#66221). Grace passes, as the bench's `idle.cpu.minimised` already shows.
-- **Covered and screen off** decide nothing on their own: no desktop tells an app reliably that it is covered. Record them.
+- **Covered and screen off** decide nothing on their own: no desktop tells an app reliably that it is covered. Record them. On Linux, Grace dropped to 10 ms a minute when covered and unpatched GPUI kept drawing ([results/hidden-idle-linux.md](results/hidden-idle-linux.md)); note whether Windows does the same.
 
 ## 4. The Windows idle patch (#268)
 
@@ -121,7 +121,7 @@ CARGO_TARGET_DIR=../../../out/gpui-prototype-target-idle cargo build --release \
   --config 'patch.crates-io.gpui-pre-windows.path="patches/vendor/gpui-pre-windows"'
 ```
 
-Expected: the build prints `Adding gpui-pre-windows v0.3.11 (…patches/vendor/gpui-pre-windows)` near its start; without that line the patch is not in.
+Expected: the build prints `Adding gpui-pre-windows v0.3.11 (…patches/vendor/gpui-pre-windows)` near its start; without that line the patch is not in. The build rewrites `Cargo.lock` to point at the patched crate: run `git checkout Cargo.lock` before committing anything.
 
 Then, in PowerShell, from `measure\windows`:
 
