@@ -1,0 +1,22 @@
+# measure/idle-patch.sh, 2026-11-07, cloud Linux, Xvfb, llvmpipe. 60 s windows after 20 s to settle; cpu in ms (10 ms resolution).
+# Empty window (examples/floor.rs), alternating, 3 rounds
+base r1 floor cpu_ms=190 wakeups=3989
+patched r1 floor cpu_ms=0 wakeups=240
+base r2 floor cpu_ms=170 wakeups=3871
+patched r2 floor cpu_ms=0 wakeups=240
+base r3 floor cpu_ms=220 wakeups=3990
+patched r3 floor cpu_ms=20 wakeups=240
+# Patched empty window, voluntary context switches per thread over 20 s
+main 0
+blocking-1 40
+WSI 24
+WSI 2
+# Prototype with test/fixtures/projects/clean open (9 tests), then Run all and a click, 2 rounds
+base idle-with-project cpu_ms=170 wakeups=3990
+base idle-after-run cpu_ms=190 wakeups=3990
+patched idle-with-project cpu_ms=10 wakeups=240
+patched idle-after-run cpu_ms=20 wakeups=240
+base idle-with-project cpu_ms=180 wakeups=3990
+base idle-after-run cpu_ms=170 wakeups=3991
+patched idle-with-project cpu_ms=10 wakeups=240
+patched idle-after-run cpu_ms=10 wakeups=240
