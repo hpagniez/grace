@@ -38,7 +38,7 @@ impl Vendor {
 }
 
 /// `buildArgs` of command.ts for a standalone project (classpath = the root).
-pub fn args(jar: &Path, root: &Path, out: &Path, dry: bool, threads: u32, targets: &[String]) -> Vec<String> {
+pub fn args(jar: &Path, root: &Path, out: &Path, dry: bool, threads: u32, env: Option<&str>, targets: &[String]) -> Vec<String> {
     let sep = if cfg!(windows) { ";" } else { ":" };
     let mut a: Vec<String> = vec![
         "-Xms64m".into(),
@@ -66,6 +66,9 @@ pub fn args(jar: &Path, root: &Path, out: &Path, dry: bool, threads: u32, target
         a.extend(["-D".into(), "-T".into(), "1".into()]);
     } else {
         a.extend(["-T".into(), threads.to_string()]);
+    }
+    if let Some(e) = env {
+        a.extend(["-e".into(), e.to_string()]);
     }
     a.extend(targets.iter().cloned());
     a
@@ -262,7 +265,75 @@ pub enum Msg {
     Started { file: String, ref_id: String },
     Finished { file: String, ref_id: String, status: Status, millis: u64, error: Option<String> },
     Line(String),
+    Http(Call),
     Done { code: Option<i32>, cancelled: bool },
+}
+
+/// One HTTP call, read from a step log (environments.ts and http.ts in Grace; Karate's text is not a contract).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Call {
+    pub feature: String,
+    pub method: String,
+    pub url: String,
+    pub status: Option<u16>,
+    pub millis: Option<u64>,
+}
+
+/// The `<env>` of every `karate-config-<env>.js` directly inside the project root (environments.ts, simplified).
+pub fn environments(root: &Path) -> Vec<String> {
+    let mut envs: Vec<String> = std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            let lower = name.to_lowercase();
+            (lower.starts_with("karate-config-") && lower.ends_with(".js"))
+                .then(|| name["karate-config-".len()..name.len() - 3].to_string())
+        })
+        .collect();
+    envs.sort();
+    envs
+}
+
+/// The calls in one step log: `request:` then `N > METHOD URL`, and `N < STATUS` after `response time in milliseconds: T`.
+pub fn parse_step_log(feature: &str, log: &str) -> Vec<Call> {
+    let lines: Vec<&str> = log.lines().collect();
+    let mut calls: Vec<(String, Call)> = vec![];
+    for i in 0..lines.len() {
+        if lines[i] == "request:" {
+            if let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" > ")) {
+                if n.chars().all(|c| c.is_ascii_digit()) {
+                    let (method, url) = rest.split_once(' ').unwrap_or((rest, ""));
+                    calls.push((
+                        n.to_string(),
+                        Call { feature: feature.to_string(), method: method.into(), url: url.into(), status: None, millis: None },
+                    ));
+                }
+            }
+        } else if let Some(t) = lines[i].strip_prefix("response time in milliseconds: ") {
+            if let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" < ")) {
+                if let Some((_, c)) = calls.iter_mut().find(|(k, _)| k == n) {
+                    c.millis = t.trim().parse().ok();
+                    c.status = rest.split_whitespace().next().and_then(|s| s.parse().ok());
+                }
+            }
+        }
+    }
+    calls.into_iter().map(|(_, c)| c).collect()
+}
+
+fn http_calls(d: &Value, tx: &futures::channel::mpsc::UnboundedSender<Msg>) {
+    let feature = d["relativePath"].as_str().unwrap_or_default();
+    for s in d["scenarioResults"].as_array().into_iter().flatten() {
+        for st in s["stepResults"].as_array().into_iter().flatten() {
+            if let Some(log) = st["stepLog"].as_str() {
+                for c in parse_step_log(feature, log) {
+                    let _ = tx.unbounded_send(Msg::Http(c));
+                }
+            }
+        }
+    }
 }
 
 /// Tails `karate-events.jsonl` every 100 ms while the run lives, as runner.ts does, and reads the process output.
@@ -333,6 +404,11 @@ fn read_new(path: &Path, offset: &mut u64, partial: &mut String, tx: &futures::c
     for line in partial.lines() {
         let Ok(ev) = serde_json::from_str::<Value>(line) else { continue };
         let d = &ev["data"];
+        if ev["type"].as_str() == Some("FEATURE_EXIT") {
+            // Every depth: a called feature's calls are calls of the test that called it.
+            http_calls(d, tx);
+            continue;
+        }
         if d["callDepth"].as_u64() != Some(0) {
             continue;
         }
@@ -432,10 +508,38 @@ mod tests {
 
     #[test]
     fn dry_run_has_one_thread_and_c1_only() {
-        let a = args(Path::new("k.jar"), Path::new("/p"), Path::new("/o"), true, 4, &["/p".into()]);
+        let a = args(Path::new("k.jar"), Path::new("/p"), Path::new("/o"), true, 4, None, &["/p".into()]);
         assert!(a.contains(&"-XX:TieredStopAtLevel=1".to_string()));
         let t = a.iter().position(|x| x == "-T").unwrap();
         assert_eq!(a[t + 1], "1");
         assert_eq!(a.last().unwrap(), "/p");
+    }
+
+    #[test]
+    fn reads_http_calls_from_step_logs() {
+        let src = std::fs::read_to_string(fixture("run-http.jsonl")).unwrap();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+        let (mut offset, mut partial) = (0u64, String::new());
+        let tmp = std::env::temp_dir().join(format!("grace-gpui-http-{}.jsonl", std::process::id()));
+        std::fs::write(&tmp, &src).unwrap();
+        read_new(&tmp, &mut offset, &mut partial, &tx);
+        std::fs::remove_file(&tmp).ok();
+        drop(tx);
+        let mut calls = vec![];
+        while let Ok(m) = rx.try_recv() {
+            if let Msg::Http(c) = m {
+                calls.push(c);
+            }
+        }
+        assert!(!calls.is_empty());
+        let post = calls.iter().find(|c| c.method == "POST").expect("a POST");
+        assert!(post.url.ends_with("/users"), "{post:?}");
+        assert!(post.status.is_some() && post.millis.is_some(), "{post:?}");
+    }
+
+    #[test]
+    fn lists_environments() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../test/fixtures/projects/env");
+        assert_eq!(environments(&root), vec!["qa".to_string()]);
     }
 }
