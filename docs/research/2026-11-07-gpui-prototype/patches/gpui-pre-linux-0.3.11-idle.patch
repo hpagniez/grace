@@ -1,0 +1,362 @@
+diff --git a/src/linux/x11/client.rs b/src/linux/x11/client.rs
+index e21f019..8e3d974 100644
+--- a/src/linux/x11/client.rs
++++ b/src/linux/x11/client.rs
+@@ -3,6 +3,7 @@ use ashpd::WindowIdentifier;
+ use calloop::{
+     LoopHandle, RegistrationToken,
+     generic::{FdWrapper, Generic},
++    ping::{Ping, PingSource, make_ping},
+ };
+ use collections::HashMap;
+ use core::str;
+@@ -115,6 +116,11 @@ enum RefreshState {
+     Hidden {
+         refresh_rate: Duration,
+     },
++    /// Visible, but the refresh loop is stopped because GPUI asked for no
++    /// frame. The window's frame waker restarts it through `frame_ping`.
++    Paused {
++        refresh_rate: Duration,
++    },
+     PeriodicRefresh {
+         refresh_rate: Duration,
+         event_loop_token: RegistrationToken,
+@@ -188,6 +194,9 @@ pub struct X11ClientState {
+     registrations: Vec<RegistrationToken>,
+     /// The environment this connection was made in, without its activation token.
+     graphical_environment: GraphicalEnvironment,
++    /// Wakes the event loop to restart the refresh loops of paused windows
++    /// that GPUI asked a frame from. Each window's frame waker holds a clone.
++    frame_ping: Ping,
+ 
+     pub(crate) last_click: Instant,
+     pub(crate) last_mouse_button: Option<MouseButton>,
+@@ -498,10 +507,13 @@ impl X11Connection {
+         };
+ 
+         let background_executor = common.borrow().background_executor.clone();
++        let (frame_ping, frame_ping_source) =
++            make_ping().context("Failed to create the X11 frame wake-up")?;
+         let connection = X11Connection(X11Client(Rc::new_cyclic(|this| {
+             RefCell::new(X11ClientState {
+                 this: X11ClientStatePtr(this.clone()),
+                 registrations: Vec::new(),
++                frame_ping,
+                 graphical_environment: GraphicalEnvironment {
+                     activation_token: None,
+                     ..environment.clone()
+@@ -557,7 +569,7 @@ impl X11Connection {
+             })
+         })));
+         // From here on, `Drop` removes whatever was registered if a later step fails.
+-        connection.register_sources(&handle, background_executor)?;
++        connection.register_sources(&handle, background_executor, frame_ping_source)?;
+         let xcb_connection = connection.0.0.borrow().xcb_connection.clone();
+         xcb_flush(&xcb_connection);
+         Ok(connection)
+@@ -572,10 +584,23 @@ impl X11Client {
+         &self,
+         handle: &LoopHandle<'static, ()>,
+         background_executor: gpui::BackgroundExecutor,
++        frame_ping_source: PingSource,
+     ) -> anyhow::Result<()> {
+         let this = self.0.borrow().this.clone();
+         let xcb_connection = self.0.borrow().xcb_connection.clone();
+ 
++        let token = handle
++            .insert_source(frame_ping_source, {
++                let this = this.clone();
++                move |(), &mut (), _| {
++                    if let Some(client) = this.get_client() {
++                        client.0.borrow_mut().resume_woken_refresh_loops();
++                    }
++                }
++            })
++            .map_err(|err| anyhow!("Failed to initialize X11 frame wake-up: {err:?}"))?;
++        self.0.borrow_mut().registrations.push(token);
++
+         // Safety: Safe if xcb::Connection always returns a valid fd
+         let fd = unsafe { FdWrapper::new(Rc::clone(&xcb_connection)) };
+         let token = handle
+@@ -1711,6 +1736,7 @@ impl X11Client {
+             .resource_database
+             .get_string("Xft.rgba", "Xft.Rgba")
+             .is_some_and(|v| v.eq_ignore_ascii_case("bgr"));
++        let frame_ping = state.frame_ping.clone();
+         let window = X11Window::new(
+             handle,
+             X11ClientStatePtr(Rc::downgrade(&self.0)),
+@@ -1728,6 +1754,7 @@ impl X11Client {
+             parent_window,
+             supports_xinput_gestures,
+             is_bgr,
++            frame_ping,
+         )?;
+         check_reply(
+             || "Failed to set XdndAware property",
+@@ -1974,9 +2001,15 @@ impl X11ClientState {
+         match (is_visible, window_ref.refresh_state.take()) {
+             (false, refresh_state @ Some(RefreshState::Hidden { .. }))
+             | (false, refresh_state @ None)
+-            | (true, refresh_state @ Some(RefreshState::PeriodicRefresh { .. })) => {
++            | (true, refresh_state @ Some(RefreshState::PeriodicRefresh { .. }))
++            | (true, refresh_state @ Some(RefreshState::Paused { .. })) => {
+                 window_ref.refresh_state = refresh_state;
+             }
++            (false, Some(RefreshState::Paused { refresh_rate })) => {
++                // Showing the window again restarts the loop; wakes are not needed until then.
++                window_ref.window.frames.unpause();
++                window_ref.refresh_state = Some(RefreshState::Hidden { refresh_rate });
++            }
+             (
+                 false,
+                 Some(RefreshState::PeriodicRefresh {
+@@ -2046,6 +2079,30 @@ impl X11ClientState {
+         }
+     }
+ 
++    /// Restarts the refresh loop of every paused window that GPUI asked a frame
++    /// from since it paused.
++    fn resume_woken_refresh_loops(&mut self) {
++        let woken: Vec<(xproto::Window, Duration)> = self
++            .windows
++            .iter()
++            .filter_map(|(x_window, window_ref)| match window_ref.refresh_state {
++                Some(RefreshState::Paused { refresh_rate }) if window_ref.window.frames.take_wake() => {
++                    Some((*x_window, refresh_rate))
++                }
++                _ => None,
++            })
++            .collect();
++        for (x_window, refresh_rate) in woken {
++            let event_loop_token = self.start_refresh_loop(x_window, refresh_rate);
++            if let Some(window_ref) = self.windows.get_mut(&x_window) {
++                window_ref.refresh_state = Some(RefreshState::PeriodicRefresh {
++                    refresh_rate,
++                    event_loop_token,
++                });
++            }
++        }
++    }
++
+     #[must_use]
+     fn start_refresh_loop(
+         &self,
+@@ -2059,12 +2116,13 @@ impl X11ClientState {
+                     let Some(client) = this.get_client() else {
+                         return calloop::timer::TimeoutAction::Drop;
+                     };
+-                    let xcb_connection = {
++                    let (xcb_connection, window) = {
+                         let mut state = client.0.borrow_mut();
+                         let xcb_connection = state.xcb_connection.clone();
+-                        if let Some(window) = state.windows.get_mut(&x_window) {
+-                            let window = window.window.clone();
+-                            drop(state);
++                        let window = state.windows.get_mut(&x_window).map(|w| w.window.clone());
++                        drop(state);
++                        if let Some(window) = &window {
++                            window.frames.begin_tick();
+                             window.refresh(RequestFrameOptions {
+                                 require_presentation: false,
+                                 force_render: false,
+@@ -2072,10 +2130,26 @@ impl X11ClientState {
+                                 signal_source: FrameRequestSource::LocalSchedule,
+                             });
+                         }
+-                        xcb_connection
++                        (xcb_connection, window)
+                     };
+                     client.process_x11_events(&xcb_connection).log_err();
+ 
++                    // Stop while GPUI neither drew, presented, nor asked for
++                    // another frame: an idle window costs no wake-ups. The
++                    // window's frame waker restarts the loop on the next
++                    // notify, input, animation frame or throttled retry.
++                    if let Some(window) = window {
++                        let mut state = client.0.borrow_mut();
++                        if let Some(window_ref) = state.windows.get_mut(&x_window)
++                            && let Some(RefreshState::PeriodicRefresh { refresh_rate, .. }) =
++                                window_ref.refresh_state
++                            && window.frames.end_tick()
++                        {
++                            window_ref.refresh_state = Some(RefreshState::Paused { refresh_rate });
++                            return calloop::timer::TimeoutAction::Drop;
++                        }
++                    }
++
+                     // Take into account that some frames have been skipped
+                     let now = Instant::now();
+                     while instant < now {
+diff --git a/src/linux/x11/window.rs b/src/linux/x11/window.rs
+index f6ee76a..93f39bf 100644
+--- a/src/linux/x11/window.rs
++++ b/src/linux/x11/window.rs
+@@ -29,8 +29,10 @@ use x11rb::{
+     xcb_ffi::XCBConnection,
+ };
+ 
++use calloop::ping::Ping;
+ use std::{
+-    cell::RefCell, ffi::c_void, fmt::Display, num::NonZeroU32, ptr::NonNull, rc::Rc, sync::Arc,
++    cell::{Cell, RefCell},
++    ffi::c_void, fmt::Display, num::NonZeroU32, ptr::NonNull, rc::Rc, sync::Arc,
+ };
+ 
+ use super::{X11Display, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
+@@ -307,10 +309,77 @@ impl X11WindowState {
+     }
+ }
+ 
++/// Whether GPUI wants frames from a window's refresh loop, so that the loop
++/// can stop while the window is idle, as the macOS Metal display link does.
++///
++/// The loop stops after a tick in which GPUI neither drew, presented, nor
++/// asked for another frame. GPUI's frame waker (called when a view becomes
++/// dirty, on `on_next_frame`, and when a throttled frame must be retried)
++/// restarts it through the client's `frame_ping`.
++pub(crate) struct FrameDemand {
++    /// GPUI asked for a frame since the current tick began.
++    woken: Cell<bool>,
++    /// The current tick drew or presented a frame.
++    presented: Cell<bool>,
++    /// The refresh loop is stopped, so a wake must restart it.
++    paused: Cell<bool>,
++    ping: Ping,
++}
++
++impl FrameDemand {
++    fn new(ping: Ping) -> Self {
++        Self {
++            woken: Cell::new(false),
++            presented: Cell::new(false),
++            paused: Cell::new(false),
++            ping,
++        }
++    }
++
++    pub(crate) fn wake(&self) {
++        self.woken.set(true);
++        if self.paused.get() {
++            self.ping.ping();
++        }
++    }
++
++    pub(crate) fn mark_presented(&self) {
++        self.presented.set(true);
++    }
++
++    pub(crate) fn begin_tick(&self) {
++        self.woken.set(false);
++        self.presented.set(false);
++    }
++
++    /// Ends a tick, pausing if GPUI neither presented nor asked for another
++    /// frame during it. Returns whether it paused.
++    pub(crate) fn end_tick(&self) -> bool {
++        let pause = !self.presented.get() && !self.woken.get();
++        self.paused.set(pause);
++        pause
++    }
++
++    /// Takes a pending wake of a paused loop: returns whether the loop must restart.
++    pub(crate) fn take_wake(&self) -> bool {
++        let restart = self.paused.get() && self.woken.get();
++        if restart {
++            self.paused.set(false);
++        }
++        restart
++    }
++
++    /// Forgets a pause, when the window is hidden and the loop is restarted by showing it.
++    pub(crate) fn unpause(&self) {
++        self.paused.set(false);
++    }
++}
++
+ #[derive(Clone)]
+ pub(crate) struct X11WindowStatePtr {
+     pub state: Rc<RefCell<X11WindowState>>,
+     pub(crate) callbacks: Rc<RefCell<Callbacks>>,
++    pub(crate) frames: Rc<FrameDemand>,
+     xcb: Rc<XCBConnection>,
+     pub(crate) x_window: xproto::Window,
+ }
+@@ -935,6 +1004,7 @@ impl X11Window {
+         parent_window: Option<X11WindowStatePtr>,
+         supports_xinput_gestures: bool,
+         is_bgr: bool,
++        frame_ping: Ping,
+     ) -> anyhow::Result<Self> {
+         let ptr = X11WindowStatePtr {
+             state: Rc::new(RefCell::new(X11WindowState::new(
+@@ -956,6 +1026,7 @@ impl X11Window {
+                 is_bgr,
+             )?)),
+             callbacks: Rc::new(RefCell::new(Callbacks::default())),
++            frames: Rc::new(FrameDemand::new(frame_ping)),
+             xcb: xcb.clone(),
+             x_window,
+         };
+@@ -1697,6 +1768,21 @@ impl PlatformWindow for X11Window {
+         self.0.state.borrow().fullscreen
+     }
+ 
++    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
++        let frames = Rc::downgrade(&self.0.frames);
++        Some(Rc::new(move || {
++            if let Some(frames) = frames.upgrade() {
++                frames.wake();
++            }
++        }))
++    }
++
++    // GPUI calls this without the frame waker when a window only needs a
++    // present, so a paused refresh loop must restart here too.
++    fn schedule_frame(&self) {
++        self.0.frames.wake();
++    }
++
+     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
+         self.0.callbacks.borrow_mut().request_frame = Some(callback);
+     }
+@@ -1749,6 +1835,7 @@ impl PlatformWindow for X11Window {
+     }
+ 
+     fn draw(&self, scene: &Scene) {
++        self.0.frames.mark_presented();
+         let mut inner = self.0.state.borrow_mut();
+         let inner = &mut *inner;
+         let Some(renderer) = &mut inner.renderer else {
+@@ -2065,3 +2152,30 @@ impl accesskit::DeactivationHandler for TrivialDeactivationHandler {
+         (self.callback)();
+     }
+ }
++
++#[cfg(test)]
++mod frame_demand_tests {
++    use super::FrameDemand;
++
++    #[test]
++    fn the_loop_pauses_only_when_gpui_neither_draws_nor_asks_again() {
++        let (ping, _source) = calloop::ping::make_ping().unwrap();
++        let frames = FrameDemand::new(ping);
++
++        frames.begin_tick();
++        frames.mark_presented();
++        assert!(!frames.end_tick(), "a tick that drew keeps it running");
++
++        frames.begin_tick();
++        frames.wake();
++        assert!(!frames.end_tick(), "a wake during the tick keeps it running");
++
++        frames.begin_tick();
++        assert!(frames.end_tick(), "an idle tick pauses it");
++        assert!(!frames.take_wake(), "nothing to restart before a wake");
++
++        frames.wake();
++        assert!(frames.take_wake(), "a wake restarts a paused loop");
++        assert!(!frames.take_wake(), "once");
++    }
++}
