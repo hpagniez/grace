@@ -1,0 +1,288 @@
+diff --git a/src/events.rs b/src/events.rs
+index 4dd0c38..2191d78 100644
+--- a/src/events.rs
++++ b/src/events.rs
+@@ -1359,9 +1359,11 @@ impl WindowsWindowInner {
+             // Validate the region so a nested message pump doesn't keep
+             // re-dispatching WM_PAINT for the still-invalid region in a busy
+             // loop until the in-progress draw unwinds. The vsync thread
+-            // re-invalidates every window on each vsync (see
+-            // `begin_vsync_thread`), so the deferred frame still gets drawn,
+-            // at most one vsync late.
++            // re-invalidates every window that is not paused on each vsync
++            // (see `begin_vsync_thread`), and the wake keeps this one from
++            // pausing, so the deferred frame still gets drawn, at most one
++            // vsync late.
++            self.state.frames.wake();
+             unsafe { ValidateRect(Some(handle), None).ok().log_err() };
+             return Some(0);
+         };
+@@ -1389,12 +1391,17 @@ impl WindowsWindowInner {
+             (None, FrameRequestSource::NativeCallback),
+             |(at, source)| (Some(at), source),
+         );
++        self.state.frames.begin_tick();
+         request_frame(RequestFrameOptions {
+             require_presentation: false,
+             force_render,
+             signal_at,
+             signal_source,
+         });
++        // Stop invalidating this window on vsync while GPUI neither drew,
++        // presented, nor asked for another frame: an idle window costs no
++        // wake-ups. Its frame waker unpauses it.
++        self.state.frames.end_tick();
+ 
+         self.state.callbacks.request_frame.set(Some(request_frame));
+         self.update_ime_enabled(handle);
+diff --git a/src/platform.rs b/src/platform.rs
+index 72731ec..a6cd8d3 100644
+--- a/src/platform.rs
++++ b/src/platform.rs
+@@ -42,6 +42,7 @@ use gpui::*;
+ struct TrackedWindow {
+     handle: SafeHwnd,
+     frame_signal: Arc<PlatformFrameSignal>,
++    frames: Arc<FrameDemand>,
+ }
+ 
+ impl TrackedWindow {
+@@ -436,6 +437,7 @@ impl WindowsPlatform {
+             // Not joined: the thread can be sending this thread a message. It exits after its
+             // next vsync, and drops its reference to the devices then.
+             stop.store(true, Ordering::Release);
++            VSYNC_GATE.open();
+         }
+         if let Some(text_system) = &self.direct_write_text_system {
+             text_system.release_gpu();
+@@ -464,6 +466,22 @@ impl WindowsPlatform {
+             .spawn(move || {
+                 let vsync_provider = VSyncProvider::new();
+                 loop {
++                    // Sleep while no window wants frames: every window is
++                    // paused, hidden or minimised. A paused window wakes the
++                    // gate when GPUI asks it for a frame; showing or restoring
++                    // a window sends WM_PAINT, whose frame wakes it if needed.
++                    if let Some(all_windows) = all_windows.upgrade() {
++                        VSYNC_GATE.wait_while(|| {
++                            all_windows.read().iter().all(|hwnd| unsafe {
++                                hwnd.frames.is_paused()
++                                    || !IsWindowVisible(hwnd.as_raw()).as_bool()
++                                    || IsIconic(hwnd.as_raw()).as_bool()
++                            })
++                        });
++                    }
++                    if stop.load(Ordering::Acquire) {
++                        break;
++                    }
+                     let signal_source = vsync_provider.wait_for_vsync();
+                     let signal_at = PlatformFrameSignal::capture(scheduler::Instant::now);
+                     if stop.load(Ordering::Acquire) {
+@@ -486,6 +504,9 @@ impl WindowsPlatform {
+                         break;
+                     };
+                     for hwnd in all_windows.read().iter() {
++                        if hwnd.frames.is_paused() {
++                            continue;
++                        }
+                         unsafe {
+                             if let Some(signal_at) = signal_at {
+                                 if IsWindowVisible(hwnd.as_raw()).as_bool()
+@@ -774,7 +795,10 @@ impl Platform for WindowsPlatform {
+         self.raw_window_handles.write().push(TrackedWindow {
+             handle: handle.into(),
+             frame_signal: window.state.frame_signal.clone(),
++            frames: window.state.frames.clone(),
+         });
++        // The vsync thread may sleep while every other window is idle.
++        VSYNC_GATE.open();
+ 
+         Ok(Box::new(window))
+     }
+@@ -1477,6 +1501,7 @@ impl Drop for WindowsPlatform {
+     fn drop(&mut self) {
+         if let Some(stop) = self.vsync_stop.borrow_mut().take() {
+             stop.store(true, Ordering::Release);
++            VSYNC_GATE.open();
+         }
+         unsafe {
+             if let Some(notification) = self.suspend_resume_notification.borrow_mut().take() {
+diff --git a/src/vsync.rs b/src/vsync.rs
+index 5121c41..19a6c0a 100644
+--- a/src/vsync.rs
++++ b/src/vsync.rs
+@@ -1,5 +1,8 @@
+ use std::{
+-    sync::LazyLock,
++    sync::{
++        Condvar, LazyLock, Mutex,
++        atomic::{AtomicBool, Ordering},
++    },
+     time::{Duration, Instant},
+ };
+ 
+@@ -20,6 +23,89 @@ static QPC_TICKS_PER_SECOND: LazyLock<u64> = LazyLock::new(|| {
+     frequency as u64
+ });
+ 
++/// Whether GPUI wants frames from a window, so that the vsync thread can stop
++/// invalidating it, and sleep once every window is idle, as the macOS Metal
++/// display link pauses.
++///
++/// A window pauses after a `WM_PAINT` in which GPUI neither drew, presented,
++/// nor asked for another frame. GPUI's frame waker (called when a view
++/// becomes dirty, on `on_next_frame`, and when a throttled frame must be
++/// retried) unpauses it and wakes the vsync thread.
++///
++/// `begin_tick`, `end_tick` and `wake` run on the main thread; the vsync
++/// thread only reads `is_paused`.
++#[derive(Default)]
++pub(crate) struct FrameDemand {
++    /// GPUI asked for a frame since the current paint began.
++    woken: AtomicBool,
++    /// The current paint drew or presented a frame.
++    presented: AtomicBool,
++    /// The vsync thread leaves this window alone until the next wake.
++    paused: AtomicBool,
++}
++
++impl FrameDemand {
++    pub(crate) fn wake(&self) {
++        self.woken.store(true, Ordering::SeqCst);
++        self.paused.store(false, Ordering::SeqCst);
++        VSYNC_GATE.open();
++    }
++
++    pub(crate) fn mark_presented(&self) {
++        self.presented.store(true, Ordering::SeqCst);
++    }
++
++    pub(crate) fn begin_tick(&self) {
++        self.woken.store(false, Ordering::SeqCst);
++        self.presented.store(false, Ordering::SeqCst);
++    }
++
++    /// Ends a paint, pausing the window if GPUI neither presented nor asked for
++    /// another frame during it. Returns whether it paused.
++    pub(crate) fn end_tick(&self) -> bool {
++        let pause = !self.presented.load(Ordering::SeqCst) && !self.woken.load(Ordering::SeqCst);
++        if pause {
++            self.paused.store(true, Ordering::SeqCst);
++        }
++        pause
++    }
++
++    pub(crate) fn is_paused(&self) -> bool {
++        self.paused.load(Ordering::SeqCst)
++    }
++}
++
++/// Where the vsync thread sleeps while no window wants frames. One per
++/// process, like the vsync thread.
++pub(crate) static VSYNC_GATE: VSyncGate = VSyncGate {
++    opened: Mutex::new(false),
++    condvar: Condvar::new(),
++};
++
++pub(crate) struct VSyncGate {
++    opened: Mutex<bool>,
++    condvar: Condvar,
++}
++
++impl VSyncGate {
++    /// Wakes the vsync thread if it sleeps, or keeps its next wait from sleeping.
++    pub(crate) fn open(&self) {
++        *self.opened.lock().unwrap_or_else(|e| e.into_inner()) = true;
++        self.condvar.notify_all();
++    }
++
++    /// Sleeps while `idle` holds and nothing opened the gate since the last
++    /// wait. A wake changes what `idle` reads before it opens the gate, so it
++    /// is never lost. `idle` must not wait on the main thread.
++    pub(crate) fn wait_while(&self, idle: impl Fn() -> bool) {
++        let mut opened = self.opened.lock().unwrap_or_else(|e| e.into_inner());
++        while !*opened && idle() {
++            opened = self.condvar.wait(opened).unwrap_or_else(|e| e.into_inner());
++        }
++        *opened = false;
++    }
++}
++
+ const VSYNC_INTERVAL_THRESHOLD: Duration = Duration::from_millis(1);
+ const DEFAULT_VSYNC_INTERVAL: Duration = Duration::from_micros(16_666); // ~60Hz
+ 
+@@ -116,4 +202,24 @@ mod tests {
+ 
+         assert_eq!(provider.wait_for_vsync(), FrameRequestSource::LocalSchedule);
+     }
++
++    #[test]
++    fn a_window_pauses_only_when_gpui_neither_draws_nor_asks_again() {
++        let frames = FrameDemand::default();
++
++        frames.begin_tick();
++        frames.mark_presented();
++        assert!(!frames.end_tick(), "a frame that drew keeps it running");
++
++        frames.begin_tick();
++        frames.wake();
++        assert!(!frames.end_tick(), "a wake during the paint keeps it running");
++
++        frames.begin_tick();
++        assert!(frames.end_tick(), "an idle paint pauses it");
++        assert!(frames.is_paused());
++
++        frames.wake();
++        assert!(!frames.is_paused(), "a wake unpauses it");
++    }
+ }
+diff --git a/src/window.rs b/src/window.rs
+index 5d8415a..7d9af7f 100644
+--- a/src/window.rs
++++ b/src/window.rs
+@@ -55,6 +55,7 @@ pub struct WindowsWindowState {
+ 
+     pub callbacks: Callbacks,
+     pub frame_signal: Arc<PlatformFrameSignal>,
++    pub(crate) frames: Arc<FrameDemand>,
+     pub input_handler: Cell<Option<PlatformInputHandler>>,
+     pub ime_enabled: Cell<bool>,
+     pub pending_surrogate: Cell<Option<u16>>,
+@@ -171,6 +172,7 @@ impl WindowsWindowState {
+             min_size,
+             callbacks,
+             frame_signal: Arc::new(PlatformFrameSignal::new()),
++            frames: Arc::new(FrameDemand::default()),
+             input_handler: Cell::new(input_handler),
+             ime_enabled: Cell::new(true),
+             pending_surrogate: Cell::new(pending_surrogate),
+@@ -970,6 +972,21 @@ impl PlatformWindow for WindowsWindow {
+         self.state.is_fullscreen()
+     }
+ 
++    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
++        let frames = Arc::downgrade(&self.state.frames);
++        Some(Rc::new(move || {
++            if let Some(frames) = frames.upgrade() {
++                frames.wake();
++            }
++        }))
++    }
++
++    // GPUI calls this without the frame waker when a window only needs a
++    // present, so a paused window must wake here too.
++    fn schedule_frame(&self) {
++        self.state.frames.wake();
++    }
++
+     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
+         self.state.callbacks.request_frame.set(Some(callback));
+     }
+@@ -1036,6 +1053,7 @@ impl PlatformWindow for WindowsWindow {
+     }
+ 
+     fn draw(&self, scene: &Scene) {
++        self.state.frames.mark_presented();
+         self.state
+             .renderer
+             .borrow_mut()
