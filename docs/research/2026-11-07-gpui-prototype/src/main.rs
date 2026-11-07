@@ -919,6 +919,7 @@ impl Grace {
                             div()
                                 .px_3()
                                 .h(px(24.))
+                                .w_full()
                                 .flex()
                                 .items_center()
                                 .gap_3()
