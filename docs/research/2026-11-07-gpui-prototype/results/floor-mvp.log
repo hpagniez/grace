@@ -1,0 +1,6 @@
+{"name":"electron","memMB":155.21484375,"cpuMs":0,"procs":6}
+{"name":"gpui","memMB":128.63671875,"cpuMs":10,"procs":1}
+{"name":"gpui","memMB":128.6484375,"cpuMs":20,"procs":1}
+{"name":"electron","memMB":155.0703125,"cpuMs":20,"procs":6}
+{"name":"electron","memMB":155.67578125,"cpuMs":40,"procs":6}
+{"name":"gpui","memMB":128.65234375,"cpuMs":10,"procs":1}
