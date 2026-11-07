@@ -138,11 +138,10 @@ impl Grace {
                 input.update(cx, |i, cx| i.set_value(v, window, cx));
             }),
             cx.subscribe_in(&threads_input, window, |g, input, e: &InputEvent, _, cx| {
-                if let InputEvent::Change = e {
-                    if let Ok(n) = input.read(cx).value().parse::<u32>() {
+                if let InputEvent::Change = e
+                    && let Ok(n) = input.read(cx).value().parse::<u32>() {
                         g.threads = n.clamp(1, 16);
                     }
-                }
             }),
         ];
         let console_text = TextSelectionHandle::new("", cx);
@@ -339,13 +338,12 @@ impl Grace {
     }
 
     fn toggle(&mut self, i: usize, cx: &mut Context<Self>) {
-        if let Some(t) = &mut self.tree {
-            if !t.nodes[i].children.is_empty() {
+        if let Some(t) = &mut self.tree
+            && !t.nodes[i].children.is_empty() {
                 t.nodes[i].expanded = !t.nodes[i].expanded;
                 self.relist();
                 cx.notify();
             }
-        }
     }
 
     fn toggle_tag(&mut self, tag: SharedString, cx: &mut Context<Self>) {
@@ -480,15 +478,14 @@ impl Grace {
                 Msg::Line(l) => self.log(l),
                 Msg::Http(c) => self.http.push(c),
                 Msg::Started { file, ref_id } => {
-                    if let Some(t) = &mut self.tree {
-                        if let Some(&i) = t.by_ref.get(&(file, ref_id)) {
+                    if let Some(t) = &mut self.tree
+                        && let Some(&i) = t.by_ref.get(&(file, ref_id)) {
                             t.nodes[i].status = Status::Running;
                         }
-                    }
                 }
                 Msg::Finished { file, ref_id, status, millis, error } => {
-                    if let Some(t) = &mut self.tree {
-                        if let Some(&i) = t.by_ref.get(&(file, ref_id)) {
+                    if let Some(t) = &mut self.tree
+                        && let Some(&i) = t.by_ref.get(&(file, ref_id)) {
                             let n = &mut t.nodes[i];
                             n.status = status;
                             n.millis = Some(millis);
@@ -500,7 +497,6 @@ impl Grace {
                                 _ => {}
                             }
                         }
-                    }
                 }
                 Msg::Done { code, cancelled } => {
                     over = true;
@@ -564,7 +560,7 @@ impl Grace {
                 Status::Failed
             } else if all.contains(&Status::Queued) {
                 Status::Queued
-            } else if all.iter().any(|s| *s == Status::Passed) {
+            } else if all.contains(&Status::Passed) {
                 Status::Passed
             } else {
                 all.first().copied().unwrap_or(Status::NotRun)
@@ -625,11 +621,10 @@ impl Grace {
             prompt: Some("Open a Karate project".into()),
         });
         cx.spawn_in(window, async move |this, cx| {
-            if let Ok(Ok(Some(mut p))) = paths.await {
-                if let Some(dir) = p.pop() {
+            if let Ok(Ok(Some(mut p))) = paths.await
+                && let Some(dir) = p.pop() {
                     let _ = this.update_in(cx, |g, window, cx| g.open(dir, window, cx));
                 }
-            }
         })
         .detach();
     }
@@ -999,7 +994,7 @@ impl Render for Grace {
                             .aria_label(SharedString::from(n.name.clone()))
                             // What AT-SPI showed missing (#269): the status, the level, open or closed, selected.
                             .aria_description(status_word(n.status))
-                            .aria_level(n.depth as usize + 1)
+                            .aria_level(n.depth + 1)
                             .when(has_kids, |d| d.aria_expanded(open))
                             .aria_selected(selected)
                             .h(px(26.))
@@ -1122,6 +1117,12 @@ impl Render for Grace {
 /// What every window of the app needs: GPUI Kit, IBM Plex, the theme and the keys.
 fn init(cx: &mut App) {
     gpui_component::init(cx);
+    // Quitting during a run or a listing stops its Java, as Grace does, instead of leaving it running.
+    cx.on_app_quit(|_| {
+        karate::kill_all();
+        async {}
+    })
+    .detach();
     look::load_fonts(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-enter", RunAll, None),
@@ -1175,7 +1176,7 @@ fn main() {
             });
             cx.spawn(async move |cx| {
                 while let Some(cmd) = rx.next().await {
-                    let _ = grace.update(cx, |g, cx| match cmd.as_str() {
+                    grace.update(cx, |g, cx| match cmd.as_str() {
                         "run" => g.run(0, cx),
                         "quit" => cx.quit(),
                         // For screenshots: select the first failed test, or show a bottom tab.

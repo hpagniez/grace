@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -302,23 +302,20 @@ pub fn parse_step_log(feature: &str, log: &str) -> Vec<Call> {
     let mut calls: Vec<(String, Call)> = vec![];
     for i in 0..lines.len() {
         if lines[i] == "request:" {
-            if let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" > ")) {
-                if n.chars().all(|c| c.is_ascii_digit()) {
+            if let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" > "))
+                && n.chars().all(|c| c.is_ascii_digit()) {
                     let (method, url) = rest.split_once(' ').unwrap_or((rest, ""));
                     calls.push((
                         n.to_string(),
                         Call { feature: feature.to_string(), method: method.into(), url: url.into(), status: None, millis: None },
                     ));
                 }
-            }
-        } else if let Some(t) = lines[i].strip_prefix("response time in milliseconds: ") {
-            if let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" < ")) {
-                if let Some((_, c)) = calls.iter_mut().find(|(k, _)| k == n) {
+        } else if let Some(t) = lines[i].strip_prefix("response time in milliseconds: ")
+            && let Some((n, rest)) = lines.get(i + 1).and_then(|l| l.split_once(" < "))
+                && let Some((_, c)) = calls.iter_mut().find(|(k, _)| k == n) {
                     c.millis = t.trim().parse().ok();
                     c.status = rest.split_whitespace().next().and_then(|s| s.parse().ok());
                 }
-            }
-        }
     }
     calls.into_iter().map(|(_, c)| c).collect()
 }
@@ -358,6 +355,8 @@ pub fn watch(
             }
         });
     }
+    let pid = child.id();
+    RUNNING.lock().unwrap().push(pid);
     std::thread::spawn(move || {
         let path = events_file(&out);
         let mut offset = 0u64;
@@ -371,6 +370,7 @@ pub fn watch(
             }
             read_new(&path, &mut offset, &mut partial, &tx);
             if let Some(status) = exited {
+                RUNNING.lock().unwrap().retain(|&p| p != pid);
                 read_new(&path, &mut offset, &mut partial, &tx);
                 let _ = tx.unbounded_send(Msg::Done { code: status.code(), cancelled });
                 return;
@@ -378,6 +378,27 @@ pub fn watch(
             std::thread::sleep(Duration::from_millis(100));
         }
     });
+}
+
+/// The Java processes still running, so that quitting the app stops them instead of leaving them orphaned.
+static RUNNING: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+/// Stops every Java process a run or a listing started and that has not exited yet. Called when the app quits.
+pub fn kill_all() {
+    let pids = std::mem::take(&mut *RUNNING.lock().unwrap());
+    for pid in pids {
+        kill_pid(pid);
+    }
+}
+
+#[cfg(windows)]
+fn kill_pid(pid: u32) {
+    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).status();
+}
+
+#[cfg(not(windows))]
+fn kill_pid(pid: u32) {
+    let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
 }
 
 #[cfg(windows)]
