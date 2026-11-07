@@ -56,8 +56,8 @@ Decided in [ADR 0023](docs/decisions/0023-run-lightly-as-a-release-requirement.m
 2. Be fast: start and response.
 3. Be small: download and install size.
 
-- Every design spec has a `## Cost` section: what the feature adds to memory, CPU, start time or size, idle and during a run, and how idle stays at zero CPU. A PR that adds a dependency states its size.
-- Idle costs nothing: no timer, poll or animation runs while no run is going, or while the window is minimised.
+- Every design spec has a `## Cost` section: what the feature adds to memory, CPU, start time or size, idle and during a run, and how it keeps to the idle rule below. A PR that adds a dependency states its size.
+- Idle: while no run is going, Grace does not wake while its window is minimised or hidden (no timer, poll, animation or redraw), and stays within the `idle.cpu.shown` limit while it is shown. Grace's own code adds no timer, poll or animation while idle; the budget is for the engine's housekeeping ([ADR 0030](docs/decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md)).
 - Every code PR gets a comment from the `perf` workflow: the PR against its base, measured by `npm run bench`. Read it. When it shows a measure worse than base beyond its noise margin, say why in the PR body. A worse number never blocks a merge, but the PR body explains it.
 - The limits are in `bench/limits.json`. Lowering one is an ordinary commit. Raising one needs a new decision record: `scripts/check-pr.mjs` fails a PR that raises a limit without adding a file under `docs/decisions/`.
 - Before a release, run the release benchmark ([Git workflow](#git-workflow)).
