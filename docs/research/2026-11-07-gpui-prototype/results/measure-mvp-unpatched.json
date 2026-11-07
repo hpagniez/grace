@@ -1,0 +1,197 @@
+{
+  "machine": "Intel(R) Xeon(R) Processor @ 2.10GHz, 4 vCPU, 17 GB",
+  "rounds": [
+    {
+      "round": 0,
+      "warmup": true,
+      "electron": {
+        "start": {
+          "paint": 3900,
+          "tree": 5361
+        },
+        "idle": {
+          "memMB": 197.87890625,
+          "javaMB": 0,
+          "cpuMs": 230,
+          "procs": 6,
+          "memAtSettleMB": 239.80859375
+        },
+        "run": {
+          "appPeakMB": 338.03515625,
+          "javaPeakMB": 258.90625,
+          "appCpuMs": 5510,
+          "javaCpuMs": 15340,
+          "wallMs": 9218,
+          "outcome": "Finished",
+          "appAfterMB": 347.33984375
+        }
+      },
+      "gpui": {
+        "start": {
+          "paint": 192,
+          "tree": 1680
+        },
+        "idle": {
+          "memMB": 161.76953125,
+          "javaMB": 0,
+          "cpuMs": 260,
+          "procs": 1,
+          "memAtSettleMB": 161.76953125
+        },
+        "run": {
+          "appPeakMB": 169.40625,
+          "javaPeakMB": 201.28125,
+          "appCpuMs": 3970,
+          "javaCpuMs": 10300,
+          "wallMs": 5217,
+          "outcome": "finished",
+          "appAfterMB": 169.5234375
+        }
+      }
+    },
+    {
+      "round": 1,
+      "warmup": false,
+      "gpui": {
+        "start": {
+          "paint": 153,
+          "tree": 1513
+        },
+        "idle": {
+          "memMB": 161.859375,
+          "javaMB": 0,
+          "cpuMs": 220,
+          "procs": 1,
+          "memAtSettleMB": 161.859375
+        },
+        "run": {
+          "appPeakMB": 169.59375,
+          "javaPeakMB": 266.11328125,
+          "appCpuMs": 3800,
+          "javaCpuMs": 10490,
+          "wallMs": 5312,
+          "outcome": "finished",
+          "appAfterMB": 169.59375
+        }
+      },
+      "electron": {
+        "start": {
+          "paint": 356,
+          "tree": 1893
+        },
+        "idle": {
+          "memMB": 199.12109375,
+          "javaMB": 0,
+          "cpuMs": 280,
+          "procs": 6,
+          "memAtSettleMB": 241.2578125
+        },
+        "run": {
+          "appPeakMB": 352.94921875,
+          "javaPeakMB": 187.5859375,
+          "appCpuMs": 4070,
+          "javaCpuMs": 12260,
+          "wallMs": 6897,
+          "outcome": "Finished",
+          "appAfterMB": 353.29296875
+        }
+      }
+    },
+    {
+      "round": 2,
+      "warmup": false,
+      "electron": {
+        "start": {
+          "paint": 276,
+          "tree": 1811
+        },
+        "idle": {
+          "memMB": 199.33203125,
+          "javaMB": 0,
+          "cpuMs": 220,
+          "procs": 6,
+          "memAtSettleMB": 241.76171875
+        },
+        "run": {
+          "appPeakMB": 340.2265625,
+          "javaPeakMB": 185.8203125,
+          "appCpuMs": 3650,
+          "javaCpuMs": 11450,
+          "wallMs": 6589,
+          "outcome": "Finished",
+          "appAfterMB": 339.70703125
+        }
+      },
+      "gpui": {
+        "start": {
+          "paint": 128,
+          "tree": 1520
+        },
+        "idle": {
+          "memMB": 159.71875,
+          "javaMB": 0,
+          "cpuMs": 250,
+          "procs": 1,
+          "memAtSettleMB": 159.71875
+        },
+        "run": {
+          "appPeakMB": 171.0234375,
+          "javaPeakMB": 203.15234375,
+          "appCpuMs": 3470,
+          "javaCpuMs": 9540,
+          "wallMs": 4754,
+          "outcome": "finished",
+          "appAfterMB": 171.0234375
+        }
+      }
+    },
+    {
+      "round": 3,
+      "warmup": false,
+      "gpui": {
+        "start": {
+          "paint": 189,
+          "tree": 1581
+        },
+        "idle": {
+          "memMB": 161.24609375,
+          "javaMB": 0,
+          "cpuMs": 220,
+          "procs": 1,
+          "memAtSettleMB": 161.24609375
+        },
+        "run": {
+          "appPeakMB": 169.73828125,
+          "javaPeakMB": 188.84765625,
+          "appCpuMs": 3400,
+          "javaCpuMs": 9680,
+          "wallMs": 4961,
+          "outcome": "finished",
+          "appAfterMB": 169.72265625
+        }
+      },
+      "electron": {
+        "start": {
+          "paint": 264,
+          "tree": 1727
+        },
+        "idle": {
+          "memMB": 199.59765625,
+          "javaMB": 0,
+          "cpuMs": 190,
+          "procs": 6,
+          "memAtSettleMB": 241.1640625
+        },
+        "run": {
+          "appPeakMB": 345.44921875,
+          "javaPeakMB": 250.53125,
+          "appCpuMs": 3590,
+          "javaCpuMs": 11340,
+          "wallMs": 6316,
+          "outcome": "Finished",
+          "appAfterMB": 341.87109375
+        }
+      }
+    }
+  ]
+}

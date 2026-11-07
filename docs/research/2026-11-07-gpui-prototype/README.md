@@ -4,7 +4,80 @@ Date 2026-11-07. A cloud Linux machine: Intel Xeon at 2.10 GHz, 4 vCPU, 17 GB, n
 
 This follows the [desk study](../2026-11-07-gpui.md). It is a reference only: not in the build, not in CI, and `target/` is not kept.
 
-## Verdict: still no-go for a migration, and Windows decides
+## Verdict, after the complete MVP (same day, evening)
+
+On Linux, the complete MVP with the idle patch is lighter than Grace on every measure except smoothness without a GPU. It idles at zero, like an empty Electron window. That changes the morning's verdict: idle CPU was the reason for a no-go that did not depend on the platform, and on Linux it is gone. Two weak points remain, and neither is decided here:
+
+1. **Smoothness needs a GPU.** GPUI redraws the whole window every frame, and llvmpipe rasterises it on the CPU here.
+2. **The idle fix is a patch to GPUI.** Grace would have to carry it in its own fork, because upstream has no such change. The Windows half is written but has never run.
+
+Grace ships on Windows, so a migration still needs the Windows measurement (#267, parked for now). Until then: **no-go for a migration, but GPUI is now a serious candidate, not a curiosity.**
+
+| Median of 5 rounds [range] | Grace (Electron) | GPUI MVP, idle patch | First prototype (morning) |
+|---|---|---|---|
+| First paint | 312 ms [251–313] | **143 ms** [126–145] | 143 ms |
+| Tree shown, 2,000 tests | 1,684 ms [1,636–1,782] | **1,582 ms** [1,499–1,648] | 1,523 ms |
+| Idle memory (USS, app) | 198.6 MB, 6 processes | **161.2 MB**, 1 process | 145.4 MB |
+| Idle CPU, shown, over 60 s | 230 ms [200–250] | **10 ms** [0–10] | 250 ms |
+| Run all: peak memory, app | 351.0 MB | **169.7 MB** | 154.6 MB |
+| Run all: CPU, app | 3,140 ms | **2,630 ms** | 2,460 ms |
+| Run all: CPU, Java | 11,160 ms | 9,730 ms | 9,970 ms |
+| Run all: wall time | 6,134 ms | **4,791 ms** | 4,720 ms |
+| Wheel over the tree, idle: longest frame | **16.8 ms** | 47.2 ms | 47.7 ms |
+| Wheel during Run all: longest frame | **33.4 ms** | 125.8 ms | 144 ms |
+| Wheel during Run all: 95th percentile | **16.8 ms** | 64.5 ms | 95 ms |
+| Size, unpacked, without Java | 279.3 MB | **40.5 MB** (one exe) | 25.5 MB |
+| Empty window: idle memory / CPU | 155 MB / 0–40 ms | **129 MB / 10–20 ms** | 125 MB / 250–350 ms |
+
+What the full MVP cost, compared with the morning's prototype: 16 MB of idle memory, 15 MB of exe (GPUI Kit, 135 more crates, and 0.8 MB of fonts), and nothing at idle. The idle patch also cut the app's CPU during Run all from 3,470 ms to 2,630 ms, because GPUI no longer redraws between batches. The same MVP without the patch idled at 220 ms a minute ([results/measure-mvp-unpatched.json](results/measure-mvp-unpatched.json), 3 rounds).
+
+Raw results: [results/measure-mvp.json](results/measure-mvp.json), [results/fluid-mvp.json](results/fluid-mvp.json), [results/floor-mvp.log](results/floor-mvp.log). Same machine and method as [below](#how-it-was-measured), built with the [idle patch](patches/README.md):
+
+```bash
+sh patches/apply.sh
+cargo build --release --config 'patch.crates-io.gpui-pre-linux.path="patches/vendor/gpui-pre-linux"'
+```
+
+### What the MVP adds (#270)
+
+Built on [GPUI Kit](https://github.com/longbridge/gpui-component) (`gpui-component` 0.9.0, which pins the same `gpui-pre` 0.3.11), in about 2,200 lines with the tests:
+
+- **Grace's look** ([src/look.rs](src/look.rs)): IBM Plex Sans and Mono embedded (TTF from Google Fonts' copy, OFL), the Lucide icons Grace uses, and the light and dark themes mapped from `src/index.css`'s tokens onto GPUI Kit's theme. The theme follows the system's, or `GRACE_THEME=light|dark`.
+- **Inputs:** a filter box that narrows the tree as you type (a feature's name shows all its tests), an environment picker filled from the project's `karate-config-<env>.js` files and passed as `-e`, and a Threads number field.
+- **A tag bar.** A chosen tag narrows the tree and turns Run all into Run tagged, with `-t @a,@b`, as the Karate CLI does.
+- **Dialogs:** Properties, with an environment list and name and value rows (in memory only), and a confirm dialog before Cancel.
+- **Selectable text** in the console (one selection across rows), the test's name, file and error.
+- **The console follows its end** unless you scrolled up.
+- **Bottom tabs:** Console, History (one row per finished run), and HTTP (method, status, URL, time and feature of every call, read from the step logs in `FEATURE_EXIT` events, as `http.ts` does).
+- **The progress bar** split into passed and failed.
+- **Accessibility props** that [#269](https://github.com/hpagniez/grace/issues/269)'s AT-SPI dump found missing: rows carry their status, level, expanded and selected state. The progress bar is a `ProgressIndicator` with its value, and the summary is a `Status`.
+
+![The MVP after Run all, light theme](screens/mvp-light.png)
+
+![The MVP's HTTP tab, dark theme](screens/mvp-dark-http.png)
+
+How it went: GPUI Kit covered every missing piece. Its input, select, number field, dialog, alert dialog, tabs, buttons, tooltips and selectable text all worked on the first build, and no widget had to be written by hand. Most of the effort went into reading its API, which is large and still moving (its README already names a newer umbrella crate, `gpui-kit` 0.7). Two traps:
+
+- A theme edited through `Theme::global_mut` does not reach the buttons. It has to go through `Theme::update`, which rebuilds the tokens the components read.
+- The icon enum that `gpui_component` exports holds only the icons its own components use. Grace's icons come from `gpui_kit_assets::IconName`, embedded one by one with `icon_assets!`.
+
+What is still missing compared with Grace: the step debugger, the report, settings, the updater, secrets, flaky-test proof, history charts, the HTTP inspector's detail panes, find in the console, and real persistence.
+
+### Tests
+
+11 tests pass in about 11 s (`cargo test`, with the real Karate for the last one):
+
+- 6 unit tests on the repo's own event fixtures. New ones: the HTTP calls of `run-http.jsonl`, and the environments of the `env` project.
+- 5 headless UI tests. New ones: typing in the filter box narrows the tree, and Cancel opens a dialog without cancelling.
+- The port of `run.spec.ts`, which now also checks the History row.
+
+The accessibility thread ([PR #272](https://github.com/hpagniez/grace/pull/272)) read the morning's tree through AT-SPI on Linux: buttons and rows can be found and pressed from outside, which is the start of a Playwright replacement, but text, states and focus were missing. The props above fill part of that; a disabled state and live announcements need a small custom element.
+
+## The morning's prototype
+
+The rest of this page is the first prototype, before GPUI Kit and before the idle patch. Its numbers stand as measured. Where the evening's results change a conclusion, the verdict above wins.
+
+### Verdict then: still no-go for a migration, and Windows decides
 
 The prototype confirms the desk study, with numbers. GPUI is much lighter in memory, size and start. It is not lighter at idle, and without a GPU it is less smooth than Chromium. None of the numbers come from the reference machine, and the two weak points both depend on the platform, so they have to be measured on Windows with a real GPU before anyone decides.
 
@@ -19,7 +92,7 @@ The prototype confirms the desk study, with numbers. GPUI is much lighter in mem
 - **Testable without a browser.** 7 tests pass in 11 s: unit tests on the repo's own event fixtures, headless UI tests, and a port of e2e `run.spec.ts` "Run all with live progress". That last test clicks Run all in a headless window and runs the real Karate ([Testability](#testability)).
 - **Slower to build.** A one-line change rebuilds the tests in 2.5 s and a release in 78 s. A cold debug build takes about 2 minutes on 4 cores.
 
-## What was built
+### What was built
 
 [src/main.rs](src/main.rs) and [src/karate.rs](src/karate.rs), about 1,100 lines with the tests, written in one afternoon:
 
@@ -126,14 +199,14 @@ Grace's [premium UI spec](../../specs/2026-10-29-premium-ui.md), requirement by 
 
 | What Grace's spec asks | Electron + Solid + Tailwind today | GPUI | Notes |
 |---|---|---|---|
-| Semantic colour tokens, light and dark | CSS variables, `prefers-color-scheme` | A theme struct in Rust; `window.appearance()` gives light or dark | Same idea, written as code; `palette.test.ts` and `tokens.test.ts` would become Rust tests |
-| IBM Plex, bundled | `@fontsource` woff2 | `text_system().add_fonts()` with TTF or OTF | Needs the TTF files: fontsource ships only woff/woff2 |
-| Lucide icons | `lucide` icon data, `Icon` | `svg()` with an asset source | Same SVGs, loaded as assets |
+| Semantic colour tokens, light and dark | CSS variables, `prefers-color-scheme` | A theme struct in Rust; `window.appearance()` gives light or dark | ✓ Both themes in the MVP, mapped onto GPUI Kit's theme; `palette.test.ts` and `tokens.test.ts` would become Rust tests |
+| IBM Plex, bundled | `@fontsource` woff2 | `text_system().add_fonts()` with TTF or OTF | ✓ In the MVP, from Google Fonts' TTF copy (0.8 MB): fontsource ships only woff/woff2 |
+| Lucide icons | `lucide` icon data, `Icon` | `svg()` with an asset source | ✓ In the MVP, from GPUI Kit's bundled Lucide set |
 | Motion on transform, opacity, colour; none under reduced motion | CSS transitions, `prefers-reduced-motion` | `with_animation`, which honours `cx.reduce_motion()` | Equal |
 | Shadows, rounded sheet, backdrop | CSS | Box shadows, corner radii; background blur only on the window | Equal for Grace's flat design (the spec has no glass) |
-| Tooltips, popovers, menus, dialogs | `Tooltip`, the Popover API, native `<dialog>` | `tooltip()`, `anchored`, `deferred`; no dialog element | Dialogs are built by hand or taken from GPUI Kit |
-| Text inputs (filter, env, properties) | `<input>`, `<datalist>` | **None in GPUI**. Its own `input.rs` example builds a text field in 920 lines. GPUI Kit has `Input` | The biggest gap for Grace's forms |
-| Selecting and copying text (console, errors, HTTP bodies) | Free in the DOM | **None in GPUI core**. Zed builds its own; GPUI Kit has selectable text | Grace's console and HTTP inspector rely on it |
+| Tooltips, popovers, menus, dialogs | `Tooltip`, the Popover API, native `<dialog>` | `tooltip()`, `anchored`, `deferred`; no dialog element | ✓ GPUI Kit's `Dialog` and `AlertDialog` in the MVP |
+| Text inputs (filter, env, properties) | `<input>`, `<datalist>` | **None in GPUI**. Its own `input.rs` example builds a text field in 920 lines. GPUI Kit has `Input` | ✓ GPUI Kit's `Input`, `Select` and `NumberInput` in the MVP: worked first time |
+| Selecting and copying text (console, errors, HTTP bodies) | Free in the DOM | **None in GPUI core**. Zed builds its own; GPUI Kit has selectable text | ✓ GPUI Kit's `SelectableText` in the MVP: one selection across console rows |
 | Cut text with a tooltip (`Cut`) | CSS `text-overflow` and a check | `truncate()`, `text_ellipsis()` | Equal |
 | Virtual lists | Grace's own (`virtual-tree`) | `uniform_list`, `list` | ✓ Built in |
 | Keyboard focus, focus ring, shortcuts | DOM focus, CSS | `FocusHandle`, `track_focus`, actions and key bindings | ✓ Shortcuts built; finer keymaps than the DOM |
@@ -149,7 +222,7 @@ What GPUI adds: one process, a frame drawn on the GPU at the display's rate, no 
 
 Grace on Electron (left) and the prototype (right), the 2,000-test project after Run all, both at 1960 passed and 40 failed. The prototype has the same structure in a plain, system-font version of Grace's light theme, without Lucide icons, IBM Plex, the filter bar, the bottom panel's tabs, the split progress bar or the console's follow-the-end. That is an afternoon of work. The premium pass, done the GPUI way, is #270.
 
-## What it means for #152
+## What it meant for #152 (morning)
 
 - **The gains are real and large** on memory, size and start: priorities 1 (memory part), 2 and 3 of ADR 0023.
 - **Two risks are now concrete** and both sit inside priority 1. Idle CPU is non-zero by GPUI's design on every platform, and fluidity depends on a GPU.
@@ -159,10 +232,10 @@ Grace on Electron (left) and the prototype (right), the 2,000-test project after
 
 Sub-issues of #152:
 
-- [#267](https://github.com/hpagniez/grace/issues/267) (should): build the prototype for Windows and measure it on the reference machine, with the GPU and without it, and both floors.
-- [#268](https://github.com/hpagniez/grace/issues/268) (could): stop GPUI's refresh loop while nothing changes.
+- [#267](https://github.com/hpagniez/grace/issues/267) (should): build the prototype for Windows and measure it on the reference machine, with the GPU and without it, and both floors. A one-command script is ready in [measure/windows/](measure/windows/README.md), not yet run; parked for now.
+- [#268](https://github.com/hpagniez/grace/issues/268) (could): stop GPUI's refresh loop while nothing changes. Done for X11 the same day ([patches/](patches/README.md)); the Windows patch is written, not run.
 - [#269](https://github.com/hpagniez/grace/issues/269) (could): check the accessibility tree, and try one e2e test through UI Automation.
-- [#270](https://github.com/hpagniez/grace/issues/270) (could): add text input, selectable text and dialogs with GPUI Kit, in Grace's look.
+- [#270](https://github.com/hpagniez/grace/issues/270) (could): add text input, selectable text and dialogs with GPUI Kit, in Grace's look. Done the same evening ([above](#what-the-mvp-adds-270)).
 
 Grace already ships only the `en-US` Chromium locale ([#150](https://github.com/hpagniez/grace/issues/150), PR #206: 12.6 MB less zipped, 50.6 MB less unpacked), and the measured package above includes that cut. #271 was closed as its duplicate.
 
@@ -172,9 +245,10 @@ If #267 ends in a go, a decision record superseding ADR 0001, 0004 and 0005 come
 
 ```bash
 # Linux: apt-get install libxkbcommon-x11-dev libxcb1-dev libvulkan1 mesa-vulkan-drivers xvfb xdotool
-cargo build --release                                  # target/release/grace-gpui, 25 MB
+sh patches/apply.sh                                    # the idle patch (#268), then:
+cargo build --release --config 'patch.crates-io.gpui-pre-linux.path="patches/vendor/gpui-pre-linux"'   # 40 MB
 GRACE_JAVA=$(which java) GRACE_KARATE_JAR=../../../vendor/karate.jar target/release/grace-gpui <project>
-GRACE_JAVA=$(which java) GRACE_KARATE_JAR=... cargo test   # 7 tests, the last one runs Karate
+GRACE_JAVA=$(which java) GRACE_KARATE_JAR=... cargo test   # 11 tests, the last one runs Karate
 cargo build --release --example floor                  # the empty-window floor
 # From a folder whose node_modules has playwright (a Grace checkout), with DISPLAY set:
 node measure.mjs --electron <Grace> --gpui <grace-gpui> --project <dir> --java <java> --jar <karate.jar>
