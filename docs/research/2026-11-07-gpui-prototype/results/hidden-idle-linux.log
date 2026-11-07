@@ -1,0 +1,40 @@
+# round 1
+electron shown cpu_ms=230 wakeups=399 procs=6
+electron minimised cpu_ms=10 wakeups=48 procs=6
+electron covered cpu_ms=10 wakeups=63 procs=6
+electron workspace cpu_ms=10 wakeups=58 procs=6
+gpui-unpatched shown cpu_ms=210 wakeups=3990 procs=1
+gpui-unpatched minimised cpu_ms=10 wakeups=240 procs=1
+gpui-unpatched covered cpu_ms=210 wakeups=3991 procs=1
+gpui-unpatched workspace cpu_ms=20 wakeups=240 procs=1
+gpui-patched shown cpu_ms=10 wakeups=240 procs=1
+gpui-patched minimised cpu_ms=0 wakeups=240 procs=1
+gpui-patched covered cpu_ms=10 wakeups=240 procs=1
+gpui-patched workspace cpu_ms=20 wakeups=240 procs=1
+# round 2
+electron shown cpu_ms=220 wakeups=361 procs=6
+electron minimised cpu_ms=20 wakeups=83 procs=6
+electron covered cpu_ms=20 wakeups=63 procs=6
+electron workspace cpu_ms=0 wakeups=58 procs=6
+gpui-unpatched shown cpu_ms=220 wakeups=3991 procs=1
+gpui-unpatched minimised cpu_ms=10 wakeups=240 procs=1
+gpui-unpatched covered cpu_ms=210 wakeups=3991 procs=1
+gpui-unpatched workspace cpu_ms=10 wakeups=240 procs=1
+gpui-patched shown cpu_ms=10 wakeups=240 procs=1
+gpui-patched minimised cpu_ms=10 wakeups=240 procs=1
+gpui-patched covered cpu_ms=10 wakeups=240 procs=1
+gpui-patched workspace cpu_ms=10 wakeups=240 procs=1
+# round 3
+electron shown cpu_ms=230 wakeups=299 procs=6
+electron minimised cpu_ms=10 wakeups=83 procs=6
+electron covered cpu_ms=10 wakeups=63 procs=6
+electron workspace cpu_ms=0 wakeups=58 procs=6
+gpui-unpatched shown cpu_ms=240 wakeups=3991 procs=1
+gpui-unpatched minimised cpu_ms=10 wakeups=240 procs=1
+gpui-unpatched covered cpu_ms=220 wakeups=3991 procs=1
+gpui-unpatched workspace cpu_ms=10 wakeups=240 procs=1
+gpui-patched shown cpu_ms=20 wakeups=240 procs=1
+gpui-patched minimised cpu_ms=10 wakeups=240 procs=1
+gpui-patched covered cpu_ms=20 wakeups=240 procs=1
+gpui-patched workspace cpu_ms=20 wakeups=240 procs=1
+END

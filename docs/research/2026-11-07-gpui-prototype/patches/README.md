@@ -84,7 +84,7 @@ Each `gpui-pre` upgrade would mean rebasing them: about 320 added lines (with co
 
 ## Upstream proposal
 
-Draft for an issue or PR on `zed-industries/zed`; not posted.
+Draft for an issue or PR on `zed-industries/zed`, written before the search in [Upstream](#upstream). Not to be posted: [zed#66449](https://github.com/zed-industries/zed/pull/66449) and [zed#66221](https://github.com/zed-industries/zed/issues/66221) already cover it, and Grace follows them from #268 and #267.
 
 > **Pause the X11 refresh timer and the Windows vsync thread while a window is idle**
 >
