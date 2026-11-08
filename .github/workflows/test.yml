@@ -78,9 +78,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # GPUI's X11 backend links libxcb and libxkbcommon
+      # GPUI's X11 backend links libxcb and libxkbcommon, its text system fontconfig and FreeType
       - if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-x11-dev libxcb1-dev
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-x11-dev libxcb1-dev libfontconfig-dev libfreetype-dev
       # rustup on the runner installs the toolchain rust-toolchain.toml pins
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

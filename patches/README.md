@@ -13,7 +13,7 @@ The copy is the crate as published on crates.io, without `.cargo_vcs_info.json`,
 GPUI and GPUI Kit are upgraded as one set, between migration phases only (migration guide R9.4):
 
 1. Bump the pins in the workspace's `Cargo.toml`.
-2. Download the new `gpui-pre-windows` from `https://static.crates.io/crates/gpui-pre-windows/gpui-pre-windows-<version>.crate`, unpack it over `gpui-pre-windows/`, drop `.cargo_vcs_info.json` and the three files above, and apply the patch (`patch -d gpui-pre-windows -p1 < <patch>`); fix the rejects by hand.
+2. Download the new `gpui-pre-windows` from `https://static.crates.io/crates/gpui-pre-windows/gpui-pre-windows-<version>.crate`, unpack it over `gpui-pre-windows/`, drop the four files above, and apply the patch (`patch -d gpui-pre-windows -p1 < <patch>`); fix the rejects by hand.
 3. Write the new `.patch` from the clean crate and the copy (`diff -ruN`), named after the new version, and update this table and `check.sh` (version and the crate's checksum from the crates.io index).
 4. Run `cargo test -p gpui-pre-windows` (its gate test also runs on Linux), then the bench's minimised idle on Windows.
 
