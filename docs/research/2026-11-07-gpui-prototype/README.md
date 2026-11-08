@@ -4,6 +4,10 @@ Date 2026-11-07. A cloud Linux machine: Intel Xeon at 2.10 GHz, 4 vCPU, 17 GB, n
 
 This follows the [desk study](../2026-11-07-gpui.md). It is a reference only: not in the build, not in CI, and `target/` is not kept.
 
+## First Windows numbers (2026-11-08, preliminary)
+
+One quick round on the reference machine, with a GPU and no idle patch ([results/windows-gpu-quick.md](results/windows-gpu-quick.md)); the 5-round run is still to come ([windows-runbook.md](windows-runbook.md), step 2). With a real GPU driver, the prototype idles at **28 MB against Grace's 172 MB**, peaks at 34 MB against 264 MB during Run all, uses a tenth of Grace's app CPU during the run, and paints first in 367 against 583 ms. Two things go the wrong way: **scrolling** (longest frame 49 ms idle and 124 ms during Run all, against 9 and 12 ms) and **CPU while minimised** (235 against 141 ms in 10 s, the vsync thread of zed-industries/zed#66221). Both are being looked into. Nothing below changes until the full run.
+
 ## Verdict, after the complete MVP (same day, evening)
 
 On Linux, the complete MVP with the idle patch is lighter than Grace on every measure except smoothness without a GPU. With the patch it idles at zero, like an empty Electron window; without it, at Grace's own 220 to 230 ms a minute. That changes the morning's verdict: idle CPU was the reason for a no-go that did not depend on the platform, and on Linux it is gone. Two weak points remain, and neither is decided here:
