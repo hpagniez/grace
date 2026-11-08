@@ -107,7 +107,7 @@ Electron and Chromium do these without code; GPUI Grace must do each one explici
    | Updates | The updater of ADR 0019 | Off: no Updates section, no startup check |
    | File watching | `ReadDirectoryChangesW` | inotify |
 
-4. **Secret values do not carry over.** Electron's `safeStorage` keeps its key in Chromium's `Local State`; GPUI Grace uses DPAPI directly and does not read the old values. Their names and the non-secret values stay. The cut-over PR says so in a `BREAKING CHANGE:` footer, and the first start after the update says once which secret values need entering again.
+4. **Secret values do not carry over.** Electron's `safeStorage` keeps its key in Chromium's `Local State`; GPUI Grace uses DPAPI directly and does not read the old values. Their names and the non-secret values stay; the values are entered or imported again. Grace is still in development, so nothing reads or converts the old values ([No backward compatibility](../../AGENTS.md#no-backward-compatibility)); the cut-over PR says so in a `BREAKING CHANGE:` footer.
 
 ### R6. Tests
 
@@ -356,7 +356,6 @@ Feature: Port Grace to Rust and GPUI
     Given the last Electron release installed with settings and run history
     When it updates to the cut-over release
     Then GPUI Grace starts, reports the update as done, and shows the same settings and run history
-    And it says which secret values need entering again
 
   Scenario: Roll back to the last Electron release
     Given the cut-over release installed
