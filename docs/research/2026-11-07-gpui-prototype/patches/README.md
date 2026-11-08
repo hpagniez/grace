@@ -2,7 +2,7 @@
 
 Date 2026-11-07. The same cloud Linux machine as the [prototype](../README.md): Intel Xeon at 2.10 GHz, 4 vCPU, no GPU, Ubuntu 24.04, Xvfb at 1920 x 1080, Mesa llvmpipe. `gpui-pre` 0.3.11, Rust 1.97.
 
-The prototype found that an idle GPUI window never stops working: on X11 a timer wakes the main thread at the screen's refresh rate for as long as the window is visible, and on Windows a `VSyncProvider` thread invalidates every visible window on every vsync. That broke the rule of the time that idle costs nothing ([ADR 0023](../../../decisions/0023-run-lightly-as-a-release-requirement.md)). These two patches stop the loop while nothing changes and restart it on the next notify, input, animation frame or throttled retry.
+The prototype found that an idle GPUI window never stops working: on X11 a timer wakes the main thread at the screen's refresh rate for as long as the window is visible, and on Windows a `VSyncProvider` thread invalidates every visible window on every vsync. That broke the rule of the time that idle costs nothing ([ADR 0023](../../../decisions/0023-run-lightly-as-a-release-requirement.md)). The X11 patch stops the loop while nothing changes and restarts it on the next notify, input, animation frame or throttled retry. The Windows patch only stops it while every window is minimised or hidden.
 
 Since [ADR 0030](../../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md), a shown window may spend a small CPU budget, and only wake-ups while it is minimised or hidden are ruled out. The patches are therefore optional: the X11 one only lowers a cost that is within budget, and only the Windows part that stops the vsync thread while every window is minimised or hidden is still needed. The plan is to get the fix upstream rather than keep a fork; see [Upstream](#upstream).
 
@@ -12,7 +12,7 @@ Searched in zed-industries/zed on 2026-11-07. Both halves are already reported o
 
 - **X11:** draft PR [zed#66449](https://github.com/zed-industries/zed/pull/66449) (2026-11-03, no review yet) does what the Linux patch here does: it implements `frame_waker` and `schedule_frame` for X11, drops the refresh timer after idle refreshes and restarts it through a calloop ping.
 - **Windows, minimised:** issue [zed#66221](https://github.com/zed-industries/zed/issues/66221) (2026-10-27, open, needs triage) reports that a minimised GPUI window keeps redrawing on every vsync, about 3 % of a core, and proposes skipping hidden windows in `VSyncProvider`. That is the part ADR 0030 still needs. Related: [zed#58048](https://github.com/zed-industries/zed/issues/58048) (laptop fans while the screen is off) and draft PR [zed#63438](https://github.com/zed-industries/zed/pull/63438) (park the vsync thread while the display is off).
-- **Windows, shown:** PR [zed#63182](https://github.com/zed-industries/zed/pull/63182) made Windows frame scheduling demand-driven, as the Windows patch here does. A maintainer closed it on 2026-09-17, unmerged, saying they plan to do it differently in-house.
+- **Windows, shown:** PR [zed#63182](https://github.com/zed-industries/zed/pull/63182) made Windows frame scheduling demand-driven, as the first Windows patch here did. A maintainer closed it on 2026-09-17, unmerged, saying they plan to do it differently in-house.
 - **Wayland:** already fixed upstream by [zed#60690](https://github.com/zed-industries/zed/pull/60690), merged 2026-08-21.
 
 So the useful upstream steps are a comment with these measurements on zed#66449 and zed#66221, not a new issue or PR. Nothing has been posted there.
@@ -37,7 +37,7 @@ Raw numbers: [../results/idle-patch.log](../results/idle-patch.log). Scripts: [.
 
 ## How it works
 
-GPUI already has the hooks. Its macOS backend pauses the Metal display link after a frame in which GPUI "neither drew, presented, nor asked for another frame" (`MetalFrames` in `gpui_macos/src/display_link.rs`), and GPUI core calls the platform's `frame_waker()` whenever a window becomes dirty, when `on_next_frame` is called (animations), and when a throttled frame must be retried. X11 and Windows return no waker and never pause. The patches port the macOS model:
+For X11 (and the first Windows version), GPUI already has the hooks. Its macOS backend pauses the Metal display link after a frame in which GPUI "neither drew, presented, nor asked for another frame" (`MetalFrames` in `gpui_macos/src/display_link.rs`), and GPUI core calls the platform's `frame_waker()` whenever a window becomes dirty, when `on_next_frame` is called (animations), and when a throttled frame must be retried. X11 and Windows return no waker and never pause. The patches port the macOS model:
 
 - A per-window `FrameDemand` records, during each frame request, whether GPUI presented (`PlatformWindow::draw`) or woke the window (`frame_waker`, `schedule_frame`).
 - After a frame request that did neither, the window pauses.
@@ -53,22 +53,24 @@ GPUI decides when frames are needed, including presenting for a while after high
 - Expose events still present directly, as before.
 - One unit test of `FrameDemand`.
 
-### Windows ([gpui-pre-windows-0.3.11-idle.patch](gpui-pre-windows-0.3.11-idle.patch)): written, not run
+### Windows ([gpui-pre-windows-0.3.11-idle.patch](gpui-pre-windows-0.3.11-idle.patch)): hidden windows only
 
-Type-checked with `cargo check --target x86_64-pc-windows-msvc`, including its new unit test, but never run: there is no Windows machine here. It needs #267's machine.
+Since ADR 0030 only the minimised and hidden case is required, so on 2026-11-08 the Windows patch was cut down to the approach [zed#66221](https://github.com/zed-industries/zed/issues/66221) proposes: +74 lines in 3 files, of which about 40 are code and the rest a unit test and comments. Shown windows behave exactly as upstream: the vsync thread still invalidates them on every vsync.
 
-- `draw_window` (the `WM_PAINT` handler) wraps GPUI's frame request in `begin_tick` and `end_tick`. A paint that GPUI did not use pauses the window.
-- The vsync thread skips paused windows instead of calling `RedrawWindow` on them.
-- When every window is paused, hidden or minimised, the vsync thread sleeps on a condition variable instead of looping on `DwmFlush`. That is the part that brings the thread's 60 to 120 wake-ups a second to zero.
-- The waker unpauses its window and opens the gate. Opening a window and stopping the thread (`detach_gpu`, `Drop`) open it too.
-- A re-entrant paint, which GPUI defers, wakes its window, so the deferred frame is still drawn at the next vsync, as before.
+- The vsync thread no longer calls `RedrawWindow` on a minimised or hidden window.
+- When every window is minimised or hidden, the thread sleeps on a condition variable (`VSYNC_GATE`) instead of looping on `DwmFlush`.
+- `report_visibility` (called on `WM_SIZE` and `WM_SHOWWINDOW`, so on minimise, restore, show and hide) opens the gate, and so do opening a window and stopping the thread (`detach_gpu`, `Drop`). Restoring a window paints it, as before.
+- One unit test of the gate.
 
-To check on Windows, against #267's numbers:
+Type-checked for `x86_64-pc-windows-msvc` with its test; the gate's test also passes on Linux. Not run on Windows yet.
 
-1. Idle CPU and wake-ups of the empty window and of the prototype, shown, minimised and hidden behind another window.
-2. Resize, restore from minimised, move between monitors with different refresh rates, and drag the window: no frozen or stale frame.
-3. Device loss: the thread checks for a lost GPU device only when it wakes, so check that a driver reset (`dxcap -forcetdr`) while idle still recovers on the next frame.
-4. Scrolling and Run all: the same frame times as without the patch.
+The first, demand-driven version (the macOS model above, also pausing shown windows) is in this branch's history at `9852684`; [../results/windows-idle-patch.md](../results/windows-idle-patch.md) measured it. It brought minimised CPU from about 1,000 to 16 to 94 ms a minute, but left about 69 thread wake-ups a second minimised, which come from threads other than the vsync loop. The smaller patch should give the same minimised numbers, since in both versions the vsync thread sleeps while every window is minimised; that is still to be measured. It does not touch the 69 wake-ups either.
+
+To check on Windows:
+
+1. Minimised and hidden: CPU and wake-ups, against `results/windows-idle-patch.md`.
+2. Restore from minimised, show after hide, a second window opened while the first is minimised: drawn at once, no black or stale frame.
+3. Device loss while every window is minimised: the thread checks for a lost GPU device only when it wakes, so check that the first frame after restoring still recovers.
 
 ## For Grace
 
@@ -80,7 +82,7 @@ gpui-pre-linux = { path = "patches/vendor/gpui-pre-linux" }
 gpui-pre-windows = { path = "patches/vendor/gpui-pre-windows" }
 ```
 
-Each `gpui-pre` upgrade would mean rebasing them: about 320 added lines (with comments and tests) across 6 files.
+Each `gpui-pre` upgrade would mean rebasing them: about 250 added lines (with comments and tests) across 5 files, 177 of them the optional X11 patch.
 
 ## Upstream proposal
 

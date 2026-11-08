@@ -1,6 +1,6 @@
 # Windows: GPUI idle patch (#268)
 
-2026-11-08, Ryzen 7 5800X, RTX 4060 Ti, both screens 120 Hz, French Windows 11 Pro. Prototype at b3dfddd, release builds. Patched: `patches/gpui-pre-windows-0.3.11-idle.patch`, target `out/gpui-prototype-target-idle`, the build printed `Adding gpui-pre-windows v0.3.11 (…patches/vendor/gpui-pre-windows)`; `Cargo.lock` restored afterwards.
+2026-11-08, Ryzen 7 5800X, RTX 4060 Ti, both screens 120 Hz, French Windows 11 Pro. Prototype at b3dfddd, release builds. Patched: `patches/gpui-pre-windows-0.3.11-idle.patch` in its first, demand-driven version (commit `9852684`; since cut down to hidden windows only, see [../patches/README.md](../patches/README.md)), target `out/gpui-prototype-target-idle`, the build printed `Adding gpui-pre-windows v0.3.11 (…patches/vendor/gpui-pre-windows)`; `Cargo.lock` restored afterwards.
 
 **The patch fixes minimised CPU: 16 and 94 ms a minute against 1,000 and 1,031, under the 125 ms gate. It does not meet the wake-up gate: 69 context switches a second minimised, against the gate's 5.** The other switches are not GPUI's vsync loop (which the patch stops), and I did not trace which threads they come from.
 
