@@ -7,7 +7,8 @@
 #          name, as bench/system.mjs windowSpot does), so the prototype sits where the bench puts Grace. With no
 #          second screen it leaves the window and says so. The size does not change.
 #   wheel  Brings the window to the front, puts the pointer over it at (OffsetX, OffsetY) from its top left corner
-#          and turns the mouse wheel Notches times, one every DelayMs: the input of bench/probes.mjs scrollTree, sent
+#          and turns the mouse wheel Notches times, one every DelayMs: faster than the screen refreshes, so every frame
+#          has work and a frame gap reads the app's frame time, not the time between notches. Sent
 #          by the operating system, so every app gets it the same way (a real WM_MOUSEWHEEL, not CDP). With StartAt
 #          (ms since the epoch) it does its slow setup first and sends the first notch at that time; lateMs says by
 #          how much it missed.
@@ -17,8 +18,8 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('move', 'wheel', 'displays')][string]$Action,
   [int]$ProcessId = 0,
-  [int]$Notches = 60,
-  [int]$DelayMs = 16,
+  [int]$Notches = 240,
+  [int]$DelayMs = 4,
   [int]$OffsetX = 250,
   [int]$OffsetY = 400,
   [long]$StartAt = 0,
@@ -41,6 +42,21 @@ public static class Win {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+  [DllImport("winmm.dll")] public static extern uint timeBeginPeriod(uint period);
+  [DllImport("winmm.dll")] public static extern uint timeEndPeriod(uint period);
+  // Compiled and on a 1 ms timer: Start-Sleep -Milliseconds 16 in a PowerShell loop read 25 to 30 ms a notch.
+  public static long Wheel(int notches, int delayMs, int delta) {
+    timeBeginPeriod(1);
+    var clock = System.Diagnostics.Stopwatch.StartNew();
+    double ticksPerMs = System.Diagnostics.Stopwatch.Frequency / 1000.0;
+    for (int i = 0; i < notches; i++) {
+      long due = (long)(i * delayMs * ticksPerMs);
+      while (clock.ElapsedTicks < due) { if (due - clock.ElapsedTicks > 2 * ticksPerMs) System.Threading.Thread.Sleep(1); }
+      mouse_event(0x0800, 0, 0, delta, UIntPtr.Zero); // MOUSEEVENTF_WHEEL
+    }
+    timeEndPeriod(1);
+    return clock.ElapsedMilliseconds;
+  }
 }
 '@
 
@@ -103,11 +119,7 @@ switch ($Action) {
       if ($wait -gt 0) { Start-Sleep -Milliseconds ([int]$wait) } else { $late = -$wait }
     }
     $delta = if ($Up) { 120 } else { -120 } # WHEEL_DELTA is 120 per notch; negative turns toward the user (down)
-    $clock = [Diagnostics.Stopwatch]::StartNew()
-    for ($i = 0; $i -lt $Notches; $i++) {
-      [Win]::mouse_event(0x0800, 0, 0, $delta, [UIntPtr]::Zero) # MOUSEEVENTF_WHEEL
-      Start-Sleep -Milliseconds $DelayMs
-    }
-    ConvertTo-Json -Compress -InputObject ([pscustomobject]@{ ms = $clock.ElapsedMilliseconds; lateMs = $late; notches = $Notches; x = $rect.Left + $OffsetX; y = $rect.Top + $OffsetY })
+    $ms = [Win]::Wheel($Notches, $DelayMs, $delta)
+    ConvertTo-Json -Compress -InputObject ([pscustomobject]@{ ms = $ms; lateMs = $late; notches = $Notches; x = $rect.Left + $OffsetX; y = $rect.Top + $OffsetY })
   }
 }

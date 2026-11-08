@@ -34,6 +34,9 @@ actions!(grace, [RunAll, Cancel, Open]);
 
 /// `GRACE_PROBE` prints `PROBE <name> <unix ms>` to stderr for the measure script; nothing else reads it.
 static PROBING: AtomicBool = AtomicBool::new(false);
+/// A wheel event came since the last frame the probe counted. GPUI draws on demand, so without it the probe's gaps
+/// include the wait before the first notch and the run's 100 ms redraws after the last one, as if they were slow frames.
+static WHEEL_TURNED: AtomicBool = AtomicBool::new(false);
 
 fn probe(name: &str) {
     if std::env::var_os("GRACE_PROBE").is_some() {
@@ -974,7 +977,7 @@ impl Render for Grace {
             "tree",
             rows,
             cx.processor(|g: &mut Grace, range: std::ops::Range<usize>, _w, cx| {
-                if PROBING.load(Ordering::Relaxed) {
+                if PROBING.load(Ordering::Relaxed) && WHEEL_TURNED.swap(false, Ordering::Relaxed) {
                     g.frames.push(Instant::now());
                 }
                 let p = palette(cx);
@@ -1111,6 +1114,19 @@ impl Render for Grace {
                     .text_color(p.muted)
                     .child(self.root.as_ref().map(|r| r.display().to_string()).unwrap_or_default()),
             )
+            .child(
+                gpui::canvas(
+                    |_, _, _| (),
+                    |_, _, window, _| {
+                        window.on_mouse_event(|_: &gpui::ScrollEvent, phase, _, _| {
+                            if phase == gpui::DispatchPhase::Capture && PROBING.load(Ordering::Relaxed) {
+                                WHEEL_TURNED.store(true, Ordering::Relaxed);
+                            }
+                        });
+                    },
+                )
+                .size_0(),
+            )
     }
 }
 
@@ -1199,6 +1215,7 @@ fn main() {
                         // The frame probe: "frames-start", scroll, then "frames-stop" prints each frame's gap.
                         "frames-start" => {
                             g.frames.clear();
+                            WHEEL_TURNED.store(false, Ordering::Relaxed);
                             PROBING.store(true, Ordering::Relaxed);
                         }
                         "frames-stop" => {

@@ -463,7 +463,7 @@ function frameStats(/** @type {number[]} */ gaps) {
 }
 
 /**
- * 60 wheel notches over the tree, one every 16 ms, sent by the OS (window-tools.ps1), while `probe` logs the frames.
+ * 240 wheel notches over the tree, one every 4 ms (faster than the screen refreshes), sent by the OS (window-tools.ps1), while `probe` logs the frames.
  * The probe opens just before the first notch, not before PowerShell's slow setup, or the setup would read as a freeze.
  * `during` runs half a second before the first notch (it starts Run all), so the wheel turns while Karate runs.
  */
