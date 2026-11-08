@@ -4,18 +4,40 @@ Date 2026-11-07. A cloud Linux machine: Intel Xeon at 2.10 GHz, 4 vCPU, 17 GB, n
 
 This follows the [desk study](../2026-11-07-gpui.md). It is a reference only: not in the build, not in CI, and `target/` is not kept.
 
-## First Windows numbers (2026-11-08, preliminary)
+## Final verdict (2026-11-08): GPUI wins on Windows except while minimised
 
-One quick round on the reference machine, with a GPU and no idle patch ([results/windows-gpu-quick.md](results/windows-gpu-quick.md)); the 5-round run is still to come ([windows-runbook.md](windows-runbook.md), step 2). With a real GPU driver, the prototype idles at **28 MB against Grace's 172 MB**, peaks at 34 MB against 264 MB during Run all, uses a tenth of Grace's app CPU during the run, and paints first in 367 against 583 ms. Scrolling first read far slower than Grace, but that was the probe: fixed, it shows GPUI drawing at the screen's rate, 8.3 ms a frame at 120 Hz, idle and during Run all ([results/windows-scroll.md](results/windows-scroll.md)). One thing goes the wrong way: **CPU while minimised** (235 against 141 ms in 10 s, the vsync thread of zed-industries/zed#66221); the Windows idle patch fixes the CPU (16 to 94 ms a minute minimised, against about 1,000 unpatched) but still leaves about 69 thread wake-ups a second, far over the gate's 5 ([results/windows-idle-patch.md](results/windows-idle-patch.md)). The Linux wheel figures below used the same probe, so their GPUI column also partly measures the gap between notches. Nothing below changes until the full run.
+The 5-round run on the reference machine (Windows 11, Ryzen 7 5800X, RTX 4060 Ti at 120 Hz), unpatched GPUI against Grace `1bcfdcd` ([results/windows-gpu-under-load.md](results/windows-gpu-under-load.md)). The PC was in use during the run (a video stream and other work), so the idle CPU rows are noisy; memory, size and run figures are steady across rounds.
 
-## Verdict, after the complete MVP (same day, evening)
+| Measure, median of 5 | Grace | GPUI | Grace's limit |
+|---|---|---|---|
+| Idle memory, whole tree | 167 MB | 28 MB | 163 MB |
+| Run all, peak app memory (2,000 / 10,000 tests) | 249 / 671 MB | 34 / 40 MB | 322 / 607 MB |
+| Run all, app CPU (2,000 / 10,000 tests) | 3.6 / 14.2 s | 0.3 / 1.3 s | 5.4 / 17.7 s |
+| Run all, wall time (2,000 / 10,000 tests) | 5.8 / 17.8 s | 4.1 / 12.3 s | |
+| First paint, profile reused | 497 ms | 325 ms | 612 ms |
+| Wheel during Run all: 95th percentile / longest frame | 8.4 / 8.4 ms | 9.1 / 9.7 ms | |
+| Unpacked size, Java included | 489 MB | 192 MB | 489 MB |
+| Idle CPU a minute, shown | 172 ms | 422 ms | 1,453 ms |
+| Idle CPU a minute, minimised | 47 ms | 891 ms | 125 ms |
+
+What this decides, by the priorities of [ADR 0023](../../decisions/0023-run-lightly-as-a-release-requirement.md):
+
+1. **Run lightly: GPUI wins, with one gap.** It uses a sixth of Grace's memory idle and a seventeenth during a 10,000-test run, and a tenth of its app CPU during runs. Java costs the same in both. Shown, it idles inside the ADR 0030 budget. Smoothness holds: with a GPU it draws at the screen's rate, idle and during Run all (9.7 ms at worst against an 8.3 ms frame; [results/windows-scroll.md](results/windows-scroll.md)). The gap is **minimised**: unpatched, GPUI's vsync thread keeps drawing (891 ms a minute against the 125 ms limit, [zed#66221](https://github.com/zed-industries/zed/issues/66221)). The idle patch brings the CPU down to 16 to 94 ms a minute, which passes, but leaves about 69 thread wake-ups a second, against the gate's 5 ([results/windows-idle-patch.md](results/windows-idle-patch.md)).
+2. **Be fast: GPUI wins.** First paint in two thirds of Grace's time, the 2,000-test tree about as fast, and Run all a third quicker end to end.
+3. **Be small: GPUI wins.** A 27 MB exe against 250 MB, 192 MB unpacked with Java against 489 MB.
+
+**Recommendation: go for a migration, once a minimised window stops waking.** That gate is the one thing left, and it is a fix inside GPUI, not a limit of the approach. Two pieces of work decide it: the source of the remaining wake-ups (a short trace on the reference machine), and the Windows patch cut down to the hidden-window skip, ideally upstream rather than a fork. Their results are added here when they land. The decision itself is the owner's, and a go needs a decision record that supersedes ADR 0001, ADR 0004 and ADR 0005. Not covered yet: accessibility on Windows (#269 did Linux), a GPU reset, and windows across screens with different refresh rates.
+
+Earlier readings: one quick round first ([results/windows-gpu-quick.md](results/windows-gpu-quick.md)), whose slow scrolling was a fault in the wheel probe, fixed in `b3dfddd`. The Linux wheel figures below used the old probe, so their GPUI column partly measures the gap between notches.
+
+## Linux verdict, after the complete MVP (2026-11-07, evening)
 
 On Linux, the complete MVP with the idle patch is lighter than Grace on every measure except smoothness without a GPU. With the patch it idles at zero, like an empty Electron window; without it, at Grace's own 220 to 230 ms a minute. That changes the morning's verdict: idle CPU was the reason for a no-go that did not depend on the platform, and on Linux it is gone. Two weak points remain, and neither is decided here:
 
 1. **Smoothness needs a GPU.** GPUI redraws the whole window every frame, and llvmpipe rasterises it on the CPU here.
 2. **The idle fix is a patch to GPUI, and is now optional.** [ADR 0030](../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md) ([#276](https://github.com/hpagniez/grace/issues/276)) replaced "idle costs nothing" with two rules: no wake-ups while the window is minimised or hidden, and a CPU budget (the `idle.cpu.shown` limit) while it is shown. Unpatched, the MVP idles shown at 220 ms a minute, as Grace does today (230 ms), well inside that budget, so the shown half of the patch is no longer required. The hidden half still matters. On X11, GPUI already drops its refresh timer while a window is hidden. On Windows, read but not run, the vsync thread keeps waking on every vsync while the window is minimised, which the new rule does not allow; the Windows patch is what fixes it ([patches/](patches/README.md)). Measured since with a window manager ([results/hidden-idle-linux.md](results/hidden-idle-linux.md)): on X11, minimised and on another workspace, the MVP idles at 10 to 20 ms a minute and 4 wake-ups a second with or without the patch, as Grace does, so it meets ADR 0030 there. Covered by another window, unpatched GPUI keeps drawing at 66 wake-ups a second (220 ms a minute), because its window never hears that it is covered; Grace drops to 10 ms. Windows still has to be measured: the [Windows runbook](windows-runbook.md), step 3. Rather than keep a fork of a pre-1.0 framework, the better path is upstream, and both halves are already there: an open draft PR for X11 ([zed#66449](https://github.com/zed-industries/zed/pull/66449)) and an open issue for the minimised Windows window ([zed#66221](https://github.com/zed-industries/zed/issues/66221)); see [patches/](patches/README.md#upstream). Nothing has been posted there. The patch also cut the app's CPU during Run all from 3,470 ms to 2,630 ms, a gain that upstreaming would keep.
 
-Grace ships on Windows, so a migration still needs the Windows measurement (#267, parked for now). Until then: **no-go for a migration, but GPUI is now a serious candidate, not a curiosity.**
+Grace ships on Windows, so a migration still needed the Windows measurement (#267); it is in the [final verdict](#final-verdict-2026-11-08-gpui-wins-on-windows-except-while-minimised) above.
 
 | Median of 5 rounds [range] | Grace (Electron) | GPUI MVP, idle patch | First prototype (morning) |
 |---|---|---|---|
