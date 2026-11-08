@@ -67,7 +67,7 @@ pub fn options(cx: &App) -> WindowOptions {
             ..Default::default()
         }),
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-            None,
+            e2e_display(cx),
             size(px(FIRST_SIZE.0), px(FIRST_SIZE.1)),
             cx,
         ))),
@@ -77,11 +77,33 @@ pub fn options(cx: &App) -> WindowOptions {
     }
 }
 
+/// The screen an end-to-end test's window opens on: with `GRACE_E2E_SCREEN=other`, the first screen that is not
+/// the main one, out of the way of the person working, as `e2e/helpers.ts` `launch()` does. Only in a build with
+/// the `e2e` feature; the release build always opens on the main screen.
+#[cfg(feature = "e2e")]
+fn e2e_display(cx: &App) -> Option<gpui::DisplayId> {
+    if std::env::var("GRACE_E2E_SCREEN").as_deref() != Ok("other") {
+        return None;
+    }
+    let main = cx.primary_display().map(|d| d.id());
+    cx.displays().into_iter().map(|d| d.id()).find(|id| Some(*id) != main)
+}
+
+#[cfg(not(feature = "e2e"))]
+fn e2e_display(_cx: &App) -> Option<gpui::DisplayId> {
+    None
+}
+
 /// Opens Grace's window: GPUI Kit's `Root` (dialogs, tooltips, text selection) around it, the theme following
 /// the system's.
 pub fn open(cx: &mut App) -> WindowHandle<Root> {
     cx.open_window(options(cx), |window, cx| {
         crate::theme::follow_system(window, cx);
+        #[cfg(feature = "e2e")]
+        if crate::e2e::wants_gallery() {
+            let gallery = cx.new(|_| crate::e2e::Gallery::default());
+            return cx.new(|cx| Root::new(gallery, window, cx));
+        }
         let grace = cx.new(|_| GraceWindow::new());
         cx.new(|cx| Root::new(grace, window, cx))
     })

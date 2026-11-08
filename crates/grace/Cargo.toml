@@ -25,5 +25,10 @@ gpui_platform = { workspace = true, features = ["x11"] }
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 gpui_platform.workspace = true
 
+[features]
+# Test hooks for crates/grace-e2e, never in a release (migration guide, Architecture): the window opens on a screen
+# other than the main one.
+e2e = []
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

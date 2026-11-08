@@ -1,0 +1,168 @@
+//! The Linux backend: AT-SPI over D-Bus, which GPUI's AccessKit adapter serves (prototype a11y-linux/). Needs a
+//! session bus with the AT-SPI bus launcher, as `scripts/e2e-linux.sh` starts them.
+use atspi::proxy::accessible::{AccessibleProxy, ObjectRefExt as _};
+use atspi::proxy::action::ActionProxy;
+use atspi::proxy::value::ValueProxy;
+use atspi::{AccessibilityConnection, Interface, ObjectRefOwned, State};
+use futures_lite::future::block_on;
+
+use crate::{Driver, Node, Result, Role, States};
+
+pub struct AtspiDriver {
+    conn: AccessibilityConnection,
+    pid: u32,
+}
+
+fn err(e: impl std::fmt::Display) -> String {
+    e.to_string()
+}
+
+/// Turns accessibility on for the session, so AccessKit in the app serves its tree. Before the app starts.
+pub fn prepare() -> Result<()> {
+    block_on(atspi::connection::set_session_accessibility(true)).map_err(err)
+}
+
+impl AtspiDriver {
+    pub fn new(pid: u32) -> Result<Self> {
+        let conn = block_on(AccessibilityConnection::new()).map_err(err)?;
+        Ok(Self { conn, pid })
+    }
+
+    /// The app's first window: the registry's application whose bus connection belongs to our process.
+    async fn window(&self) -> Result<ObjectRefOwned> {
+        let bus = self.conn.connection();
+        let dbus = atspi::zbus::fdo::DBusProxy::new(bus).await.map_err(err)?;
+        let root = self.conn.root_accessible_on_registry().await.map_err(err)?;
+        for app in root.get_children().await.map_err(err)? {
+            let Some(name) = app.name() else { continue };
+            let Ok(pid) = dbus.get_connection_unix_process_id(name.clone().into()).await else {
+                continue;
+            };
+            if pid != self.pid {
+                continue;
+            }
+            let app = app.as_accessible_proxy(bus).await.map_err(err)?;
+            if let Some(window) = app.get_children().await.map_err(err)?.into_iter().next() {
+                return Ok(window);
+            }
+        }
+        Err(format!(
+            "process {} has no window in the accessibility tree yet",
+            self.pid
+        ))
+    }
+
+    async fn proxy(&self, at: &ObjectRefOwned) -> Result<AccessibleProxy<'_>> {
+        at.clone()
+            .into_accessible_proxy(self.conn.connection())
+            .await
+            .map_err(err)
+    }
+
+    async fn read(&self, at: &ObjectRefOwned, path: Vec<usize>) -> Result<Node> {
+        let p = self.proxy(at).await?;
+        let role = role(p.get_role().await.map_err(err)?);
+        let state = p.get_state().await.map_err(err)?;
+        let interfaces = p.get_interfaces().await.map_err(err)?;
+        let value = if interfaces.contains(Interface::Value) {
+            let v = ValueProxy::builder(self.conn.connection())
+                .destination(p.inner().destination().to_owned())
+                .map_err(err)?
+                .path(p.inner().path().to_owned())
+                .map_err(err)?
+                .build()
+                .await
+                .map_err(err)?;
+            v.current_value().await.ok()
+        } else {
+            None
+        };
+        let mut children = Vec::new();
+        for (i, child) in p.get_children().await.map_err(err)?.into_iter().enumerate() {
+            let mut at = path.clone();
+            at.push(i);
+            children.push(Box::pin(self.read(&child, at)).await?);
+        }
+        Ok(Node {
+            role,
+            name: p.name().await.map_err(err)?,
+            description: p.description().await.unwrap_or_default(),
+            value,
+            states: States {
+                enabled: state.contains(State::Enabled),
+                focusable: state.contains(State::Focusable),
+                focused: state.contains(State::Focused),
+                selected: state.contains(State::Selected),
+                expanded: state
+                    .contains(State::Expandable)
+                    .then(|| state.contains(State::Expanded)),
+            },
+            path,
+            children,
+        })
+    }
+}
+
+impl Driver for AtspiDriver {
+    fn tree(&self) -> Result<Node> {
+        block_on(async {
+            let window = self.window().await?;
+            self.read(&window, vec![]).await
+        })
+    }
+
+    fn press(&self, node: &Node) -> Result<()> {
+        block_on(async {
+            let mut at = self.window().await?;
+            for &i in &node.path {
+                let p = self.proxy(&at).await?;
+                at = p.get_child_at_index(i as i32).await.map_err(err)?;
+            }
+            let p = self.proxy(&at).await?;
+            let action = ActionProxy::builder(self.conn.connection())
+                .destination(p.inner().destination().to_owned())
+                .map_err(err)?
+                .path(p.inner().path().to_owned())
+                .map_err(err)?
+                .build()
+                .await
+                .map_err(err)?;
+            match action.do_action(0).await.map_err(err)? {
+                true => Ok(()),
+                false => Err(format!("{:?} {:?} did not take its action", node.role, node.name)),
+            }
+        })
+    }
+}
+
+/// AT-SPI's roles to the driver's. GPUI's AccessKit adapter answers `GetRole` but not `GetRoleName`.
+fn role(role: atspi::Role) -> Role {
+    use atspi::Role as A;
+    match role {
+        // AccessKit gives an `Application` node AT-SPI's `Embedded` role
+        A::Application | A::Embedded => Role::Application,
+        A::Frame | A::Window => Role::Window,
+        A::Panel | A::Section | A::Filler | A::Grouping => Role::Group,
+        A::Button | A::ToggleButton => Role::Button,
+        A::CheckBox => Role::CheckBox,
+        A::RadioButton => Role::RadioButton,
+        A::Entry | A::PasswordText => Role::Entry,
+        A::ComboBox => Role::ComboBox,
+        A::SpinButton => Role::SpinButton,
+        A::Slider => Role::Slider,
+        A::PageTab => Role::Tab,
+        A::PageTabList => Role::TabList,
+        A::Tree | A::TreeTable => Role::Tree,
+        A::TreeItem => Role::TreeItem,
+        A::List | A::ListBox => Role::List,
+        A::ListItem => Role::ListItem,
+        A::Link => Role::Link,
+        A::MenuItem => Role::MenuItem,
+        A::StatusBar => Role::Status,
+        A::ProgressBar => Role::ProgressBar,
+        A::Image | A::Icon => Role::Image,
+        A::Label | A::Static | A::Text => Role::Text,
+        A::Dialog | A::Alert => Role::Dialog,
+        other => Role::Other(format!("{other:?}")),
+    }
+}
