@@ -123,7 +123,7 @@ Three levels, each replacing one of today's:
 
 1. Each phase that adds to the app ends with `npm run bench` on the GPUI build, reported in the phase's PR. Until the cut-over the GPUI numbers are reported, not judged.
 2. The bench learns to launch `Grace.exe` without Playwright: start, idle, run and size measures read processes and files, as today. The `smooth.*` measures come from a frame probe in the app, turned on by an environment variable and costing one check at start when off. Selecting, expanding and scrolling are driven through the accessibility tree or synthetic input. The `page.*` measures are retired at the cut-over (ADR 0031).
-3. Every phase keeps ADR 0030: no wake-ups while minimised or hidden, and the shown idle within `idle.cpu.shown`. Grace's own code adds no timer, poll or animation while idle. A view that animates (the waiting stripe, the progress bar) stops when no run is going and when reduced motion is on.
+3. Every phase keeps ADR 0030: no wake-ups while minimised or hidden, measured as `idle.wakeups.minimised` (Grace's own threads, under 5 a second, GPU driver threads reported apart; [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md#wake-ups-while-minimised-count-only-graces-own-threads)) and `idle.cpu.minimised`, and the shown idle within `idle.cpu.shown`. Grace's own code adds no timer, poll or animation while idle. A view that animates (the waiting stripe, the progress bar) stops when no run is going and when reduced motion is on.
 4. At the cut-over, the release benchmark compares the GPUI release with the last Electron release, on the reference machine, with every limit of `bench/limits.json` except `page.*` (R10).
 
 ### R8. Accessibility
@@ -274,7 +274,7 @@ Each phase has an issue, a plan in `docs/plans/` written just before it starts, 
 
 | Phase | Builds | Exit check |
 |---|---|---|
-| **P0 Foundation** ([#279](https://github.com/hpagniez/grace/issues/279)) | The workspace and pins; the idle patch under `[patch.crates-io]`; `rust-toolchain.toml`; the theme, fonts, icons and shared elements; the accessibility base and the tree-walking test (R8.2); the e2e driver on UI Automation and AT-SPI with a first test; packaging into the release zip layout; CI (R6.5); the bench launching `Grace.exe` (R7.2); AGENTS.md's first "GPUI rules" | An empty Grace window passes ADR 0030 on the reference machine (minimised and shown) and Narrator reads it; the zip has the contract's layout; CI is green on both platforms; the Windows half of #269 is closed |
+| **P0 Foundation** ([#279](https://github.com/hpagniez/grace/issues/279)) | The workspace and pins; the idle patch under `[patch.crates-io]`; `rust-toolchain.toml`; the theme, fonts, icons and shared elements; the accessibility base and the tree-walking test (R8.2); the e2e driver on UI Automation and AT-SPI with a first test; packaging into the release zip layout; CI (R6.5); the bench launching `Grace.exe` (R7.2) and measuring `idle.wakeups.minimised` per thread (R7.3); AGENTS.md's first "GPUI rules" | An empty Grace window passes ADR 0030 on the reference machine (minimised and shown, `idle.wakeups.minimised` under 5 a second) and Narrator reads it; the zip has the contract's layout; CI is green on both platforms; the Windows half of #269 is closed |
 | **P1 Core** ([#280](https://github.com/hpagniez/grace/issues/280)) | `grace-core`: every module in the P1 map, with its unit tests ported | Every `src/main` and `src/shared` unit test row ported or `n/a`; a headless run of the 2,000-test bench project from `grace-core` alone matches Electron Grace's `run.json` |
 | **P2 Main screen** ([#281](https://github.com/hpagniez/grace/issues/281)) | The window, home screen, toolbar, tree, filter bar, environments and properties, threads, run and cancel, progress, details, console, bottom panel, appearance | P2 parity rows ticked; bench on the GPUI build within every limit it shares with Electron Grace |
 | **P3 Panels** ([#282](https://github.com/hpagniez/grace/issues/282)) | HTTP, history, trends, flaky, reports, data-driven view, failures, step comments, editor, tab order | P3 parity rows ticked |
@@ -290,7 +290,7 @@ What the move changes, by ADR 0023's priorities, from the prototype's numbers on
 - **CPU.** During runs, the app's CPU drops to about a tenth. Idle shown stays within `idle.cpu.shown` (422 ms a minute measured, limit 1,453 ms); minimised, 0 to 47 ms a minute with the idle patch, limit 125 ms.
 - **Start.** First paint from about 500 ms to about 325 ms.
 - **Size.** Unpacked from 489 MB to about 192 MB with Java; the zip shrinks accordingly.
-- **Idle rule.** No timer, poll or animation while idle, in Grace's code (R7.3). GPUI's shown refresh is the engine's housekeeping, inside the budget; the patch removes the minimised one.
+- **Idle rule.** No timer, poll or animation while idle, in Grace's code (R7.3). Minimised, Grace's own threads wake 0 to 0.1 times a second in the patched prototype, against a limit of 5; the GPU driver's thread is reported apart. GPUI's shown refresh is the engine's housekeeping, inside the budget; the patch removes the minimised one.
 - **CI.** A Rust build of GPUI is several minutes cold; `actions/cache` keeps `target/` and the Cargo registry. `perf` builds two trees once it judges the GPUI build (P6).
 - **People.** About 14,500 lines of TypeScript and 1,967 tests to port while Electron Grace keeps shipping. That cost is the reason for the phases and the freeze of R9.3.
 
@@ -313,7 +313,6 @@ What the move changes, by ADR 0023's priorities, from the prototype's numbers on
 
 ## Open questions
 
-- **The wake-up gate (owner).** The Windows runbook's gate of under 5 wake-ups a second while minimised cannot be met by any D3D11 app on an NVIDIA driver: its driver thread wakes about 61 times a second, and Grace's GPU process has the same thread at 92. Drop the gate, or count only Grace's own threads? ADR 0030's `idle.cpu.minimised` limit applies either way. P0's exit check waits for this answer.
 - **Other GPUs (P0).** Only NVIDIA was measured. P0 checks an Intel or AMD GPU too, and the minimised idle with the patch on it.
 - **Untested platform cases (P0).** A GPU reset, windows across screens with different refresh rates, showing a window again after hiding it.
 - **Upstream (P0 and each upgrade).** Whether zed#66221 or zed#66449 lands, so the patch can go. Grace follows them from its own issues and posts nothing on Zed's repository.
@@ -341,6 +340,7 @@ Feature: Port Grace to Rust and GPUI
     Given GPUI Grace on the reference machine with a project open and no run going
     When the window is minimised for 60 s
     Then idle.cpu.minimised is within its limit
+    And Grace's own threads wake under 5 times a second, not counting the GPU driver's threads
 
   Scenario: Idle while shown
     Given GPUI Grace on the reference machine with a project open and no run going

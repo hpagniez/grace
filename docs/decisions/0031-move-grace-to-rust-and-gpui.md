@@ -64,6 +64,15 @@ Each new crate the app depends on is named in the PR that adds it, with its size
 - Windows 11 x64 is the only platform Grace ships on. The app also builds and runs on Linux (X11), for development, CI and agents, without a release.
 - git flow, Conventional Commits, the issue and PR rules, `merge-when-green` and the release-candidate scheme ([ADR 0015](0015-release-candidates-until-a-stable-release-is-decided.md)).
 
+### Wake-ups while minimised count only Grace's own threads
+
+ADR 0030 rules out wake-ups while Grace is minimised or hidden. On Windows, any app with a D3D11 device gets a thread from the GPU driver that wakes on its own: on NVIDIA, a thread in `nvwgf2umx.dll` wakes about 61 times a second for the prototype and 92 times a second for Electron Grace's GPU process. Grace cannot stop it. Without it, the patched prototype wakes 0 to 0.1 times a second minimised.
+
+- A new bench measure, `idle.wakeups.minimised`: the context switches a second of Grace's threads while minimised and idle, limit 5 a second. It counts every thread of Grace's processes except those whose start address is in the GPU driver's user-mode DLL (NVIDIA `nvwgf2umx.dll`, AMD `amdxx64.dll`, Intel `igd10iumd64.dll` and their siblings). Those are reported on their own line, not judged.
+- It runs on every PR with the rest of the bench, so a timer or redraw that wakes a minimised Grace fails the limit even when it costs little CPU, which is what drains a battery.
+- `idle.cpu.minimised` stays as it is and counts every thread, the driver's included.
+- The list of excluded driver DLLs changes only by a commit that names the vendor and the measurement; excluding anything else needs a decision record, as raising a limit does.
+
 ### How
 
 The [migration guide](../specs/2026-11-08-gpui-migration.md) holds the plan: every feature of Grace mapped to its port, the phases, and the [parity checklist](../specs/2026-11-08-gpui-migration-parity.md) of every spec scenario, end-to-end test and unit test the GPUI app must pass before it replaces the Electron one. The Electron app keeps shipping from `develop` until then.
@@ -72,10 +81,10 @@ The [migration guide](../specs/2026-11-08-gpui-migration.md) holds the plan: eve
 
 - Good: a large cut in memory, CPU during runs, start time and size, the three priorities of ADR 0023 in order.
 - Good: one language for the whole app, and an app that runs on the Linux machines agents work on.
+- Good: the minimised wake-up rule judges what Grace controls, and still catches a regression in Grace or GPUI.
 - Good: the updater contract and the data folder stay, so people update from the last Electron release in one click.
 - Bad: a rewrite of about 14,500 lines of TypeScript and their 1,773 unit tests and 194 end-to-end tests, during which new features cost twice or wait.
 - Bad: GPUI has no stable release and its line is split; Grace pins one snapshot and carries a patch until upstream has the fix. Every GPUI Kit update is a planned upgrade, like a Solid RC bump.
 - Bad: agents know GPUI far less well than the web. AGENTS.md gets a "GPUI rules" section, as it had one for Solid 2.
 - Bad: the accessibility tree is set by hand, element by element; nothing gives it for free as the DOM did. A test that walks the tree and fails on an unnamed control makes up for part of it.
 - Bad: stored secret values are encrypted with Electron's `safeStorage`, whose key lives in Chromium's `Local State`. GPUI Grace encrypts with DPAPI directly and does not read them: secrets are entered again or imported again after the cut-over update, said in its `BREAKING CHANGE:` footer.
-- Neutral: the wake-up gate of the Windows runbook (under 5 a second, minimised) cannot be met by any D3D11 app on an NVIDIA driver, Grace included. Whether that gate is dropped or counts only Grace's own threads is still the owner's call ([guide](../specs/2026-11-08-gpui-migration.md#open-questions)); ADR 0030's CPU limit applies either way.
