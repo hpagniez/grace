@@ -1,6 +1,6 @@
 # Runbook: what is left to run on Windows (#267, #268, #269)
 
-Everything the GPUI evaluation could not do on the Linux cloud machine, for the owner to run on the reference machine (`bench/limits.json`: Windows 11 Pro, Ryzen 7 5800X, 32 GB, a GPU, a second screen at 59 Hz). Each step has the command, what it should print or write, and what counts as pass or fail. A go for #152 needs every **gate** below to pass; the other checks are recorded but decide nothing alone.
+Everything the GPUI evaluation could not do on the Linux cloud machine, for the owner to run on the reference machine (`bench/limits.json`: Windows 11 Pro, Ryzen 7 5800X, 32 GB, a GPU, a second screen; both screens run at 120 Hz on the machine measured 2026-11-08). Each step has the command, what it should print or write, and what counts as pass or fail. A go for #152 needs every **gate** below to pass; the other checks are recorded but decide nothing alone.
 
 Nothing here has been run on Windows. Step 1 proves the scripts work before the long runs.
 
@@ -80,7 +80,7 @@ function Measure-Idle([string]$Name, [int]$Seconds = 60) {
 }
 ```
 
-`Get-Counter` uses English counter names. On a Windows in another display language it finds nothing and the line shows `wakeups_per_s=n/a`; then read the wake-ups from [Process Explorer](https://learn.microsoft.com/sysinternals/downloads/process-explorer) instead (the "Context Switch Delta" column, per second, summed over the app's processes).
+`Get-Counter` uses English counter names. On a Windows in another display language (French on the reference machine) it finds nothing and the line shows `wakeups_per_s=n/a`; then read the wake-ups with WMI (`Win32_PerfRawData_PerfProc_Thread`, `ContextSwitchesPersec`, summed over the app's threads, before and after the span), as on 2026-11-08, or from [Process Explorer](https://learn.microsoft.com/sysinternals/downloads/process-explorer) instead (the "Context Switch Delta" column, per second, summed over the app's processes).
 
 Start each app on the 2,000-test project, wait until the tree shows, then 20 s more, and measure each state for 60 s. The project from step 2 was in a temporary folder; make it again from the Grace checkout's root:
 
@@ -134,7 +134,7 @@ powershell -ExecutionPolicy Bypass -File .\build-and-measure.ps1 -Label gpu-idle
 - **Gate:** step 3's gate passes for the patched GPUI.
 - **And nothing breaks**, checked by hand on the patched GPUI:
   1. Restore from minimised: the tree shows at once, with no stale or black frame.
-  2. Resize by dragging an edge, and drag the window between the two screens (59 Hz and the main one): no frozen frame.
+  2. Resize by dragging an edge, and drag the window between the two screens: no frozen frame.
   3. Run all, then scroll the tree during the run: the progress moves and the wheel scrolls; `results\windows-gpu-idle-patch.md` shows no worse `scroll.*` than `windows-gpu.md` beyond 8 ms.
   4. GPU reset while idle: `dxcap -forcetdr` from an admin prompt (`dxcap` comes with the Graphics Tools optional feature), then click a row: it redraws within a second.
 - **If it fails:** record what, and stop there. Since ADR 0030, the patch is optional for shown windows, and upstream is the place for this fix (zed-industries/zed#66221, tracked on #267).
