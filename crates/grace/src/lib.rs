@@ -7,6 +7,7 @@ pub mod e2e;
 pub mod elements;
 pub mod probe;
 pub mod theme;
+pub mod tooltip;
 pub mod window;
 
 use gpui::App;
@@ -15,5 +16,6 @@ use gpui::App;
 pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     assets::load_fonts(cx);
+    a11y::bind_keys(cx);
     theme::apply(false, None, cx);
 }

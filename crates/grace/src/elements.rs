@@ -161,8 +161,8 @@ pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>, kind: Bu
     }
 }
 
-/// An icon-only, borderless button, 28 px square or 24 px when `small` (R10.3). `label` is its accessible name
-/// and its tooltip.
+/// An icon-only, borderless button, 28 px square or 24 px when `small` (R10.3). `label` is its accessible name;
+/// give it the same tooltip with `tooltip::tooltip(..).focusable(|f| icon_button(..).track_focus(f))`.
 pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<SharedString>, small: bool) -> Button {
     let label = label.into();
     let side = if small {
@@ -174,8 +174,7 @@ pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<Shared
         .icon(icon)
         .ghost()
         .with_size(px(side))
-        .accessibility_label(label.clone())
-        .tooltip(label)
+        .accessibility_label(label)
 }
 
 #[cfg(test)]

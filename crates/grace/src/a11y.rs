@@ -90,3 +90,26 @@ impl<E: Element> Element for Announcer<E> {
         self.inner.a11y_synthetic_children(prepaint, builder)
     }
 }
+
+gpui::actions!(grace, [FocusNext, FocusPrevious]);
+
+/// The key context of a window's root, where Tab and Shift+Tab move the focus.
+const WINDOW: &str = "GraceWindow";
+
+/// Tab and Shift+Tab, as a browser gives Electron Grace for free (guide R4): bound once at start.
+pub fn bind_keys(cx: &mut App) {
+    cx.bind_keys([
+        gpui::KeyBinding::new("tab", FocusNext, Some(WINDOW)),
+        gpui::KeyBinding::new("shift-tab", FocusPrevious, Some(WINDOW)),
+    ]);
+}
+
+/// Makes `root` the window's root for the keyboard: it holds `focus` when nothing inside does, so the keys reach it,
+/// and Tab and Shift+Tab move through the tab stops in order. A dialog keeps its own Tab inside it.
+pub fn tab_order(root: gpui::Stateful<gpui::Div>, focus: &gpui::FocusHandle) -> gpui::Stateful<gpui::Div> {
+    use gpui::InteractiveElement as _;
+    root.track_focus(focus)
+        .key_context(WINDOW)
+        .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
+        .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
+}
