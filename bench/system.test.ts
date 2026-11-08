@@ -9,13 +9,17 @@ import {
   cpuLoad,
   cpuMeter,
   folderMB,
+  GPU_DRIVER,
   minimise,
+  placeWindow,
   sample,
   screens,
   SELECT_TREE,
   splitTree,
   startSampler,
+  threads,
   waitForQuiet,
+  wakeups,
   windowSpot,
 } from "./system.mjs";
 
@@ -354,6 +358,86 @@ describe("minimise", () => {
     } finally {
       kill(child);
     }
+  });
+});
+
+describe("placeWindow", () => {
+  it("rejects for a process that has no window", { timeout: SLOW }, async () => {
+    const child = await holder();
+    try {
+      await expect(
+        placeWindow(child.pid!, { x: 0, y: 0, width: 800, height: 600 }),
+      ).rejects.toThrow(/no window/);
+    } finally {
+      kill(child);
+    }
+  });
+});
+
+describe("threads", () => {
+  it(
+    "reads every thread of the tree with its context switches and start",
+    { timeout: SLOW },
+    async () => {
+      const child = await holder();
+      try {
+        const all = await threads(child.pid!);
+        expect(all.length).toBeGreaterThan(1);
+        expect(all.every((t) => t.pid === child.pid && t.cs >= 0)).toBe(true);
+        // node starts its threads in its own exe or in ntdll and the C runtime
+        expect(
+          all.some((t) => /^(node\.exe|ntdll\.dll|ucrtbase\.dll|kernel32\.dll)\+0x/i.test(t.start)),
+        ).toBe(true);
+      } finally {
+        kill(child);
+      }
+    },
+  );
+
+  it("rejects for a process that is not running", { timeout: SLOW }, async () => {
+    await expect(threads(2 ** 30)).rejects.toThrow(/not running/);
+  });
+});
+
+describe("wakeups", () => {
+  const t = (pid: number, id: number, cs: number, start: string) => ({ pid, id, cs, start });
+
+  it("gives the tree's context switches a second, the GPU driver's apart", () => {
+    const before = [t(1, 1, 10, "Grace.exe+0x10"), t(1, 2, 100, "nvwgf2umx.dll+0x5")];
+    const after = [t(1, 1, 16, "Grace.exe+0x10"), t(1, 2, 700, "nvwgf2umx.dll+0x5")];
+    expect(wakeups(before, after, 60)).toEqual({ own: 0.1, gpu: 10 });
+  });
+
+  it("counts a thread that started between the readings from zero, and drops one that ended", () => {
+    const before = [t(1, 1, 50, "Grace.exe+0x10"), t(1, 9, 500, "ntdll.dll+0x1")];
+    const after = [t(1, 1, 50, "Grace.exe+0x10"), t(2, 1, 30, "java.exe+0x2")];
+    expect(wakeups(before, after, 10)).toEqual({ own: 3, gpu: 0 });
+  });
+
+  it("tells threads of two processes with the same id apart", () => {
+    const before = [t(1, 7, 10, "a.exe+0x1"), t(2, 7, 1000, "b.exe+0x1")];
+    const after = [t(1, 7, 20, "a.exe+0x1"), t(2, 7, 1000, "b.exe+0x1")];
+    expect(wakeups(before, after, 10)).toEqual({ own: 1, gpu: 0 });
+  });
+
+  it("refuses a span that is not a time", () => {
+    expect(() => wakeups([], [], 0)).toThrow(RangeError);
+  });
+});
+
+describe("GPU_DRIVER", () => {
+  it("knows NVIDIA's, AMD's and Intel's user-mode drivers, and nothing else", () => {
+    for (const dll of [
+      "nvwgf2umx.dll",
+      "NVWGF2UM.DLL",
+      "amdxx64.dll",
+      "atidxx64.dll",
+      "igd10iumd64.dll",
+      "igd12umd64.dll",
+    ])
+      expect(GPU_DRIVER.test(dll), dll).toBe(true);
+    for (const dll of ["Grace.exe", "d3d11.dll", "dxgi.dll", "ntdll.dll", "nvwgf2umx.dll.bak", ""])
+      expect(GPU_DRIVER.test(dll), dll).toBe(false);
   });
 });
 

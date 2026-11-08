@@ -39,7 +39,7 @@ const memory: Entry = { unit: "MB", limit: 95, noise: 5, machine: true };
 describe("MEASURES", () => {
   it("lists the ids in table order with their units, release-only ones flagged", () => {
     const ids = Object.keys(MEASURES);
-    expect(ids.slice(0, 13)).toEqual([
+    expect(ids.slice(0, 15)).toEqual([
       "size.unpacked",
       "size.zip",
       "start.paint.fresh",
@@ -49,6 +49,8 @@ describe("MEASURES", () => {
       "idle.memory",
       "idle.cpu.shown",
       "idle.cpu.minimised",
+      "idle.wakeups.minimised",
+      "idle.wakeups.gpu",
       "run.memory.app",
       "run.memory.java",
       "run.cpu.app",
@@ -66,6 +68,12 @@ describe("MEASURES", () => {
     expect(MEASURES["smooth.run.fps"]).toEqual({ unit: "fps" });
     expect(MEASURES["page.nodes.open"]).toEqual({ unit: "count" });
     expect(MEASURES["page.heap.run"]).toEqual({ unit: "MB" });
+    expect(MEASURES["idle.wakeups.minimised"]).toEqual({
+      unit: "/s",
+      release: true,
+      reported: true,
+      aim: 5,
+    });
   });
 
   it("repeats every run, smooth and page id with @10k, for a release only", () => {
@@ -292,6 +300,18 @@ describe("judge", () => {
     ]);
     expect(out.rows[1].aim).toBe(100);
   });
+
+  it("reports the wake-ups with the catalogue's aim, and judges them on nothing but build a", () => {
+    const out = judge(
+      report("release", { "idle.wakeups.minimised": 40, "idle.wakeups.gpu": 92 }),
+      limits({}),
+    );
+    expect(out.rows.map((r) => [r.id, r.limit, r.aim, r.verdict])).toEqual([
+      ["idle.wakeups.minimised", null, 5, "n/a"],
+      ["idle.wakeups.gpu", null, null, "n/a"],
+    ]);
+    expect(out.result).toBe("pass");
+  });
 });
 
 describe("makeLimits", () => {
@@ -310,6 +330,17 @@ describe("makeLimits", () => {
       noise: 6,
       machine: true,
     });
+  });
+
+  it("gives no limit to a measure that is only reported", () => {
+    const r = {
+      ...report("release", {}),
+      rounds: [
+        ...rounds("idle.wakeups.minimised", "b", [40, 41, 39]),
+        ...rounds("idle.wakeups.gpu", "b", [90, 92, 91]),
+      ],
+    };
+    expect(makeLimits(r, meta).measures).toEqual({});
   });
 
   it("gives a size its spread as noise, at least 1 MB, with no 5% of the median", () => {
