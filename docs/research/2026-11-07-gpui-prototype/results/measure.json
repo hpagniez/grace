@@ -1,0 +1,293 @@
+{
+ "machine": "Intel(R) Xeon(R) Processor @ 2.10GHz, 4 vCPU, 17 GB",
+ "rounds": [
+  {
+   "round": 0,
+   "warmup": true,
+   "electron": {
+    "start": {
+     "paint": 270,
+     "tree": 1616
+    },
+    "idle": {
+     "memMB": 208.83203125,
+     "javaMB": 0,
+     "cpuMs": 240,
+     "procs": 6,
+     "memAtSettleMB": 250.40234375
+    },
+    "run": {
+     "appPeakMB": 354.984375,
+     "javaPeakMB": 266.54296875,
+     "appCpuMs": 3950,
+     "javaCpuMs": 11750,
+     "wallMs": 6838,
+     "outcome": "Finished",
+     "appAfterMB": 354.45703125
+    }
+   },
+   "gpui": {
+    "start": {
+     "paint": 170,
+     "tree": 1642
+    },
+    "idle": {
+     "memMB": 145.265625,
+     "javaMB": 0,
+     "cpuMs": 220,
+     "procs": 1,
+     "memAtSettleMB": 145.265625
+    },
+    "run": {
+     "appPeakMB": 155.8125,
+     "javaPeakMB": 262.8203125,
+     "appCpuMs": 2320,
+     "javaCpuMs": 9430,
+     "wallMs": 4677,
+     "outcome": "finished",
+     "appAfterMB": 155.8125
+    }
+   }
+  },
+  {
+   "round": 1,
+   "warmup": false,
+   "gpui": {
+    "start": {
+     "paint": 163,
+     "tree": 1523
+    },
+    "idle": {
+     "memMB": 145.41796875,
+     "javaMB": 0,
+     "cpuMs": 230,
+     "procs": 1,
+     "memAtSettleMB": 145.41796875
+    },
+    "run": {
+     "appPeakMB": 154.453125,
+     "javaPeakMB": 187.5703125,
+     "appCpuMs": 2210,
+     "javaCpuMs": 9380,
+     "wallMs": 4611,
+     "outcome": "finished",
+     "appAfterMB": 154.50390625
+    }
+   },
+   "electron": {
+    "start": {
+     "paint": 282,
+     "tree": 1804
+    },
+    "idle": {
+     "memMB": 208.921875,
+     "javaMB": 0,
+     "cpuMs": 240,
+     "procs": 6,
+     "memAtSettleMB": 251.17578125
+    },
+    "run": {
+     "appPeakMB": 357.4140625,
+     "javaPeakMB": 246.6875,
+     "appCpuMs": 3250,
+     "javaCpuMs": 10920,
+     "wallMs": 6123,
+     "outcome": "Finished",
+     "appAfterMB": 354.24609375
+    }
+   }
+  },
+  {
+   "round": 2,
+   "warmup": false,
+   "electron": {
+    "start": {
+     "paint": 252,
+     "tree": 1679
+    },
+    "idle": {
+     "memMB": 209.5859375,
+     "javaMB": 0,
+     "cpuMs": 230,
+     "procs": 6,
+     "memAtSettleMB": 251.87890625
+    },
+    "run": {
+     "appPeakMB": 357.0859375,
+     "javaPeakMB": 197.25,
+     "appCpuMs": 3230,
+     "javaCpuMs": 11120,
+     "wallMs": 6094,
+     "outcome": "Finished",
+     "appAfterMB": 354.5390625
+    }
+   },
+   "gpui": {
+    "start": {
+     "paint": 119,
+     "tree": 1495
+    },
+    "idle": {
+     "memMB": 144.609375,
+     "javaMB": 0,
+     "cpuMs": 310,
+     "procs": 1,
+     "memAtSettleMB": 144.609375
+    },
+    "run": {
+     "appPeakMB": 155,
+     "javaPeakMB": 242.3828125,
+     "appCpuMs": 2460,
+     "javaCpuMs": 10010,
+     "wallMs": 4916,
+     "outcome": "finished",
+     "appAfterMB": 155.0078125
+    }
+   }
+  },
+  {
+   "round": 3,
+   "warmup": false,
+   "gpui": {
+    "start": {
+     "paint": 177,
+     "tree": 1665
+    },
+    "idle": {
+     "memMB": 145.4765625,
+     "javaMB": 0,
+     "cpuMs": 250,
+     "procs": 1,
+     "memAtSettleMB": 145.4765625
+    },
+    "run": {
+     "appPeakMB": 153.2265625,
+     "javaPeakMB": 197.14453125,
+     "appCpuMs": 2470,
+     "javaCpuMs": 9470,
+     "wallMs": 4687,
+     "outcome": "finished",
+     "appAfterMB": 153.2265625
+    }
+   },
+   "electron": {
+    "start": {
+     "paint": 307,
+     "tree": 1802
+    },
+    "idle": {
+     "memMB": 209.25,
+     "javaMB": 0,
+     "cpuMs": 230,
+     "procs": 6,
+     "memAtSettleMB": 251.27734375
+    },
+    "run": {
+     "appPeakMB": 351.4296875,
+     "javaPeakMB": 205.3984375,
+     "appCpuMs": 3720,
+     "javaCpuMs": 11680,
+     "wallMs": 6510,
+     "outcome": "Finished",
+     "appAfterMB": 349.984375
+    }
+   }
+  },
+  {
+   "round": 4,
+   "warmup": false,
+   "electron": {
+    "start": {
+     "paint": 305,
+     "tree": 1844
+    },
+    "idle": {
+     "memMB": 210.40625,
+     "javaMB": 0,
+     "cpuMs": 230,
+     "procs": 6,
+     "memAtSettleMB": 252.30859375
+    },
+    "run": {
+     "appPeakMB": 352.12890625,
+     "javaPeakMB": 253.55078125,
+     "appCpuMs": 3850,
+     "javaCpuMs": 12290,
+     "wallMs": 6657,
+     "outcome": "Finished",
+     "appAfterMB": 351.265625
+    }
+   },
+   "gpui": {
+    "start": {
+     "paint": 128,
+     "tree": 1520
+    },
+    "idle": {
+     "memMB": 145.9609375,
+     "javaMB": 0,
+     "cpuMs": 280,
+     "procs": 1,
+     "memAtSettleMB": 145.9609375
+    },
+    "run": {
+     "appPeakMB": 154.6015625,
+     "javaPeakMB": 245.71875,
+     "appCpuMs": 2450,
+     "javaCpuMs": 9970,
+     "wallMs": 4720,
+     "outcome": "finished",
+     "appAfterMB": 154.6015625
+    }
+   }
+  },
+  {
+   "round": 5,
+   "warmup": false,
+   "gpui": {
+    "start": {
+     "paint": 143,
+     "tree": 1839
+    },
+    "idle": {
+     "memMB": 145.171875,
+     "javaMB": 0,
+     "cpuMs": 250,
+     "procs": 1,
+     "memAtSettleMB": 145.171875
+    },
+    "run": {
+     "appPeakMB": 155.890625,
+     "javaPeakMB": 260.625,
+     "appCpuMs": 2490,
+     "javaCpuMs": 10060,
+     "wallMs": 4901,
+     "outcome": "finished",
+     "appAfterMB": 155.89453125
+    }
+   },
+   "electron": {
+    "start": {
+     "paint": 316,
+     "tree": 1850
+    },
+    "idle": {
+     "memMB": 209.71484375,
+     "javaMB": 0,
+     "cpuMs": 230,
+     "procs": 6,
+     "memAtSettleMB": 251.68359375
+    },
+    "run": {
+     "appPeakMB": 352.07421875,
+     "javaPeakMB": 252.62109375,
+     "appCpuMs": 3930,
+     "javaCpuMs": 12050,
+     "wallMs": 6925,
+     "outcome": "Finished",
+     "appAfterMB": 351.13671875
+    }
+   }
+  }
+ ]
+}

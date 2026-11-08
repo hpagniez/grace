@@ -1,0 +1,266 @@
+[
+ {
+  "round": 0,
+  "warmup": true,
+  "app": "electron",
+  "idle": {
+   "frames": 78,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.799999999999727,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 850
+  },
+  "run": {
+   "frames": 75,
+   "maxMs": 50,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   987,
+   1031
+  ]
+ },
+ {
+  "round": 0,
+  "warmup": true,
+  "app": "gpui",
+  "idle": {
+   "frames": 33,
+   "maxMs": 47.4,
+   "p95Ms": 31.9,
+   "medianMs": 31.7,
+   "appCpuMs": 2710
+  },
+  "run": {
+   "frames": 28,
+   "maxMs": 143.9,
+   "p95Ms": 79.7,
+   "medianMs": 47.6
+  },
+  "wheelMs": [
+   1034,
+   1039
+  ]
+ },
+ {
+  "round": 1,
+  "warmup": false,
+  "app": "gpui",
+  "idle": {
+   "frames": 32,
+   "maxMs": 47.7,
+   "p95Ms": 31.8,
+   "medianMs": 31.7,
+   "appCpuMs": 2780
+  },
+  "run": {
+   "frames": 29,
+   "maxMs": 143.6,
+   "p95Ms": 47.8,
+   "medianMs": 32.3
+  },
+  "wheelMs": [
+   1021,
+   1028
+  ]
+ },
+ {
+  "round": 1,
+  "warmup": false,
+  "app": "electron",
+  "idle": {
+   "frames": 77,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.700000000000728,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 810
+  },
+  "run": {
+   "frames": 73,
+   "maxMs": 50,
+   "p95Ms": 33.30000000000018,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   983,
+   1024
+  ]
+ },
+ {
+  "round": 2,
+  "warmup": false,
+  "app": "electron",
+  "idle": {
+   "frames": 77,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 840
+  },
+  "run": {
+   "frames": 76,
+   "maxMs": 33.399999999999636,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   986,
+   1006
+  ]
+ },
+ {
+  "round": 2,
+  "warmup": false,
+  "app": "gpui",
+  "idle": {
+   "frames": 33,
+   "maxMs": 47.7,
+   "p95Ms": 31.8,
+   "medianMs": 31.7,
+   "appCpuMs": 2740
+  },
+  "run": {
+   "frames": 31,
+   "maxMs": 128.2,
+   "p95Ms": 94.9,
+   "medianMs": 32.9
+  },
+  "wheelMs": [
+   1043,
+   1054
+  ]
+ },
+ {
+  "round": 3,
+  "warmup": false,
+  "app": "gpui",
+  "idle": {
+   "frames": 33,
+   "maxMs": 47.6,
+   "p95Ms": 31.9,
+   "medianMs": 31.8,
+   "appCpuMs": 2630
+  },
+  "run": {
+   "frames": 31,
+   "maxMs": 175.3,
+   "p95Ms": 49.8,
+   "medianMs": 31.8
+  },
+  "wheelMs": [
+   1033,
+   1004
+  ]
+ },
+ {
+  "round": 3,
+  "warmup": false,
+  "app": "electron",
+  "idle": {
+   "frames": 78,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.799999999999727,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 760
+  },
+  "run": {
+   "frames": 75,
+   "maxMs": 33.400000000000546,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   986,
+   1008
+  ]
+ },
+ {
+  "round": 4,
+  "warmup": false,
+  "app": "electron",
+  "idle": {
+   "frames": 78,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.700000000000273,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 790
+  },
+  "run": {
+   "frames": 73,
+   "maxMs": 50.099999999999454,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   985,
+   1013
+  ]
+ },
+ {
+  "round": 4,
+  "warmup": false,
+  "app": "gpui",
+  "idle": {
+   "frames": 32,
+   "maxMs": 47.8,
+   "p95Ms": 31.9,
+   "medianMs": 31.7,
+   "appCpuMs": 2730
+  },
+  "run": {
+   "frames": 30,
+   "maxMs": 143.6,
+   "p95Ms": 111.6,
+   "medianMs": 32.2
+  },
+  "wheelMs": [
+   1025,
+   1046
+  ]
+ },
+ {
+  "round": 5,
+  "warmup": false,
+  "app": "gpui",
+  "idle": {
+   "frames": 28,
+   "maxMs": 191.6,
+   "p95Ms": 47.7,
+   "medianMs": 31.7,
+   "appCpuMs": 2500
+  },
+  "run": {
+   "frames": 31,
+   "maxMs": 176.5,
+   "p95Ms": 114.3,
+   "medianMs": 31.8
+  },
+  "wheelMs": [
+   1040,
+   1038
+  ]
+ },
+ {
+  "round": 5,
+  "warmup": false,
+  "app": "electron",
+  "idle": {
+   "frames": 78,
+   "maxMs": 16.800000000000182,
+   "p95Ms": 16.700000000000273,
+   "medianMs": 16.699999999999818,
+   "appCpuMs": 830
+  },
+  "run": {
+   "frames": 71,
+   "maxMs": 66.59999999999945,
+   "p95Ms": 16.800000000000182,
+   "medianMs": 16.699999999999818
+  },
+  "wheelMs": [
+   989,
+   1020
+  ]
+ }
+]

@@ -1,0 +1,30 @@
+[package]
+name = "grace-gpui"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+gpui-component = "=0.9.0"
+gpui-base = "=0.9.0"
+gpui-kit-assets = "=0.9.0"
+futures = "0.3"
+serde_json = "1"
+
+# GPUI's platform crate picks its backend from the target: DirectX 11 on Windows, X11 on Linux. Only Linux has the `x11`
+# feature to turn on; the Windows build needs none (measure/windows/README.md).
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["x11"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true
+
+[dev-dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11", features = ["test-support"] }

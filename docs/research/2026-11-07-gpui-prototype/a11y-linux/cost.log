@@ -1,0 +1,10 @@
+{'mode': 'off', 'idle_mb': 169.1, 'idle_cpu_ms_10s': 40, 'peak_mb': 173.1, 'after_mb': 173.1, 'run_cpu_ms': 3790, 'run_s': 5.13, 'atspi_events': None}
+{'mode': 'on', 'idle_mb': 168.5, 'idle_cpu_ms_10s': 30, 'peak_mb': 171.4, 'after_mb': 172.7, 'run_cpu_ms': 3570, 'run_s': 4.93, 'atspi_events': '542'}
+{'mode': 'on', 'idle_mb': 169.8, 'idle_cpu_ms_10s': 40, 'peak_mb': 173.8, 'after_mb': 173.8, 'run_cpu_ms': 4130, 'run_s': 5.37, 'atspi_events': '554'}
+{'mode': 'off', 'idle_mb': 168.7, 'idle_cpu_ms_10s': 50, 'peak_mb': 172.9, 'after_mb': 172.9, 'run_cpu_ms': 3780, 'run_s': 5.21, 'atspi_events': None}
+{'mode': 'off', 'idle_mb': 168.3, 'idle_cpu_ms_10s': 50, 'peak_mb': 174.5, 'after_mb': 174.5, 'run_cpu_ms': 3860, 'run_s': 5.15, 'atspi_events': None}
+{'mode': 'on', 'idle_mb': 169.8, 'idle_cpu_ms_10s': 50, 'peak_mb': 175.8, 'after_mb': 175.8, 'run_cpu_ms': 4370, 'run_s': 5.41, 'atspi_events': '554'}
+{'mode': 'on', 'idle_mb': 168.9, 'idle_cpu_ms_10s': 40, 'peak_mb': 174.8, 'after_mb': 174.8, 'run_cpu_ms': 3520, 'run_s': 4.9, 'atspi_events': '540'}
+{'mode': 'off', 'idle_mb': 169.3, 'idle_cpu_ms_10s': 30, 'peak_mb': 172.5, 'after_mb': 172.5, 'run_cpu_ms': 3650, 'run_s': 4.99, 'atspi_events': None}
+{'mode': 'off', 'idle_mb': 168.9, 'idle_cpu_ms_10s': 60, 'peak_mb': 173.2, 'after_mb': 173.0, 'run_cpu_ms': 3720, 'run_s': 5.12, 'atspi_events': None}
+{'mode': 'on', 'idle_mb': 169.1, 'idle_cpu_ms_10s': 50, 'peak_mb': 173.2, 'after_mb': 173.2, 'run_cpu_ms': 3770, 'run_s': 5.11, 'atspi_events': '539'}
