@@ -128,8 +128,8 @@ Nothing guards this today. The [big-project note](../research/2026-10-29-big-pro
 
 A short `## Performance` section in AGENTS.md says:
 1. The promise and its order (R1).
-2. Every design spec has a `## Cost` section. It says what the feature adds to memory, CPU, start time or size, idle and during a run, and how idle stays at zero CPU. The Doc rules line about specs says so too. A PR that adds a dependency states its size.
-3. Idle costs nothing: no timer, poll or animation runs while no run is going, or while the window is minimised.
+2. Every design spec has a `## Cost` section. It says what the feature adds to memory, CPU, start time or size, idle and during a run, and how it keeps to the idle rule (R6.3). The Doc rules line about specs says so too. A PR that adds a dependency states its size.
+3. Idle: while no run is going, nothing in Grace wakes it while its window is minimised or hidden (no timer, poll, animation or redraw), and it stays within the `idle.cpu.minimised` limit then and the `idle.cpu.shown` limit while shown. Grace's own code adds no timer, poll or animation while idle. (Was "idle costs nothing"; replaced by [ADR 0030](../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md).)
 4. Read the PR's perf comment, and explain a worse number in the PR body.
 5. Before a release, run the release benchmark (R5). This also goes in the Git workflow section, next to the public-docs check.
 6. Never write a release's `Decision:` line.
