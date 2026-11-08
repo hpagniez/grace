@@ -1,12 +1,13 @@
 //! The Windows backend: UI Automation, which GPUI's AccessKit adapter serves. Reads the raw view, so nothing the
 //! app exposes is filtered out.
+use uiautomation::inputs::{Keyboard, Mouse};
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
 };
-use uiautomation::types::{ControlType, ExpandCollapseState};
+use uiautomation::types::{ControlType, ExpandCollapseState, Point};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
 
-use crate::{Driver, Node, Result, Role, States};
+use crate::{Driver, Key, Node, Rect, Result, Role, States};
 
 pub struct UiaDriver {
     automation: UIAutomation,
@@ -88,8 +89,18 @@ impl UiaDriver {
                 self.read(c, at)
             })
             .collect::<Result<Vec<_>>>()?;
+        let rect = e.get_bounding_rectangle().ok().map(|r| Rect {
+            x: r.get_left(),
+            y: r.get_top(),
+            width: r.get_width(),
+            height: r.get_height(),
+        });
         Ok(Node {
-            role: role(e.get_control_type().map_err(err)?),
+            // AccessKit gives a dialog UI Automation's Window type, as Chromium does: one inside the window is a dialog
+            role: match role(e.get_control_type().map_err(err)?) {
+                Role::Window if !path.is_empty() => Role::Dialog,
+                r => r,
+            },
             name: e.get_name().unwrap_or_default(),
             description,
             value,
@@ -100,6 +111,7 @@ impl UiaDriver {
                 selected: selected.unwrap_or(false),
                 expanded,
             },
+            rect,
             path,
             children,
         })
@@ -125,6 +137,23 @@ impl Driver for UiaDriver {
             .get_pattern::<UIInvokePattern>()
             .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
         invoke.invoke().map_err(err)
+    }
+
+    fn hover(&self, node: &Node) -> Result<()> {
+        let (x, y) = node
+            .rect
+            .ok_or_else(|| format!("{:?} {:?} has no place on the screen", node.role, node.name))?
+            .centre();
+        Mouse::new().move_to(&Point::new(x, y)).map_err(err)
+    }
+
+    fn key(&self, key: Key) -> Result<()> {
+        Keyboard::new()
+            .send_keys(match key {
+                Key::Tab => "{tab}",
+                Key::Escape => "{esc}",
+            })
+            .map_err(err)
     }
 }
 
@@ -152,6 +181,7 @@ fn role(t: ControlType) -> Role {
         ControlType::ProgressBar => Role::ProgressBar,
         ControlType::Image => Role::Image,
         ControlType::Text => Role::Text,
+        ControlType::ToolTip => Role::Tooltip,
         other => Role::Other(format!("{other:?}")),
     }
 }

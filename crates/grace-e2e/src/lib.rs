@@ -40,6 +40,7 @@ pub enum Role {
     Image,
     Text,
     Dialog,
+    Tooltip,
     Other(String),
 }
 
@@ -75,6 +76,28 @@ pub struct States {
     pub expanded: Option<bool>,
 }
 
+/// Where a node is, in pixels: its left, top, width and height.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl Rect {
+    pub fn centre(&self) -> (i32, i32) {
+        (self.x + self.width / 2, self.y + self.height / 2)
+    }
+}
+
+/// A key the tests press.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Key {
+    Tab,
+    Escape,
+}
+
 /// One node of the tree, as read. `path` is its position under the app's window, which `Driver::press` finds again.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
@@ -83,6 +106,9 @@ pub struct Node {
     pub description: String,
     pub value: Option<f64>,
     pub states: States,
+    /// Where it is, when the platform says: on the screen through UI Automation, in its window through AT-SPI.
+    /// `Driver::hover` reads it as its backend wrote it.
+    pub rect: Option<Rect>,
     pub path: Vec<usize>,
     pub children: Vec<Node>,
 }
@@ -140,6 +166,10 @@ pub trait Driver {
     fn tree(&self) -> Result<Node>;
     /// Does the node's default action (a button's press).
     fn press(&self, node: &Node) -> Result<()>;
+    /// Moves the pointer to the middle of the node, as a person resting the mouse on it.
+    fn hover(&self, node: &Node) -> Result<()>;
+    /// Presses a key on the keyboard, for the window under the pointer or with the focus.
+    fn key(&self, key: Key) -> Result<()>;
 }
 
 /// The built `Grace` binary: `GRACE_EXE` when set, else the workspace's debug build.
@@ -223,6 +253,21 @@ impl App {
     pub fn press(&self, node: &Node) -> Result<()> {
         self.driver.press(node)
     }
+
+    pub fn hover(&self, node: &Node) -> Result<()> {
+        self.driver.hover(node)
+    }
+
+    pub fn key(&self, key: Key) -> Result<()> {
+        self.driver.key(key)
+    }
+
+    /// Waits until no node has this role and name.
+    pub fn wait_for_no_node(&self, role: Role, name: &str) -> Result<Node> {
+        self.wait_for(&format!("no {role:?} {name:?}"), Duration::from_secs(10), |t| {
+            t.find(&role, name).is_none()
+        })
+    }
 }
 
 impl Drop for App {
@@ -266,6 +311,7 @@ mod tests {
             description: String::new(),
             value: None,
             states: States::default(),
+            rect: None,
             path: vec![],
             children,
         }

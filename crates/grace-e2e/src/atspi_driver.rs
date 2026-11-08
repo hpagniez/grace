@@ -2,11 +2,12 @@
 //! session bus with the AT-SPI bus launcher, as `scripts/e2e-linux.sh` starts them.
 use atspi::proxy::accessible::{AccessibleProxy, ObjectRefExt as _};
 use atspi::proxy::action::ActionProxy;
+use atspi::proxy::component::ComponentProxy;
 use atspi::proxy::value::ValueProxy;
-use atspi::{AccessibilityConnection, Interface, ObjectRefOwned, State};
+use atspi::{AccessibilityConnection, CoordType, Interface, ObjectRefOwned, State};
 use futures_lite::future::block_on;
 
-use crate::{Driver, Node, Result, Role, States};
+use crate::{Driver, Key, Node, Rect, Result, Role, States};
 
 pub struct AtspiDriver {
     conn: AccessibilityConnection,
@@ -77,6 +78,22 @@ impl AtspiDriver {
         } else {
             None
         };
+        let rect = if interfaces.contains(Interface::Component) {
+            let c = ComponentProxy::builder(self.conn.connection())
+                .destination(p.inner().destination().to_owned())
+                .map_err(err)?
+                .path(p.inner().path().to_owned())
+                .map_err(err)?
+                .build()
+                .await
+                .map_err(err)?;
+            c.get_extents(CoordType::Window)
+                .await
+                .ok()
+                .map(|(x, y, width, height)| Rect { x, y, width, height })
+        } else {
+            None
+        };
         let mut children = Vec::new();
         for (i, child) in p.get_children().await.map_err(err)?.into_iter().enumerate() {
             let mut at = path.clone();
@@ -97,9 +114,25 @@ impl AtspiDriver {
                     .contains(State::Expandable)
                     .then(|| state.contains(State::Expanded)),
             },
+            rect,
             path,
             children,
         })
+    }
+}
+
+impl AtspiDriver {
+    /// The app's X window, by its process.
+    fn x_window(&self) -> Result<String> {
+        let found = std::process::Command::new("xdotool")
+            .args(["search", "--onlyvisible", "--pid", &self.pid.to_string()])
+            .output()
+            .map_err(|e| format!("cannot run xdotool (apt install xdotool): {e}"))?;
+        String::from_utf8_lossy(&found.stdout)
+            .lines()
+            .next()
+            .map(str::to_owned)
+            .ok_or_else(|| format!("process {} shows no X window", self.pid))
     }
 }
 
@@ -133,6 +166,45 @@ impl Driver for AtspiDriver {
             }
         })
     }
+
+    /// Through `xdotool`, on the X display the app is on: AT-SPI has no pointer of its own. The node's place is
+    /// read in the window's coordinates, since the app cannot know where an X window without a window manager is.
+    fn hover(&self, node: &Node) -> Result<()> {
+        let (x, y) = node
+            .rect
+            .ok_or_else(|| format!("{:?} {:?} has no place in the window", node.role, node.name))?
+            .centre();
+        let window = self.x_window()?;
+        xdotool(&["mousemove", "--window", &window, &x.to_string(), &y.to_string()])
+    }
+
+    /// To the app's window, given the keyboard focus first: with no window manager, nothing else gives it.
+    fn key(&self, key: Key) -> Result<()> {
+        let window = self.x_window()?;
+        xdotool(&["windowfocus", "--sync", &window])?;
+        xdotool(&[
+            "key",
+            match key {
+                Key::Tab => "Tab",
+                Key::Escape => "Escape",
+            },
+        ])
+    }
+}
+
+fn xdotool(args: &[&str]) -> Result<()> {
+    let out = std::process::Command::new("xdotool")
+        .args(args)
+        .output()
+        .map_err(|e| format!("cannot run xdotool (apt install xdotool): {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "xdotool {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
 }
 
 /// AT-SPI's roles to the driver's. GPUI's AccessKit adapter answers `GetRole` but not `GetRoleName`.
@@ -163,6 +235,7 @@ fn role(role: atspi::Role) -> Role {
         A::Image | A::Icon => Role::Image,
         A::Label | A::Static | A::Text => Role::Text,
         A::Dialog | A::Alert => Role::Dialog,
+        A::ToolTip => Role::Tooltip,
         other => Role::Other(format!("{other:?}")),
     }
 }
