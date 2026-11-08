@@ -95,8 +95,15 @@ jobs:
       # the patched GPUI crate is crates.io's plus the idle patch, and nothing else (patches/README.md)
       - if: ${{ runner.os == 'Linux' }}
         run: sh patches/check.sh
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --locked
+      # GPUI Grace's e2e tests through the accessibility tree (guide R6.5, ADR 0017): AT-SPI under Xvfb on Linux for
+      # every PR; UI Automation on Windows only for PRs into main and runs by hand, as the Playwright e2e
+      - if: ${{ runner.os == 'Linux' }}
+        run: sudo apt-get install -y xvfb at-spi2-core dbus
+      - name: e2e
+        if: ${{ runner.os == 'Linux' || github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
+        run: sh scripts/e2e-gpui.sh
 
   e2e:
     if: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
