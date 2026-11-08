@@ -100,7 +100,7 @@ jobs:
       # GPUI Grace's e2e tests through the accessibility tree (guide R6.5, ADR 0017): AT-SPI under Xvfb on Linux for
       # every PR; UI Automation on Windows only for PRs into main and runs by hand, as the Playwright e2e
       - if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get install -y xvfb at-spi2-core dbus
+        run: sudo apt-get install -y xvfb at-spi2-core dbus mesa-vulkan-drivers
       - name: e2e
         if: ${{ runner.os == 'Linux' || github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
         run: sh scripts/e2e-gpui.sh
