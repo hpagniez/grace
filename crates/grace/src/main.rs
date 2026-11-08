@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 fn main() {
+    grace::probe::init();
     gpui_platform::application()
         .with_assets(grace::assets::Assets)
         .run(|cx| {

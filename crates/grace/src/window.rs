@@ -9,6 +9,7 @@ use gpui::{
 use gpui_component::Root;
 
 use crate::a11y;
+use crate::probe;
 use crate::theme::Theme;
 
 /// The window's smallest size: the toolbar fits down to 760 px wide, and 480 px leaves room for the bars,
@@ -21,12 +22,15 @@ pub const FIRST_SIZE: (f32, f32) = (1200., 800.);
 pub struct GraceWindow {
     /// What the live region says; a new text is announced.
     pub announcement: SharedString,
+    /// The first frame was asked for: the probe's `first_frame` follows it (`crate::probe`).
+    painted: bool,
 }
 
 impl GraceWindow {
     pub fn new() -> Self {
         Self {
             announcement: SharedString::default(),
+            painted: false,
         }
     }
 }
@@ -38,7 +42,13 @@ impl Default for GraceWindow {
 }
 
 impl Render for GraceWindow {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if !self.painted {
+            self.painted = true;
+            if probe::on() {
+                window.on_next_frame(|_, _| probe::mark("first_frame"));
+            }
+        }
         let t = Theme::global(cx).tokens;
         div()
             .id("grace")
