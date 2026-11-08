@@ -50,7 +50,7 @@ Not covered: frames during the drags themselves (screenshots came after each dra
 
 The control is [d3d-control.ps1](../measure/windows/d3d-control.ps1): a PowerShell process that creates a device and sleeps. No device-creation flag removes the thread. Releasing the device does: 21 driver threads before, none after. So GPUI could stop it only by dropping its D3D11 device while every window is hidden and recreating it on show, which is a much larger change than the idle patch and which I did not try.
 
-**What this means for the gate.** Runbook step 3 asks for under 5 wake-ups a second minimised. Nothing using a D3D11 device on this driver can pass that, Grace included. ADR 0030 (on `feature/idle-cpu-budget`) already counts what the runtime does by itself against the CPU limit, not as a wake-up of the app. Excluding the driver thread, the prototype has 0.0 to 0.1 wake-ups a second minimised. Only NVIDIA was tested: this machine has no other GPU.
+**What this means for the gate.** Runbook step 3 asks for under 5 wake-ups a second minimised. Nothing using a D3D11 device on this driver can pass that, Grace included. [ADR 0030](../../../decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md) already counts what the runtime does by itself against the CPU limit, not as a wake-up of the app. Excluding the driver thread, the prototype has 0.0 to 0.1 wake-ups a second minimised. Only NVIDIA was tested: this machine has no other GPU.
 
 ## The smaller patch (hidden-window skip)
 
