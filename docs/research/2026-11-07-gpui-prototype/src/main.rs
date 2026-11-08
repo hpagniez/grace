@@ -1195,6 +1195,16 @@ fn main() {
                     grace.update(cx, |g, cx| match cmd.as_str() {
                         "run" => g.run(0, cx),
                         "quit" => cx.quit(),
+                        // The Windows idle patch's check: a second window opened while the first is minimised.
+                        c if c.starts_with("open-window ") => {
+                            let xy: Vec<f32> = c[12..].split(' ').filter_map(|s| s.parse().ok()).collect();
+                            let bounds = Bounds::new(gpui::point(px(xy[0]), px(xy[1])), size(px(900.), px(600.)));
+                            open_window(
+                                cx,
+                                WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
+                                None,
+                            );
+                        }
                         // For screenshots: select the first failed test, or show a bottom tab.
                         "select-failed" => {
                             g.selected = g.tree.as_ref().and_then(|t| {
