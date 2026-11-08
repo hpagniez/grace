@@ -202,6 +202,12 @@ try {
   } else {
     Say "Using the packaged Grace at $GraceExe (delete out\Grace-win32-x64 to repackage)"
   }
+  # electron's binary comes on first use, not with npm install, and the Electron floor runs it
+  if (-not (Test-Path (Join-Path $Grace 'node_modules\electron\dist\electron.exe'))) {
+    Say 'npx electron --version (downloads the Electron binary for the empty-window floor)'
+    & npx electron --version
+    if ($LASTEXITCODE -ne 0) { Fail 'npx electron --version failed.' }
+  }
 } finally { Pop-Location }
 
 # ---- 3. the prototype ----
