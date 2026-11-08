@@ -7,3 +7,5 @@ playwright-report/
 .superpowers/
 .impeccable/
 bench-out/
+target/
+patches/vendor/

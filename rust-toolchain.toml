@@ -1,0 +1,5 @@
+# The Rust toolchain of GPUI Grace (ADR 0031). Upgraded only between migration phases, with the GPUI set (guide R9.4).
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

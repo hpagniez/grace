@@ -1,0 +1,162 @@
+diff --git a/src/events.rs b/src/events.rs
+index 4dd0c38..e00720b 100644
+--- a/src/events.rs
++++ b/src/events.rs
+@@ -1285,6 +1285,9 @@ impl WindowsWindowInner {
+     // update completes, as activation does. The state is read at delivery so
+     // a burst of messages collapses to the final value.
+     fn report_visibility(self: &Rc<Self>) {
++        // Showing or restoring a window must wake a vsync thread that sleeps
++        // while every window is minimised or hidden.
++        VSYNC_GATE.open();
+         if self.state.last_visibility.get().is_none() {
+             return;
+         }
+diff --git a/src/platform.rs b/src/platform.rs
+index 72731ec..e28666c 100644
+--- a/src/platform.rs
++++ b/src/platform.rs
+@@ -436,6 +436,7 @@ impl WindowsPlatform {
+             // Not joined: the thread can be sending this thread a message. It exits after its
+             // next vsync, and drops its reference to the devices then.
+             stop.store(true, Ordering::Release);
++            VSYNC_GATE.open();
+         }
+         if let Some(text_system) = &self.direct_write_text_system {
+             text_system.release_gpu();
+@@ -464,6 +465,20 @@ impl WindowsPlatform {
+             .spawn(move || {
+                 let vsync_provider = VSyncProvider::new();
+                 loop {
++                    // Sleep while every window is minimised or hidden: they draw
++                    // nothing, so waking on every vsync only costs CPU (zed#66221).
++                    // Showing, restoring or opening a window opens the gate.
++                    if let Some(all_windows) = all_windows.upgrade() {
++                        VSYNC_GATE.wait_while(|| {
++                            all_windows.read().iter().all(|hwnd| unsafe {
++                                !IsWindowVisible(hwnd.as_raw()).as_bool()
++                                    || IsIconic(hwnd.as_raw()).as_bool()
++                            })
++                        });
++                    }
++                    if stop.load(Ordering::Acquire) {
++                        break;
++                    }
+                     let signal_source = vsync_provider.wait_for_vsync();
+                     let signal_at = PlatformFrameSignal::capture(scheduler::Instant::now);
+                     if stop.load(Ordering::Acquire) {
+@@ -487,15 +502,17 @@ impl WindowsPlatform {
+                     };
+                     for hwnd in all_windows.read().iter() {
+                         unsafe {
++                            if !IsWindowVisible(hwnd.as_raw()).as_bool()
++                                || IsIconic(hwnd.as_raw()).as_bool()
++                            {
++                                // Hidden windows may not consume WM_PAINT until shown
++                                // again, and showing or restoring one paints it, so
++                                // don't invalidate it (zed#66221).
++                                hwnd.frame_signal.take();
++                                continue;
++                            }
+                             if let Some(signal_at) = signal_at {
+-                                if IsWindowVisible(hwnd.as_raw()).as_bool()
+-                                    && !IsIconic(hwnd.as_raw()).as_bool()
+-                                {
+-                                    hwnd.frame_signal.record(signal_at, signal_source);
+-                                } else {
+-                                    // Hidden windows may not consume WM_PAINT until shown again.
+-                                    hwnd.frame_signal.take();
+-                                }
++                                hwnd.frame_signal.record(signal_at, signal_source);
+                             }
+                             RedrawWindow(Some(hwnd.as_raw()), None, None, RDW_INVALIDATE)
+                                 .ok()
+@@ -775,6 +792,8 @@ impl Platform for WindowsPlatform {
+             handle: handle.into(),
+             frame_signal: window.state.frame_signal.clone(),
+         });
++        // The vsync thread may sleep while every other window is minimised or hidden.
++        VSYNC_GATE.open();
+ 
+         Ok(Box::new(window))
+     }
+@@ -1477,6 +1496,7 @@ impl Drop for WindowsPlatform {
+     fn drop(&mut self) {
+         if let Some(stop) = self.vsync_stop.borrow_mut().take() {
+             stop.store(true, Ordering::Release);
++            VSYNC_GATE.open();
+         }
+         unsafe {
+             if let Some(notification) = self.suspend_resume_notification.borrow_mut().take() {
+diff --git a/src/vsync.rs b/src/vsync.rs
+index 5121c41..634d803 100644
+--- a/src/vsync.rs
++++ b/src/vsync.rs
+@@ -1,5 +1,5 @@
+ use std::{
+-    sync::LazyLock,
++    sync::{Condvar, LazyLock, Mutex},
+     time::{Duration, Instant},
+ };
+ 
+@@ -20,6 +20,37 @@ static QPC_TICKS_PER_SECOND: LazyLock<u64> = LazyLock::new(|| {
+     frequency as u64
+ });
+ 
++/// Where the vsync thread sleeps while every window is minimised or hidden,
++/// instead of waking on every vsync for windows that draw nothing. One per
++/// process, like the vsync thread.
++pub(crate) static VSYNC_GATE: VSyncGate = VSyncGate {
++    opened: Mutex::new(false),
++    condvar: Condvar::new(),
++};
++
++pub(crate) struct VSyncGate {
++    opened: Mutex<bool>,
++    condvar: Condvar,
++}
++
++impl VSyncGate {
++    /// Wakes the vsync thread if it sleeps, or keeps its next wait from sleeping.
++    pub(crate) fn open(&self) {
++        *self.opened.lock().unwrap_or_else(|e| e.into_inner()) = true;
++        self.condvar.notify_all();
++    }
++
++    /// Sleeps while `idle` holds and nothing opened the gate since the last
++    /// wait. `idle` must not wait on the main thread.
++    pub(crate) fn wait_while(&self, idle: impl Fn() -> bool) {
++        let mut opened = self.opened.lock().unwrap_or_else(|e| e.into_inner());
++        while !*opened && idle() {
++            opened = self.condvar.wait(opened).unwrap_or_else(|e| e.into_inner());
++        }
++        *opened = false;
++    }
++}
++
+ const VSYNC_INTERVAL_THRESHOLD: Duration = Duration::from_millis(1);
+ const DEFAULT_VSYNC_INTERVAL: Duration = Duration::from_micros(16_666); // ~60Hz
+ 
+@@ -116,4 +147,22 @@ mod tests {
+ 
+         assert_eq!(provider.wait_for_vsync(), FrameRequestSource::LocalSchedule);
+     }
++
++    #[test]
++    fn the_gate_sleeps_only_while_idle_and_not_opened() {
++        let gate = VSyncGate {
++            opened: Mutex::new(false),
++            condvar: Condvar::new(),
++        };
++        gate.wait_while(|| false); // not idle: returns at once
++        gate.open();
++        gate.wait_while(|| true); // opened before the wait: returns at once
++        std::thread::scope(|scope| {
++            scope.spawn(|| {
++                std::thread::sleep(Duration::from_millis(20));
++                gate.open();
++            });
++            gate.wait_while(|| true); // idle: sleeps until opened
++        });
++    }
+ }

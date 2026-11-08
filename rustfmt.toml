@@ -1,0 +1,2 @@
+# The prototype's width: GPUI's builder chains read better on long lines.
+max_width = 120
