@@ -2,7 +2,7 @@
 
 Date 2026-11-08. Issue [#279](https://github.com/hpagniez/grace/issues/279), under [#278](https://github.com/hpagniez/grace/issues/278). Spec: the [migration guide](../specs/2026-11-08-gpui-migration.md) (Phases, R4 to R8), [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Checklist: [parity](../specs/2026-11-08-gpui-migration-parity.md), phase P0 rows.
 
-P0 builds what every later phase stands on, and ends with an empty Grace window that passes ADR 0030 on the reference machine and that Narrator reads. It lands in three PRs into `develop`, each `Part of #279`, then a by-hand check on Windows.
+P0 builds what every later phase stands on, and ends with an empty Grace window that passes ADR 0030 on the reference machine and that Narrator reads. It lands in four PRs into `develop`, each `Part of #279`, then a by-hand check on Windows.
 
 ## PR 1: the workspace, the look and CI
 
@@ -21,12 +21,15 @@ P0 builds what every later phase stands on, and ends with an empty Grace window 
 
 ## PR 2: the e2e driver and the tree check
 
-1. `crates/grace-e2e`: one `Driver` trait (find by role and name, read name, value, description and states, press, type, wait until the tree settles, read announcements), with an AT-SPI backend (Linux, `atspi` crate or the session bus) and a UI Automation backend (Windows, the `uiautomation` crate or `windows` bindings). Each crate is named with its size in the PR.
-2. The `e2e` Cargo feature of `crates/grace`: reads `GRACE_E2E_SEAMS` and answers the dialog, open-path and clipboard seams; the release build has none of it. P0 adds the seam traits and their recorder, with nothing yet behind them but the window.
-3. Windows on a screen other than the main one, as `e2e/helpers.ts` `launch()` does.
-4. The tree check (guide R8.2): walk the whole tree of every window and fail on an interactive element (button, input, checkbox, tab, tree item, link, menu item) without a name. Its first subject is a test window with every shared element.
-5. The tooltip helper (`tooltip()`, the 500 ms pause, `side`, one at a time, Escape and a click close it) and `cut`, with their tests: PU-19, PU-20, PU-21.
-6. A first e2e test: the empty window opens, is named Grace, and has its live region. CI: the AT-SPI e2e on Linux under Xvfb for PRs into `develop`; UI Automation on Windows for PRs into `main` (ADR 0017).
+1. `crates/grace-e2e`: one `Driver` trait that reads the tree as a snapshot (role, name, description, value, enabled, focusable, focused, selected, expanded, children) and presses a node; searching and waiting are plain Rust on the snapshot (`App::wait_for`, every 50 ms, never a fixed sleep). Backends: AT-SPI on Linux (`atspi` 0.29, already in the lock through GPUI's AccessKit adapter), UI Automation on Windows (`uiautomation` 0.25.1, on the `windows` 0.62 GPUI already uses). `App::launch` starts the built app with a fresh `GRACE_USER_DATA` and kills it and deletes the folder when the test ends.
+2. The `e2e` Cargo feature of `crates/grace`, never in a release: `GRACE_E2E_SCREEN=other` opens the window on a screen other than the main one, as `e2e/helpers.ts` `launch()` does; `GRACE_E2E_VIEW=elements` opens a gallery of every shared element, the tree check's first subject. The dialog, open-path and clipboard seams of the guide's Architecture come with their first caller (P2, P3): a seam with nothing behind it would be guessed, not ported.
+3. The tree check (guide R8.2): `Node::unnamed_controls` lists every button, check box, radio, entry, combo box, spin button, slider, tab, tree or list item, link and menu item without a name; a test fails on any, in the window and in the gallery.
+4. Tests: the window opens named Grace with its live region and no unnamed control; every status mark reads as its name (PU-08); icon buttons are named; the driver presses a button and the app sees it. They are `#[ignore]` in `cargo test --workspace`, since they start the app; `scripts/e2e-gpui.sh` builds with the `e2e` feature and runs them, starting Xvfb, a session bus and the AT-SPI bus launcher on a Linux without a desktop.
+5. CI: in the `rust` job, the AT-SPI e2e on Linux for every PR; the UI Automation e2e on Windows for PRs into `main` and runs by hand (ADR 0017). The step is named `e2e`, so `merge-when-green`'s back-merge check counts it.
+
+## PR 4: tooltip and cut
+
+The tooltip helper (`tooltip()`, the 500 ms pause, `side`, one at a time, shown on keyboard focus, closed by Escape and a click) and `cut`, with PU-19, PU-20 and PU-21 through the e2e driver.
 
 ## PR 3: packaging and the bench
 

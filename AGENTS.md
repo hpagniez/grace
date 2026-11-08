@@ -18,7 +18,8 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run screens:readme` | Package the app, then retake the README's screenshots in `docs/images/` |
 | `cargo run -p grace` | Run GPUI Grace, the port in `crates/` ([GPUI rules](#gpui-rules)) |
 | `cargo test --workspace` | GPUI Grace's tests: `grace-core` and the headless views |
-| `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all` | GPUI Grace's lint and format |
+| `sh scripts/e2e-gpui.sh` | GPUI Grace's end-to-end tests through the accessibility tree (`crates/grace-e2e`); on Linux it starts Xvfb and AT-SPI itself |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo fmt --all` | GPUI Grace's lint and format |
 
 Never run any two of `npm test`, `npm run e2e` and `npm run bench` at the same time. The e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes, so never run two e2e runs at once either. Nor run Karate yourself during e2e (a measurement script, the big project): its thousands of local HTTP calls make Windows refuse Playwright's connection to a starting app, and the test fails with `Process failed to launch!` ([#191](https://github.com/hpagniez/grace/issues/191)). The bench needs a quiet machine, and it and e2e both package into `out/`. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
@@ -173,7 +174,8 @@ Grace is moving to Rust and GPUI ([ADR 0031](docs/decisions/0031-move-grace-to-r
 - Icons only through `grace::assets::Icon`, the same Lucide files as Electron Grace's `lucide` version; a new icon in `src/renderer` fails `has_the_icons_of_electron_grace` until it is added to `crates/grace/assets/icons/`. GPUI Kit's own `IconName` holds only the icons its controls use.
 - Statuses only through `elements::status_mark`, buttons through `elements::button` and `icon_button` (GPUI Kit's `Button`, which brings focus, the ring and the accessible name).
 - Accessibility is set by hand: an element reaches the tree only with both `.id(...)` and `.role(...)`, then `.aria_label(...)` and its states. `div` has no live region: wrap it in `a11y::live`. On Linux the pinned AccessKit adapter drops a button's disabled state and a row's level and expanded state.
-- Headless `#[gpui::test]` windows build no accessibility tree: GPUI fills it only when an assistive technology connects. Test the tree through the e2e driver.
+- Headless `#[gpui::test]` windows build no accessibility tree: GPUI fills it only when an assistive technology connects. Test the tree through the e2e driver, `crates/grace-e2e`: find nodes by role and name, wait with `App::wait_for`, never sleep. Its tests are `#[ignore]`d in `cargo test` and run by `scripts/e2e-gpui.sh`, which builds Grace with the `e2e` feature. Test hooks live behind that feature only (`grace::e2e`); the release build has none.
+- Through AT-SPI, AccessKit's `Application` role reads as `Embedded`, and a node answers `GetRole` but not `GetRoleName`.
 - Idle ([ADR 0030](docs/decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md)): no timer, `cx.spawn` loop or `with_animation` that runs while no run is going. An animation runs only while its state lasts (a running test's mark), and not with reduced motion.
 
 ### UI conventions
