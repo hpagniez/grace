@@ -206,7 +206,7 @@ try {
   if (-not (Test-Path (Join-Path $Grace 'node_modules\electron\dist\electron.exe'))) {
     Say 'npx electron --version (downloads the Electron binary for the empty-window floor)'
     & npx electron --version
-    if ($LASTEXITCODE -ne 0) { Fail 'npx electron --version failed.' }
+    if ($LASTEXITCODE -ne 0) { Warn 'npx electron --version failed: the Electron floor is skipped.' }
   }
 } finally { Pop-Location }
 
