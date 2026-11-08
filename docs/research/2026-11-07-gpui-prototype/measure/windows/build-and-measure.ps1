@@ -154,7 +154,7 @@ if (-not $fxc -or -not $rc) {
 # Grace's own side: node_modules, the vendor folder, the packaged exe
 if (-not (Test-Path (Join-Path $Grace 'node_modules\@playwright\test'))) { Warn 'Grace has no node_modules yet: `npm install` runs below.' }
 $graceNeedsVendor = -not ((Test-Path $java) -and (Test-Path $jar))
-if ($graceNeedsVendor -and $vendorGiven) { $problems.Add("-Vendor $Vendor has no jre\bin\java.exe or karate.jar. Run `npm run vendor` in the Grace checkout, or point -Vendor at its vendor folder.") }
+if ($graceNeedsVendor -and $vendorGiven) { $problems.Add("-Vendor $Vendor has no jre\bin\java.exe or karate.jar. Run 'npm run vendor' in the Grace checkout, or point -Vendor at its vendor folder.") }
 
 # The machine itself: leftovers and power
 $left = @(Get-Process -Name 'Grace', 'grace-gpui', 'java', 'electron' -ErrorAction SilentlyContinue)
@@ -223,7 +223,7 @@ if ($SkipBuild) {
   } finally { Pop-Location }
   Say ("Built in {0:N0} s: {1} ({2:N1} MB)" -f $clock.Elapsed.TotalSeconds, $gpuiExe, ((Get-Item $gpuiExe).Length / 1e6))
 }
-if (-not (Test-Path $floorExe)) { Warn "No $floorExe: the GPUI floor is skipped."; $floorExe = $null }
+if (-not (Test-Path $floorExe)) { Warn "No ${floorExe}: the GPUI floor is skipped."; $floorExe = $null }
 
 # ---- 4. measure ----
 
