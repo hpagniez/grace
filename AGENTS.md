@@ -18,6 +18,8 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run screens:readme` | Package the app, then retake the README's screenshots in `docs/images/` |
 | `cargo run -p grace` | Run GPUI Grace, the port in `crates/` ([GPUI rules](#gpui-rules)) |
 | `cargo test --workspace` | GPUI Grace's tests: `grace-core` and the headless views |
+| `npm run package:gpui` | Build GPUI Grace in release and lay it out as the release zip (ADR 0019) in `out/gpui/`; Windows, after `npm run vendor`. Not released until phase P5 |
+| `npm run bench:gpui` | The bench on GPUI Grace: size, start, idle and `idle.wakeups.minimised` (no Playwright). `-- --a <exe>` compares it with another build, such as Electron Grace's |
 | `sh scripts/e2e-gpui.sh` | GPUI Grace's end-to-end tests through the accessibility tree (`crates/grace-e2e`); on Linux it starts Xvfb and AT-SPI itself |
 | `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo fmt --all` | GPUI Grace's lint and format |
 
@@ -176,6 +178,7 @@ Grace is moving to Rust and GPUI ([ADR 0031](docs/decisions/0031-move-grace-to-r
 - Accessibility is set by hand: an element reaches the tree only with both `.id(...)` and `.role(...)`, then `.aria_label(...)` and its states. `div` has no live region: wrap it in `a11y::live`. On Linux the pinned AccessKit adapter drops a button's disabled state and a row's level and expanded state.
 - Headless `#[gpui::test]` windows build no accessibility tree: GPUI fills it only when an assistive technology connects. Test the tree through the e2e driver, `crates/grace-e2e`: find nodes by role and name, wait with `App::wait_for`, never sleep. Its tests are `#[ignore]`d in `cargo test` and run by `scripts/e2e-gpui.sh`, which builds Grace with the `e2e` feature. Test hooks live behind that feature only (`grace::e2e`); the release build has none.
 - Through AT-SPI, AccessKit's `Application` role reads as `Embedded`, and a node answers `GetRole` but not `GetRoleName`.
+- The bench reads GPUI Grace through `grace::probe`: with `GRACE_PROBE` set it prints `PROBE <name> <unix ms>` on stderr (`bench/gpui.mjs`). It is in the release build, the one the bench measures, and costs one look at the environment when off. A new probe goes through `probe::mark`, never its own `eprintln!`.
 - Idle ([ADR 0030](docs/decisions/0030-no-wake-ups-while-hidden-and-an-idle-cpu-budget.md)): no timer, `cx.spawn` loop or `with_animation` that runs while no run is going. An animation runs only while its state lasts (a running test's mark), and not with reduced motion.
 
 ### UI conventions
