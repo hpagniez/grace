@@ -229,100 +229,58 @@ mod tests {
         }
     }
 
-    /// What `vendor.ts`, `command.ts` (`buildArgs`), `process.ts` (`spawnKarate`) and `events.ts` (`readAllEvents`)
-    /// give the two Java tests. Their ports are other modules of this phase (`karate::{command, process, events}`);
-    /// until they land the tests build the same command line by hand and run it without a shell. Swap this module for
-    /// them then. Real Java and Karate (guide R6.1): the `java` on PATH on Linux, the bundled JRE on Windows, and the
-    /// pinned `vendor/karate.jar` (`npm run vendor`).
+    /// What the two Java tests take from the other modules: the command line from `command::build_args`, the run from
+    /// `process::spawn_karate` (without a shell, in the cleaned environment, and on Linux in a UTF-8 locale, which a
+    /// path with `é` needs), and `testing`'s `vendor` and `copy_dir`. Real Java and Karate (guide R6.1): the `java` on
+    /// PATH on Linux, the bundled JRE on Windows, and the pinned `vendor/karate.jar` (`npm run vendor`).
     mod java {
         use super::*;
-        use std::process::Command;
+        use crate::karate::command::{BuildArgs, build_args};
+        use crate::karate::process::{SpawnOptions, spawn_karate};
+        use std::sync::{Arc, Mutex};
 
-        /// `STRIPPED_ENV_VARS` of `src/shared/env.ts`: they override the values the run passes.
-        const STRIPPED: [&str; 6] = [
-            "KARATE_OPTIONS",
-            "KARATE_ENV",
-            "KARATE_CONFIG_DIR",
-            "JAVA_TOOL_OPTIONS",
-            "JDK_JAVA_OPTIONS",
-            "_JAVA_OPTIONS",
-        ];
-
-        pub struct Vendor {
-            pub java: PathBuf,
-            pub jar: PathBuf,
-        }
-
-        pub fn vendor() -> Vendor {
-            // not canonicalized: on Windows that gives a `\\?\` path, which Java's classpath does not take
-            let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
-            let java = if cfg!(windows) {
-                repo.join("vendor").join("jre").join("bin").join("java.exe")
-            } else {
-                PathBuf::from("java")
-            };
-            let jar = repo.join("vendor").join("karate.jar");
-            assert!(jar.is_file(), "{} is missing: run `npm run vendor`", jar.display());
-            Vendor { java, jar }
-        }
+        pub use crate::karate::testing::{copy_dir, vendor};
 
         /// `buildArgs` for a run without tags, environment, config folder, JUnit XML or debugger, on one thread.
-        pub fn build_args(
+        pub fn build(
             jar: &Path,
-            classpath: &[&Path],
+            classpath: &[PathBuf],
             root: &Path,
             out_dir: &Path,
             arg_file: Option<&Path>,
             targets: &[String],
         ) -> Vec<String> {
-            let sep = if cfg!(windows) { ";" } else { ":" };
-            let cp: Vec<String> = std::iter::once(jar)
-                .chain(classpath.iter().copied())
-                .map(|p| p.display().to_string())
-                .collect();
-            let mut args: Vec<String> = vec![];
-            // The launcher expands `@file` only before the main class, so it goes first.
-            args.extend(arg_file.map(|f| format!("@{}", f.display())));
-            args.extend(
-                [
-                    "-Xms64m",
-                    "-Xmx2g",
-                    "-XX:+ExitOnOutOfMemoryError",
-                    "-XX:CICompilerCount=2",
-                    "-Dstdout.encoding=UTF-8",
-                    "-Dstderr.encoding=UTF-8",
-                    "-cp",
-                ]
-                .map(String::from),
-            );
-            args.push(cp.join(sep));
-            args.extend(["io.karatelabs.Main", "run", "--no-color", "--no-pom", "-w"].map(String::from));
-            args.push(root.display().to_string());
-            args.push("-o".to_string());
-            args.push(out_dir.display().to_string());
-            args.extend(["-B", "false", "-f", "html,karate:jsonl", "-T", "1"].map(String::from));
-            args.extend(targets.iter().cloned());
-            args
+            build_args(&BuildArgs {
+                jar,
+                classpath,
+                root,
+                out_dir,
+                dry_run: false,
+                tags: &[],
+                targets,
+                env: None,
+                arg_file,
+                threads: 1,
+                config_dir: None,
+                debug: None,
+                junit_xml: false,
+            })
         }
 
-        /// The exit code and every line Java printed (stdout, then stderr).
+        /// The exit code and every line Java printed.
         pub fn run(java: &Path, args: &[String], cwd: &Path) -> (Option<i32>, Vec<String>) {
-            let mut cmd = Command::new(java);
-            cmd.args(args).current_dir(cwd);
-            for name in STRIPPED {
-                cmd.env_remove(name);
-            }
-            // Windows hands Java its command line in UTF-16. On Linux Java decodes it in the locale's charset, and
-            // under `LANG=C` (a CI container) a path with `é` is "malformed input": run it in a UTF-8 locale.
-            // `karate::process` must do the same for a project folder with a non-ASCII name.
-            #[cfg(not(windows))]
-            cmd.env("LC_ALL", "C.UTF-8");
-            let out = cmd.output().expect("java could not be started");
-            let mut lines = vec![];
-            for bytes in [&out.stdout, &out.stderr] {
-                lines.extend(String::from_utf8_lossy(bytes).lines().map(String::from));
-            }
-            (out.status.code(), lines)
+            let lines = Arc::new(Mutex::new(Vec::new()));
+            let sink = Arc::clone(&lines);
+            let p = spawn_karate(
+                java,
+                args,
+                cwd,
+                move |l| sink.lock().unwrap().extend(l),
+                SpawnOptions::default(),
+            );
+            let exit = p.wait();
+            let lines = lines.lock().unwrap().clone();
+            (exit, lines)
         }
 
         /// The `<feature> <refId>` of every depth-0 `SCENARIO_EXIT` of a run's events file, sorted.
@@ -343,20 +301,6 @@ mod tests {
                 .collect();
             ran.sort();
             ran
-        }
-
-        /// `cpSync(from, to, { recursive: true })`.
-        pub fn copy_dir(from: &Path, to: &Path) {
-            fs::create_dir_all(to).unwrap();
-            for entry in fs::read_dir(from).unwrap() {
-                let entry = entry.unwrap();
-                let target = to.join(entry.file_name());
-                if entry.file_type().unwrap().is_dir() {
-                    copy_dir(&entry.path(), &target);
-                } else {
-                    fs::copy(entry.path(), target).unwrap();
-                }
-            }
         }
     }
 
@@ -383,9 +327,9 @@ mod tests {
             let arg_file = arg_dir.path().join("run-args.txt");
             write_arg_file(&arg_file, &[row("a", TRICKY), row("b", "plain")]).unwrap();
             let out_dir = tmp();
-            let args = java::build_args(
+            let args = java::build(
                 &vendor.jar,
-                &[root.path()],
+                &[root.path().to_path_buf()],
                 root.path(),
                 out_dir.path(),
                 Some(&arg_file),
@@ -409,8 +353,7 @@ mod tests {
         fn runs_exactly_the_targets_of_the_file_in_paths_with_a_space_and_e_acute() {
             let vendor = java::vendor();
             let root = tempfile::Builder::new().prefix("kk hist é-").tempdir().unwrap();
-            let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/fixtures/projects/edge");
-            java::copy_dir(&fixture, root.path());
+            java::copy_dir(&crate::karate::testing::fixture("edge"), root.path());
             fs::write(
                 root.path().join("tests").join("second.feature"),
                 ["Feature: second", "", "Scenario: only one", "* match 1 == 1", ""].join("\n"),
@@ -429,9 +372,9 @@ mod tests {
             )
             .unwrap();
             let out_dir = tmp();
-            let args = java::build_args(
+            let args = java::build(
                 &vendor.jar,
-                &[root.path()],
+                &[root.path().to_path_buf()],
                 root.path(),
                 out_dir.path(),
                 None,
