@@ -15,6 +15,7 @@ pub mod home;
 pub mod instance;
 pub mod probe;
 pub mod progress;
+pub mod properties;
 pub mod seams;
 pub mod status_bar;
 #[cfg(test)]

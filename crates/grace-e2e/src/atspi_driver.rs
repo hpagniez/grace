@@ -235,7 +235,8 @@ impl Driver for AtspiDriver {
     fn type_text(&self, text: &str) -> Result<()> {
         let window = self.x_window()?;
         xdotool(&["windowfocus", "--sync", &window])?;
-        xdotool(&["type", "--delay", "20", text])
+        // "--" ends the options, so a text that starts with "-" is typed, not read as one
+        xdotool(&["type", "--delay", "20", "--", text])
     }
 
     fn close(&self) -> Result<()> {

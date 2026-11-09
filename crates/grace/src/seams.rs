@@ -14,6 +14,8 @@ pub type Answer<T> = Pin<Box<dyn Future<Output = T>>>;
 pub trait Seams: 'static {
     /// Asks for a folder, starting in `start` when given (Open…, #82). `None` when the person cancels.
     fn pick_folder(&self, start: Option<PathBuf>, cx: &mut AsyncApp) -> Answer<Option<PathBuf>>;
+    /// Asks for a `.properties` file to import (Import from file…). `None` when the person cancels.
+    fn pick_file(&self, cx: &mut AsyncApp) -> Answer<Option<PathBuf>>;
     /// Opens a file with the program the system gives its type, as Electron's `shell.openPath`: the HTML report in
     /// the default browser (Report).
     fn open_path(&self, path: &std::path::Path, cx: &mut gpui::App);
@@ -30,6 +32,25 @@ impl Seams for Platform {
     #[cfg(windows)]
     fn pick_folder(&self, start: Option<PathBuf>, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
         windows_dialog::pick_folder(start)
+    }
+
+    #[cfg(windows)]
+    fn pick_file(&self, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+        windows_dialog::pick_file()
+    }
+
+    // GPUI's portal dialog, which has no filter by type: on Linux, which is not released (guide R5), every file shows.
+    #[cfg(not(windows))]
+    fn pick_file(&self, cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+        let picked = cx.update(|cx| {
+            cx.prompt_for_paths(gpui::PathPromptOptions {
+                files: true,
+                directories: false,
+                multiple: false,
+                prompt: None,
+            })
+        });
+        Box::pin(async move { picked.await.ok()?.ok()?.and_then(|mut paths| paths.pop()) })
     }
 
     // GPUI's portal dialog: it cannot start in a given folder, so on Linux, which is not released (guide R5), it
@@ -50,8 +71,9 @@ impl Seams for Platform {
 
 #[cfg(windows)]
 mod windows_dialog {
-    //! The Shell's folder dialog with a starting folder, which GPUI's `prompt_for_paths` cannot give (#82, HS-12). It
-    //! runs on a thread of its own, owned by Grace's window, so the window stays drawn while it is open.
+    //! The Shell's folder dialog with a starting folder, which GPUI's `prompt_for_paths` cannot give (#82, HS-12), and
+    //! its file dialog with Electron Grace's title and filters. Each runs on a thread of its own, owned by Grace's
+    //! window, so the window stays drawn while it is open.
     use super::Answer;
     use std::path::PathBuf;
     use windows::Win32::Foundation::{ERROR_CANCELLED, HWND};
@@ -61,34 +83,68 @@ mod windows_dialog {
     };
     use windows::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
     use windows::Win32::UI::Shell::{
-        FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, FileOpenDialog, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName,
-        SIGDN_FILESYSPATH,
+        Common::COMDLG_FILTERSPEC, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, FileOpenDialog,
+        IFileOpenDialog, IShellItem, SHCreateItemFromParsingName, SIGDN_FILESYSPATH,
     };
-    use windows::core::{HRESULT, HSTRING};
+    use windows::core::{HRESULT, HSTRING, w};
+
+    /// What the dialog picks.
+    enum Pick {
+        /// A folder, starting in the one given.
+        Folder(Option<PathBuf>),
+        /// A file to import, as Electron Grace's `importProperties` asked: `.properties` files, or all files.
+        PropertiesFile,
+    }
 
     pub fn pick_folder(start: Option<PathBuf>) -> Answer<Option<PathBuf>> {
+        on_a_thread(Pick::Folder(start))
+    }
+
+    pub fn pick_file() -> Answer<Option<PathBuf>> {
+        on_a_thread(Pick::PropertiesFile)
+    }
+
+    fn on_a_thread(pick: Pick) -> Answer<Option<PathBuf>> {
         // Called on the UI thread: its active window is Grace's, the dialog's owner.
         let owner = unsafe { GetActiveWindow() }.0 as isize;
         let (tx, rx) = async_channel::bounded(1);
         std::thread::spawn(move || {
-            let _ = tx.send_blocking(show(start, HWND(owner as _)));
+            let _ = tx.send_blocking(show(pick, HWND(owner as _)));
         });
         Box::pin(async move { rx.recv().await.ok().flatten() })
     }
 
-    fn show(start: Option<PathBuf>, owner: HWND) -> Option<PathBuf> {
+    fn show(pick: Pick, owner: HWND) -> Option<PathBuf> {
         unsafe {
             CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
                 .ok()
                 .ok()?;
             let picked = (|| -> windows::core::Result<Option<PathBuf>> {
                 let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
-                dialog.SetOptions(dialog.GetOptions()? | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM)?;
-                if let Some(start) = start {
-                    let item: windows::core::Result<IShellItem> =
-                        SHCreateItemFromParsingName(&HSTRING::from(start.as_os_str()), None);
-                    if let Ok(item) = item {
-                        dialog.SetFolder(&item)?;
+                match pick {
+                    Pick::Folder(start) => {
+                        dialog.SetOptions(dialog.GetOptions()? | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM)?;
+                        if let Some(start) = start {
+                            let item: windows::core::Result<IShellItem> =
+                                SHCreateItemFromParsingName(&HSTRING::from(start.as_os_str()), None);
+                            if let Ok(item) = item {
+                                dialog.SetFolder(&item)?;
+                            }
+                        }
+                    }
+                    Pick::PropertiesFile => {
+                        dialog.SetOptions(dialog.GetOptions()? | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM)?;
+                        dialog.SetTitle(w!("Import properties"))?;
+                        dialog.SetFileTypes(&[
+                            COMDLG_FILTERSPEC {
+                                pszName: w!("Properties files"),
+                                pszSpec: w!("*.properties"),
+                            },
+                            COMDLG_FILTERSPEC {
+                                pszName: w!("All files"),
+                                pszSpec: w!("*.*"),
+                            },
+                        ])?;
                     }
                 }
                 let owner = (!owner.0.is_null()).then_some(owner);
@@ -118,6 +174,8 @@ pub mod fake {
     #[derive(Default)]
     pub struct FakeSeams {
         answer: Option<PathBuf>,
+        /// The file Import from file… picks.
+        pub file: Mutex<Option<PathBuf>>,
         asked: Mutex<Vec<Option<PathBuf>>>,
         opened: Mutex<Vec<PathBuf>>,
     }
@@ -126,6 +184,7 @@ pub mod fake {
         pub fn answering(folder: Option<&str>) -> Self {
             Self {
                 answer: folder.map(PathBuf::from),
+                file: Mutex::default(),
                 asked: Mutex::default(),
                 opened: Mutex::default(),
             }
@@ -142,6 +201,10 @@ pub mod fake {
         fn pick_folder(&self, start: Option<PathBuf>, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
             self.asked.lock().unwrap().push(start);
             let answer = self.answer.clone();
+            Box::pin(async move { answer })
+        }
+        fn pick_file(&self, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+            let answer = self.file.lock().unwrap().clone();
             Box::pin(async move { answer })
         }
         fn open_path(&self, path: &std::path::Path, _cx: &mut gpui::App) {

@@ -52,4 +52,5 @@ e2e = []
 serde_json = "1.0.154"
 
 [dev-dependencies]
+tempfile = "3.27.0"
 gpui = { workspace = true, features = ["test-support"] }

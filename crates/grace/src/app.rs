@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Task};
+use grace_core::model::env::{ImportResult, PropertiesEdit};
 use grace_core::model::events::AppEvent;
 use grace_core::model::tags::FilterState;
 use grace_core::runner::Runner;
@@ -44,6 +45,8 @@ pub trait Backend: Send + Sync + 'static {
     fn set_env(&self, name: Option<&str>) -> std::io::Result<()>;
     /// Sets the open project's thread count as the box holds it; the runner checks it and sends the count in force.
     fn set_threads(&self, n: &serde_json::Value);
+    /// Applies the Properties dialog's edit; true once applied, false after a notice if refused.
+    fn save_properties(&self, edit: &PropertiesEdit) -> bool;
     /// The last run's HTML report, if it is there.
     fn report_path(&self) -> Option<PathBuf>;
 }
@@ -90,6 +93,9 @@ impl Backend for Runner {
     }
     fn set_threads(&self, n: &serde_json::Value) {
         Runner::set_threads(self, n)
+    }
+    fn save_properties(&self, edit: &PropertiesEdit) -> bool {
+        Runner::save_properties(self, edit)
     }
     fn report_path(&self) -> Option<PathBuf> {
         Runner::report_path(self)
@@ -361,6 +367,28 @@ impl Grace {
         });
     }
 
+    /// The Properties dialog's Save: the answer comes once the runner has applied the edit, or refused it.
+    pub fn save_properties(&mut self, edit: PropertiesEdit, cx: &mut Context<Self>) -> async_channel::Receiver<bool> {
+        let (tx, rx) = async_channel::bounded(1);
+        self.background(cx, Order::End, move |b| {
+            let _ = tx.try_send(b.save_properties(&edit));
+            Ok(())
+        });
+        rx
+    }
+
+    /// Import from file…: asks for a file, then reads its keys off the UI thread. `None` when no file was picked.
+    pub fn import_properties(&mut self, cx: &mut Context<Self>) -> Task<Option<ImportResult>> {
+        let seams = Arc::clone(&self.seams);
+        cx.spawn(async move |_, cx| {
+            let file = seams.pick_file(cx).await?;
+            Some(
+                cx.background_spawn(async move { grace_core::properties_file::read_properties_file(&file) })
+                    .await,
+            )
+        })
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.at_once(cx, |b| {
             b.cancel();
@@ -425,6 +453,10 @@ pub mod fake {
     #[derive(Default)]
     pub struct FakeBackend {
         pub calls: Mutex<Vec<String>>,
+        /// Each edit Save sent.
+        pub edits: Mutex<Vec<PropertiesEdit>>,
+        /// Answers Save with false, as the runner does after a notice.
+        pub refuse_save: std::sync::atomic::AtomicBool,
     }
 
     impl FakeBackend {
@@ -485,6 +517,11 @@ pub mod fake {
         }
         fn set_threads(&self, n: &serde_json::Value) {
             self.record(format!("set_threads {n}"));
+        }
+        fn save_properties(&self, edit: &PropertiesEdit) -> bool {
+            self.record("save_properties".into());
+            self.edits.lock().unwrap().push(edit.clone());
+            !self.refuse_save.load(std::sync::atomic::Ordering::SeqCst)
         }
         fn report_path(&self) -> Option<PathBuf> {
             self.record("report_path".into());

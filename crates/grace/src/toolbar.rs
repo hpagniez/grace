@@ -1,11 +1,10 @@
 //! `Toolbar.tsx`: the row above the sheet (toolbar spec, premium UI R13.1). Home, the project's name and layout,
-//! Refresh, Open…, Report, Re-run failed with its count, Cancel and Run all, in that order, Run all last and the only
-//! primary button. Below 1280 px the labels of Open…, Report, Re-run failed and Cancel go from sight, not from the
-//! buttons' names, and say themselves in a tooltip instead (`narrow.ts`).
+//! Env, Threads, Properties…, Refresh, Open…, Report, Re-run failed with its count, Cancel and Run all, in that order,
+//! Run all last and the only primary button. Below 1280 px the labels of Properties…, Open…, Report, Re-run failed and
+//! Cancel go from sight, not from the buttons' names, and say themselves in a tooltip instead (`narrow.ts`).
 //!
-//! The environment and threads boxes are `env_picker`'s and `threads_box`'s; Properties joins in P2's fourth PR; the
-//! Watch toggle and the step debugger's
-//! buttons with the runner's watch and debug runs in phase P4 (P2 plan).
+//! The environment and threads boxes are `env_picker`'s and `threads_box`'s, the Properties dialog `properties`'; the
+//! Watch toggle and the step debugger's buttons come with the runner's watch and debug runs in phase P4 (P2 plan).
 use gpui::accesskit::Role;
 use gpui::{
     AnyElement, App, Entity, ImageSource, InteractiveElement as _, IntoElement, ParentElement, Resource, SharedString,
@@ -69,6 +68,8 @@ pub struct Actions {
     pub rerun_failed: bool,
     pub cancel: bool,
     pub run_all: bool,
+    /// Properties…: a project is open and nothing runs.
+    pub properties: bool,
     /// The newest run's failed tests; the pill shows only above 0.
     pub failed: u32,
 }
@@ -89,6 +90,7 @@ pub fn actions(state: &AppState) -> Actions {
         rerun_failed: !busy && failed > 0,
         cancel: busy,
         run_all: !busy && can_run,
+        properties: !busy && state.env.is_some(),
         failed,
     }
 }
@@ -189,9 +191,25 @@ pub fn render(
         });
 
     let g = grace.clone();
-    let open = labelled("open-button", Icon::FolderOpen, OPEN, a.open, narrow, None, move |cx| {
-        g.update(cx, |g, cx| g.open_project(cx))
-    });
+    let properties = labelled(
+        "properties-button",
+        Icon::SlidersHorizontal,
+        crate::properties::LABEL,
+        a.properties,
+        narrow,
+        None,
+        move |window, cx| crate::properties::open(&g, window, cx),
+    );
+    let g = grace.clone();
+    let open = labelled(
+        "open-button",
+        Icon::FolderOpen,
+        OPEN,
+        a.open,
+        narrow,
+        None,
+        move |_, cx| g.update(cx, |g, cx| g.open_project(cx)),
+    );
     let g = grace.clone();
     let report = labelled(
         "report-button",
@@ -200,7 +218,7 @@ pub fn render(
         a.report,
         narrow,
         None,
-        move |cx| g.update(cx, |g, cx| g.open_report(cx)),
+        move |_, cx| g.update(cx, |g, cx| g.open_report(cx)),
     );
     let g = grace.clone();
     let pill = (a.failed > 0).then(|| count_pill(a.failed, cx));
@@ -211,7 +229,7 @@ pub fn render(
         a.rerun_failed,
         narrow,
         pill,
-        move |cx| g.update(cx, |g, cx| g.rerun_failed(cx)),
+        move |_, cx| g.update(cx, |g, cx| g.rerun_failed(cx)),
     );
     let g = grace.clone();
     let cancel = labelled(
@@ -221,7 +239,7 @@ pub fn render(
         a.cancel,
         narrow,
         None,
-        move |cx| g.update(cx, |g, cx| g.cancel(cx)),
+        move |_, cx| g.update(cx, |g, cx| g.cancel(cx)),
     );
     let g = grace.clone();
     let run_all = div().debug_selector(|| "run-all-button".into()).child(
@@ -244,6 +262,7 @@ pub fn render(
         .child(div().debug_selector(|| "home-button".into()).child(home))
         .child(project)
         .children(boxes)
+        .child(properties)
         .child(divider("divider-actions", cx))
         .child(div().debug_selector(|| "refresh-button".into()).child(refresh))
         .child(open)
@@ -294,7 +313,7 @@ fn labelled(
     enabled: bool,
     narrow: bool,
     extra: Option<AnyElement>,
-    press: impl Fn(&mut App) + 'static,
+    press: impl Fn(&mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     let tip = narrow.then(|| SharedString::from(label));
     let wrapped = tooltip(SharedString::from(format!("tip-{id}")), tip).focusable(move |f| {
@@ -319,7 +338,7 @@ fn labelled(
         b.track_focus(f)
             .disabled(!enabled)
             .children(extra)
-            .on_click(move |_, _, cx| press(cx))
+            .on_click(move |_, window, cx| press(window, cx))
     });
     div().debug_selector(move || id.into()).child(wrapped)
 }

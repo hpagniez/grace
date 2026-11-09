@@ -365,3 +365,34 @@ mod the_actions {
         assert!(!actions(&no_tree).run_all);
     }
 }
+
+mod properties {
+    use super::*;
+
+    /// `PropertiesDialog.test.tsx`: the Properties button is disabled with no project, while busy and while running.
+    #[test]
+    fn is_off_with_no_environment_view_while_busy_and_while_running() {
+        let mut s = idle();
+        assert!(!actions(&s).properties, "no environment view yet");
+        s.env = Some(grace_core::model::env::EnvView {
+            env: None,
+            suggestions: vec![],
+            overlays: vec![],
+            properties: Default::default(),
+            secrets_available: true,
+        });
+        assert!(actions(&s).properties);
+        s.busy = true;
+        assert!(!actions(&s).properties);
+        s.busy = false;
+        s.run.active = true;
+        assert!(!actions(&s).properties);
+    }
+
+    #[gpui::test]
+    fn sits_after_the_boxes_and_before_refresh(cx: &mut TestAppContext) {
+        let (_, mut cx) = toolbar(cx, WIDE, idle());
+        assert!(at(&mut cx, "project").origin.x < at(&mut cx, "properties-button").origin.x);
+        assert!(at(&mut cx, "properties-button").origin.x < at(&mut cx, "refresh-button").origin.x);
+    }
+}
