@@ -51,8 +51,10 @@ pub struct Harness {
 
 impl Harness {
     /// Puts `state` in place of the runner's, as the Electron tests rendered a view on a state.
-    pub fn set(&self, cx: &mut VisualTestContext, state: AppState) {
+    pub fn set(&self, cx: &mut VisualTestContext, mut state: AppState) {
         self.grace.update(cx, |g, cx| {
+            // as a `project` event does: a view that builds on the tree sees a new one
+            state.trees = g.state.trees + 1;
             *g.state_mut() = state;
             cx.notify();
         });

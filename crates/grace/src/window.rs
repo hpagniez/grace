@@ -45,6 +45,8 @@ pub struct GraceWindow {
     save: Option<Task<()>>,
     /// The progress section, which keeps the run's clock.
     progress: Option<Entity<crate::progress::Progress>>,
+    /// The tree, which keeps the rows a person opened and closed.
+    pub tree: Option<Entity<crate::tree::Tree>>,
     _motion: Option<gpui::Subscription>,
 }
 
@@ -59,6 +61,7 @@ impl GraceWindow {
             painted: false,
             save: None,
             progress: None,
+            tree: None,
             _motion: None,
         }
     }
@@ -78,6 +81,7 @@ impl GraceWindow {
         .detach();
         let mut me = Self::new(cx);
         me.progress = Some(cx.new(|cx| crate::progress::Progress::new(grace.clone(), cx)));
+        me.tree = Some(cx.new(|cx| crate::tree::Tree::new(grace.clone(), cx)));
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
@@ -142,7 +146,7 @@ impl Render for GraceWindow {
                 crate::home::render(&grace, &state, shown, &self.open_focus, window, cx).into_any_element()
             } else {
                 let toolbar = crate::toolbar::render(&grace, &state, window, cx).into_any_element();
-                project_view(toolbar, self.progress.clone(), shown, cx).into_any_element()
+                project_view(toolbar, self.progress.clone(), self.tree.clone(), shown, cx).into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -178,11 +182,13 @@ impl Render for GraceWindow {
     }
 }
 
-/// The project view: the toolbar, then the sheet (spec R3.3) with the progress section and the notice. P2's later PRs
-/// fill the rest of the sheet: the tree, the details and the bottom panel (P2 plan).
+/// The project view: the toolbar, then the sheet (spec R3.3) with the progress section, the notice, then the tree on
+/// the left half. P2's later PRs fill the rest of the sheet: the details on the right half and the bottom panel (P2
+/// plan).
 fn project_view(
     toolbar: gpui::AnyElement,
     progress: Option<Entity<crate::progress::Progress>>,
+    tree: Option<Entity<crate::tree::Tree>>,
     shown: Option<gpui::AnyElement>,
     cx: &App,
 ) -> impl IntoElement {
@@ -212,7 +218,16 @@ fn project_view(
                 .border_color(Theme::color(t.line))
                 .bg(Theme::color(t.surface))
                 .children(progress)
-                .children(shown.map(|n| div().px_3().py_2().child(n))),
+                .children(shown.map(|n| div().px_3().py_2().child(n)))
+                .child(
+                    div()
+                        .debug_selector(|| "main".into())
+                        .flex()
+                        .flex_1()
+                        .min_h(px(120.))
+                        .child(div().flex().flex_col().w_1_2().min_h_0().children(tree))
+                        .child(div().w_1_2()),
+                ),
         )
 }
 
