@@ -395,6 +395,22 @@ pub fn save_panel_height(data_dir: &Path, h: f32) -> io::Result<()> {
     })
 }
 
+/// The saved order of the bottom panel's tabs (`panelTabs`); the default when none is saved, it is not the three tabs
+/// once each, or the file cannot be read.
+pub fn load_tab_order(data_dir: &Path) -> [crate::panel_tabs::TabId; 3] {
+    crate::panel_tabs::parse_tab_order(read(data_dir).ok().as_ref().and_then(|s| s.get("panelTabs")))
+}
+
+/// An order that cannot be saved is only forgotten: the caller drops the error.
+pub fn save_tab_order(data_dir: &Path, order: &[crate::panel_tabs::TabId; 3]) -> io::Result<()> {
+    update(data_dir, |s| {
+        s.insert(
+            "panelTabs".into(),
+            order.iter().map(|t| t.name()).collect::<Vec<_>>().into(),
+        );
+    })
+}
+
 // ----- a project's entry -----
 
 /// A saved property: a plain value, or a secret as base64 ciphertext.
@@ -1773,6 +1789,29 @@ mod tests {
             save_panel_height(data.path(), 300.4).unwrap();
             let saved: Value = serde_json::from_str(&fs::read_to_string(settings_file(&data)).unwrap()).unwrap();
             assert_eq!(saved, json!({ "lastProject": "D:\\x", "panelHeight": 300 }));
+        }
+    }
+
+    mod panel_tabs {
+        use super::*;
+        use crate::panel_tabs::TabId::{Console, History, Http};
+
+        #[test]
+        fn save_then_load_returns_the_order_as_a_json_list() {
+            let data = tmp();
+            assert_eq!(load_tab_order(data.path()), [Console, History, Http]);
+            save_tab_order(data.path(), &[History, Http, Console]).unwrap();
+            assert_eq!(load_tab_order(data.path()), [History, Http, Console]);
+            let saved: Value = serde_json::from_str(&fs::read_to_string(settings_file(&data)).unwrap()).unwrap();
+            assert_eq!(saved, json!({ "panelTabs": ["history", "http", "console"] }));
+        }
+
+        #[test]
+        fn falls_back_to_the_default_when_the_file_cannot_be_read() {
+            let data = tmp();
+            save_tab_order(data.path(), &[History, Http, Console]).unwrap();
+            let _busy = hooks::reads_fail(ErrorKind::ResourceBusy);
+            assert_eq!(load_tab_order(data.path()), [Console, History, Http]);
         }
     }
 

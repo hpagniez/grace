@@ -11,6 +11,7 @@ pub mod karate;
 pub mod mask;
 pub mod model;
 pub mod panel_height;
+pub mod panel_tabs;
 pub mod paths;
 pub mod properties_file;
 pub mod recent;
