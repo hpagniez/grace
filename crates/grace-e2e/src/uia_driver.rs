@@ -3,6 +3,7 @@
 use uiautomation::inputs::{Keyboard, Mouse};
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
+    UITogglePattern,
 };
 use uiautomation::types::{ControlType, ExpandCollapseState, Point};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
@@ -151,10 +152,20 @@ impl Driver for UiaDriver {
                 .nth(i)
                 .ok_or_else(|| format!("{:?} is gone", node.path))?;
         }
-        let invoke = at
-            .get_pattern::<UIInvokePattern>()
+        // as a click would: AccessKit gives Invoke to a button, Toggle to a check box, and neither to a button that
+        // opens something (ExpandCollapse) or to a tree item; those take a click of the pointer on their centre
+        if let Ok(invoke) = at.get_pattern::<UIInvokePattern>() {
+            return invoke.invoke().map_err(err);
+        }
+        if let Ok(toggle) = at.get_pattern::<UITogglePattern>() {
+            return toggle.toggle().map_err(err);
+        }
+        self.to_foreground()?;
+        let r = at
+            .get_bounding_rectangle()
             .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
-        invoke.invoke().map_err(err)
+        let centre = Point::new(r.get_left() + r.get_width() / 2, r.get_top() + r.get_height() / 2);
+        Mouse::new().click(&centre).map_err(err)
     }
 
     fn hover(&self, node: &Node) -> Result<()> {
