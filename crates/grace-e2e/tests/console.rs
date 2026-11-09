@@ -106,7 +106,12 @@ fn one_feature(text: &str) -> std::path::PathBuf {
 }
 
 fn open_dir(dir: &std::path::Path) -> App {
-    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    // the keys Grace takes go to stderr, for a key that seems lost on CI
+    let app = App::launch_with_settings(
+        &json!({ "lastProject": dir.to_string_lossy() }),
+        &[("GRACE_E2E_KEYS", "1")],
+    )
+    .unwrap();
     app.wait_for("the tests found", WAIT, |t| starting(t, "tests ").is_some())
         .unwrap();
     app

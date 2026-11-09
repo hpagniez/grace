@@ -40,6 +40,8 @@ pub fn init(cx: &mut App) {
     a11y::bind_keys(cx);
     console::bind_keys(cx);
     theme::apply(false, None, cx);
+    #[cfg(feature = "e2e")]
+    e2e::log_keys(cx);
 }
 
 /// Where the bundled Java and Karate are: `resources` beside `Grace.exe` in the release zip (ADR 0019), else the
