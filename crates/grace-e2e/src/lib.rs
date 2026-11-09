@@ -197,6 +197,10 @@ pub trait Driver {
     /// Asks the window to close, as its close button does: Grace then saves, stops a run and quits (Playwright's
     /// `app.close()`).
     fn close(&self) -> Result<()>;
+    /// Where the system says the keyboard focus is, for a failure's message: the element and the foreground window.
+    fn focus_report(&self) -> String {
+        String::new()
+    }
 }
 
 /// The built `Grace` binary: `GRACE_EXE` when set, else the workspace's debug build.
@@ -381,6 +385,11 @@ impl App {
         self.driver.tree()
     }
 
+    /// Where the system says the keyboard focus is (Windows only), for a failure's message.
+    pub fn focus_report(&self) -> String {
+        self.driver.focus_report()
+    }
+
     /// Waits until the tree satisfies `ok`, reading it every 50 ms, up to `timeout`; returns that tree.
     pub fn wait_for(&self, what: &str, timeout: Duration, ok: impl Fn(&Node) -> bool) -> Result<Node> {
         let start = Instant::now();
@@ -463,7 +472,8 @@ impl App {
                     .iter()
                     .any(|n| n.role == role && n.name == name && n.states.focused)
             },
-        )?;
+        )
+        .map_err(|e| format!("{e}\n{}", self.focus_report()))?;
         self.key(Key::SelectAll)?;
         self.key(Key::Backspace)?;
         if text.is_empty() { Ok(()) } else { self.type_text(text) }

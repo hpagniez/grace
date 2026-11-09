@@ -235,6 +235,26 @@ impl Driver for UiaDriver {
     }
 
     /// The window pattern's Close: `WM_CLOSE`, as the title bar's button sends.
+    fn focus_report(&self) -> String {
+        let describe = |e: &UIElement| {
+            format!(
+                "{:?} {:?} pid {:?} framework {:?}",
+                e.get_control_type().ok(),
+                e.get_name().ok(),
+                e.get_process_id().ok(),
+                e.get_framework_id().ok()
+            )
+        };
+        let focused = self.automation.get_focused_element().map(|f| {
+            let is_window = self
+                .window()
+                .ok()
+                .and_then(|w| self.automation.compare_elements(&w, &f).ok());
+            format!("{}, the window itself: {is_window:?}", describe(&f))
+        });
+        format!("UI Automation's focus: {focused:?} (our pid {})", self.pid)
+    }
+
     fn close(&self) -> Result<()> {
         self.window()?
             .get_pattern::<uiautomation::patterns::UIWindowPattern>()

@@ -39,7 +39,8 @@ fn tab_to(app: &App, role: Role, name: &str) {
         });
     }
     panic!(
-        "Tab never reached {role:?} {name:?}; the focus went {seen:?}\n{}",
+        "Tab never reached {role:?} {name:?}; the focus went {seen:?}\n{}\n{}",
+        app.focus_report(),
         app.tree().map(|t| t.dump()).unwrap_or_default()
     );
 }
