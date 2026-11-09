@@ -19,10 +19,21 @@ serde_json = { version = "1.0.154", features = ["preserve_order"] }
 # The project fingerprint (fingerprint.rs). The version GPUI Kit's rust-embed links; the other one is Linux-only.
 sha2 = "=0.11.1"
 
-# DPAPI for the current user: Windows' side of the secret box (secrets.rs, migration guide R5.3). The version GPUI's
-# Windows backend links, so the exe gains no second copy.
+# Windows' side of the platform seams (migration guide R5.3): DPAPI for the current user (secrets.rs); the job object,
+# the priority class and a process's executable (karate/process.rs). The version GPUI's Windows backend links, so the
+# exe gains no second copy.
 [target.'cfg(windows)'.dependencies]
-windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+windows = { version = "=0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_Security_Cryptography",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
+# Linux's side of karate/process.rs: `setpriority` (nice 10) and `kill` of a process group, which std has no call for.
+# The version already in the lock through GPUI: no new crate.
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.191"
 
 [dev-dependencies]
 tempfile = "3.27.0"
