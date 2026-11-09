@@ -5,7 +5,7 @@ use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
     UITogglePattern, UIValuePattern,
 };
-use uiautomation::types::{ControlType, ExpandCollapseState, Point};
+use uiautomation::types::{ControlType, ExpandCollapseState, Point, ToggleState};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
@@ -98,6 +98,14 @@ impl UiaDriver {
             .get_pattern::<UISelectionItemPattern>()
             .ok()
             .and_then(|p| p.is_selected().ok());
+        // a check box toggles; a radio button is a selection item that is selected when it is on
+        let toggled = e
+            .get_pattern::<UITogglePattern>()
+            .ok()
+            .and_then(|p| p.get_toggle_state().ok())
+            .is_some_and(|t| t == ToggleState::On);
+        let checked =
+            toggled || (matches!(e.get_control_type(), Ok(ControlType::RadioButton)) && selected.unwrap_or(false));
         let expanded = e
             .get_pattern::<UIExpandCollapsePattern>()
             .ok()
@@ -152,6 +160,7 @@ impl UiaDriver {
                 focusable: e.is_keyboard_focusable().unwrap_or(false),
                 focused: e.has_keyboard_focus().unwrap_or(false),
                 selected: selected.unwrap_or(false),
+                checked,
                 expanded,
             },
             rect,

@@ -125,6 +125,7 @@ impl AtspiDriver {
                 focusable: state.contains(State::Focusable),
                 focused: state.contains(State::Focused),
                 selected: state.contains(State::Selected),
+                checked: state.contains(State::Checked),
                 expanded: state
                     .contains(State::Expandable)
                     .then(|| state.contains(State::Expanded)),
