@@ -198,9 +198,10 @@ impl Driver for AtspiDriver {
 }
 
 /// `WM_DELETE_WINDOW`, what a window manager sends when the close button is pressed. `xdotool windowclose` would
-/// destroy the window instead, which the app never hears of.
+/// destroy the window instead, which the app never hears of. The request is checked, a round trip, before the
+/// connection closes: a connection closed right after its last request could lose it, and Grace then never heard
+/// of the close (about one run in six under Xvfb).
 fn ask_to_close(window: u32) -> Result<()> {
-    use x11rb::connection::Connection as _;
     use x11rb::protocol::xproto::{ClientMessageEvent, ConnectionExt as _, EventMask};
     let (conn, _) = x11rb::connect(None).map_err(err)?;
     let atom =
@@ -208,9 +209,9 @@ fn ask_to_close(window: u32) -> Result<()> {
     let (protocols, delete) = (atom(b"WM_PROTOCOLS")?, atom(b"WM_DELETE_WINDOW")?);
     let event = ClientMessageEvent::new(32, window, protocols, [delete, x11rb::CURRENT_TIME, 0, 0, 0]);
     conn.send_event(false, window, EventMask::NO_EVENT, event)
-        .map_err(err)?;
-    conn.flush().map_err(err)?;
-    Ok(())
+        .map_err(err)?
+        .check()
+        .map_err(err)
 }
 
 fn xdotool(args: &[&str]) -> Result<()> {
