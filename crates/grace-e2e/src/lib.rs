@@ -312,8 +312,24 @@ impl App {
 
     /// Answers the next folder dialogs with `folder` (the app's `e2e` seams, `GRACE_E2E_SEAMS`).
     pub fn answer_folder(&self, folder: Option<&Path>) -> Result<()> {
-        let answer = serde_json::json!({ "folder": folder });
-        std::fs::write(seams_file(&self.data), answer.to_string()).map_err(|e| e.to_string())
+        self.answer("folder", folder)
+    }
+
+    /// Answers the next file dialogs, Import from file…'s, with `file`.
+    pub fn answer_file(&self, file: Option<&Path>) -> Result<()> {
+        self.answer("file", file)
+    }
+
+    /// Sets one seam's answer and keeps the others'.
+    fn answer(&self, seam: &str, path: Option<&Path>) -> Result<()> {
+        let file = seams_file(&self.data);
+        let mut answers = std::fs::read_to_string(&file)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .filter(|v| v.is_object())
+            .unwrap_or_else(|| serde_json::json!({}));
+        answers[seam] = serde_json::json!(path);
+        std::fs::write(file, answers.to_string()).map_err(|e| e.to_string())
     }
 
     /// Where each folder dialog started, in order (`e2e-seams.jsonl`).
@@ -341,7 +357,12 @@ impl App {
     /// The Java processes this Grace started: their command line holds its data folder, where a run's output and
     /// argument file go (`ourJavaPids` of `e2e/helpers.ts`, which looked for the bundled JRE).
     pub fn java_pids(&self) -> Vec<u32> {
-        java_pids_under(&self.data)
+        java_under(&self.data).into_iter().map(|(pid, _)| pid).collect()
+    }
+
+    /// The command lines of the Java processes this Grace started (`ourJavaCommandLines` of `e2e/helpers.ts`).
+    pub fn java_command_lines(&self) -> Vec<String> {
+        java_under(&self.data).into_iter().map(|(_, cmd)| cmd).collect()
     }
 
     /// Asks the window to close, as its close button does.
@@ -504,7 +525,7 @@ impl Drop for App {
 
 /// Java processes whose command line names `dir`.
 #[cfg(target_os = "linux")]
-fn java_pids_under(dir: &Path) -> Vec<u32> {
+fn java_under(dir: &Path) -> Vec<(u32, String)> {
     let dir = dir.to_string_lossy();
     let Ok(procs) = std::fs::read_dir("/proc") else {
         return Vec::new();
@@ -516,13 +537,13 @@ fn java_pids_under(dir: &Path) -> Vec<u32> {
             let cmd = std::fs::read(p.path().join("cmdline")).ok()?;
             let cmd = String::from_utf8_lossy(&cmd).replace('\0', " ");
             let first = cmd.split(' ').next()?;
-            (first.ends_with("java") && cmd.contains(dir.as_ref())).then_some(pid)
+            (first.ends_with("java") && cmd.contains(dir.as_ref())).then_some((pid, cmd))
         })
         .collect()
 }
 
 #[cfg(windows)]
-fn java_pids_under(dir: &Path) -> Vec<u32> {
+fn java_under(dir: &Path) -> Vec<(u32, String)> {
     let script = "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }";
     let Ok(out) = Command::new("powershell")
         .args(["-NoProfile", "-Command", script])
@@ -534,7 +555,10 @@ fn java_pids_under(dir: &Path) -> Vec<u32> {
     String::from_utf8_lossy(&out.stdout)
         .lines()
         .filter(|l| l.to_lowercase().contains(&dir))
-        .filter_map(|l| l.split(' ').next()?.parse().ok())
+        .filter_map(|l| {
+            let (pid, cmd) = l.split_once(' ')?;
+            Some((pid.parse().ok()?, cmd.to_string()))
+        })
         .collect()
 }
 
