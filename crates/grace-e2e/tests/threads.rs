@@ -171,8 +171,9 @@ fn the_box_is_disabled_while_a_run_is_going() {
         t.find(&Role::Button, "Cancel").is_some_and(|b| b.states.enabled) || !enabled(t)
     })
     .unwrap();
+    // the box is disabled in the frame after Cancel is enabled, not always in the same one
     if cfg!(windows) {
-        assert!(!enabled(&app.tree().unwrap()));
+        app.wait_for("the box disabled", WAIT, |t| !enabled(t)).unwrap();
     }
     let _ = app.key(Key::Up);
     finished(&app, 1);
