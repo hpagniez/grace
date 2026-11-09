@@ -11,6 +11,7 @@ pub mod model;
 pub mod paths;
 pub mod properties_file;
 pub mod recent;
+pub mod rows;
 pub mod runner;
 pub mod secrets;
 pub mod settings;
