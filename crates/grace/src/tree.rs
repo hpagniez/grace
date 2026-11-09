@@ -398,7 +398,7 @@ fn busy(state: &AppState) -> bool {
 }
 
 /// A status as its mark shows it.
-fn mark(s: Status) -> MarkStatus {
+pub fn mark(s: Status) -> MarkStatus {
     match s {
         Status::NotRun => MarkStatus::NotRun,
         Status::Pending => MarkStatus::Pending,
@@ -596,22 +596,7 @@ impl Tree {
                         .child(title),
                 )
             });
-        let tags = node.tags.iter().map(|tag| {
-            div()
-                .flex()
-                .flex_none()
-                .items_center()
-                .h(px(20.))
-                .px(px(6.))
-                .rounded(px(4.))
-                .border_1()
-                .border_color(Theme::color(t.line))
-                .bg(Theme::color(t.surface))
-                .text_size(px(METRICS.text_2xs.size))
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .text_color(Theme::color(t.muted))
-                .child(tag.clone())
-        });
+        let tags = node.tags.iter().map(|tag| crate::ui::tag_chip(tag.clone(), cx));
         let flaky_badge = flaky.clone().map(|words| {
             let badge = div()
                 .flex()

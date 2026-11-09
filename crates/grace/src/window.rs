@@ -52,6 +52,8 @@ pub struct GraceWindow {
     pub threads: Option<Entity<crate::threads_box::ThreadsBox>>,
     /// The bottom panel, which keeps the console's search, its height and its tabs' order.
     pub panel: Option<Entity<crate::bottom_panel::BottomPanel>>,
+    /// The selected test's or group's details, right of the tree.
+    pub details: Option<Entity<crate::details::Details>>,
     _motion: Option<gpui::Subscription>,
 }
 
@@ -71,6 +73,7 @@ impl GraceWindow {
             env: None,
             threads: None,
             panel: None,
+            details: None,
             _motion: None,
         }
     }
@@ -95,6 +98,7 @@ impl GraceWindow {
         me.env = Some(cx.new(|cx| crate::env_picker::EnvPicker::new(grace.clone(), window, cx)));
         me.threads = Some(cx.new(|cx| crate::threads_box::ThreadsBox::new(grace.clone(), window, cx)));
         me.panel = Some(cx.new(|cx| crate::bottom_panel::BottomPanel::new(grace.clone(), window, cx)));
+        me.details = Some(cx.new(|cx| crate::details::Details::new(grace.clone(), cx)));
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
@@ -176,16 +180,7 @@ impl Render for GraceWindow {
                 .map(|b| b.into_any_element())
                 .collect();
                 let toolbar = crate::toolbar::render(&grace, &state, boxes, window, cx).into_any_element();
-                project_view(
-                    toolbar,
-                    self.progress.clone(),
-                    self.filter_bar.clone(),
-                    self.tree.clone(),
-                    self.panel.clone(),
-                    shown,
-                    cx,
-                )
-                .into_any_element()
+                project_view(self, toolbar, shown, cx).into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -232,17 +227,21 @@ impl Render for GraceWindow {
 }
 
 /// The project view: the toolbar, then the sheet (spec R3.3) with the progress section, the notice, the filter bar,
-/// then the tree on the left half above the bottom panel. P2's next PR fills the right half with the details (P2
+/// then the tree and the details side by side above the bottom panel (P2
 /// plan).
 fn project_view(
+    window: &GraceWindow,
     toolbar: gpui::AnyElement,
-    progress: Option<Entity<crate::progress::Progress>>,
-    filter_bar: Option<Entity<crate::filter_bar::FilterBar>>,
-    tree: Option<Entity<crate::tree::Tree>>,
-    panel: Option<Entity<crate::bottom_panel::BottomPanel>>,
     shown: Option<gpui::AnyElement>,
     cx: &App,
 ) -> impl IntoElement {
+    let (progress, filter_bar, tree, panel, details) = (
+        window.progress.clone(),
+        window.filter_bar.clone(),
+        window.tree.clone(),
+        window.panel.clone(),
+        window.details.clone(),
+    );
     let t = Theme::global(cx).tokens;
     let m = crate::theme::METRICS;
     let room = panel.as_ref().map(|p| p.read(cx).room.clone());
@@ -292,7 +291,7 @@ fn project_view(
                                 .flex_1()
                                 .min_h(px(grace_core::panel_height::MAIN_MIN))
                                 .child(div().flex().flex_col().w_1_2().min_h_0().children(tree))
-                                .child(div().w_1_2()),
+                                .child(div().flex().flex_col().w_1_2().min_h_0().children(details)),
                         )
                         .children(panel),
                 ),

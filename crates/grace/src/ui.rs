@@ -73,6 +73,25 @@ pub fn notice(
     )
 }
 
+/// A tag as a chip: muted text in a bordered box (`ui.ts`'s `tagChip`).
+pub fn tag_chip(text: impl Into<SharedString>, cx: &App) -> gpui::Div {
+    let t = Theme::global(cx).tokens;
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .h(px(20.))
+        .px(px(6.))
+        .rounded(px(4.))
+        .border_1()
+        .border_color(Theme::color(t.line))
+        .bg(Theme::color(t.surface))
+        .text_size(px(METRICS.text_2xs.size))
+        .font_weight(gpui::FontWeight::MEDIUM)
+        .text_color(Theme::color(t.muted))
+        .child(text.into())
+}
+
 /// An empty list or panel: one muted 24 px icon, one sentence and, when there is one, the action that fills it
 /// (premium UI R6.5).
 pub fn empty_state(
