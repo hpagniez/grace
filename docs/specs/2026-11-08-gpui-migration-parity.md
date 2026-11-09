@@ -357,7 +357,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | PU-05 | Main and the startup screen use the CSS ground colours (unit) | | ☐ |
 | PU-06 | The window follows the Windows theme | | ☐ |
 | PU-07 | Grace draws its own typefaces offline | | ☐ |
-| PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name` | ☑ |
+| PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name`; through the tree, `crates/grace-e2e/tests/elements.rs::names_each_status_mark` | ☑ |
 | PU-09 | A cancelled run marks its interrupted tests | | ☐ |
 | PU-10 | Tag chip states differ by shape, not only colour (unit) | | ☐ |
 | PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | | ☐ |

@@ -2,6 +2,8 @@
 //! elements, accessibility and an empty window. The views come in phases P2 to P4 (migration guide, Phases).
 pub mod a11y;
 pub mod assets;
+#[cfg(feature = "e2e")]
+pub mod e2e;
 pub mod elements;
 pub mod theme;
 pub mod window;

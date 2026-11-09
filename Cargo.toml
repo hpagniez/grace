@@ -2,7 +2,7 @@
 # until the cut-over release (guide R10).
 [workspace]
 resolver = "3"
-members = ["crates/grace-core", "crates/grace"]
+members = ["crates/grace-core", "crates/grace", "crates/grace-e2e"]
 # The research prototypes build on their own.
 exclude = ["docs/research"]
 

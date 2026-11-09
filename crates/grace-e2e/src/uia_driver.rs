@@ -1,0 +1,157 @@
+//! The Windows backend: UI Automation, which GPUI's AccessKit adapter serves. Reads the raw view, so nothing the
+//! app exposes is filtered out.
+use uiautomation::patterns::{
+    UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
+};
+use uiautomation::types::{ControlType, ExpandCollapseState};
+use uiautomation::{UIAutomation, UIElement, UITreeWalker};
+
+use crate::{Driver, Node, Result, Role, States};
+
+pub struct UiaDriver {
+    automation: UIAutomation,
+    walker: UITreeWalker,
+    pid: u32,
+}
+
+fn err(e: impl std::fmt::Display) -> String {
+    e.to_string()
+}
+
+impl UiaDriver {
+    pub fn new(pid: u32) -> Result<Self> {
+        let automation = UIAutomation::new().map_err(err)?;
+        let walker = automation.get_raw_view_walker().map_err(err)?;
+        Ok(Self {
+            automation,
+            walker,
+            pid,
+        })
+    }
+
+    /// The app's first top-level window: a child of the desktop that belongs to our process.
+    fn window(&self) -> Result<UIElement> {
+        let root = self.automation.get_root_element().map_err(err)?;
+        for top in self.children(&root) {
+            if top.get_process_id().ok() == Some(self.pid) {
+                return Ok(top);
+            }
+        }
+        Err(format!(
+            "process {} has no window in the accessibility tree yet",
+            self.pid
+        ))
+    }
+
+    fn children(&self, of: &UIElement) -> Vec<UIElement> {
+        let mut out = Vec::new();
+        let mut next = self.walker.get_first_child(of).ok();
+        while let Some(e) = next {
+            next = self.walker.get_next_sibling(&e).ok();
+            out.push(e);
+        }
+        out
+    }
+
+    fn read(&self, e: &UIElement, path: Vec<usize>) -> Result<Node> {
+        let value = e
+            .get_pattern::<UIRangeValuePattern>()
+            .ok()
+            .and_then(|p| p.get_value().ok());
+        let selected = e
+            .get_pattern::<UISelectionItemPattern>()
+            .ok()
+            .and_then(|p| p.is_selected().ok());
+        let expanded = e
+            .get_pattern::<UIExpandCollapsePattern>()
+            .ok()
+            .and_then(|p| p.get_state().ok())
+            .and_then(|s| match s {
+                ExpandCollapseState::Expanded | ExpandCollapseState::PartiallyExpanded => Some(true),
+                ExpandCollapseState::Collapsed => Some(false),
+                _ => None,
+            });
+        let description = e
+            .get_pattern::<UILegacyIAccessiblePattern>()
+            .ok()
+            .and_then(|p| p.get_description().ok())
+            .filter(|d| !d.is_empty())
+            .or_else(|| e.get_help_text().ok())
+            .unwrap_or_default();
+        let children = self
+            .children(e)
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let mut at = path.clone();
+                at.push(i);
+                self.read(c, at)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Node {
+            role: role(e.get_control_type().map_err(err)?),
+            name: e.get_name().unwrap_or_default(),
+            description,
+            value,
+            states: States {
+                enabled: e.is_enabled().unwrap_or(false),
+                focusable: e.is_keyboard_focusable().unwrap_or(false),
+                focused: e.has_keyboard_focus().unwrap_or(false),
+                selected: selected.unwrap_or(false),
+                expanded,
+            },
+            path,
+            children,
+        })
+    }
+}
+
+impl Driver for UiaDriver {
+    fn tree(&self) -> Result<Node> {
+        let window = self.window()?;
+        self.read(&window, vec![])
+    }
+
+    fn press(&self, node: &Node) -> Result<()> {
+        let mut at = self.window()?;
+        for &i in &node.path {
+            at = self
+                .children(&at)
+                .into_iter()
+                .nth(i)
+                .ok_or_else(|| format!("{:?} is gone", node.path))?;
+        }
+        let invoke = at
+            .get_pattern::<UIInvokePattern>()
+            .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
+        invoke.invoke().map_err(err)
+    }
+}
+
+/// UI Automation's control types to the driver's roles.
+fn role(t: ControlType) -> Role {
+    match t {
+        ControlType::Window => Role::Window,
+        ControlType::Pane | ControlType::Group | ControlType::Custom => Role::Group,
+        ControlType::Button | ControlType::SplitButton => Role::Button,
+        ControlType::CheckBox => Role::CheckBox,
+        ControlType::RadioButton => Role::RadioButton,
+        ControlType::Edit => Role::Entry,
+        ControlType::ComboBox => Role::ComboBox,
+        ControlType::Spinner => Role::SpinButton,
+        ControlType::Slider => Role::Slider,
+        ControlType::TabItem => Role::Tab,
+        ControlType::Tab => Role::TabList,
+        ControlType::Tree => Role::Tree,
+        ControlType::TreeItem => Role::TreeItem,
+        ControlType::List => Role::List,
+        ControlType::ListItem | ControlType::DataItem => Role::ListItem,
+        ControlType::Hyperlink => Role::Link,
+        ControlType::MenuItem => Role::MenuItem,
+        ControlType::StatusBar => Role::Status,
+        ControlType::ProgressBar => Role::ProgressBar,
+        ControlType::Image => Role::Image,
+        ControlType::Text => Role::Text,
+        other => Role::Other(format!("{other:?}")),
+    }
+}
