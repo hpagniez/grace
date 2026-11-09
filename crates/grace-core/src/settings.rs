@@ -376,6 +376,25 @@ pub fn save_window_state(data_dir: &Path, window: &WindowState) -> io::Result<()
     })
 }
 
+// ----- the bottom panel -----
+
+/// The saved bottom panel height (`panelHeight`); the default when none is saved, the value is unusable or the file
+/// cannot be read. Clamped when shown, not here.
+pub fn load_panel_height(data_dir: &Path) -> f32 {
+    read(data_dir)
+        .ok()
+        .and_then(|s| s.get("panelHeight").and_then(js::finite))
+        .filter(|h| *h >= f64::from(crate::panel_height::PANEL_MIN) && *h <= f64::from(f32::MAX))
+        .map_or(crate::panel_height::PANEL_DEFAULT, |h| h as f32)
+}
+
+/// Saves the height as a whole number. A height that cannot be saved is only forgotten: the caller drops the error.
+pub fn save_panel_height(data_dir: &Path, h: f32) -> io::Result<()> {
+    update(data_dir, |s| {
+        s.insert("panelHeight".into(), Value::from(h.round() as i64));
+    })
+}
+
 // ----- a project's entry -----
 
 /// A saved property: a plain value, or a secret as base64 ciphertext.
@@ -1715,6 +1734,45 @@ mod tests {
             };
             save_window_state(data.path(), &w).unwrap();
             assert_eq!(load_window_state(data.path()), Some(w));
+        }
+    }
+
+    mod panel_height {
+        use super::*;
+
+        #[test]
+        fn load_panel_height_reads_a_saved_height() {
+            let data = tmp();
+            write_settings(&data, &json!({ "panelHeight": 300 }));
+            assert_eq!(load_panel_height(data.path()), 300.0);
+            write_settings(&data, &json!({ "panelHeight": 2000 }));
+            assert_eq!(load_panel_height(data.path()), 2000.0); // clamped when shown, not here
+        }
+
+        #[test]
+        fn load_panel_height_falls_back_to_the_default() {
+            assert_eq!(load_panel_height(tmp().path()), 192.0);
+            for v in [json!("abc"), json!(-5), json!(50), json!(null), json!("300")] {
+                let data = tmp();
+                write_settings(&data, &json!({ "panelHeight": v }));
+                assert_eq!(load_panel_height(data.path()), 192.0, "{v}");
+            }
+            let data = tmp();
+            write_text(&data, r#"{"panelHeight":1e999}"#);
+            assert_eq!(load_panel_height(data.path()), 192.0);
+            let data = tmp();
+            save_panel_height(data.path(), 300.0).unwrap();
+            let _busy = hooks::reads_fail(ErrorKind::ResourceBusy);
+            assert_eq!(load_panel_height(data.path()), 192.0);
+        }
+
+        #[test]
+        fn save_panel_height_writes_a_rounded_integer_and_keeps_the_rest() {
+            let data = tmp();
+            write_settings(&data, &json!({ "lastProject": "D:\\x" }));
+            save_panel_height(data.path(), 300.4).unwrap();
+            let saved: Value = serde_json::from_str(&fs::read_to_string(settings_file(&data)).unwrap()).unwrap();
+            assert_eq!(saved, json!({ "lastProject": "D:\\x", "panelHeight": 300 }));
         }
     }
 
