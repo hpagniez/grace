@@ -139,3 +139,42 @@ impl Render for Gallery {
             .child(tips)
     }
 }
+
+/// The seams' answers for an end-to-end test (migration guide, Architecture). `GRACE_E2E_SEAMS` names a JSON file the
+/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null}`. Each ask
+/// is appended to `<data folder>/e2e-seams.jsonl`, `{"seam": "folder", "start": "<path>" | null}`, as the Playwright
+/// tests recorded `dialog.showOpenDialog`'s options.
+pub struct E2eSeams {
+    answers: std::path::PathBuf,
+    log: std::path::PathBuf,
+}
+
+impl E2eSeams {
+    pub fn from_env() -> Option<Self> {
+        let answers = std::env::var_os("GRACE_E2E_SEAMS")?.into();
+        let log = grace_core::paths::data_dir()?.join("e2e-seams.jsonl");
+        Some(Self { answers, log })
+    }
+
+    fn record(&self, line: serde_json::Value) {
+        use std::io::Write as _;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&self.log) {
+            let _ = writeln!(f, "{line}");
+        }
+    }
+}
+
+impl crate::seams::Seams for E2eSeams {
+    fn pick_folder(
+        &self,
+        start: Option<std::path::PathBuf>,
+        _cx: &mut gpui::AsyncApp,
+    ) -> crate::seams::Answer<Option<std::path::PathBuf>> {
+        self.record(serde_json::json!({ "seam": "folder", "start": start }));
+        let answer = std::fs::read_to_string(&self.answers)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("folder")?.as_str().map(std::path::PathBuf::from));
+        Box::pin(async move { answer })
+    }
+}

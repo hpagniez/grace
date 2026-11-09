@@ -278,26 +278,49 @@ impl Theme {
     }
 }
 
-/// Which theme a window gets: `GRACE_THEME=dark|light` pins it (for screenshots and tests), else it follows the
-/// system's, as `nativeTheme` does in Electron Grace.
+/// Which theme a window gets: `GRACE_THEME=dark|light` pins it (for screenshots and tests), else the saved Appearance
+/// (`settings.json`, premium UI R8): Light or Dark whatever the system says, Follow Windows the system's, as
+/// `nativeTheme.themeSource` does in Electron Grace.
 pub fn wants_dark(appearance: WindowAppearance, pinned: Option<&str>) -> bool {
-    match pinned {
-        Some("dark") => true,
-        Some("light") => false,
+    wants_dark_with(appearance, pinned, Appearance::System)
+}
+
+pub fn wants_dark_with(appearance: WindowAppearance, pinned: Option<&str>, saved: Appearance) -> bool {
+    match (pinned, saved) {
+        (Some("dark"), _) => true,
+        (Some("light"), _) => false,
+        (_, Appearance::Dark) => true,
+        (_, Appearance::Light) => false,
         _ => matches!(appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark),
     }
 }
 
-/// Sets the theme from the window's appearance, and keeps following it.
-pub fn follow_system(window: &mut Window, cx: &mut App) {
+pub use grace_core::model::theme::Theme as Appearance;
+
+/// The Appearance in force: read from `settings.json` before the first window, changed by Settings (P2 PR 5).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SavedAppearance(pub Appearance);
+
+impl gpui::Global for SavedAppearance {}
+
+fn current(window: &Window, cx: &App) -> bool {
     let pinned = std::env::var("GRACE_THEME").ok();
-    apply(wants_dark(window.appearance(), pinned.as_deref()), Some(window), cx);
+    let saved = cx.try_global::<SavedAppearance>().copied().unwrap_or_default().0;
+    wants_dark_with(window.appearance(), pinned.as_deref(), saved)
+}
+
+/// Sets the theme from the saved Appearance and the window's appearance, and keeps following the window's.
+pub fn follow_system(window: &mut Window, cx: &mut App) {
+    apply(current(window, cx), Some(window), cx);
     window
-        .observe_window_appearance(move |window, cx| {
-            let pinned = std::env::var("GRACE_THEME").ok();
-            apply(wants_dark(window.appearance(), pinned.as_deref()), Some(window), cx);
-        })
+        .observe_window_appearance(move |window, cx| apply(current(window, cx), Some(window), cx))
         .detach();
+}
+
+/// Applies a new Appearance at once (Settings, premium UI R8.4).
+pub fn set_appearance(appearance: Appearance, window: &mut Window, cx: &mut App) {
+    cx.set_global(SavedAppearance(appearance));
+    apply(current(window, cx), Some(window), cx);
 }
 
 /// Sets Grace's theme, and maps its tokens onto GPUI Kit's, so GPUI Kit's controls draw in Grace's colours.
@@ -578,6 +601,15 @@ mod tests {
         assert!(wants_dark(WindowAppearance::Light, Some("dark")));
         assert!(!wants_dark(WindowAppearance::Dark, Some("light")));
         assert!(wants_dark(WindowAppearance::VibrantDark, Some("other")));
+        // the saved Appearance wins over the system's; GRACE_THEME over both
+        assert!(wants_dark_with(WindowAppearance::Light, None, Appearance::Dark));
+        assert!(!wants_dark_with(WindowAppearance::Dark, None, Appearance::Light));
+        assert!(wants_dark_with(WindowAppearance::Dark, None, Appearance::System));
+        assert!(!wants_dark_with(
+            WindowAppearance::Dark,
+            Some("light"),
+            Appearance::Dark
+        ));
     }
 
     /// `palette.test.ts`: colours come from the tokens. In Rust, a colour literal is `rgb(`, `rgba(`, `hsla(` or

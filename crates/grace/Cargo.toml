@@ -17,6 +17,19 @@ gpui-component.workspace = true
 gpui-base.workspace = true
 gpui-kit-assets.workspace = true
 grace-core.workspace = true
+# The runner's events reach the window on a channel its task waits on (`app`): already in the lock through GPUI.
+async-channel = "=2.5.0"
+serde_json = { version = "1.0.154", optional = true }
+
+# The Shell's folder dialog with a starting folder (`seams`, #82): the `windows` GPUI already uses, two more features.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+] }
 
 # GPUI's platform crate picks its backend from the target: DirectX 11 on Windows, X11 on Linux. Only Linux has a
 # feature to turn on.
@@ -29,7 +42,7 @@ gpui_platform.workspace = true
 [features]
 # Test hooks for crates/grace-e2e, never in a release (migration guide, Architecture): the window opens on a screen
 # other than the main one.
-e2e = []
+e2e = ["dep:serde_json"]
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

@@ -1,6 +1,6 @@
 # GPUI migration: parity checklist
 
-Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P1.
+Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P2.
 
 This is the list the cut-over is checked against ([guide R3](2026-11-08-gpui-migration.md#r3-what-ported-means)): 594 spec scenarios, 194 end-to-end tests and 1,773 unit and component tests, taken from `develop` at `32a5ef6`, the commit of the go decision. A row is ported when the behaviour it names works in GPUI Grace and a test proves it: fill **Proof** with the test (`crates/…::test_name`, `e2e-uia/…`, a bench measure, or a dated check record for a by-hand check) and tick the box in the PR that ports it. A row that does not apply any more says why, in words, in **Proof**, with `n/a` in the last column; only the owner can accept an `n/a` on a user-facing row.
 
@@ -192,17 +192,17 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WB-01 | The window comes back where it was | | ☐ |
 | WB-02 | A maximized window comes back maximized | | ☐ |
 | WB-03 | A move by the person is saved before the app closes | | ☐ |
-| WB-04 | The saved state keeps the other settings (unit) | | ☐ |
+| WB-04 | The saved state keeps the other settings (unit) | `grace-core::settings::tests::window_state::saving_the_window_keeps_the_other_settings` | ☑ |
 | WB-05 | A window closed while minimized opens normal | | ☐ |
 | WB-06 | A failed save does not stop the app from closing | | ☐ |
-| WB-07 | A cut-off save leaves the old settings whole (unit) | | ☐ |
-| WB-08 | A short saved window is held at the minimum height | | ☐ |
-| WB-09 | A broken saved state opens the window as on a first start | | ☐ |
+| WB-07 | A cut-off save leaves the old settings whole (unit) | `grace-core::settings::tests::window_state::a_failed_rename_leaves_the_file_as_it_was` | ☑ |
+| WB-08 | A short saved window is held at the minimum height | `grace::window::tests::a_short_saved_window_is_held_at_the_minimum_height` | ☑ |
+| WB-09 | A broken saved state opens the window as on a first start | `grace-core::settings::tests::window_state::load_window_state_reads_a_broken_state_as_nothing_saved`, `grace::window::tests::a_broken_or_missing_state_opens_as_on_a_first_start` | ☑ |
 | WB-10 | A window partly off the screen is pulled onto it | | ☐ |
 | WB-11 | A window bigger than the screen is shrunk to fit | | ☐ |
-| WB-12 | A window on a screen that is gone opens on the main screen | | ☐ |
-| WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | | ☐ |
-| WB-14 | Placement on two screens (unit) | | ☐ |
+| WB-12 | A window on a screen that is gone opens on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
+| WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` (the maximized case) | ☑ |
+| WB-14 | Placement on two screens (unit) | `grace-core::window::tests` (13 tests: two screens, edges, flush, shrink) | ☑ |
 | WB-15 | Two screens (by hand) | | ☐ |
 | WB-16 | The second screen is gone (by hand) | | ☐ |
 | WB-17 | Partly off the screen (by hand) | | ☐ |
@@ -255,29 +255,29 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| HS-01 | A first start shows the home screen | | ☐ |
-| HS-02 | Opening a folder from the home screen | | ☐ |
-| HS-03 | The last project opens at start without the home screen | | ☐ |
-| HS-04 | Opening with no project open shows the project view, not home (unit) | | ☐ |
-| HS-05 | No home screen flash at start (by hand) | | ☐ |
-| HS-06 | A slow network folder does not hold up the home screen (unit) | | ☐ |
-| HS-07 | Removing the missing last project forgets it (unit) | | ☐ |
-| HS-08 | A missing last project shows the home screen | | ☐ |
-| HS-09 | A failed open from the home screen goes back to it (unit) | | ☐ |
+| HS-01 | A first start shows the home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen`, `grace::home::tests::a_first_start_shows_the_home_screen_without_a_list` | ☑ |
+| HS-02 | Opening a folder from the home screen | `grace-e2e/tests/home.rs::opening_a_folder_from_the_home_screen` | ☑ |
+| HS-03 | The last project opens at start without the home screen | `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` | ☑ |
+| HS-04 | Opening with no project open shows the project view, not home (unit) | `grace-core::state::tests::reduce::home_screen::an_opening_event_sets_opening_and_loaded_and_null_clears_opening`, `grace-core::runner::tests::home::open_emits_opening_around_the_discovery` | ☑ |
+| HS-05 | No home screen flash at start (by hand) | `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` (no frame of the home screen on the way; the window draws the ground alone until the runner says what is open) | ☑ |
+| HS-06 | A slow network folder does not hold up the home screen (unit) | `grace-core::recent::tests::check_recent::a_folder_that_does_not_answer_within_the_time_bound_counts_as_existing` | ☑ |
+| HS-07 | Removing the missing last project forgets it (unit) | `grace-core::settings::tests::recent_projects::remove_recent_project_drops_the_row_and_a_matching_last_project` | ☑ |
+| HS-08 | A missing last project shows the home screen | `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` | ☑ |
+| HS-09 | A failed open from the home screen goes back to it (unit) | `grace-core::runner::tests::home::a_failed_open_from_the_home_screen_changes_nothing` | ☑ |
 | HS-10 | A dry-run error still opens the project | | ☐ |
-| HS-11 | Reopening a folder from the list | | ☐ |
-| HS-12 | The folder dialog starts next to the newest existing folder | | ☐ |
-| HS-13 | Removing a row | | ☐ |
+| HS-11 | Reopening a folder from the list | `grace-e2e/tests/home.rs::reopening_a_folder_from_the_list` | ☑ |
+| HS-12 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder`; on Windows the Shell dialog's `SetFolder` (`grace::seams`), checked by hand in PR 6 | ☑ |
+| HS-13 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
 | HS-14 | The list works from the keyboard | | ☐ |
 | HS-15 | The home screen follows the dark theme (by hand) | | ☐ |
 | HS-16 | Home closes the project and survives a restart | | ☐ |
 | HS-17 | Home is disabled during a run | | ☐ |
-| HS-18 | Main refuses to close a busy project (unit) | | ☐ |
+| HS-18 | Main refuses to close a busy project (unit) | `grace-core::runner::tests::home::close_is_refused_while_busy` | ☑ |
 | HS-19 | A reload after Home stays home | | ☐ |
-| HS-20 | The list keeps the 10 newest folders (unit) | | ☐ |
-| HS-21 | The same folder in another case is one entry (unit) | | ☐ |
-| HS-22 | A broken list reads as what can be kept (unit) | | ☐ |
-| HS-23 | A failed list save keeps the project open (unit) | | ☐ |
+| HS-20 | The list keeps the 10 newest folders (unit) | `grace-core::settings::tests::recent_projects::keeps_the_10_newest_folders` | ☑ |
+| HS-21 | The same folder in another case is one entry (unit) | `grace-core::settings::tests::recent_projects::same_folder_with_a_trailing_separator_or_another_case_is_one_entry` | ☑ |
+| HS-22 | A broken list reads as what can be kept (unit) | `grace-core::settings::tests::recent_projects::a_broken_list_reads_as_what_can_be_kept` | ☑ |
+| HS-23 | A failed list save keeps the project open (unit) | `grace-core::runner::tests::home::a_failed_list_save_keeps_the_project_open` | ☑ |
 | HS-24 | A path not in the list is refused | | ☐ |
 
 ### AU · App updates
@@ -1069,15 +1069,15 @@ Phase P2 · 14 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-home-01 | A first start shows the home screen | | ☐ |
-| E-home-02 | Opening a folder from the home screen | | ☐ |
-| E-home-03 | The last project opens at start without the home screen | | ☐ |
-| E-home-04 | A missing last project shows the home screen | | ☐ |
+| E-home-01 | A first start shows the home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` | ☑ |
+| E-home-02 | Opening a folder from the home screen | `grace-e2e/tests/home.rs::opening_a_folder_from_the_home_screen` | ☑ |
+| E-home-03 | The last project opens at start without the home screen | `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` | ☑ |
+| E-home-04 | A missing last project shows the home screen | `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` | ☑ |
 | E-home-05 | A dry-run error still opens the project | | ☐ |
 | E-home-06 | The home screen is on the ground in light and in dark | | ☐ |
 | E-home-07 | Reopening a folder from the list | | ☐ |
-| E-home-08 | The folder dialog starts next to the newest existing folder | | ☐ |
-| E-home-09 | Removing a row | | ☐ |
+| E-home-08 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder` | ☑ |
+| E-home-09 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
 | E-home-10 | The list works from the keyboard | | ☐ |
 | E-home-11 | Home closes the project and survives a restart | | ☐ |
 | E-home-12 | Home is disabled during a run | | ☐ |
@@ -1385,17 +1385,17 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless | ☐ |
 | `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless | ☐ |
-| `src/renderer/EmptyState.test.tsx` | 3 | view `EmptyState` (`grace::ui`), headless | ☐ |
+| `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless | ☐ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
 | `src/renderer/FieldMessage.test.tsx` | 2 | view `FieldMessage` (`grace::ui`), headless | ☐ |
 | `src/renderer/FilterBar.test.tsx` | 21 | view `FilterBar` (`grace::ui`), headless | ☐ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
-| `src/renderer/Home.test.tsx` | 26 | view `Home` (`grace::ui`), headless | ☐ |
+| `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` (12 of 26 so far; the toolbar's, the tree's and the sheet's port with them in P2 PRs 2, 3 and 5) | ☐ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | view `HttpCalls` (`grace::ui`), headless | ☐ |
 | `src/renderer/Icon.test.tsx` | 3 | view `Icon` (`grace::ui`), headless | ☐ |
-| `src/renderer/Notice.test.tsx` | 6 | view `Notice` (`grace::ui`), headless | ☐ |
+| `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | view `Progress` (`grace::ui`), headless | ☐ |
 | `src/renderer/PropertiesDialog.test.tsx` | 54 | view `PropertiesDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless | ☐ |
@@ -1423,8 +1423,8 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight` | ☐ |
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs` | ☐ |
 | `src/renderer/placeTip.test.ts` | 16 | `grace::ui::placeTip` | ☐ |
-| `src/renderer/reduce.test.ts` | 45 | `grace::ui::reduce` | ☐ |
-| `src/renderer/store.test.tsx` | 8 | view `store` (`grace::ui`), headless | ☐ |
+| `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
+| `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store` (7 of 8; "subscribes before ready…" checks the state only, the IPC subscription is gone; `toggleGroup` ports with the HTTP tab in P3) | ☐ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace::ui::treeRows` | ☐ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |

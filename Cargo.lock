@@ -2799,12 +2799,15 @@ checksum = "99b18b06f5026b3d312488eacfdddbe78f82b4bf32bb2d2bc3186e31e552b797"
 name = "grace"
 version = "0.0.0"
 dependencies = [
+ "async-channel",
  "gpui-base",
  "gpui-component",
  "gpui-kit-assets",
  "gpui-pre",
  "gpui-pre-platform",
  "grace-core",
+ "serde_json",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -2830,6 +2833,7 @@ version = "0.0.0"
 dependencies = [
  "atspi",
  "futures-lite",
+ "serde_json",
  "uiautomation",
 ]
 
