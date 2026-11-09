@@ -49,15 +49,22 @@ impl UiaDriver {
     /// process that had no input of late, and `SetFocus` then still answers success while the keys would go to
     /// another window; a key press counts as input and lifts the lock, so the next try takes. The key is F24, which no
     /// window acts on: a tap of Alt, which this sent before, put a window that had the focus after all in its menu
-    /// mode, and the Tabs after it never reached Grace's controls (#301).
+    /// mode, and the Tabs after it never reached Grace's controls (#301). A window that has the focus already is left
+    /// alone: `SetFocus` on it would move the focus to the window from the control that holds it.
     fn to_foreground(&self) -> Result<()> {
+        let ours = || {
+            let focused = self.automation.get_focused_element().ok();
+            focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid)
+        };
+        if ours() {
+            return Ok(());
+        }
         let window = self.window()?;
         for _ in 0..5 {
             window
                 .set_focus()
                 .map_err(|e| format!("cannot bring the window to the foreground: {e}"))?;
-            let focused = self.automation.get_focused_element().ok();
-            if focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid) {
+            if ours() {
                 return Ok(());
             }
             Keyboard::new().send_keys("{F24}").map_err(err)?;

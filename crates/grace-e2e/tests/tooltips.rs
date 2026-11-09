@@ -38,7 +38,10 @@ fn tab_to(app: &App, role: Role, name: &str) {
             t.all().iter().any(|n| n.states.focused)
         });
     }
-    panic!("Tab never reached {role:?} {name:?}; the focus went {seen:?}");
+    panic!(
+        "Tab never reached {role:?} {name:?}; the focus went {seen:?}\n{}",
+        app.tree().map(|t| t.dump()).unwrap_or_default()
+    );
 }
 
 /// PU-20: a tooltip shows after a pause on hover, also on a disabled button.
