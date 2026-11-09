@@ -7,6 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+# `clock` for `chrono::Local`: the history labels are in local time. The lock has chrono 0.4.45 through GPUI.
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 # The stored format of an encrypted secret (secrets.rs). Two versions are in the lock; this one is GPUI's (usvg).
 base64 = "=0.22.1"
 indexmap = { version = "2.14.2", features = ["serde"] }
