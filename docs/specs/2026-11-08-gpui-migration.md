@@ -274,7 +274,7 @@ Each phase has an issue, a plan in `docs/plans/` written just before it starts, 
 
 | Phase | Builds | Exit check |
 |---|---|---|
-| **P0 Foundation** ([#279](https://github.com/hpagniez/grace/issues/279)) | The workspace and pins; the idle patch under `[patch.crates-io]`; `rust-toolchain.toml`; the theme, fonts, icons and shared elements; the accessibility base and the tree-walking test (R8.2); the e2e driver on UI Automation and AT-SPI with a first test; packaging into the release zip layout; CI (R6.5); the bench launching `Grace.exe` (R7.2) and measuring `idle.wakeups.minimised` per thread (R7.3); AGENTS.md's first "GPUI rules" | An empty Grace window passes ADR 0030 on the reference machine (minimised and shown, `idle.wakeups.minimised` under 5 a second) and Narrator reads it; the zip has the contract's layout; CI is green on both platforms; the Windows half of #269 is closed |
+| **P0 Foundation** ([#279](https://github.com/hpagniez/grace/issues/279)) | The workspace and pins; the idle patch under `[patch.crates-io]`; `rust-toolchain.toml`; the theme, fonts, icons and shared elements; the accessibility base and the tree-walking test (R8.2); the e2e driver on UI Automation and AT-SPI with a first test; packaging into the release zip layout; CI (R6.5); the bench launching `Grace.exe` (R7.2) and measuring `idle.wakeups.minimised` per thread (R7.3); AGENTS.md's first "GPUI rules" | An empty Grace window passes ADR 0030 on the reference machine (minimised and shown, `idle.wakeups.minimised` under 5 a second); the zip has the contract's layout; CI is green on both platforms. Narrator and the rest of the Windows half of #269 are optional in P0 (the owner, 2026-11-09) |
 | **P1 Core** ([#280](https://github.com/hpagniez/grace/issues/280)) | `grace-core`: every module in the P1 map, with its unit tests ported | Every `src/main` and `src/shared` unit test row ported or `n/a`; a headless run of the 2,000-test bench project from `grace-core` alone matches Electron Grace's `run.json` |
 | **P2 Main screen** ([#281](https://github.com/hpagniez/grace/issues/281)) | The window, home screen, toolbar, tree, filter bar, environments and properties, threads, run and cancel, progress, details, console, bottom panel, appearance | P2 parity rows ticked; bench on the GPUI build within every limit it shares with Electron Grace |
 | **P3 Panels** ([#282](https://github.com/hpagniez/grace/issues/282)) | HTTP, history, trends, flaky, reports, data-driven view, failures, step comments, editor, tab order | P3 parity rows ticked |
@@ -313,7 +313,7 @@ What the move changes, by ADR 0023's priorities, from the prototype's numbers on
 
 ## Open questions
 
-- **Other GPUs (P0).** Only NVIDIA was measured. P0 checks an Intel or AMD GPU too, and the minimised idle with the patch on it.
+- **Other GPUs.** Only NVIDIA was measured. Checking an Intel or AMD GPU is optional (the owner, 2026-11-09: none at hand); take it when such a machine is available.
 - **Untested platform cases (P0).** A GPU reset, windows across screens with different refresh rates, showing a window again after hiding it.
 - **Upstream (P0 and each upgrade).** Whether zed#66221 or zed#66449 lands, so the patch can go. Grace follows them from its own issues and posts nothing on Zed's repository.
 

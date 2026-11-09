@@ -22,22 +22,21 @@ pub const FIRST_SIZE: (f32, f32) = (1200., 800.);
 pub struct GraceWindow {
     /// What the live region says; a new text is announced.
     pub announcement: SharedString,
+    tips: Option<gpui::Entity<crate::tooltip::Tips>>,
+    /// Held by the window's root when nothing inside has the focus, so Tab reaches it (`a11y::tab_order`).
+    pub focus: gpui::FocusHandle,
     /// The first frame was asked for: the probe's `first_frame` follows it (`crate::probe`).
     painted: bool,
 }
 
 impl GraceWindow {
-    pub fn new() -> Self {
+    pub fn new(cx: &mut App) -> Self {
         Self {
             announcement: SharedString::default(),
+            tips: None,
+            focus: cx.focus_handle(),
             painted: false,
         }
-    }
-}
-
-impl Default for GraceWindow {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -49,9 +48,12 @@ impl Render for GraceWindow {
                 window.on_next_frame(|_, _| probe::mark("first_frame"));
             }
         }
+        let tips = self
+            .tips
+            .get_or_insert_with(|| crate::tooltip::install(window, cx))
+            .clone();
         let t = Theme::global(cx).tokens;
-        div()
-            .id("grace")
+        a11y::tab_order(div().id("grace"), &self.focus)
             .role(Role::Application)
             .aria_label("Grace")
             .size_full()
@@ -67,6 +69,7 @@ impl Render for GraceWindow {
                     }),
                 Live::Polite,
             ))
+            .child(tips)
     }
 }
 
@@ -111,10 +114,12 @@ pub fn open(cx: &mut App) -> WindowHandle<Root> {
         crate::theme::follow_system(window, cx);
         #[cfg(feature = "e2e")]
         if crate::e2e::wants_gallery() {
-            let gallery = cx.new(|_| crate::e2e::Gallery::default());
+            let gallery = cx.new(|cx| crate::e2e::Gallery::new(cx));
+            gallery.read(cx).focus.clone().focus(window, cx);
             return cx.new(|cx| Root::new(gallery, window, cx));
         }
-        let grace = cx.new(|_| GraceWindow::new());
+        let grace = cx.new(|cx| GraceWindow::new(cx));
+        grace.read(cx).focus.clone().focus(window, cx);
         cx.new(|cx| Root::new(grace, window, cx))
     })
     .expect("the window opens")
@@ -131,7 +136,7 @@ mod tests {
             crate::init(cx);
             crate::theme::apply(true, None, cx);
         });
-        let window = cx.add_window(|_, _| GraceWindow::new());
+        let window = cx.add_window(|_, cx| GraceWindow::new(cx));
         cx.run_until_parked();
         window
             .update(cx, |grace, _, cx| {

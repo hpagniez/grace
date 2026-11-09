@@ -14,4 +14,4 @@ if [ "$(uname)" = Linux ] && [ -z "${GRACE_E2E_DESKTOP:-}" ]; then
   trap 'kill $xvfb 2>/dev/null' EXIT
   exec dbus-run-session -- sh -c '/usr/libexec/at-spi-bus-launcher --launch-immediately & sleep 1; exec "$0" "$@"' "$0" "$@"
 fi
-cargo test -p grace-e2e --locked -- --ignored --test-threads=1 "$@"
+cargo test -p grace-e2e --locked --no-fail-fast -- --ignored --test-threads=1 "$@"

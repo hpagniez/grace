@@ -29,7 +29,9 @@ P0 builds what every later phase stands on, and ends with an empty Grace window 
 
 ## PR 4: tooltip and cut
 
-The tooltip helper (`tooltip()`, the 500 ms pause, `side`, one at a time, shown on keyboard focus, closed by Escape and a click) and `cut`, with PU-19, PU-20 and PU-21 through the e2e driver.
+1. `grace::tooltip`: `tooltip(id, text)` wraps a trigger, `cut(id, text)` a line that may be cut (its tooltip shows only when the line is cut, measured with the text system). One `Tips` entity per window draws the open tooltip with the Tooltip role, deferred above dialogs, placed by `gpui_base::Positioner` on its `side` (below, left, right, or over the line for `cut`). It shows after 500 ms of hover, also over a disabled button, or at once on a keyboard focus (`.focusable(..)`), once per focus; one at a time; Escape (taken before any other handler, so a dialog stays open) and a click close it. A keystroke makes GPUI report an un-hover, which the tooltip ignores while the pointer is still on its trigger. `elements::icon_button` no longer brings GPUI Kit's own tooltip.
+2. Tab order: the window's root tracks a focus handle and binds Tab and Shift-Tab (`a11y::tab_order`), focused when the window opens; GPUI Kit's `Root` does this only for its own views.
+3. The e2e driver gains a pointer and keys (`App::hover`, `App::key`, `wait_for_no_node`) and each node's place: `xdotool` on Linux, in the window's coordinates since AT-SPI's screen extents lack the X window's place without a window manager; UI Automation's mouse and keyboard on Windows. The gallery gets a disabled button with a tooltip, a cut line and a dialog. PU-19, PU-20 and PU-21 pass through the tree on Linux.
 
 ## PR 3: packaging and the bench
 
@@ -47,9 +49,11 @@ Nothing runs on the owner's PC without the owner's go-ahead. After PR 3, a check
 2. Narrator and Accessibility Insights read the window (the Windows half of [#269](https://github.com/hpagniez/grace/issues/269)).
 3. An Intel or AMD GPU, or the Basic Display Adapter if none is at hand: the same idle check (guide, Open questions).
 
+Done on 2026-11-09 for 1: [docs/checks/2026-11-09-gpui-p0-windows.md](../checks/2026-11-09-gpui-p0-windows.md). `idle.wakeups.minimised` was 0.1 a second, every measure taken is within Electron Grace's limits, the zip has the contract's layout, and the UI Automation e2e passed once the driver brought the window to the foreground before a key. The owner made 2 and 3 optional on 2026-11-09 (no other GPU at hand; the UI Automation e2e reads the same tree as Narrator), so they are not done.
+
 ## Exit check (from #279)
 
-An empty Grace window passes ADR 0030 on the reference machine, minimised and shown, with `idle.wakeups.minimised` under 5 a second, and Narrator reads it; an Intel or AMD GPU is checked too; the zip has the contract's layout; CI is green on both platforms; the parity rows of phase P0 are ticked.
+An empty Grace window passes ADR 0030 on the reference machine, minimised and shown, with `idle.wakeups.minimised` under 5 a second; the zip has the contract's layout; CI is green on both platforms; the parity rows of phase P0 are ticked. Narrator and an Intel or AMD GPU are optional (the owner, 2026-11-09).
 
 ## Cost
 
@@ -58,3 +62,4 @@ PR 1 ships nothing: the Electron app is unchanged, and the Rust app is not packa
 - **CI time.** The `rust` job builds GPUI on two VMs, about 5 minutes on 4 cores cold, less from the cache. It runs beside the Electron `unit` halves, so `test` takes about as long as before once the cache is warm.
 - **Repository size.** 0.8 MB of fonts, 50 icons of 0.3 KB, the patched crate (0.7 MB of source).
 - **The app.** An empty window: GPUI's floor, about 28 MB idle on Windows in the prototype. No timer, poll or animation of its own; the running mark's animation exists only while a test runs.
+- **The tooltip (PR 4).** No new crate: `gpui-base` was already built through GPUI Kit. One timer per hover, spawned only when the pointer rests on a trigger and dropped when it leaves or the tooltip shows; nothing runs while idle or hidden. One small entity per window.

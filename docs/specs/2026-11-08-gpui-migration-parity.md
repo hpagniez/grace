@@ -368,9 +368,9 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | PU-16 | Follow Windows is the default | | ☐ |
 | PU-17 | A malformed appearance setting reads as Follow Windows (unit) | | ☐ |
 | PU-18 | Main rejects an unknown theme (unit) | | ☐ |
-| PU-19 | A tooltip shows on keyboard focus and closes with Escape | | ☐ |
-| PU-20 | A tooltip shows after a pause on hover, also on a disabled button | | ☐ |
-| PU-21 | Escape in a dialog closes the tooltip first | | ☐ |
+| PU-19 | A tooltip shows on keyboard focus and closes with Escape | `crates/grace::tooltip::tests::shows_at_once_on_keyboard_focus_and_once_per_focus`, `…closes_on_escape_and_on_a_press_of_its_target`, `…does_not_show_on_a_focus_from_the_mouse`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` | ☑ |
+| PU-20 | A tooltip shows after a pause on hover, also on a disabled button | `crates/grace::tooltip::tests::shows_after_the_pause_not_before`, `…does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after`, `…shows_one_at_a_time`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` | ☑ |
+| PU-21 | Escape in a dialog closes the tooltip first | `crates/grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` (the tooltip takes Escape before any other handler) | ☑ |
 | PU-22 | No native title attribute is left (unit) | | ☐ |
 | PU-23 | Every control shows the focus ring | | ☐ |
 | PU-24 | Targets are at least 24 by 24 | | ☐ |

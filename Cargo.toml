@@ -17,6 +17,8 @@ publish = false
 gpui = { package = "gpui-pre", version = "=0.3.11" }
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
 gpui-component = "=0.9.0"
+# GPUI Kit's unstyled layer: the tooltip role and the positioner (grace::tooltip). Already in the lock through GPUI Kit.
+gpui-base = "=0.9.0"
 gpui-kit-assets = "=0.9.0"
 grace-core = { path = "crates/grace-core" }
 
