@@ -90,6 +90,11 @@ pub struct WindowsWindowState {
     initial_placement: Cell<Option<WindowOpenStatus>>,
     hwnd: HWND,
     pub(crate) a11y: RefCell<Option<A11yState>>,
+    /// Whether the last `WM_ACTIVATE` activated the window. The window is shown, and so activated, before
+    /// `a11y_init` runs, so AccessKit would miss that activation without it.
+    pub(crate) active: Cell<bool>,
+    /// Set when a `WM_ACTIVATE` came while `a11y` was borrowed; the next tree update passes it on.
+    pub(crate) a11y_focus_stale: Cell<bool>,
     pub mouse_position: Cell<Point<Pixels>>,
 }
 
@@ -192,6 +197,8 @@ impl WindowsWindowState {
             draw_coordinator,
             direct_manipulation,
             a11y: RefCell::new(None),
+            active: Cell::new(false),
+            a11y_focus_stale: Cell::new(false),
             mouse_position: Cell::new(Point::default()),
         })
     }
@@ -1081,7 +1088,9 @@ impl PlatformWindow for WindowsWindow {
 
     fn a11y_init(&self, callbacks: gpui::A11yCallbacks) {
         let action_handler = A11yActionHandler(callbacks.action);
-        let is_focused = unsafe { GetForegroundWindow() } == self.0.hwnd;
+        let is_focused =
+            self.state.active.get() || unsafe { GetForegroundWindow() } == self.0.hwnd;
+        self.state.a11y_focus_stale.set(false);
 
         let adapter = accesskit_windows::Adapter::new(
             accesskit_windows::HWND(self.0.hwnd.0),
@@ -1102,14 +1111,25 @@ impl PlatformWindow for WindowsWindow {
     fn a11y_tree_update(&self, tree_update: accesskit::TreeUpdate) {
         let events = {
             let mut a11y = self.state.a11y.borrow_mut();
-            a11y.as_mut()
-                .and_then(|a11y| a11y.adapter.update_if_active(|| tree_update))
+            a11y.as_mut().map(|a11y| {
+                let focus = self
+                    .state
+                    .a11y_focus_stale
+                    .take()
+                    .then(|| a11y.adapter.update_window_focus_state(self.state.active.get()))
+                    .flatten();
+                (focus, a11y.adapter.update_if_active(|| tree_update))
+            })
         };
         // The borrow must be dropped before raising events, because
         // `events.raise()` calls `UiaRaiseAutomationPropertyChangedEvent`
         // which may send a nested `WM_GETOBJECT` back into this window
         // procedure, re-entering `handle_wm_getobject` which also borrows
         // `self.state.a11y`.
+        let (focus, events) = events.unwrap_or_default();
+        if let Some(focus) = focus {
+            focus.raise();
+        }
         if let Some(events) = events {
             events.raise();
         }
