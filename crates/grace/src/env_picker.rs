@@ -25,7 +25,7 @@ use crate::ui::{FieldKind, field_message};
 pub const NONE: &str = "(none)";
 pub const LABEL: &str = "Env";
 pub const SUGGESTIONS: &str = "Environments";
-pub const INVALID_ENV: &str = "Use letters, digits, '.', '_' or '-' (up to 64), starting with a letter or digit";
+pub use grace_core::model::env::INVALID_ENV;
 /// The box's width: Tailwind's `w-28`.
 pub const WIDTH: f32 = 112.;
 
