@@ -133,9 +133,10 @@ When the main agent dispatches subagents (implementers, reviewers, explorers), i
 |---|---|
 | Haiku 5.5 (`haiku`) | Mechanical, bounded work: locating code, read-only lookups, renames, re-reviewing a single small fix. |
 | Sonnet 5.5 (`sonnet`) | Default for clear tasks: implementing a plan task with a precise brief, writing tests, spec and quality reviews of one task. |
-| Opus 5.5 (`opus`) | Hard judgment: design and architecture, ambiguous specs, cross-cutting changes, debugging an unknown cause, whole-branch final reviews. |
+| Fable 5.2 (`fable`) | Hard judgment: design and architecture, ambiguous specs, cross-cutting changes, debugging an unknown cause, whole-branch final reviews. |
 
-- Always set reasoning effort to extra high (`effort: "xhigh"`), whatever the model.
+- When Fable 5.2 has no quota left, use Opus 5.5 (`opus`) for the hard-judgment work instead, and say so.
+- Set reasoning effort to high (`effort: "high"`) for Fable 5.2, and to extra high (`effort: "xhigh"`) for every other model, the Opus 5.5 fallback included.
 - Pick the cheapest model that can do the task well. Escalate to the next model if a subagent fails or returns weak work; do not retry on the same model.
 
 ## Stack
