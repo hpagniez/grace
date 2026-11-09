@@ -75,9 +75,12 @@ fn hide_non_matching(app: &App) {
     app.press_named(Role::CheckBox, "Hide non-matching").unwrap();
 }
 
+/// Opens each feature in turn, waiting for it to open before the next: an Expand button takes a click on its centre,
+/// and the rows a feature opens move the buttons below it.
 fn open_features(app: &App, features: &[&str]) {
     for f in features {
         app.press_named(Role::Button, &format!("Expand {f}")).unwrap();
+        app.wait_for_node(Role::Button, &format!("Collapse {f}")).unwrap();
     }
 }
 

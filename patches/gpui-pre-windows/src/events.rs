@@ -797,13 +797,17 @@ impl WindowsWindowInner {
 
     fn handle_activate_msg(self: &Rc<Self>, wparam: WPARAM) -> Option<isize> {
         let activated = wparam.loword() > 0;
+        self.state.active.set(activated);
 
-        let events = self
-            .state
-            .a11y
-            .try_borrow_mut()
-            .ok()
-            .and_then(|mut a11y| a11y.as_mut()?.adapter.update_window_focus_state(activated));
+        let events = match self.state.a11y.try_borrow_mut() {
+            Ok(mut a11y) => a11y
+                .as_mut()
+                .and_then(|a11y| a11y.adapter.update_window_focus_state(activated)),
+            Err(_) => {
+                self.state.a11y_focus_stale.set(true);
+                None
+            }
+        };
         if let Some(events) = events {
             events.raise();
         }

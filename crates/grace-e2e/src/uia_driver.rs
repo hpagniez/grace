@@ -20,6 +20,13 @@ fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
+/// Before a launch: a key press, F24, which no window acts on. Windows lets a process take the foreground only if the
+/// one that started it had input of late; without it the first Grace a test process starts may open behind another
+/// window, take keys only once `to_foreground` forces it, and never tell UI Automation where its focus is (#301).
+pub fn prepare() -> Result<()> {
+    Keyboard::new().send_keys("{F24}").map_err(err)
+}
+
 impl UiaDriver {
     pub fn new(pid: u32) -> Result<Self> {
         let automation = UIAutomation::new().map_err(err)?;
@@ -47,18 +54,27 @@ impl UiaDriver {
 
     /// Brings the window to the foreground and checks that it has the focus. Windows' foreground lock can refuse a
     /// process that had no input of late, and `SetFocus` then still answers success while the keys would go to
-    /// another window; a tap of Alt counts as input and lifts the lock, so the next try takes.
+    /// another window; a key press counts as input and lifts the lock, so the next try takes. The key is F24, which no
+    /// window acts on: a tap of Alt, which this sent before, put a window that had the focus after all in its menu
+    /// mode, and the Tabs after it never reached Grace's controls (#301). A window that has the focus already is left
+    /// alone: `SetFocus` on it would move the focus to the window from the control that holds it.
     fn to_foreground(&self) -> Result<()> {
+        let ours = || {
+            let focused = self.automation.get_focused_element().ok();
+            focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid)
+        };
+        if ours() {
+            return Ok(());
+        }
         let window = self.window()?;
         for _ in 0..5 {
             window
                 .set_focus()
                 .map_err(|e| format!("cannot bring the window to the foreground: {e}"))?;
-            let focused = self.automation.get_focused_element().ok();
-            if focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid) {
+            if ours() {
                 return Ok(());
             }
-            Keyboard::new().send_keys("{alt}").map_err(err)?;
+            Keyboard::new().send_keys("{F24}").map_err(err)?;
         }
         Err(format!("process {}'s window does not take the focus", self.pid))
     }
@@ -160,6 +176,9 @@ impl Driver for UiaDriver {
                 .nth(i)
                 .ok_or_else(|| format!("{:?} is gone", node.path))?;
         }
+        // a click brings its window to the foreground first: a dialog opened in a window that is not active never
+        // gets the focus, and the keys after it went nowhere (#301)
+        self.to_foreground()?;
         // as a click would: AccessKit gives Invoke to a button, Toggle to a check box, and neither to a button that
         // opens something (ExpandCollapse) or to a tree item; those take a click of the pointer on their centre
         if let Ok(invoke) = at.get_pattern::<UIInvokePattern>() {
@@ -168,7 +187,6 @@ impl Driver for UiaDriver {
         if let Ok(toggle) = at.get_pattern::<UITogglePattern>() {
             return toggle.toggle().map_err(err);
         }
-        self.to_foreground()?;
         let r = at
             .get_bounding_rectangle()
             .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
@@ -224,6 +242,26 @@ impl Driver for UiaDriver {
     }
 
     /// The window pattern's Close: `WM_CLOSE`, as the title bar's button sends.
+    fn focus_report(&self) -> String {
+        let describe = |e: &UIElement| {
+            format!(
+                "{:?} {:?} pid {:?} framework {:?}",
+                e.get_control_type().ok(),
+                e.get_name().ok(),
+                e.get_process_id().ok(),
+                e.get_framework_id().ok()
+            )
+        };
+        let focused = self.automation.get_focused_element().map(|f| {
+            let is_window = self
+                .window()
+                .ok()
+                .and_then(|w| self.automation.compare_elements(&w, &f).ok());
+            format!("{}, the window itself: {is_window:?}", describe(&f))
+        });
+        format!("UI Automation's focus: {focused:?} (our pid {})", self.pid)
+    }
+
     fn close(&self) -> Result<()> {
         self.window()?
             .get_pattern::<uiautomation::patterns::UIWindowPattern>()

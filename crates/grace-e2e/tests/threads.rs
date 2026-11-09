@@ -158,30 +158,33 @@ fn the_box_starts_from_karate_pom_json_and_the_persons_count_wins() {
     assert_eq!(ran_threads(&runs(&app)[0]), 1);
 }
 
-/// TC-06: a run's disabled state reaches UI Automation only (the pinned AT-SPI adapter drops it), so on Linux this
-/// checks the box refuses a change during the run instead
+/// TC-06. GPUI Kit's `Input` keeps a disabled box out of the accessibility tree's disabled state on both platforms (its
+/// text element writes the node, and GPUI has no disabled setter), so this checks what the state does instead: the
+/// focused box takes no step during the run, and takes one again after it.
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn the_box_is_disabled_while_a_run_is_going() {
     let (dir, app) = open_clean(None);
-    let enabled = |t: &Node| t.find(&Role::SpinButton, THREADS).is_some_and(|b| b.states.enabled);
-    assert!(enabled(&app.tree().unwrap()));
+    app.wait_for_text(Role::SpinButton, THREADS, "1").unwrap();
+    app.fill(Role::SpinButton, THREADS, "1").unwrap();
     app.press_named(Role::Button, "Run all").unwrap();
     app.wait_for("the run going", WAIT, |t| {
-        t.find(&Role::Button, "Cancel").is_some_and(|b| b.states.enabled) || !enabled(t)
+        t.find(&Role::Button, "Cancel").is_some_and(|b| b.states.enabled)
     })
     .unwrap();
-    if cfg!(windows) {
-        assert!(!enabled(&app.tree().unwrap()));
-    }
-    let _ = app.key(Key::Up);
+    app.key(Key::Up).unwrap();
     finished(&app, 1);
     assert_eq!(
         saved_threads(&app, &dir),
         Value::Null,
         "the box took no change during the run"
     );
-    app.wait_for("the box enabled again", WAIT, enabled).unwrap();
+    app.fill(Role::SpinButton, THREADS, "1").unwrap();
+    app.key(Key::Up).unwrap();
+    app.wait_until("the box stepped after the run", WAIT, || {
+        saved_threads(&app, &dir) == json!(2)
+    })
+    .unwrap();
 }
 
 /// TC-09
