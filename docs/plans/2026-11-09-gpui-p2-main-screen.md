@@ -98,6 +98,11 @@ P1's rules hold ([P1 plan](2026-11-09-gpui-p1-core.md#porting-rules)): same fixt
 | `bottom_panel` | Focus never scrolls the layout: GPUI does not scroll an element into view when it takes the focus, so a cut-off layout cannot lose its toolbar (E-panel-11) | Electron's DOM scrolled the focused element into view | Nothing to test: GPUI has no such scroll |
 | `bottom_panel` | The History and HTTP tabs show no content yet, and HTTP no count; the Variables tab comes with P4 | Their panels are P3's and P4's (P2 plan) | Their rows stay with P3 and P4 |
 | `console`, `bottom_panel` | The console's colours on the sunken token in both themes (CB-12, E-console-02) are looked at in PR 6's check by eye | The tree has no colours | PR 6 |
+| `details` | A step's keyword and text show as one line in the mono face, cut as one, where Electron Grace set the keyword in the sans at 500 | `tooltip::cut` cuts one run of text, and the tooltip names the whole step, keyword included, as before | `details::tests::long_text` |
+| `details` | Details reads the state where the `Grace` entity keeps it and builds only the part shown: no copy of the state, no memo, and a group's status is worked out once per frame it is drawn | GPUI draws the view again on a change; Solid needed a memo to share one `deriveStatus` walk between the badge and the counts | `details::tests::a_group` (the counts and the status from one walk each) |
+| `details` | The open logs are kept by step index in the `Details` entity and cleared when the selection changes | Solid made the rows afresh for a new test, which closed them; GPUI keeps an entity's fields | `details::tests::a_test::a_new_selection_closes_the_logs` |
+| `details` | The headless tests check the parts drawn, where they sit and the tokens they take, not class names; the names a screen reader reads are the e2e test's | GPUI has no classes, and a headless window builds no accessibility tree | `details::tests`, `grace-e2e/tests/details.rs` |
+| `details` | E-details-01's first half, a test's steps and comments from its file before a run, waits for phase P4 with the file's steps | Details shows no steps before a run until P4 ports the file's steps | E-details-01's run half in `grace-e2e/tests/details.rs::failure_details` |
 
 ## PR 1: the window, the state and the home screen
 
