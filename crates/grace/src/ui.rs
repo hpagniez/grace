@@ -250,12 +250,24 @@ pub enum FieldKind {
 /// An inline message under a field (`FieldMessage.tsx`): 12 px with its 14 px icon. A screen reader reads it as the
 /// field's description (the field sets it), so it is a plain label here.
 pub fn field_message(id: impl Into<ElementId>, kind: FieldKind, text: impl Into<SharedString>, cx: &App) -> AnyElement {
+    field_message_marked(id, kind, None, text, cx)
+}
+
+/// A field message with its own icon in place of its kind's: the Properties dialog's secrets note has a lock.
+pub fn field_message_marked(
+    id: impl Into<ElementId>,
+    kind: FieldKind,
+    mark: Option<Icon>,
+    text: impl Into<SharedString>,
+    cx: &App,
+) -> AnyElement {
     let t = Theme::global(cx).tokens;
-    let (tone, mark) = match kind {
+    let (tone, own) = match kind {
         FieldKind::Hint => (t.muted, Icon::Info),
         FieldKind::Warning => (t.cancelled, Icon::TriangleAlert),
         FieldKind::Error => (t.failed, Icon::CircleAlert),
     };
+    let mark = mark.unwrap_or(own);
     let text = text.into();
     let id = id.into();
     let selector: SharedString = id.to_string().into();

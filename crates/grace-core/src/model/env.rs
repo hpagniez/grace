@@ -77,6 +77,9 @@ impl fmt::Display for ValueError {
     }
 }
 
+/// What an environment's name may hold, said under a box that holds another (`INVALID_ENV` of `EnvPicker.tsx`).
+pub const INVALID_ENV: &str = "Use letters, digits, '.', '_' or '-' (up to 64), starting with a letter or digit";
+
 /// `ENV_NAME`, `/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/`: an environment's name. Written as a check of bytes rather than
 /// a regular expression: it only accepts ASCII, so a byte is a character.
 pub fn valid_env_name(name: &str) -> bool {

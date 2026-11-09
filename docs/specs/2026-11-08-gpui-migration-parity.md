@@ -70,12 +70,12 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | EV-03 | Changing the environment clears results | `grace-e2e/tests/env.rs::changing_the_environment_clears_results` | ☑ |
 | EV-04 | A run uses the environment | `grace-e2e/tests/env.rs::a_run_uses_the_environment` | ☑ |
 | EV-05 | An environment without an overlay file | `grace-e2e/tests/env.rs::an_environment_without_an_overlay_file`; `grace::env_picker::tests::says_when_the_environment_has_no_overlay_file` | ☑ |
-| EV-06 | Shared and environment properties, environment wins | | ☐ |
-| EV-07 | A secret is used but never shown | | ☐ |
-| EV-08 | A secret stays off the command line and out of the settings file | | ☐ |
-| EV-09 | Reserved names are refused | | ☐ |
-| EV-10 | An unreadable secret blocks runs | | ☐ |
-| EV-11 | Settings survive a restart | Environment part: `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; the properties with the properties dialog (P2 PR 4b) | ☐ |
+| EV-06 | Shared and environment properties, environment wins | `grace-e2e/tests/properties.rs::shared_and_environment_properties_environment_wins`; `grace-core::runner::tests::properties::shared_and_env_properties_env_wins` | ☑ |
+| EV-07 | A secret is used but never shown | `grace-e2e/tests/properties.rs::a_secret_is_used_but_never_shown` (Windows); `grace-core::runner::tests::properties::a_secret_reaches_the_run_and_is_masked` | ☑ |
+| EV-08 | A secret stays off the command line and out of the settings file | `grace-e2e/tests/properties.rs::a_secret_stays_off_the_command_line_and_out_of_the_settings_file` (Windows); `grace-core::runner::tests::properties::the_secret_is_not_on_the_command_line`, `grace-core::runner::tests::properties::settings_never_hold_the_plain_secret` | ☑ |
+| EV-09 | Reserved names are refused | `grace-e2e/tests/properties.rs::reserved_names_are_refused`; `grace-core::properties_draft::tests::a_reserved_name_is_an_error_in_any_letter_case` | ☑ |
+| EV-10 | An unreadable secret blocks runs | `grace-e2e/tests/properties.rs::an_unreadable_secret_blocks_runs`; `grace-core::runner::tests::properties::an_unreadable_secret_blocks_the_run` | ☑ |
+| EV-11 | Settings survive a restart | `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; `grace-e2e/tests/properties.rs::the_properties_survive_a_restart` (Windows) | ☑ |
 | EV-12 | The machine's KARATE_ENV is ignored | `grace-e2e/tests/env.rs::the_machines_karate_env_is_ignored` | ☑ |
 
 ### HI · HTTP inspector
@@ -769,32 +769,32 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| EP-01 | The name rules follow the kind | | ☐ |
-| EP-02 | Stripped variables cannot be set | | ☐ |
-| EP-03 | Two variables that differ only in case | | ☐ |
-| EP-04 | Switching the kind keeps a saved secret | | ☐ |
-| EP-05 | An environment variable reaches the run and is masked | | ☐ |
-| EP-06 | Both kinds in one run | | ☐ |
-| EP-07 | The variable replaces the machine's in any letter case | | ☐ |
-| EP-08 | The environment's variable wins over a shared one in another case | | ☐ |
-| EP-09 | Dry runs get no environment variables | | ☐ |
-| EP-10 | Old rows load as system properties | | ☐ |
-| EP-11 | A malformed kind is kept, not loaded | | ☐ |
-| EP-12 | Main parses a .properties file as Java does | | ☐ |
-| EP-13 | A byte order mark is dropped | | ☐ |
-| EP-14 | A malformed escape refuses the file | | ☐ |
-| EP-15 | A file over 1 MB is refused | | ☐ |
-| EP-16 | Closing the Open dialog does nothing | | ☐ |
-| EP-17 | The import step lists adds, replaces and skips | | ☐ |
-| EP-18 | A file that is no .properties file shows no line of it | | ☐ |
-| EP-19 | Two keys with one name | | ☐ |
-| EP-20 | An invalid prefix blocks the import | | ☐ |
-| EP-21 | An import past the list limit is blocked | | ☐ |
-| EP-22 | Import adds to the draft only | | ☐ |
-| EP-23 | Back changes nothing | | ☐ |
-| EP-24 | Import into an environment with no list yet | | ☐ |
-| EP-25 | Import needs secret storage | | ☐ |
-| EP-26 | Import a secrets file and run with it (e2e) | | ☐ |
+| EP-01 | The name rules follow the kind | `grace-core::model::env::tests::environment_variables::the_kind_picks_the_rule`; `grace-core::properties_draft::tests::env_variable_picks_the_name_rule_and_save_sends_it` | ☑ |
+| EP-02 | Stripped variables cannot be set | `grace-core::model::env::tests::environment_variables::cannot_be_one_grace_strips_from_karates_environment_in_any_case`; `grace-core::import_plan::tests::skips_a_value_the_value_rules_refuse_and_a_reserved_variable` | ☑ |
+| EP-03 | Two variables that differ only in case | `grace-core::properties_draft::tests::two_variables_that_differ_only_in_case_are_duplicates_a_property_beside_them_is_not` | ☑ |
+| EP-04 | Switching the kind keeps a saved secret | `grace-core::properties_draft::tests::ticking_env_variable_on_a_saved_secret_keeps_it`; `grace-core::runner::tests::properties::the_kind_is_saved_and_switching_it_keeps_the_secret` | ☑ |
+| EP-05 | An environment variable reaches the run and is masked | `grace-core::runner::tests::properties::an_environment_variable_reaches_the_run_masked_and_stays_out_of_run_args_txt` | ☑ |
+| EP-06 | Both kinds in one run | `grace-core::runner::tests::properties::both_kinds_in_one_run` | ☑ |
+| EP-07 | The variable replaces the machine's in any letter case | `grace-core::runner::tests::properties::the_machines_variable_is_replaced_in_any_case` | ☑ |
+| EP-08 | The environment's variable wins over a shared one in another case | `grace-core::runner::tests::properties::the_environments_variable_wins_over_a_shared_one_in_another_case` | ☑ |
+| EP-09 | Dry runs get no environment variables | `grace-core::runner::tests::properties::dry_runs_get_no_environment_variables` | ☑ |
+| EP-10 | Old rows load as system properties | `grace-core::settings::tests::environment_and_run_properties::an_environment_variable_row_keeps_its_kind_a_row_without_one_is_a_system_property` | ☑ |
+| EP-11 | A malformed kind is kept, not loaded | `grace-core::settings::tests::environment_and_run_properties::a_malformed_kind_or_a_name_its_kind_refuses_is_named_and_kept_not_loaded` | ☑ |
+| EP-12 | Main parses a .properties file as Java does | `grace-core::properties_file::tests::parse_properties::reads_keys_the_way_java_util_properties_load_does` | ☑ |
+| EP-13 | A byte order mark is dropped | `grace-core::properties_file::tests::read_properties_file::drops_a_utf_8_byte_order_mark_and_reads_the_rest_as_iso_8859_1` | ☑ |
+| EP-14 | A malformed escape refuses the file | `grace-core::properties_file::tests::read_properties_file::refuses_a_malformed_escape_without_a_value_in_the_message` | ☑ |
+| EP-15 | A file over 1 MB is refused | `grace-core::properties_file::tests::read_properties_file::refuses_a_file_over_1_mb` | ☑ |
+| EP-16 | Closing the Open dialog does nothing | `grace::properties::tests::back_changes_nothing_and_no_file_picked_shows_no_step` | ☑ |
+| EP-17 | The import step lists adds, replaces and skips | `grace::properties::tests::import_shows_what_it_adds_and_puts_secret_variables_in_the_draft`; `grace-core::import_plan::tests::adds_replaces_and_skips_as_variables_with_no_prefix` | ☑ |
+| EP-18 | A file that is no .properties file shows no line of it | `grace::properties::tests::import_shows_what_it_adds_and_puts_secret_variables_in_the_draft` (the empty key counted, not listed) | ☑ |
+| EP-19 | Two keys with one name | `grace-core::import_plan::tests::skips_a_key_that_maps_to_the_name_of_an_earlier_one` | ☑ |
+| EP-20 | An invalid prefix blocks the import | `grace::properties::tests::an_invalid_prefix_blocks_the_import` | ☑ |
+| EP-21 | An import past the list limit is blocked | `grace::properties::tests::an_import_past_the_list_limit_is_blocked` | ☑ |
+| EP-22 | Import adds to the draft only | `grace::properties::tests::import_shows_what_it_adds_and_puts_secret_variables_in_the_draft`; `grace-core::properties_draft::tests::import_puts_secret_variables_in_the_draft_replacing_in_place` | ☑ |
+| EP-23 | Back changes nothing | `grace::properties::tests::back_changes_nothing_and_no_file_picked_shows_no_step` | ☑ |
+| EP-24 | Import into an environment with no list yet | `grace-core::properties_draft::tests::imports_into_the_chosen_environments_new_list` | ☑ |
+| EP-25 | Import needs secret storage | `grace::properties::tests::without_secret_storage_nothing_can_become_a_secret`; `grace-e2e/tests/properties.rs::without_secret_storage_no_secret_can_be_saved` (Linux) | ☑ |
+| EP-26 | Import a secrets file and run with it (e2e) | `grace-e2e/tests/properties.rs::import_a_secrets_file_and_run_with_it` (Windows) | ☑ |
 
 ### GF · Say once when the config fails, and group failures that share an error
 
@@ -1003,13 +1003,13 @@ Phase P2 · 13 tests
 | E-env-03 | Changing the environment clears results | `grace-e2e/tests/env.rs::changing_the_environment_clears_results` | ☑ |
 | E-env-04 | A run uses the environment | `grace-e2e/tests/env.rs::a_run_uses_the_environment` | ☑ |
 | E-env-05 | An environment without an overlay file | `grace-e2e/tests/env.rs::an_environment_without_an_overlay_file` | ☑ |
-| E-env-06 | Shared and environment properties, environment wins | | ☐ |
-| E-env-07 | A secret is used but never shown | | ☐ |
-| E-env-08 | Import a secrets file and run with it | | ☐ |
-| E-env-09 | A secret stays off the command line and out of the settings file | | ☐ |
-| E-env-10 | Reserved names are refused | | ☐ |
-| E-env-11 | An unreadable secret blocks runs | | ☐ |
-| E-env-12 | Settings survive a restart | Environment part: `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; the properties with the properties dialog (P2 PR 4b) | ☐ |
+| E-env-06 | Shared and environment properties, environment wins | `grace-e2e/tests/properties.rs::shared_and_environment_properties_environment_wins`; `grace-core::runner::tests::properties::shared_and_env_properties_env_wins` | ☑ |
+| E-env-07 | A secret is used but never shown | `grace-e2e/tests/properties.rs::a_secret_is_used_but_never_shown` (Windows); `grace-core::runner::tests::properties::a_secret_reaches_the_run_and_is_masked` | ☑ |
+| E-env-08 | Import a secrets file and run with it | `grace-e2e/tests/properties.rs::import_a_secrets_file_and_run_with_it` (Windows) | ☑ |
+| E-env-09 | A secret stays off the command line and out of the settings file | `grace-e2e/tests/properties.rs::a_secret_stays_off_the_command_line_and_out_of_the_settings_file` (Windows); `grace-core::runner::tests::properties::the_secret_is_not_on_the_command_line`, `grace-core::runner::tests::properties::settings_never_hold_the_plain_secret` | ☑ |
+| E-env-10 | Reserved names are refused | `grace-e2e/tests/properties.rs::reserved_names_are_refused`; `grace-core::properties_draft::tests::a_reserved_name_is_an_error_in_any_letter_case` | ☑ |
+| E-env-11 | An unreadable secret blocks runs | `grace-e2e/tests/properties.rs::an_unreadable_secret_blocks_runs`; `grace-core::runner::tests::properties::an_unreadable_secret_blocks_the_run` | ☑ |
+| E-env-12 | Settings survive a restart | `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; `grace-e2e/tests/properties.rs::the_properties_survive_a_restart` (Windows) | ☑ |
 | E-env-13 | The machine's KARATE_ENV is ignored | `grace-e2e/tests/env.rs::the_machines_karate_env_is_ignored` | ☑ |
 
 ### e2e/examples.spec.ts
@@ -1397,7 +1397,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Icon.test.tsx` | 3 | view `Icon` (`grace::ui`), headless | ☐ |
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
-| `src/renderer/PropertiesDialog.test.tsx` | 54 | view `PropertiesDialog` (`grace::ui`), headless | ☐ |
+| `src/renderer/PropertiesDialog.test.tsx` | 54 | `grace-core::properties_draft::tests` (20) and `grace::properties::tests` (18), headless; the fade-out group goes (P2 plan, Redesigns); the look tests (spec R19) wait for P2 PR 6's check by eye | ☐ |
 | `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless | ☐ |
 | `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
 | `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
@@ -1416,7 +1416,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind` | ☐ |
 | `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
 | `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
-| `src/renderer/importPlan.test.ts` | 6 | `grace::ui::importPlan` | ☐ |
+| `src/renderer/importPlan.test.ts` | 6 | `grace-core::import_plan::tests` (6 tests) | ☑ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
 | `src/renderer/nodes.test.ts` | 3 | `grace_core::rows::tests::feature_of` (all 3) | ☑ |
 | `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
