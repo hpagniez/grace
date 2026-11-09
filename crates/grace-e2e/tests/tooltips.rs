@@ -59,7 +59,6 @@ fn shows_on_hover_also_over_a_disabled_button() {
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn shows_on_keyboard_focus_and_closes_with_escape() {
     let app = gallery();
-    // the keys go to the window under the pointer
     let anywhere = app.wait_for_node(Role::Button, "Pressed 0 times").unwrap();
     app.hover(&anywhere).unwrap();
     tab_to(&app, Role::Button, "Settings");

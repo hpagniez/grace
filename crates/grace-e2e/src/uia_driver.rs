@@ -147,7 +147,12 @@ impl Driver for UiaDriver {
         Mouse::new().move_to(&Point::new(x, y)).map_err(err)
     }
 
+    /// To the app's window, brought to the foreground first: keys go to the foreground window, and a test that
+    /// only pressed through the tree never made it so.
     fn key(&self, key: Key) -> Result<()> {
+        self.window()?
+            .set_focus()
+            .map_err(|e| format!("cannot bring the window to the foreground: {e}"))?;
         Keyboard::new()
             .send_keys(match key {
                 Key::Tab => "{tab}",
