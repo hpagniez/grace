@@ -31,14 +31,14 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WS-01 | Open a project and see its tests | | ☐ |
 | WS-02 | Maven layout with classpath resources | | ☐ |
 | WS-03 | Syntax error is reported, not hidden | | ☐ |
-| WS-04 | Run all with live progress | | ☐ |
+| WS-04 | Run all with live progress | progress part: `grace-e2e/tests/run.rs::run_all_with_live_progress`; the rows turning running, passed and failed with the tree (P2 PR 3) | ☐ |
 | WS-05 | Run one outline row | | ☐ |
 | WS-06 | Failure details | | ☐ |
 | WS-07 | A feature edited outside the app | | ☐ |
-| WS-08 | Cancel leaves nothing behind | | ☐ |
-| WS-09 | Closing the app during a run | | ☐ |
-| WS-10 | Nothing to run | | ☐ |
-| WS-11 | Open the HTML report | | ☐ |
+| WS-08 | Cancel leaves nothing behind | progress, Java and Report: `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind`; "slow loop" interrupted with the tree (P2 PR 3) | ☐ |
+| WS-09 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` | ☑ |
+| WS-10 | Nothing to run | Run all part: `grace-e2e/tests/run.rs::nothing_to_run`, `grace::toolbar::tests::the_actions::run_all_is_disabled_with_nothing_to_run`; the tree's line with the tree (P2 PR 3) | ☐ |
+| WS-11 | Open the HTML report | `grace-e2e/tests/run.rs::report_opens_the_runs_html_report` | ☑ |
 | WS-12 | The project is not modified | | ☐ |
 
 ### TF · Tag filter: run by tag
@@ -334,15 +334,15 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| LV-01 | Finding tests shows the stripe | | ☐ |
+| LV-01 | Finding tests shows the stripe | `grace::progress::tests::the_bar_r14_1::finding_tests_shows_the_stripe_until_the_runner_is_no_longer_busy`, `grace::progress::tests::after_a_run_r14_2::shows_finding_tests_with_the_turning_icon_while_the_runner_discovers` | ☑ |
 | LV-02 | Finding tests for the first time | | ☐ |
-| LV-03 | Tests found | | ☐ |
-| LV-04 | The stripe never covers a run's results | | ☐ |
-| LV-05 | The stripe stays until the first result | | ☐ |
-| LV-06 | The bar fills smoothly | | ☐ |
-| LV-07 | Cancel stops the stripe | | ☐ |
-| LV-08 | Reduced motion | | ☐ |
-| LV-09 | Run and finish (e2e) | | ☐ |
+| LV-03 | Tests found | `grace::progress::tests::the_bar_r14_1::finding_tests_shows_the_stripe_until_the_runner_is_no_longer_busy` | ☑ |
+| LV-04 | The stripe never covers a run's results | `grace::progress::tests::the_bar_r14_1::the_stripe_hides_the_last_runs_segments_and_they_show_again_after` | ☑ |
+| LV-05 | The stripe stays until the first result | `grace::progress::tests::the_bar_r14_1::the_stripe_stays_until_the_first_result_and_a_cancel_stops_it` | ☑ |
+| LV-06 | The bar fills smoothly | `grace::progress::tests::the_bar_r14_1::is_6_px_with_2_px_gaps_between_passed_failed_and_cancelled` (a spring, not a CSS transition: P2 plan, Redesigns) | ☑ |
+| LV-07 | Cancel stops the stripe | `grace::progress::tests::the_bar_r14_1::the_stripe_stays_until_the_first_result_and_a_cancel_stops_it` | ☑ |
+| LV-08 | Reduced motion | `grace::progress::tests::the_bar_r14_1::reduced_motion_keeps_the_stripe_still` | ☑ |
+| LV-09 | Run and finish (e2e) | `grace-e2e/tests/run.rs::run_all_with_live_progress` | ☑ |
 
 ### PU · Premium look and feel with a defined graphic chart
 
@@ -559,13 +559,13 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| TB-01 | The toolbar holds the name and the chip, not the path | | ☐ |
-| TB-02 | The name is cut in the middle, keeping its end | | ☐ |
-| TB-03 | A cut name explains itself | | ☐ |
+| TB-01 | The toolbar holds the name and the chip, not the path | `grace::toolbar::tests::the_project::shows_the_folder_name_and_the_layout_and_leaves_the_path_to_the_status_bar_r1_1`, `grace::toolbar::tests::the_project::draws_the_name_and_the_chip` | ☑ |
+| TB-02 | The name is cut in the middle, keeping its end | `grace::toolbar::tests::the_project::cuts_a_long_name_in_the_middle_its_start_gives_way_its_last_12_characters_stay_r1_2`, `grace::toolbar::tests::the_project::lets_the_chip_go_whole_before_the_name_is_cut_r1_2` | ☑ |
+| TB-03 | A cut name explains itself | `grace::toolbar::tests::the_project::explains_a_cut_name_in_a_tooltip_and_says_nothing_while_it_fits_r1_3` | ☑ |
 | TB-04 | The name shows whole at the default size (e2e) | | ☐ |
 | TB-05 | A long path at the minimum width (e2e) | | ☐ |
-| TB-06 | The status bar shows the path while a project is open | | ☐ |
-| TB-07 | A cut path explains itself | | ☐ |
+| TB-06 | The status bar shows the path while a project is open | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` | ☑ |
+| TB-07 | A cut path explains itself | `grace::status_bar::tests::explains_a_cut_path_in_a_tooltip_and_says_nothing_while_it_fits` | ☑ |
 | TB-08 | Env and Threads below 1280 px | | ☐ |
 
 ### CF · A one-line filter bar
@@ -933,8 +933,8 @@ Phase P2 · 2 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-cancel-01 | Cancel leaves nothing behind | | ☐ |
-| E-cancel-02 | Closing the app during a run | | ☐ |
+| E-cancel-01 | Cancel leaves nothing behind | progress, Java and Report: `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind`; the slow feature's own run and "slow loop" interrupted with the tree (P2 PR 3) | ☐ |
+| E-cancel-02 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` (Run all in place of the slow feature's own button) | ☑ |
 
 ### e2e/console-find.spec.ts
 
@@ -1178,7 +1178,7 @@ Phase P3 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-report-01 | Open the HTML report | | ☐ |
+| E-report-01 | Open the HTML report | `grace-e2e/tests/run.rs::report_opens_the_runs_html_report` (Run all in place of the outline feature's own button) | ☑ |
 
 ### e2e/run.spec.ts
 
@@ -1186,10 +1186,10 @@ Phase P2 · 4 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-run-01 | Run all with live progress | | ☐ |
+| E-run-01 | Run all with live progress | progress part: `grace-e2e/tests/run.rs::run_all_with_live_progress`; the rows with the tree (P2 PR 3) | ☐ |
 | E-run-02 | Run one outline row | | ☐ |
 | E-run-03 | A feature edited outside the app | | ☐ |
-| E-run-04 | The project is not modified | | ☐ |
+| E-run-04 | The project is not modified | `grace-e2e/tests/run.rs::the_project_is_not_modified` | ☑ |
 
 ### e2e/scrollbar.spec.ts
 
@@ -1392,18 +1392,18 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/FilterBar.test.tsx` | 21 | view `FilterBar` (`grace::ui`), headless | ☐ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
-| `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` (12 of 26 so far; the toolbar's, the tree's and the sheet's port with them in P2 PRs 2, 3 and 5) | ☐ |
+| `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` and, for the toolbar's three, `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons`, `order_and_shape_r13_1` and `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar` (15 of 26 so far; the tree's and the sheet's port with them in P2 PRs 3 and 5) | ☐ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | view `HttpCalls` (`grace::ui`), headless | ☐ |
 | `src/renderer/Icon.test.tsx` | 3 | view `Icon` (`grace::ui`), headless | ☐ |
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
-| `src/renderer/Progress.test.tsx` | 18 | view `Progress` (`grace::ui`), headless | ☐ |
+| `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
 | `src/renderer/PropertiesDialog.test.tsx` | 54 | view `PropertiesDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless | ☐ |
-| `src/renderer/StatusBar.test.tsx` | 18 | view `StatusBar` (`grace::ui`), headless | ☐ |
+| `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
 | `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless | ☐ |
-| `src/renderer/Toolbar.test.tsx` | 36 | view `Toolbar` (`grace::ui`), headless | ☐ |
+| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` (the order, narrow, Home and Refresh, project and action tests so far; Env, Threads and Properties with P2 PR 4, Watch and the step debugger with P4) | ☐ |
 | `src/renderer/Tooltip.test.tsx` | 46 | view `Tooltip` (`grace::ui`), headless | ☐ |
 | `src/renderer/Tree.test.tsx` | 86 | view `Tree` (`grace::ui`), headless | ☐ |
 | `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
