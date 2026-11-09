@@ -196,9 +196,11 @@ impl BottomPanel {
         (self.over == Some(id) && from != id).then(|| self.index(from) < self.index(id))
     }
 
-    fn splitter_view(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// The splitter; `shown` is the height this frame draws, which its value says at once (the last layout's would
+    /// lag a frame behind a key).
+    fn splitter_view(&self, shown: f32, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
-        let (shown, max) = self.sizes();
+        let max = self.sizes().1;
         let this = cx.entity();
         let pressed = self.drag.is_some();
         div()
@@ -441,7 +443,7 @@ impl Render for BottomPanel {
                     .absolute()
                     .size_full(),
             )
-            .child(self.splitter_view(cx))
+            .child(self.splitter_view(h.round(), cx))
             .child(
                 div()
                     .flex()

@@ -143,6 +143,7 @@ impl Render for GraceWindow {
             .filter(|g| g.read(cx).state.loaded && !g.read(cx).state.home())
             .and(self.panel.as_ref())
             .map(|p| p.read(cx).console.clone());
+        let also = console.as_ref().map(|_| crate::console::CONTEXT);
         let view = self.grace.clone().map(|grace| {
             let state = grace.read(cx).state.clone();
             if !state.loaded {
@@ -196,7 +197,7 @@ impl Render for GraceWindow {
                 .child(crate::status_bar::render(&state, cx))
                 .into_any_element()
         });
-        a11y::tab_order(div().id("grace"), &self.focus)
+        a11y::tab_order(div().id("grace"), &self.focus, also)
             .role(Role::Application)
             .aria_label("Grace")
             .size_full()
@@ -207,10 +208,7 @@ impl Render for GraceWindow {
             .text_size(px(crate::theme::METRICS.text_sm.size))
             .when_some(console, |d, c| {
                 let (find, next, prev) = (c.clone(), c.clone(), c);
-                d.key_context(crate::console::CONTEXT)
-                    .on_action(move |_: &crate::console::FindInConsole, w, cx| {
-                        find.update(cx, |c, cx| c.open_bar(w, cx))
-                    })
+                d.on_action(move |_: &crate::console::FindInConsole, w, cx| find.update(cx, |c, cx| c.open_bar(w, cx)))
                     .on_action(move |_: &crate::console::NextError, _, cx| {
                         next.update(cx, |c, cx| c.step_error(true, cx))
                     })

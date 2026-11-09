@@ -71,7 +71,7 @@ impl Render for Gallery {
         for (i, status) in MarkStatus::ALL.into_iter().enumerate() {
             marks = marks.child(status_mark(("mark", i), status, 16., false, false, cx));
         }
-        crate::a11y::tab_order(div().id("gallery"), &self.focus)
+        crate::a11y::tab_order(div().id("gallery"), &self.focus, None)
             .role(Role::Group)
             .aria_label("Elements")
             .size_full()

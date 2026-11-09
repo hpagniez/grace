@@ -78,7 +78,7 @@ fn the_splitter_works_from_the_keyboard() {
     app.key(Key::Up).unwrap();
     wait_height(&app, "two steps up", |h| h == 224.);
     app.wait_until("the height saved", WAIT, || {
-        app.settings()["panelHeight"] == json!(224.0)
+        app.settings()["panelHeight"] == json!(224)
     })
     .unwrap();
     app.key(Key::Home).unwrap();
@@ -103,7 +103,7 @@ fn the_height_survives_a_restart() {
     app.key(Key::Up).unwrap();
     wait_height(&app, "a step up", |h| h == 208.);
     app.wait_until("the height saved", WAIT, || {
-        app.settings()["panelHeight"] == json!(208.0)
+        app.settings()["panelHeight"] == json!(208)
     })
     .unwrap();
     let app = app.relaunch(&[]).unwrap();

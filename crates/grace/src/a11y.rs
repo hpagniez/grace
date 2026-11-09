@@ -105,11 +105,21 @@ pub fn bind_keys(cx: &mut App) {
 }
 
 /// Makes `root` the window's root for the keyboard: it holds `focus` when nothing inside does, so the keys reach it,
-/// and Tab and Shift+Tab move through the tab stops in order. A dialog keeps its own Tab inside it.
-pub fn tab_order(root: gpui::Stateful<gpui::Div>, focus: &gpui::FocusHandle) -> gpui::Stateful<gpui::Div> {
+/// and Tab and Shift+Tab move through the tab stops in order. A dialog keeps its own Tab inside it. `also` adds a key
+/// context of the root's own, such as the project view's: an element has one context, which may name several.
+pub fn tab_order(
+    root: gpui::Stateful<gpui::Div>,
+    focus: &gpui::FocusHandle,
+    also: Option<&'static str>,
+) -> gpui::Stateful<gpui::Div> {
     use gpui::InteractiveElement as _;
+    let mut context = gpui::KeyContext::default();
+    context.add(WINDOW);
+    if let Some(also) = also {
+        context.add(also);
+    }
     root.track_focus(focus)
-        .key_context(WINDOW)
+        .key_context(context)
         .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
         .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
 }
