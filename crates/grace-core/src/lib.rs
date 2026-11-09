@@ -14,4 +14,5 @@ pub mod recent;
 pub mod secrets;
 pub mod settings;
 pub mod trends;
+pub mod vendor;
 pub mod window;
