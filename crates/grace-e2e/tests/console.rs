@@ -150,13 +150,16 @@ fn step_through_a_failing_runs_errors() {
     run_all(&app);
     app.wait_for("two errors", WAIT, |t| found(t, "2 errors")).unwrap();
     assert!(app.tree().unwrap().find(&Role::Group, "Errors").is_some());
-    // the ERROR line comes during the run, the failed test in Karate's summary at its end
+    // the ERROR line comes during the run, the failed test in Karate's summary at its end. A click on the console
+    // first, as a person's hand would: on CI's Xvfb the window did not always take an F8 sent to it unfocused
+    let log = app.wait_for_node(Role::Other("Log".into()), "Console").unwrap();
+    app.click(&log).unwrap();
     app.key(Key::F8).unwrap();
     let tree = app
         .wait_for("an error current", WAIT, |t| {
             status_among(t, &["1 of 2 errors", "2 of 2 errors"]).is_some()
         })
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e}\nfocus: {}", app.focus_report()));
     if status_among(&tree, &["1 of 2 errors"]).is_some() {
         app.key(Key::F8).unwrap();
     }
