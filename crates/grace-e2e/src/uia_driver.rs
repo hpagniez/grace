@@ -161,6 +161,9 @@ impl Driver for UiaDriver {
                 .nth(i)
                 .ok_or_else(|| format!("{:?} is gone", node.path))?;
         }
+        // a click brings its window to the foreground first: a dialog opened in a window that is not active never
+        // gets the focus, and the keys after it went nowhere (#301)
+        self.to_foreground()?;
         // as a click would: AccessKit gives Invoke to a button, Toggle to a check box, and neither to a button that
         // opens something (ExpandCollapse) or to a tree item; those take a click of the pointer on their centre
         if let Ok(invoke) = at.get_pattern::<UIInvokePattern>() {
@@ -169,7 +172,6 @@ impl Driver for UiaDriver {
         if let Ok(toggle) = at.get_pattern::<UITogglePattern>() {
             return toggle.toggle().map_err(err);
         }
-        self.to_foreground()?;
         let r = at
             .get_bounding_rectangle()
             .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
