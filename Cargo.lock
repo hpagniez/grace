@@ -2835,6 +2835,7 @@ dependencies = [
  "futures-lite",
  "serde_json",
  "uiautomation",
+ "x11rb",
 ]
 
 [[package]]

@@ -170,6 +170,9 @@ pub trait Driver {
     fn hover(&self, node: &Node) -> Result<()>;
     /// Presses a key on the keyboard, for the window under the pointer or with the focus.
     fn key(&self, key: Key) -> Result<()>;
+    /// Asks the window to close, as its close button does: Grace then saves, stops a run and quits (Playwright's
+    /// `app.close()`).
+    fn close(&self) -> Result<()>;
 }
 
 /// The built `Grace` binary: `GRACE_EXE` when set, else the workspace's debug build.
@@ -300,6 +303,52 @@ impl App {
             .collect()
     }
 
+    /// The files Grace opened with their program, in order (`e2e-seams.jsonl`): Report's HTML.
+    pub fn opened_paths(&self) -> Vec<String> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "open")
+            .filter_map(|v| v["path"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    /// The Java processes this Grace started: their command line holds its data folder, where a run's output and
+    /// argument file go (`ourJavaPids` of `e2e/helpers.ts`, which looked for the bundled JRE).
+    pub fn java_pids(&self) -> Vec<u32> {
+        java_pids_under(&self.data)
+    }
+
+    /// Asks the window to close, as its close button does.
+    pub fn close(&self) -> Result<()> {
+        self.driver.close()
+    }
+
+    /// Waits for Grace's process to end, up to `timeout`; true if it did.
+    pub fn exited(&mut self, timeout: Duration) -> bool {
+        let start = Instant::now();
+        while start.elapsed() < timeout {
+            if let Ok(Some(_)) = self.child.try_wait() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        false
+    }
+
+    /// Waits until `ok` holds, checking every 50 ms, up to `timeout`.
+    pub fn wait_until(&self, what: &str, timeout: Duration, ok: impl Fn() -> bool) -> Result<()> {
+        let start = Instant::now();
+        while start.elapsed() < timeout {
+            if ok() {
+                return Ok(());
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        Err(format!("timed out waiting for {what}"))
+    }
+
     pub fn data_dir(&self) -> &Path {
         &self.data
     }
@@ -339,6 +388,29 @@ impl App {
         self.driver.press(node)
     }
 
+    /// Presses the node with this role and name, reading the tree afresh: a node is pressed by its place in the
+    /// tree, and a tree that changed between the read and the press (a run's first event, a button's new state) moves
+    /// it. Tries again for up to 5 s.
+    pub fn press_named(&self, role: Role, name: &str) -> Result<()> {
+        let start = Instant::now();
+        loop {
+            let tried = self
+                .driver
+                .tree()
+                .and_then(|t| {
+                    t.find(&role, name)
+                        .cloned()
+                        .ok_or_else(|| format!("no {role:?} {name:?}"))
+                })
+                .and_then(|n| self.driver.press(&n));
+            match tried {
+                Ok(()) => return Ok(()),
+                Err(e) if start.elapsed() > Duration::from_secs(5) => return Err(e),
+                Err(_) => std::thread::sleep(Duration::from_millis(50)),
+            }
+        }
+    }
+
     pub fn hover(&self, node: &Node) -> Result<()> {
         self.driver.hover(node)
     }
@@ -363,6 +435,42 @@ impl Drop for App {
             let _ = std::fs::remove_dir_all(&self.data);
         }
     }
+}
+
+/// Java processes whose command line names `dir`.
+#[cfg(target_os = "linux")]
+fn java_pids_under(dir: &Path) -> Vec<u32> {
+    let dir = dir.to_string_lossy();
+    let Ok(procs) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    procs
+        .flatten()
+        .filter_map(|p| {
+            let pid: u32 = p.file_name().to_str()?.parse().ok()?;
+            let cmd = std::fs::read(p.path().join("cmdline")).ok()?;
+            let cmd = String::from_utf8_lossy(&cmd).replace('\0', " ");
+            let first = cmd.split(' ').next()?;
+            (first.ends_with("java") && cmd.contains(dir.as_ref())).then_some(pid)
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn java_pids_under(dir: &Path) -> Vec<u32> {
+    let script = "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }";
+    let Ok(out) = Command::new("powershell")
+        .args(["-NoProfile", "-Command", script])
+        .output()
+    else {
+        return Vec::new();
+    };
+    let dir = dir.to_string_lossy().to_lowercase();
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| l.to_lowercase().contains(&dir))
+        .filter_map(|l| l.split(' ').next()?.parse().ok())
+        .collect()
 }
 
 /// The file the app reads its seams' answers from; a test writes it with `App::answer_folder`.

@@ -160,6 +160,15 @@ impl Driver for UiaDriver {
             })
             .map_err(err)
     }
+
+    /// The window pattern's Close: `WM_CLOSE`, as the title bar's button sends.
+    fn close(&self) -> Result<()> {
+        self.window()?
+            .get_pattern::<uiautomation::patterns::UIWindowPattern>()
+            .map_err(err)?
+            .close()
+            .map_err(err)
+    }
 }
 
 /// UI Automation's control types to the driver's roles.

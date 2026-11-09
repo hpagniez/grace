@@ -190,6 +190,27 @@ impl Driver for AtspiDriver {
             },
         ])
     }
+
+    fn close(&self) -> Result<()> {
+        let window = self.x_window()?;
+        ask_to_close(window.parse().map_err(err)?)
+    }
+}
+
+/// `WM_DELETE_WINDOW`, what a window manager sends when the close button is pressed. `xdotool windowclose` would
+/// destroy the window instead, which the app never hears of.
+fn ask_to_close(window: u32) -> Result<()> {
+    use x11rb::connection::Connection as _;
+    use x11rb::protocol::xproto::{ClientMessageEvent, ConnectionExt as _, EventMask};
+    let (conn, _) = x11rb::connect(None).map_err(err)?;
+    let atom =
+        |name: &[u8]| -> Result<u32> { Ok(conn.intern_atom(false, name).map_err(err)?.reply().map_err(err)?.atom) };
+    let (protocols, delete) = (atom(b"WM_PROTOCOLS")?, atom(b"WM_DELETE_WINDOW")?);
+    let event = ClientMessageEvent::new(32, window, protocols, [delete, x11rb::CURRENT_TIME, 0, 0, 0]);
+    conn.send_event(false, window, EventMask::NO_EVENT, event)
+        .map_err(err)?;
+    conn.flush().map_err(err)?;
+    Ok(())
 }
 
 fn xdotool(args: &[&str]) -> Result<()> {
