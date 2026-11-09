@@ -95,6 +95,20 @@ jobs:
       # the patched GPUI crate is crates.io's plus the idle patch, and nothing else (patches/README.md)
       - if: ${{ runner.os == 'Linux' }}
         run: sh patches/check.sh
+      # grace-core's tests run the real Java and Karate (guide R6.1): the bundled JRE and jar on Windows, the runner's
+      # Java 21 and the pinned jar on Linux
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            vendor
+            !vendor/.download
+          key: vendor-rust-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
+      - if: ${{ runner.os == 'Windows' }}
+        run: node scripts/fetch-vendor.mjs
+      - if: ${{ runner.os == 'Linux' }}
+        run: |
+          node scripts/fetch-vendor.mjs --jar
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --locked
       # GPUI Grace's e2e tests through the accessibility tree (guide R6.5, ADR 0017): AT-SPI under Xvfb on Linux for

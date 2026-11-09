@@ -57,6 +57,7 @@ Each feature of Grace, where its code is today, where its port goes, and its pha
 3. A row that cannot apply any more (it tests Electron, the DOM, Chromium or Solid itself) is marked `n/a` with the reason. Only the owner accepts an `n/a` on a row someone using Grace would notice.
 4. A unit test ports test for test, with the same name in snake case and the same fixtures (`test/fixtures/events/`, `test/fixtures/projects/`). It may merge or split only when the PR says why.
 5. Every bug fixed in Electron Grace stays fixed: the [regressions](#regressions-to-keep-fixed) list is part of the parity bar.
+6. A port is not a transcription (the owner, 2026-11-09). Where Rust or GPUI does something better than the TypeScript did (simpler, faster, more idiomatic), the port does it that way, as long as what the person sees, the data on disk and the Karate command line stay at parity. Every such change is recorded in the phase plan's **Redesigns** table, in the PR that makes it: what changed, why, and the test that keeps parity. The P1 table is in [its plan](../plans/2026-11-09-gpui-p1-core.md#redesigns).
 
 ### R4. What Electron gave for free
 

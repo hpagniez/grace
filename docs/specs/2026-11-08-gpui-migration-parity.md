@@ -1,6 +1,6 @@
 # GPUI migration: parity checklist
 
-Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P0.
+Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P1.
 
 This is the list the cut-over is checked against ([guide R3](2026-11-08-gpui-migration.md#r3-what-ported-means)): 594 spec scenarios, 194 end-to-end tests and 1,773 unit and component tests, taken from `develop` at `32a5ef6`, the commit of the go decision. A row is ported when the behaviour it names works in GPUI Grace and a test proves it: fill **Proof** with the test (`crates/…::test_name`, `e2e-uia/…`, a bench measure, or a dated check record for a by-hand check) and tick the box in the PR that ports it. A row that does not apply any more says why, in words, in **Proof**, with `n/a` in the last column; only the owner can accept an `n/a` on a user-facing row.
 
@@ -1324,28 +1324,28 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 
 | File | Tests | Moves to | Ported |
 |---|---|---|---|
-| `src/main/batch.test.ts` | 2 | `grace-core::batch` | ☐ |
+| `src/main/batch.test.ts` | 2 | `grace-core::batch::tests` (4 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/editor.test.ts` | 10 | `grace-core::editor` | ☐ |
-| `src/main/fingerprint.test.ts` | 10 | `grace-core::fingerprint` | ☐ |
+| `src/main/fingerprint.test.ts` | 10 | `grace-core::fingerprint::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/flaky.test.ts` | 19 | `grace-core::flaky` | ☐ |
 | `src/main/history.test.ts` | 19 | `grace-core::history` | ☐ |
-| `src/main/karate/argfile.test.ts` | 9 | `grace-core::karate::argfile` | ☐ |
+| `src/main/karate/argfile.test.ts` | 9 | `grace-core::karate::argfile::tests` (12 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/command.test.ts` | 46 | `grace-core::karate::command` | ☐ |
 | `src/main/karate/compiled.test.ts` | 11 | `grace-core::karate::compiled` | ☐ |
 | `src/main/karate/debug.test.ts` | 8 | `grace-core::karate::debug` | ☐ |
 | `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments` | ☐ |
-| `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events` | ☐ |
-| `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http` | ☐ |
+| `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
+| `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries` | ☐ |
 | `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven` | ☐ |
 | `src/main/karate/pom.test.ts` | 19 | `grace-core::karate::pom` | ☐ |
 | `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process` | ☐ |
-| `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run-state` | ☐ |
-| `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps` | ☐ |
+| `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run_state::tests` (26 tests, every Vitest test and the added ones) | ☑ |
+| `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps::tests` (9 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/subfolders.test.ts` | 10 | `grace-core::karate::subfolders` | ☐ |
-| `src/main/karate/tree.test.ts` | 17 | `grace-core::karate::tree` | ☐ |
+| `src/main/karate/tree.test.ts` | 17 | `grace-core::karate::tree::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/mask.test.ts` | 15 | `grace-core::mask` | ☐ |
-| `src/main/propertiesFile.test.ts` | 12 | `grace-core::propertiesFile` | ☐ |
+| `src/main/propertiesFile.test.ts` | 12 | `grace-core::properties_file::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/recent.test.ts` | 6 | `grace-core::recent` | ☐ |
 | `src/main/report-zip.test.ts` | 6 | `grace-core::report-zip` | ☐ |
 | `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
@@ -1367,7 +1367,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner` (threads) | ☐ |
 | `src/main/runner.trends.test.ts` | 2 | `grace-core::runner` (trends) | ☐ |
 | `src/main/runner.watch.test.ts` | 18 | `grace-core::runner` (watch) | ☐ |
-| `src/main/secrets.test.ts` | 6 | `grace-core::secrets` | ☐ |
+| `src/main/secrets.test.ts` | 6 | `grace-core::secrets::tests` (10 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/settings.test.ts` | 62 | `grace-core::settings` | ☐ |
 | `src/main/trends.test.ts` | 10 | `grace-core::trends` | ☐ |
 | `src/main/updates/check.test.ts` | 11 | `grace-core::updates::check` | ☐ |
@@ -1378,7 +1378,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/updates/switch.test.ts` | 22 | `grace-core::updates::switch` | ☐ |
 | `src/main/updates/updater.test.ts` | 36 | `grace-core::updates::updater` | ☐ |
 | `src/main/watch.test.ts` | 13 | `grace-core::watch` | ☐ |
-| `src/main/window.test.ts` | 5 | `grace-core::window` | ☐ |
+| `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless | ☐ |
 | `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless | ☐ |
 | `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
@@ -1430,15 +1430,15 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
 | `src/renderer/ui.test.ts` | 1 | `grace::ui::ui` | ☐ |
 | `src/renderer/virtual.test.ts` | 15 | `grace::ui::virtual` | ☐ |
-| `src/shared/env.test.ts` | 29 | `grace-core::model::env` | ☐ |
-| `src/shared/flaky.test.ts` | 6 | `grace-core::model::flaky` | ☐ |
-| `src/shared/history.test.ts` | 18 | `grace-core::model::history` | ☐ |
-| `src/shared/http.test.ts` | 19 | `grace-core::model::http` | ☐ |
-| `src/shared/sanity.test.ts` | 1 | `grace-core::model::sanity` | ☐ |
-| `src/shared/status.test.ts` | 9 | `grace-core::model::status` | ☐ |
-| `src/shared/tags.test.ts` | 14 | `grace-core::model::tags` | ☐ |
-| `src/shared/theme.test.ts` | 4 | `grace-core::model::theme` | ☐ |
-| `src/shared/threads.test.ts` | 3 | `grace-core::model::threads` | ☐ |
-| `src/shared/updates.test.ts` | 18 | `grace-core::model::updates` | ☐ |
-| `src/shared/version.test.ts` | 6 | `grace-core::model::version` | ☐ |
+| `src/shared/env.test.ts` | 29 | `grace-core::model::env::tests` (54 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/flaky.test.ts` | 6 | `grace-core::model::flaky::tests` (7 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/history.test.ts` | 18 | `grace-core::model::history::tests` (22 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/http.test.ts` | 19 | `grace-core::model::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/sanity.test.ts` | 1 | Checked that Vitest runs; `cargo test` needs no such check | n/a |
+| `src/shared/status.test.ts` | 9 | `grace-core::model::status::tests` (10 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/tags.test.ts` | 14 | `grace-core::model::tags::tests` (15 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/theme.test.ts` | 4 | `grace-core::model::theme::tests` (5 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/threads.test.ts` | 3 | `grace-core::model::threads::tests` (14 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/updates.test.ts` | 18 | `grace-core::model::updates::tests` (21 tests, every Vitest test and the added ones) | ☑ |
+| `src/shared/version.test.ts` | 6 | `grace-core::model::version::tests` (7 tests, every Vitest test and the added ones) | ☑ |
 
