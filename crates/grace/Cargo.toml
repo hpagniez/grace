@@ -47,5 +47,9 @@ gpui_platform.workspace = true
 # other than the main one.
 e2e = []
 
+# build.rs reads the versions the console's banner names from package.json and scripts/vendor.json
+[build-dependencies]
+serde_json = "1.0.154"
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

@@ -215,6 +215,12 @@ impl Driver for AtspiDriver {
                 Key::CtrlEnter => "ctrl+Return",
                 Key::SelectAll => "ctrl+a",
                 Key::Backspace => "BackSpace",
+                Key::ShiftEnter => "shift+Return",
+                Key::CtrlF => "ctrl+f",
+                Key::F8 => "F8",
+                Key::ShiftF8 => "shift+F8",
+                Key::AltLeft => "alt+Left",
+                Key::AltRight => "alt+Right",
             },
         ])
     }

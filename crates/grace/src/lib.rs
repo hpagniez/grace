@@ -4,6 +4,8 @@
 pub mod a11y;
 pub mod app;
 pub mod assets;
+pub mod bottom_panel;
+pub mod console;
 #[cfg(feature = "e2e")]
 pub mod e2e;
 pub mod elements;
@@ -35,6 +37,7 @@ pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     assets::load_fonts(cx);
     a11y::bind_keys(cx);
+    console::bind_keys(cx);
     theme::apply(false, None, cx);
 }
 

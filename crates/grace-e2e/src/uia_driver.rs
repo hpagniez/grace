@@ -223,6 +223,12 @@ impl Driver for UiaDriver {
                 Key::CtrlEnter => "{ctrl}{enter}",
                 Key::SelectAll => "{ctrl}a",
                 Key::Backspace => "{backspace}",
+                Key::ShiftEnter => "{shift}{enter}",
+                Key::CtrlF => "{ctrl}f",
+                Key::F8 => "{F8}",
+                Key::ShiftF8 => "{shift}{F8}",
+                Key::AltLeft => "{alt}{left}",
+                Key::AltRight => "{alt}{right}",
             })
             .map_err(err)
     }

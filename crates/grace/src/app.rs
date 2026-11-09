@@ -332,6 +332,14 @@ impl Grace {
         cx.notify();
     }
 
+    /// The bottom panel's tab.
+    pub fn show_panel(&mut self, panel: grace_core::state::Panel, cx: &mut Context<Self>) {
+        if self.state.panel != panel {
+            self.state_mut().show_panel(panel);
+            cx.notify();
+        }
+    }
+
     /// The tag filter. The window never edits the filter itself: the runner sends it back.
     pub fn set_filter(&mut self, filter: FilterState, cx: &mut Context<Self>) {
         self.background(cx, Order::End, move |b| {
