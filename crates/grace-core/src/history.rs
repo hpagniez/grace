@@ -94,7 +94,52 @@ fn remove_path(path: &Path) -> io::Result<()> {
 /// `removeDir`: deletes `dir`, trying again `max_retries` times while it fails for a reason a moment can cure. A
 /// background cleanup passes 0. False if the folder stayed. This blocks for up to 1.5 s with 5 retries.
 fn remove_dir(dir: &Path, max_retries: u32) -> bool {
-    with_retries(max_retries, || remove_path(dir), thread::sleep).is_ok()
+    #[cfg(test)]
+    if held::is_held(dir) {
+        return false;
+    }
+    remove_retrying(dir, max_retries).is_ok()
+}
+
+/// `rmSync(path, { recursive: true, force: true, maxRetries })` with its error: the runner empties its dry run folder
+/// with it, and a failure there ends the discovery.
+pub(crate) fn remove_retrying(path: &Path, max_retries: u32) -> io::Result<()> {
+    with_retries(max_retries, || remove_path(path), thread::sleep)
+}
+
+/// `rmSync(file, { force: true, maxRetries })`: a file, never a folder (which is an error); one that is not there is
+/// deleted already. The runner deletes a run's argument files with it.
+pub(crate) fn remove_file_retrying(file: &Path, max_retries: u32) -> io::Result<()> {
+    let attempt = || match fs::remove_file(file) {
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+        removed => removed,
+    };
+    with_retries(max_retries, attempt, thread::sleep)
+}
+
+/// Folders a test of the runner holds the way Windows holds a folder a process runs in: `remove_dir` leaves them and
+/// fails. Linux lets such a folder go, so the runner's tests hold it here, on the thread that asks for the delete (the
+/// runner deletes the history on its caller's thread).
+#[cfg(test)]
+pub(crate) mod held {
+    use std::cell::RefCell;
+    use std::path::{Path, PathBuf};
+
+    thread_local! {
+        static HELD: RefCell<Vec<PathBuf>> = const { RefCell::new(Vec::new()) };
+    }
+
+    pub(crate) fn hold(dir: &Path) {
+        HELD.with(|h| h.borrow_mut().push(dir.to_path_buf()));
+    }
+
+    pub(crate) fn release(dir: &Path) {
+        HELD.with(|h| h.borrow_mut().retain(|d| d != dir));
+    }
+
+    pub(super) fn is_held(dir: &Path) -> bool {
+        HELD.with(|h| h.borrow().iter().any(|d| d == dir))
+    }
 }
 
 /// `now`'s local time as `yyyyMMdd-HHmmss-SSS`: the id of a run started then, before a suffix. Takes the local

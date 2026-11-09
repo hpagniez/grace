@@ -18,6 +18,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 # The project fingerprint (fingerprint.rs). The version GPUI Kit's rust-embed links; the other one is Linux-only.
 sha2 = "=0.11.1"
+# A project's folder in the data folder, `projects/<first 12 hex of SHA-1 of its root>` (runner.rs), named as Electron
+# Grace names it. No dependencies of its own; already in Grace.exe through AccessKit's `uuid`.
+sha1_smol = "=1.0.1"
 
 # Windows' side of the platform seams (migration guide R5.3): DPAPI for the current user (secrets.rs); the job object,
 # the priority class and a process's executable (karate/process.rs). The version GPUI's Windows backend links, so the
