@@ -279,6 +279,8 @@ impl App {
         let exe = grace_exe();
         #[cfg(target_os = "linux")]
         atspi_driver::prepare()?;
+        #[cfg(windows)]
+        uia_driver::prepare()?;
         let mut cmd = Command::new(&exe);
         cmd.env("GRACE_USER_DATA", &data)
             .env("GRACE_E2E_SCREEN", "other")

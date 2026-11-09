@@ -20,6 +20,13 @@ fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
+/// Before a launch: a key press, F24, which no window acts on. Windows lets a process take the foreground only if the
+/// one that started it had input of late; without it the first Grace a test process starts may open behind another
+/// window, take keys only once `to_foreground` forces it, and never tell UI Automation where its focus is (#301).
+pub fn prepare() -> Result<()> {
+    Keyboard::new().send_keys("{F24}").map_err(err)
+}
+
 impl UiaDriver {
     pub fn new(pid: u32) -> Result<Self> {
         let automation = UIAutomation::new().map_err(err)?;
