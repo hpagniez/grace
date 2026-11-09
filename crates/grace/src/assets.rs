@@ -113,11 +113,23 @@ impl gpui_component::IconNamed for Icon {
     }
 }
 
-/// Grace's icons under `grace/icons/`, then GPUI Kit's own.
+/// Grace's icons under `grace/icons/`, the mascot, then GPUI Kit's own.
 pub struct Assets;
+
+/// The home screen's mascot (ADR 0013), Electron Grace's own file.
+const MASCOT: &[u8] = include_bytes!("../../../assets/mascot.svg");
+
+impl Assets {
+    pub fn load_mascot(&self) -> &'static [u8] {
+        MASCOT
+    }
+}
 
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        if path == crate::home::MASCOT {
+            return Ok(Some(Cow::Borrowed(MASCOT)));
+        }
         if let Some(name) = path.strip_prefix("grace/icons/").and_then(|p| p.strip_suffix(".svg")) {
             return Ok(Icon::ALL
                 .iter()
