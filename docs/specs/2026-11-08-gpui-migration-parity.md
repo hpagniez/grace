@@ -459,8 +459,8 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
 | JM-01 | Every Java Grace starts gets the memory flags | `karate::command::tests::build_args::builds_the_exact_command_line`, `…passes_the_count_on_runs_and_t_1_on_dry_runs`, `…adds_the_debug_listener_and_its_socket_to_a_debug_run_only`; real Java: `…build_args_through_java::java_stops_at_the_first_out_of_memory_error_with_the_line_out_of_memory_finds`. The build tool's Java ports with Maven in P4
-| JM-02 | A run that runs out of memory says so | | ☐ |
-| JM-03 | A dry run that runs out of memory says so | | ☐ |
+| JM-02 | A run that runs out of memory says so | `runner::tests::runs::says_so_when_java_runs_out_of_memory_and_the_next_run_does_not` (real Java); the notice on screen with P2
+| JM-03 | A dry run that runs out of memory says so | `runner::tests::discovery::a_dry_run_that_ran_out_of_heap_says_so_one_that_only_names_the_error_does_not`; the notice on screen with P2
 | JM-04 | Another out-of-memory error gets no notice | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (Metaspace and native-thread lines)
 | JM-05 | A test's output that names the error is not Java running out of memory | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (a response body and a test name that name the error)
 | JM-06 | The bench shows a run takes less memory | | ☐ |
@@ -1338,7 +1338,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries` | ☐ |
 | `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven` | ☐ |
-| `src/main/karate/pom.test.ts` | 19 | `grace-core::karate::pom` | ☐ |
+| `src/main/karate/pom.test.ts` | 19 | Partly, in P1: `grace-core::karate::pom::tests` (`read_pom`, 23 tests). The 5 `pomStart` tests port with `maven.rs` in P4 | ☐ |
 | `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process::tests` (11 tests; the job object, Windows priority and `taskkill` bodies run on Windows CI) | ☑ |
 | `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run_state::tests` (26 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps::tests` (9 tests, every Vitest test and the added ones) | ☑ |
@@ -1349,23 +1349,23 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/recent.test.ts` | 6 | `grace-core::recent::tests` (7 tests) | ☑ |
 | `src/main/report-zip.test.ts` | 6 | `grace-core::report-zip` | ☐ |
 | `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
-| `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner` (discovery) | ☐ |
+| `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner::tests::discovery` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.editor.test.ts` | 2 | `grace-core::runner` (editor) | ☐ |
-| `src/main/runner.env.test.ts` | 12 | `grace-core::runner` (env) | ☐ |
-| `src/main/runner.fingerprint.test.ts` | 10 | `grace-core::runner` (fingerprint) | ☐ |
-| `src/main/runner.flaky.test.ts` | 3 | `grace-core::runner` (flaky) | ☐ |
-| `src/main/runner.history.test.ts` | 15 | `grace-core::runner` (history) | ☐ |
-| `src/main/runner.home.test.ts` | 13 | `grace-core::runner` (home) | ☐ |
+| `src/main/runner.env.test.ts` | 12 | `grace-core::runner::tests::env` (12 tests, real Java and Karate) | ☑ |
+| `src/main/runner.fingerprint.test.ts` | 10 | `grace-core::runner::tests::fingerprint` (10 tests, real Java and Karate) | ☑ |
+| `src/main/runner.flaky.test.ts` | 3 | `grace-core::runner::tests::flaky` (3 tests, real Java and Karate) | ☑ |
+| `src/main/runner.history.test.ts` | 15 | `grace-core::runner::tests::history` (16 tests, real Java and Karate) | ☑ |
+| `src/main/runner.home.test.ts` | 13 | `grace-core::runner::tests::home` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.libraries.test.ts` | 31 | `grace-core::runner` (libraries) | ☐ |
 | `src/main/runner.pom.test.ts` | 12 | `grace-core::runner` (pom) | ☐ |
-| `src/main/runner.properties.test.ts` | 18 | `grace-core::runner` (properties) | ☐ |
-| `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner` (rerun) | ☐ |
-| `src/main/runner.runs.test.ts` | 13 | `grace-core::runner` (runs) | ☐ |
+| `src/main/runner.properties.test.ts` | 18 | `grace-core::runner::tests::properties` (19 tests, real Java and Karate) (one, a file another process holds, runs on Windows only) | ☑ |
+| `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
+| `src/main/runner.runs.test.ts` | 13 | `grace-core::runner::tests::runs` (14 tests, real Java and Karate) (and one new: a cancel just before Java starts) | ☑ |
 | `src/main/runner.setup.test.ts` | 9 | `grace-core::runner` (setup) | ☐ |
 | `src/main/runner.subfolders.test.ts` | 7 | `grace-core::runner` (subfolders) | ☐ |
-| `src/main/runner.tags.test.ts` | 13 | `grace-core::runner` (tags) | ☐ |
-| `src/main/runner.threads.test.ts` | 8 | `grace-core::runner` (threads) | ☐ |
-| `src/main/runner.trends.test.ts` | 2 | `grace-core::runner` (trends) | ☐ |
+| `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
+| `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
+| `src/main/runner.trends.test.ts` | 2 | `grace-core::runner::tests::trends` (2 tests, real Java and Karate) | ☑ |
 | `src/main/runner.watch.test.ts` | 18 | `grace-core::runner` (watch) | ☐ |
 | `src/main/secrets.test.ts` | 6 | `grace-core::secrets::tests` (10 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/settings.test.ts` | 62 | `grace-core::settings::tests` (80 tests: every Vitest case, `it.each` rows one test each, and the bytes Node writes) | ☑ |

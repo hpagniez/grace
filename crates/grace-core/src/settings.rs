@@ -32,7 +32,7 @@
 //!   `Infinity`: the other keys are then lost at the next save. Nothing writes one.
 //! - The tests make a read or a rename fail through thread-local hooks of `cfg(test)` (`hooks`), as the TypeScript's
 //!   mock `node:fs`; the library has no seam for it.
-use crate::model::env::{name_error, property_value_error, valid_env_name};
+use crate::model::env::{Named, name_error, property_value_error, valid_env_name};
 use crate::model::js;
 use crate::model::tags::{FilterState, parse_filter_state};
 use crate::model::theme::{Theme, parse_theme};
@@ -433,6 +433,13 @@ impl StoredRow {
             row.insert("envVar".into(), Value::Bool(true));
         }
         Value::Object(row)
+    }
+}
+
+/// A saved row has a name, so the runner takes a run's rows with `model::env::effective_rows`, as `runner.ts` does.
+impl Named for StoredRow {
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 

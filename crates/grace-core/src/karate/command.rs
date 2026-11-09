@@ -83,7 +83,7 @@ pub(crate) fn join(base: &Path, rel: &str) -> PathBuf {
 }
 
 /// The path made absolute against the working directory, as Node's `path.resolve` does, and normalized.
-fn absolute(path: &Path) -> PathBuf {
+pub(crate) fn absolute(path: &Path) -> PathBuf {
     if path.is_absolute() {
         return normalize(path);
     }
