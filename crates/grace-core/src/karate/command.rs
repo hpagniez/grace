@@ -1391,10 +1391,12 @@ mod tests {
 
         #[test]
         fn join_appends_a_leading_slash_and_normalizes_as_node_does() {
-            let base = Path::new("/p").join("src");
+            // A base already in the platform's own form: Node's `path.join` also turns `/` into `\` on Windows
+            let p = std::env::temp_dir().join("p");
+            let base = p.join("src");
             assert_eq!(join(&base, "/conf/my.js"), at(&base, "conf/my.js"));
             assert_eq!(join(&base, "a/./b/../c"), at(&base, "a/c"));
-            assert_eq!(join(&base, "../x"), at(Path::new("/p"), "x"));
+            assert_eq!(join(&base, "../x"), at(&p, "x"));
             assert_eq!(join(&base, "").as_os_str(), base.as_os_str());
         }
 
