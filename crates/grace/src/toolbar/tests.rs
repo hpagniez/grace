@@ -21,7 +21,7 @@ const BUTTONS: [&str; 7] = [
 fn toolbar(cx: &mut TestAppContext, width: f32, state: AppState) -> (Harness, VisualTestContext) {
     open(cx, width, state, |grace, window, cx| {
         let state = grace.read(cx).state.clone();
-        render(grace, &state, window, cx).into_any_element()
+        render(grace, &state, vec![], window, cx).into_any_element()
     })
 }
 

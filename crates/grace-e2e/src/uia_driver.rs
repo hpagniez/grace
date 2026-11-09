@@ -3,7 +3,7 @@
 use uiautomation::inputs::{Keyboard, Mouse};
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
-    UITogglePattern,
+    UITogglePattern, UIValuePattern,
 };
 use uiautomation::types::{ControlType, ExpandCollapseState, Point};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
@@ -98,6 +98,13 @@ impl UiaDriver {
             .filter(|d| !d.is_empty())
             .or_else(|| e.get_help_text().ok())
             .unwrap_or_default();
+        // a text box's text, through the Value pattern a button or a check box does not have
+        let text = matches!(
+            e.get_control_type(),
+            Ok(ControlType::Edit | ControlType::ComboBox | ControlType::Spinner)
+        )
+        .then(|| e.get_pattern::<UIValuePattern>().ok()?.get_value().ok())
+        .flatten();
         let children = self
             .children(e)
             .iter()
@@ -123,6 +130,7 @@ impl UiaDriver {
             name: e.get_name().unwrap_or_default(),
             description,
             value,
+            text,
             states: States {
                 enabled: e.is_enabled().unwrap_or(false),
                 focusable: e.is_keyboard_focusable().unwrap_or(false),
@@ -195,8 +203,24 @@ impl Driver for UiaDriver {
                 Key::PageUp => "{pgup}",
                 Key::PageDown => "{pgdn}",
                 Key::CtrlEnter => "{ctrl}{enter}",
+                Key::SelectAll => "{ctrl}a",
+                Key::Backspace => "{backspace}",
             })
             .map_err(err)
+    }
+
+    fn click(&self, node: &Node) -> Result<()> {
+        let (x, y) = node
+            .rect
+            .ok_or_else(|| format!("{:?} {:?} has no place on the screen", node.role, node.name))?
+            .centre();
+        self.to_foreground()?;
+        Mouse::new().click(&Point::new(x, y)).map_err(err)
+    }
+
+    fn type_text(&self, text: &str) -> Result<()> {
+        self.to_foreground()?;
+        Keyboard::new().send_text(text).map_err(err)
     }
 
     /// The window pattern's Close: `WM_CLOSE`, as the title bar's button sends.

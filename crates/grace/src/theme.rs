@@ -328,8 +328,39 @@ pub fn set_appearance(appearance: Appearance, window: &mut Window, cx: &mut App)
     apply(current(window, cx), Some(window), cx);
 }
 
+/// A floating panel's shadow (`--shadow-float`): the tag panel's, the environment's suggestions'.
+pub fn float_shadow(cx: &App) -> Vec<gpui::BoxShadow> {
+    let theme = Theme::global(cx);
+    let (t, m) = (theme.tokens, theme.metrics);
+    m.shadow_float
+        .iter()
+        .zip(t.shadow_float)
+        .map(|(&(y, blur), colour)| gpui::BoxShadow {
+            color: Theme::color_alpha(colour),
+            offset: gpui::point(px(0.), px(y)),
+            blur_radius: px(blur),
+            spread_radius: px(0.),
+            inset: false,
+        })
+        .collect()
+}
+
+/// How a text box's caret blinks: every 500 ms, then steady 5 s after the last key, focus or move, as the Windows
+/// caret (`CaretTimeout`) Electron Grace's boxes had; steady with reduced motion. GPUI Kit's own default blinks while
+/// the box has the focus, also in a hidden window, which ADR 0030's idle rule forbids.
+pub fn cursor_blink(reduced: bool) -> gpui_component::input::CursorBlink {
+    use gpui_component::input::CursorBlink;
+    if reduced {
+        CursorBlink::steady()
+    } else {
+        CursorBlink::blinking(std::time::Duration::from_millis(500))
+            .with_idle_timeout(std::time::Duration::from_secs(5))
+    }
+}
+
 /// Sets Grace's theme, and maps its tokens onto GPUI Kit's, so GPUI Kit's controls draw in Grace's colours.
 pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
+    let reduced = cx.reduce_motion();
     let theme = Theme::new(dark);
     cx.set_global(theme);
     KitTheme::change(if dark { ThemeMode::Dark } else { ThemeMode::Light }, window, cx);
@@ -349,6 +380,7 @@ pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
         k.radius = px(m.radius);
         k.radius_lg = px(m.radius_lg);
         k.shadow = true;
+        k.cursor_blink = cursor_blink(reduced);
         let k = &mut k.colors;
         k.background = c(t.surface);
         k.foreground = c(t.ink);
@@ -411,6 +443,18 @@ mod tests {
 
     fn repo() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
+    #[test]
+    fn the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion() {
+        use gpui_component::input::CursorBlink;
+        assert_eq!(cursor_blink(true), CursorBlink::steady());
+        assert_ne!(
+            cursor_blink(false),
+            CursorBlink::default(),
+            "GPUI Kit's default blinks forever"
+        );
+        assert_ne!(cursor_blink(false), CursorBlink::steady());
     }
 
     fn without_comments(css: &str) -> String {

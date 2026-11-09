@@ -3,7 +3,8 @@
 //! primary button. Below 1280 px the labels of Open…, Report, Re-run failed and Cancel go from sight, not from the
 //! buttons' names, and say themselves in a tooltip instead (`narrow.ts`).
 //!
-//! The environment, threads and properties boxes join in P2's fourth PR; the Watch toggle and the step debugger's
+//! The environment and threads boxes are `env_picker`'s and `threads_box`'s; Properties joins in P2's fourth PR; the
+//! Watch toggle and the step debugger's
 //! buttons with the runner's watch and debug runs in phase P4 (P2 plan).
 use gpui::accesskit::Role;
 use gpui::{
@@ -97,8 +98,14 @@ pub fn narrow(window: &Window) -> bool {
     f32::from(window.viewport_size().width) < NARROW_BELOW
 }
 
-/// The toolbar of the open project.
-pub fn render(grace: &Entity<Grace>, state: &AppState, window: &mut Window, cx: &mut App) -> impl IntoElement {
+/// The toolbar of the open project, with `boxes` (the environment and the thread count) after the project's name.
+pub fn render(
+    grace: &Entity<Grace>,
+    state: &AppState,
+    boxes: Vec<AnyElement>,
+    window: &mut Window,
+    cx: &mut App,
+) -> impl IntoElement {
     let t = Theme::global(cx).tokens;
     let a = actions(state);
     let narrow = narrow(window);
@@ -236,6 +243,7 @@ pub fn render(grace: &Entity<Grace>, state: &AppState, window: &mut Window, cx: 
         .bg(Theme::color(t.ground))
         .child(div().debug_selector(|| "home-button".into()).child(home))
         .child(project)
+        .children(boxes)
         .child(divider("divider-actions", cx))
         .child(div().debug_selector(|| "refresh-button".into()).child(refresh))
         .child(open)
