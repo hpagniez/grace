@@ -366,7 +366,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | PU-14 | The startup screen shows the logo in the active theme (by hand) | | ☐ |
 | PU-15 | Choosing Dark overrides a light Windows | | ☐ |
 | PU-16 | Follow Windows is the default | | ☐ |
-| PU-17 | A malformed appearance setting reads as Follow Windows (unit) | | ☐ |
+| PU-17 | A malformed appearance setting reads as Follow Windows (unit) | `grace_core::settings` tests `appearance` | ☑ |
 | PU-18 | Main rejects an unknown theme (unit) | | ☐ |
 | PU-19 | A tooltip shows on keyboard focus and closes with Escape | `crates/grace::tooltip::tests::shows_at_once_on_keyboard_focus_and_once_per_focus`, `…closes_on_escape_and_on_a_press_of_its_target`, `…does_not_show_on_a_focus_from_the_mouse`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` | ☑ |
 | PU-20 | A tooltip shows after a pause on hover, also on a disabled button | `crates/grace::tooltip::tests::shows_after_the_pause_not_before`, `…does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after`, `…shows_one_at_a_time`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` | ☑ |
@@ -920,12 +920,12 @@ Phase P2 · 6 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-appearance-01 | Follow Windows is the default | | ☐ |
-| E-appearance-02 | A saved Dark is in force at start, whatever Windows is | | ☐ |
-| E-appearance-03 | Choosing a theme in Settings applies at once, with a project open, and is still there after a restart | | ☐ |
-| E-appearance-04 | A theme change with a dialog up switches the window and the dialog and loses no state | | ☐ |
-| E-appearance-05 | Escape closes a shown tooltip first, then the Settings page goes back | | ☐ |
-| E-appearance-06 | Main refuses a theme it does not know and keeps the saved one | | ☐ |
+| E-appearance-01 | Follow Windows is the default | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` | ☑ |
+| E-appearance-02 | A saved Dark is in force at start, whatever Windows is | `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (the ground's pixels on Linux) | ☑ |
+| E-appearance-03 | Choosing a theme in Settings applies at once, with a project open, and is still there after a restart | `grace-e2e/tests/appearance.rs::choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart` | ☑ |
+| E-appearance-04 | A theme change with a dialog up switches the window and the dialog and loses no state | `properties::tests::a_theme_change_keeps_the_draft_and_the_focus` (plan, Redesigns) | ☑ |
+| E-appearance-05 | Escape closes a shown tooltip first, then the Settings page goes back | Going back: `grace-e2e/tests/appearance.rs::escape_goes_back_from_the_settings_page`; the tooltip half with P5's update button (plan, Redesigns) | ☐ |
+| E-appearance-06 | Main refuses a theme it does not know and keeps the saved one | Nothing to refuse: no IPC, and a theme is an enum (plan, Redesigns) | ☑ |
 
 ### e2e/cancel.spec.ts
 
@@ -1398,7 +1398,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
 | `src/renderer/PropertiesDialog.test.tsx` | 54 | `grace-core::properties_draft::tests` (20) and `grace::properties::tests` (18), headless; the fade-out group goes (P2 plan, Redesigns); the look tests (spec R19) wait for P2 PR 6's check by eye | ☐ |
-| `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless | ☐ |
+| `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless: `settings::tests` (the page, Back and Appearance); the Updates tests with P5 | ☐ |
 | `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
 | `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
