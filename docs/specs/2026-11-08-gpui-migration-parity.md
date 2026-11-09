@@ -458,11 +458,11 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| JM-01 | Every Java Grace starts gets the memory flags | | ☐ |
+| JM-01 | Every Java Grace starts gets the memory flags | `karate::command::tests::build_args::builds_the_exact_command_line`, `…passes_the_count_on_runs_and_t_1_on_dry_runs`, `…adds_the_debug_listener_and_its_socket_to_a_debug_run_only`; real Java: `…build_args_through_java::java_stops_at_the_first_out_of_memory_error_with_the_line_out_of_memory_finds`. The build tool's Java ports with Maven in P4
 | JM-02 | A run that runs out of memory says so | | ☐ |
 | JM-03 | A dry run that runs out of memory says so | | ☐ |
-| JM-04 | Another out-of-memory error gets no notice | | ☐ |
-| JM-05 | A test's output that names the error is not Java running out of memory | | ☐ |
+| JM-04 | Another out-of-memory error gets no notice | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (Metaspace and native-thread lines)
+| JM-05 | A test's output that names the error is not Java running out of memory | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (a response body and a test name that name the error)
 | JM-06 | The bench shows a run takes less memory | | ☐ |
 
 ### EN · Ship only the en-US locale
@@ -482,8 +482,8 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| JJ-01 | The dry run compiles with C1 only | | ☐ |
-| JJ-02 | A run keeps C2 on fewer threads | | ☐ |
+| JJ-01 | The dry run compiles with C1 only | `karate::command::tests::build_args::builds_the_exact_command_line` (the dry run's `-XX:TieredStopAtLevel=1`)
+| JJ-02 | A run keeps C2 on fewer threads | `karate::command::tests::build_args::builds_the_exact_command_line` (the run's `-XX:CICompilerCount=2`)
 | JJ-03 | Heavy JavaScript runs no slower | | ☐ |
 | JJ-04 | The bench shows Java works less | | ☐ |
 
@@ -1327,26 +1327,26 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/batch.test.ts` | 2 | `grace-core::batch::tests` (4 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/editor.test.ts` | 10 | `grace-core::editor` | ☐ |
 | `src/main/fingerprint.test.ts` | 10 | `grace-core::fingerprint::tests` (20 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/flaky.test.ts` | 19 | `grace-core::flaky` | ☐ |
-| `src/main/history.test.ts` | 19 | `grace-core::history` | ☐ |
+| `src/main/flaky.test.ts` | 19 | `grace-core::flaky::tests` (20 tests) | ☑ |
+| `src/main/history.test.ts` | 19 | `grace-core::history::tests` (37 tests) | ☑ |
 | `src/main/karate/argfile.test.ts` | 9 | `grace-core::karate::argfile::tests` (12 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/karate/command.test.ts` | 46 | `grace-core::karate::command` | ☐ |
+| `src/main/karate/command.test.ts` | 46 | `grace-core::karate::command::tests` (51 tests: the 46 Vitest tests on the same strings, and 5 for paths and the Linux classpath) | ☑ |
 | `src/main/karate/compiled.test.ts` | 11 | `grace-core::karate::compiled` | ☐ |
 | `src/main/karate/debug.test.ts` | 8 | `grace-core::karate::debug` | ☐ |
-| `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments` | ☐ |
+| `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments::tests` (11 tests) | ☑ |
 | `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries` | ☐ |
 | `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven` | ☐ |
 | `src/main/karate/pom.test.ts` | 19 | `grace-core::karate::pom` | ☐ |
-| `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process` | ☐ |
+| `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process::tests` (11 tests; the job object, Windows priority and `taskkill` bodies run on Windows CI) | ☑ |
 | `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run_state::tests` (26 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps::tests` (9 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/subfolders.test.ts` | 10 | `grace-core::karate::subfolders` | ☐ |
 | `src/main/karate/tree.test.ts` | 17 | `grace-core::karate::tree::tests` (20 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/mask.test.ts` | 15 | `grace-core::mask` | ☐ |
+| `src/main/mask.test.ts` | 15 | `grace-core::mask::tests` (26 tests; two gaps of Electron Grace fixed, #293) | ☑ |
 | `src/main/propertiesFile.test.ts` | 12 | `grace-core::properties_file::tests` (13 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/recent.test.ts` | 6 | `grace-core::recent` | ☐ |
+| `src/main/recent.test.ts` | 6 | `grace-core::recent::tests` (7 tests) | ☑ |
 | `src/main/report-zip.test.ts` | 6 | `grace-core::report-zip` | ☐ |
 | `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
 | `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner` (discovery) | ☐ |
@@ -1368,8 +1368,8 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.trends.test.ts` | 2 | `grace-core::runner` (trends) | ☐ |
 | `src/main/runner.watch.test.ts` | 18 | `grace-core::runner` (watch) | ☐ |
 | `src/main/secrets.test.ts` | 6 | `grace-core::secrets::tests` (10 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/settings.test.ts` | 62 | `grace-core::settings` | ☐ |
-| `src/main/trends.test.ts` | 10 | `grace-core::trends` | ☐ |
+| `src/main/settings.test.ts` | 62 | `grace-core::settings::tests` (80 tests: every Vitest case, `it.each` rows one test each, and the bytes Node writes) | ☑ |
+| `src/main/trends.test.ts` | 10 | `grace-core::trends::tests` (11 tests) | ☑ |
 | `src/main/updates/check.test.ts` | 11 | `grace-core::updates::check` | ☐ |
 | `src/main/updates/fetchZip.test.ts` | 11 | `grace-core::updates::fetchZip` | ☐ |
 | `src/main/updates/original-fs.test.ts` | 1 | `grace-core::updates::original-fs` | ☐ |
