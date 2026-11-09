@@ -1,4 +1,4 @@
-# Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017). Each job runs on its own VM, so the suites' Java leak
+# Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017), and GPUI Grace's Rust tests on Windows and Linux (ADR 0031). Each job runs on its own VM, so the suites' Java leak
 # checks never see each other's processes. Unit tests run on every PR; e2e only on PRs into main once ready for
 # review, and on manual runs. A release/* or hotfix/* merge back into develop runs nothing: its PR into main did.
 name: test
@@ -62,6 +62,41 @@ jobs:
       - name: npm test
         run: |
           if [ ${{ matrix.half }} = 1 ]; then UNIT_EXCLUDE="$SECOND_HALF" npm test; else npm test -- $SECOND_HALF; fi
+
+  # GPUI Grace (ADR 0031, migration guide R6.5): clippy and cargo test on both platforms it builds on. Its own job,
+  # so the Electron halves keep their time. The first build of GPUI takes several minutes; the cache keeps target/.
+  rust:
+    if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # GPUI's X11 backend links libxcb and libxkbcommon, its text system fontconfig and FreeType
+      - if: ${{ runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-x11-dev libxcb1-dev libfontconfig-dev libfreetype-dev
+      # rustup on the runner installs the toolchain rust-toolchain.toml pins
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: rust-${{ runner.os }}-
+      # the patched GPUI crate is crates.io's plus the idle patch, and nothing else (patches/README.md)
+      - if: ${{ runner.os == 'Linux' }}
+        run: sh patches/check.sh
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
 
   e2e:
     if: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}

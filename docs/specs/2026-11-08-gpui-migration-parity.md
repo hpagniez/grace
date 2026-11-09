@@ -1,6 +1,6 @@
 # GPUI migration: parity checklist
 
-Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: nothing ported.
+Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P0.
 
 This is the list the cut-over is checked against ([guide R3](2026-11-08-gpui-migration.md#r3-what-ported-means)): 594 spec scenarios, 194 end-to-end tests and 1,773 unit and component tests, taken from `develop` at `32a5ef6`, the commit of the go decision. A row is ported when the behaviour it names works in GPUI Grace and a test proves it: fill **Proof** with the test (`crates/…::test_name`, `e2e-uia/…`, a bench measure, or a dated check record for a by-hand check) and tick the box in the PR that ports it. A row that does not apply any more says why, in words, in **Proof**, with `n/a` in the last column; only the owner can accept an `n/a` on a user-facing row.
 
@@ -350,14 +350,14 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PU-01 | Every token pair meets WCAG 2.2 AA in both themes (unit) | | ☐ |
-| PU-02 | The dark theme changes colours only (unit) | | ☐ |
+| PU-01 | Every token pair meets WCAG 2.2 AA in both themes (unit) | `crates/grace::theme::tests::keeps_text_at_4_5_to_1_on_every_background`, `…keeps_each_status_readable_on_surface_its_tint_and_a_selected_row`, `…keeps_the_filled_buttons_text_readable`, `…keeps_control_borders_and_the_focus_ring_at_3_to_1`, `…paints_console_matches_readably_the_current_one_stronger` | ☑ |
+| PU-02 | The dark theme changes colours only (unit) | By construction: `grace::theme::Theme` is one shared `Metrics` and one `Tokens` per theme, so no size can differ; `crates/grace::theme::tests::matches_the_dark_tokens_of_index_css`, `…matches_the_sizes_of_index_css` | ☑ |
 | PU-03 | The structure and the primary button do not change with the theme | | ☐ |
-| PU-04 | No raw palette class or dark: variant is left (unit) | | ☐ |
+| PU-04 | No raw palette class or dark: variant is left (unit) | `crates/grace::theme::tests::colours_come_only_from_the_theme` (no colour literal outside `theme.rs`; GPUI has no `dark:` variant) | ☑ |
 | PU-05 | Main and the startup screen use the CSS ground colours (unit) | | ☐ |
 | PU-06 | The window follows the Windows theme | | ☐ |
 | PU-07 | Grace draws its own typefaces offline | | ☐ |
-| PU-08 | Each status has its own icon and name | | ☐ |
+| PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name` | ☑ |
 | PU-09 | A cancelled run marks its interrupted tests | | ☐ |
 | PU-10 | Tag chip states differ by shape, not only colour (unit) | | ☐ |
 | PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | | ☐ |
@@ -1419,13 +1419,13 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/importPlan.test.ts` | 6 | `grace::ui::importPlan` | ☐ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
 | `src/renderer/nodes.test.ts` | 3 | `grace::ui::nodes` | ☐ |
-| `src/renderer/palette.test.ts` | 6 | `grace::ui::palette` | ☐ |
+| `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
 | `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight` | ☐ |
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs` | ☐ |
 | `src/renderer/placeTip.test.ts` | 16 | `grace::ui::placeTip` | ☐ |
 | `src/renderer/reduce.test.ts` | 45 | `grace::ui::reduce` | ☐ |
 | `src/renderer/store.test.tsx` | 8 | view `store` (`grace::ui`), headless | ☐ |
-| `src/renderer/tokens.test.ts` | 19 | `grace::ui::tokens` | ☐ |
+| `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace::ui::treeRows` | ☐ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
 | `src/renderer/ui.test.ts` | 1 | `grace::ui::ui` | ☐ |

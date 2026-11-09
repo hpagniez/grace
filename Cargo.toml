@@ -1,0 +1,31 @@
+# GPUI Grace (ADR 0031, migration guide docs/specs/2026-11-08-gpui-migration.md). It lives beside the Electron app
+# until the cut-over release (guide R10).
+[workspace]
+resolver = "3"
+members = ["crates/grace-core", "crates/grace"]
+# The research prototypes build on their own.
+exclude = ["docs/research"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# One set, upgraded together between phases, the idle patch rebased each time (ADR 0031, guide R9.4).
+[workspace.dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
+gpui-component = "=0.9.0"
+gpui-kit-assets = "=0.9.0"
+grace-core = { path = "crates/grace-core" }
+
+# The Windows idle patch: the vsync thread sleeps while every window is minimised or hidden (ADR 0030, ADR 0031).
+# Dropped when an upstream release has the fix (zed#66221). patches/README.md says how to rebase it.
+[patch.crates-io]
+gpui-pre-windows = { path = "patches/gpui-pre-windows" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true

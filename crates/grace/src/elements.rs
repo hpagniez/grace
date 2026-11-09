@@ -1,0 +1,222 @@
+//! The small pieces every view shares (premium UI spec): icons, status marks and buttons. Each one is built
+//! here once, as `Icon`, `StatusMark` and `buttons.ts` are in Electron Grace (R9.1).
+use std::time::Duration;
+
+use gpui::accesskit::Role;
+use gpui::{
+    Animation, AnimationExt as _, App, ElementId, Hsla, InteractiveElement as _, IntoElement, ParentElement,
+    SharedString, StatefulInteractiveElement as _, Styled, Transformation, div, percentage,
+    prelude::FluentBuilder as _, px, svg,
+};
+use gpui_component::Sizable as _;
+use gpui_component::button::{Button, ButtonVariants as _};
+
+use crate::assets::Icon;
+use crate::theme::Theme;
+
+/// A Lucide icon at one of Grace's sizes (12, 14, 16 or 24 px), in the given colour. Decorative: a control that
+/// holds only an icon names itself.
+pub fn icon(icon: Icon, size: f32, color: Hsla) -> gpui::Svg {
+    svg().path(icon.path()).size(px(size)).flex_none().text_color(color)
+}
+
+/// What a test is, plus the two outcomes that are not a test's status, and the test a debug run is paused in
+/// (`MarkStatus` of `StatusMark.tsx`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MarkStatus {
+    NotRun,
+    Pending,
+    Running,
+    Passed,
+    Failed,
+    Interrupted,
+    Cancelled,
+    Skipped,
+    Paused,
+}
+
+impl MarkStatus {
+    pub const ALL: [MarkStatus; 9] = [
+        Self::NotRun,
+        Self::Pending,
+        Self::Running,
+        Self::Passed,
+        Self::Failed,
+        Self::Interrupted,
+        Self::Cancelled,
+        Self::Skipped,
+        Self::Paused,
+    ];
+
+    /// Its shape (spec R7.1: never colour alone).
+    pub fn icon(self) -> Icon {
+        match self {
+            Self::NotRun => Icon::Circle,
+            Self::Pending => Icon::CircleDashed,
+            Self::Running => Icon::LoaderCircle,
+            Self::Passed => Icon::CircleCheck,
+            Self::Failed => Icon::CircleX,
+            Self::Interrupted | Self::Cancelled => Icon::CircleSlash,
+            Self::Skipped => Icon::CircleMinus,
+            Self::Paused => Icon::Pause,
+        }
+    }
+
+    /// Its colour token.
+    pub fn color(self, theme: &Theme) -> u32 {
+        let t = theme.tokens;
+        match self {
+            Self::NotRun | Self::Pending | Self::Skipped => t.skipped,
+            Self::Running | Self::Paused => t.running,
+            Self::Passed => t.passed,
+            Self::Failed => t.failed,
+            Self::Interrupted | Self::Cancelled => t.cancelled,
+        }
+    }
+
+    /// Its accessible name, the words of `STATUS_LABEL` in `nodes.ts`.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NotRun => "Not run",
+            Self::Pending => "Pending",
+            Self::Running => "Running",
+            Self::Passed => "Passed",
+            Self::Failed => "Failed",
+            Self::Interrupted => "Interrupted",
+            Self::Cancelled => "Cancelled",
+            Self::Skipped => "Skipped",
+            Self::Paused => "Paused",
+        }
+    }
+}
+
+/// A status by shape, colour and accessible name. `decorative` (beside the word that names the status) leaves
+/// it out of the accessibility tree. A running mark turns, which only happens during a run (ADR 0030), and not
+/// when reduced motion is on.
+pub fn status_mark(
+    id: impl Into<ElementId>,
+    status: MarkStatus,
+    size: f32,
+    decorative: bool,
+    reduce_motion: bool,
+    cx: &App,
+) -> impl IntoElement {
+    let color = Theme::color(status.color(Theme::global(cx)));
+    let mark = icon(status.icon(), size, color);
+    let mark = if status == MarkStatus::Running && !reduce_motion {
+        mark.with_animation("turn", Animation::new(Duration::from_secs(1)).repeat(), |svg, delta| {
+            svg.with_transformation(Transformation::rotate(percentage(delta)))
+        })
+        .into_any_element()
+    } else {
+        mark.into_any_element()
+    };
+    div()
+        .id(id)
+        .flex()
+        .flex_none()
+        .when(!decorative, |d| {
+            d.role(Role::Image).aria_label(SharedString::from(status.label()))
+        })
+        .child(mark)
+}
+
+/// A button's look (`buttons.ts`): bordered, filled green, filled red, or borderless.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ButtonKind {
+    Plain,
+    Primary,
+    Danger,
+    Ghost,
+}
+
+/// A button's size: 28 px with 13 px text, 24 px with 12 px text, or a dialog's 28 px with 14 px text (R2.2,
+/// R3.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ButtonSize {
+    Medium,
+    Small,
+    Dialog,
+}
+
+/// A text button. GPUI Kit's `Button` gives it focus, the focus ring, the keyboard and its accessible name.
+pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>, kind: ButtonKind, size: ButtonSize) -> Button {
+    let m = crate::theme::METRICS;
+    let (height, pad, text) = match size {
+        ButtonSize::Medium => (m.control_height, 12., m.text_sm.size),
+        ButtonSize::Small => (m.control_height_small, 8., m.text_xs.size),
+        ButtonSize::Dialog => (m.control_height, 12., m.text_base.size),
+    };
+    let b = Button::new(id)
+        .label(label)
+        .h(px(height))
+        .px(px(pad))
+        .text_size(px(text))
+        .rounded(px(m.radius));
+    match kind {
+        ButtonKind::Plain => b.outline(),
+        ButtonKind::Primary => b.primary(),
+        ButtonKind::Danger => b.danger(),
+        ButtonKind::Ghost => b.ghost(),
+    }
+}
+
+/// An icon-only, borderless button, 28 px square or 24 px when `small` (R10.3). `label` is its accessible name
+/// and its tooltip.
+pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<SharedString>, small: bool) -> Button {
+    let label = label.into();
+    let side = if small {
+        crate::theme::METRICS.control_height_small
+    } else {
+        crate::theme::METRICS.control_height
+    };
+    Button::new(id)
+        .icon(icon)
+        .ghost()
+        .with_size(px(side))
+        .accessibility_label(label.clone())
+        .tooltip(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `StatusMark.tsx`'s `MARK` table, row by row: icon, colour and label.
+    #[test]
+    fn marks_each_status_as_electron_grace_does() {
+        let theme = Theme::new(false);
+        let t = theme.tokens;
+        let expected = [
+            (MarkStatus::NotRun, Icon::Circle, t.skipped, "Not run"),
+            (MarkStatus::Pending, Icon::CircleDashed, t.skipped, "Pending"),
+            (MarkStatus::Running, Icon::LoaderCircle, t.running, "Running"),
+            (MarkStatus::Passed, Icon::CircleCheck, t.passed, "Passed"),
+            (MarkStatus::Failed, Icon::CircleX, t.failed, "Failed"),
+            (MarkStatus::Interrupted, Icon::CircleSlash, t.cancelled, "Interrupted"),
+            (MarkStatus::Cancelled, Icon::CircleSlash, t.cancelled, "Cancelled"),
+            (MarkStatus::Skipped, Icon::CircleMinus, t.skipped, "Skipped"),
+            (MarkStatus::Paused, Icon::Pause, t.running, "Paused"),
+        ];
+        for (status, icon, color, label) in expected {
+            assert_eq!(
+                (status.icon(), status.color(&theme), status.label()),
+                (icon, color, label),
+                "{status:?}"
+            );
+        }
+        assert_eq!(MarkStatus::ALL.len(), expected.len());
+    }
+
+    /// Never by colour alone: two statuses that share a colour differ in shape or name.
+    #[test]
+    fn tells_statuses_apart_by_shape_or_name() {
+        for a in MarkStatus::ALL {
+            for b in MarkStatus::ALL {
+                if a != b {
+                    assert!(a.icon() != b.icon() || a.label() != b.label(), "{a:?} {b:?}");
+                }
+            }
+        }
+    }
+}

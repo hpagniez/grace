@@ -39,6 +39,11 @@ jobs:
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
       - run: npm audit --audit-level=high
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
+      # GPUI Grace's Rust format (ADR 0031); clippy needs a full build, so it runs in test.yml
+      - run: rustup show active-toolchain || rustup toolchain install
+        if: ${{ !cancelled() }}
+      - run: cargo fmt --all --check
+        if: ${{ !cancelled() }}
       - run: node scripts/check-pr.mjs
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
         env:
