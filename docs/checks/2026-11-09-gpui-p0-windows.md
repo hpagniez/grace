@@ -61,7 +61,9 @@ The packaged `Grace.exe`, and the e2e build's gallery (real buttons and icons), 
 
 The frames before about 200 ms after a restore show the window behind Grace, as Windows' restore animation does; none showed a blank or half-drawn Grace.
 
-## Still needs a person
+## Optional, not done
 
-- Narrator and Accessibility Insights reading the window and the gallery (the Windows half of #269). The UI Automation e2e reads the same tree, but a screen reader's own reading has not been heard.
-- An Intel or AMD GPU, or the Basic Display Adapter: the same idle check. The agent changes no driver on the owner's machine.
+The owner made both of these optional for P0 on 2026-11-09: there is no machine with another GPU at hand, and the UI Automation e2e already reads the same tree a screen reader does.
+
+- Narrator and Accessibility Insights reading the window and the gallery (the Windows half of #269).
+- An Intel or AMD GPU, or the Basic Display Adapter: the same idle check.

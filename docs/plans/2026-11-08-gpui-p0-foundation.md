@@ -49,11 +49,11 @@ Nothing runs on the owner's PC without the owner's go-ahead. After PR 3, a check
 2. Narrator and Accessibility Insights read the window (the Windows half of [#269](https://github.com/hpagniez/grace/issues/269)).
 3. An Intel or AMD GPU, or the Basic Display Adapter if none is at hand: the same idle check (guide, Open questions).
 
-Done on 2026-11-09 for 1: [docs/checks/2026-11-09-gpui-p0-windows.md](../checks/2026-11-09-gpui-p0-windows.md). `idle.wakeups.minimised` was 0.1 a second, every measure taken is within Electron Grace's limits, the zip has the contract's layout, and the UI Automation e2e passed once the driver brought the window to the foreground before a key. 2 and 3 wait for the owner.
+Done on 2026-11-09 for 1: [docs/checks/2026-11-09-gpui-p0-windows.md](../checks/2026-11-09-gpui-p0-windows.md). `idle.wakeups.minimised` was 0.1 a second, every measure taken is within Electron Grace's limits, the zip has the contract's layout, and the UI Automation e2e passed once the driver brought the window to the foreground before a key. The owner made 2 and 3 optional on 2026-11-09 (no other GPU at hand; the UI Automation e2e reads the same tree as Narrator), so they are not done.
 
 ## Exit check (from #279)
 
-An empty Grace window passes ADR 0030 on the reference machine, minimised and shown, with `idle.wakeups.minimised` under 5 a second, and Narrator reads it; an Intel or AMD GPU is checked too; the zip has the contract's layout; CI is green on both platforms; the parity rows of phase P0 are ticked.
+An empty Grace window passes ADR 0030 on the reference machine, minimised and shown, with `idle.wakeups.minimised` under 5 a second; the zip has the contract's layout; CI is green on both platforms; the parity rows of phase P0 are ticked. Narrator and an Intel or AMD GPU are optional (the owner, 2026-11-09).
 
 ## Cost
 
