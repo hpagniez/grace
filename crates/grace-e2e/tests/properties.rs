@@ -312,7 +312,12 @@ fn shows_a_saved_secret(app: &App) {
 fn a_secret_is_used_but_never_shown() {
     let (_, app) = open_with_secret();
     run_always(&app);
-    assert!(run_log(&app).contains("api.token = ****"));
+    // Karate's own log holds what it printed; the console masks it, which `runner::tests::properties` checks and the
+    // console's e2e test with P2's fifth PR
+    assert!(
+        run_log(&app).contains(&format!("api.token = {SECRET}")),
+        "the run got it"
+    );
     assert!(!everything(&app).contains(SECRET));
     shows_a_saved_secret(&app);
     assert!(!everything(&app).contains(SECRET));
@@ -393,6 +398,9 @@ fn import_a_secrets_file_and_run_with_it() {
     assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
 
     run_always(&app);
-    assert!(run_log(&app).contains("APP_API_TOKEN = ****"));
+    assert!(
+        run_log(&app).contains(&format!("APP_API_TOKEN = {SECRET}")),
+        "the run got it"
+    );
     assert!(!everything(&app).contains(SECRET));
 }
