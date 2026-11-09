@@ -47,7 +47,9 @@ impl UiaDriver {
 
     /// Brings the window to the foreground and checks that it has the focus. Windows' foreground lock can refuse a
     /// process that had no input of late, and `SetFocus` then still answers success while the keys would go to
-    /// another window; a tap of Alt counts as input and lifts the lock, so the next try takes.
+    /// another window; a key press counts as input and lifts the lock, so the next try takes. The key is F24, which no
+    /// window acts on: a tap of Alt, which this sent before, put a window that had the focus after all in its menu
+    /// mode, and the Tabs after it never reached Grace's controls (#301).
     fn to_foreground(&self) -> Result<()> {
         let window = self.window()?;
         for _ in 0..5 {
@@ -58,7 +60,7 @@ impl UiaDriver {
             if focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid) {
                 return Ok(());
             }
-            Keyboard::new().send_keys("{alt}").map_err(err)?;
+            Keyboard::new().send_keys("{F24}").map_err(err)?;
         }
         Err(format!("process {}'s window does not take the focus", self.pid))
     }
