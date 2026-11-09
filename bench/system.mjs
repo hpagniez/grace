@@ -351,3 +351,93 @@ export function folderMB(dir) {
     if (entry.isFile()) bytes += statSync(path.join(entry.parentPath, entry.name)).size;
   return Math.round(bytes / 1e5) / 10;
 }
+
+/**
+ * A GPU driver's user-mode DLL: NVIDIA's D3D and OpenGL ones, AMD's and Intel's. Any app with a D3D11 device gets a
+ * thread of the driver's that wakes on its own, and the app cannot stop it, so it is reported apart from the app's own
+ * wake-ups (ADR 0031, "Wake-ups while minimised count only Grace's own threads").
+ */
+export const GPU_DRIVER =
+  /^(nvwgf2umx?|nvd3dumx?|nvoglv(32|64)|nvldumdx?|amdxx(32|64)|amdxc(32|64)|atidxx(32|64)|atiumd(64|6a)|aticfx(32|64)|igd10iumd(32|64)|igd12umd(32|64)|igdumdim(32|64)|igc(32|64))\.dll$/i;
+
+/** @typedef {{ pid: number, id: number, cs: number, start: string }} Thread One thread: its context switches so far and the module its start address is in (`name.dll+0x…`, or a bare address). */
+
+/**
+ * Every thread of the tree under `rootPid`, from one PowerShell call: its context switches so far and where it
+ * started. Needs no admin rights. From the GPUI prototype's `measure/windows/thread-wakeups.ps1`.
+ * @param {number} rootPid
+ * @returns {Promise<Thread[]>}
+ */
+export async function threads(rootPid) {
+  if (!Number.isInteger(rootPid)) throw new TypeError(`not a process id: ${rootPid}`);
+  const out = await powershell(`$ErrorActionPreference = 'Stop'
+${SELECT_TREE}
+Add-Type -Namespace Bench -Name Thread -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern IntPtr OpenThread(uint access, bool inherit, uint id);
+[DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+[DllImport("ntdll.dll")] public static extern int NtQueryInformationThread(IntPtr h, int cls, out IntPtr info, int size, IntPtr ret);
+'@
+$all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate
+$ids = Select-Tree $all ${rootPid}
+if (-not ($all | Where-Object { $_.ProcessId -eq ${rootPid} })) { [Console]::Error.WriteLine('process ${rootPid} is not running'); exit 1 }
+$rows = foreach ($p in $ids) {
+  $mods = try { (Get-Process -Id $p).Modules | ForEach-Object { [pscustomobject]@{ n = $_.ModuleName; b = $_.BaseAddress.ToInt64(); e = $_.BaseAddress.ToInt64() + $_.ModuleMemorySize } } } catch { @() }
+  Get-CimInstance -Query "SELECT IDThread, ContextSwitchesPersec FROM Win32_PerfRawData_PerfProc_Thread WHERE IDProcess=$p" | ForEach-Object {
+    $start = ''
+    $h = [Bench.Thread]::OpenThread(0x0040, $false, [uint32]$_.IDThread) # THREAD_QUERY_INFORMATION
+    if ($h -ne [IntPtr]::Zero) {
+      $a = [IntPtr]::Zero
+      if ([Bench.Thread]::NtQueryInformationThread($h, 9, [ref]$a, [IntPtr]::Size, [IntPtr]::Zero) -eq 0) { # ThreadQuerySetWin32StartAddress
+        $v = $a.ToInt64(); $m = $mods | Where-Object { $v -ge $_.b -and $v -lt $_.e } | Select-Object -First 1
+        $start = if ($m) { '{0}+0x{1:x}' -f $m.n, ($v - $m.b) } else { '0x{0:x}' -f $v }
+      }
+      [void][Bench.Thread]::CloseHandle($h)
+    }
+    [pscustomobject]@{ pid = $p; id = [int]$_.IDThread; cs = [long]$_.ContextSwitchesPersec; start = $start }
+  }
+}
+ConvertTo-Json -Compress -InputObject @($rows)`);
+  return [JSON.parse(out)].flat();
+}
+
+/**
+ * Wake-ups a second between two `threads` readings `seconds` apart: the context switches of the tree's threads, the
+ * GPU driver's (`GPU_DRIVER`) apart from the rest. A thread that started between the readings counts from zero; one
+ * that ended is not seen, and neither is what it did.
+ * @param {Thread[]} before
+ * @param {Thread[]} after
+ * @param {number} seconds
+ * @returns {{ own: number, gpu: number }}
+ */
+export function wakeups(before, after, seconds) {
+  if (!(seconds > 0)) throw new RangeError(`not a time span: ${seconds}`);
+  const was = new Map(before.map((t) => [`${t.pid}:${t.id}`, t.cs]));
+  const sums = { own: 0, gpu: 0 };
+  for (const t of after) {
+    const module = t.start.split("+")[0];
+    sums[GPU_DRIVER.test(module) ? "gpu" : "own"] += Math.max(
+      0,
+      t.cs - (was.get(`${t.pid}:${t.id}`) ?? 0),
+    );
+  }
+  const rate = (/** @type {number} */ n) => Math.round((n / seconds) * 10) / 10;
+  return { own: rate(sums.own), gpu: rate(sums.gpu) };
+}
+
+/**
+ * Moves and sizes the main window of process `pid` (SetWindowPos, in screen pixels). For an app that cannot be told
+ * where to open, such as GPUI Grace before it remembers its window (phase P2). Rejects when the process has no window.
+ * @param {number} pid
+ * @param {{ x: number, y: number, width: number, height: number }} at
+ * @returns {Promise<void>}
+ */
+export async function placeWindow(pid, { x, y, width, height }) {
+  if (!Number.isInteger(pid)) throw new TypeError(`not a process id: ${pid}`);
+  for (const n of [x, y, width, height])
+    if (!Number.isInteger(n)) throw new TypeError(`not a whole number of pixels: ${n}`);
+  await powershell(`
+Add-Type -Namespace Win32 -Name Place -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);'
+$handle = (Get-Process -Id ${pid}).MainWindowHandle
+if ($handle -eq 0) { [Console]::Error.WriteLine('process ${pid} has no window'); exit 1 }
+if (-not [Win32.Place]::SetWindowPos($handle, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0014)) { [Console]::Error.WriteLine('SetWindowPos failed'); exit 1 } # SWP_NOZORDER | SWP_NOACTIVATE`);
+}

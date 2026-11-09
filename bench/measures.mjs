@@ -1,7 +1,8 @@
 // The bench's catalogue: every measure id, in table order, with its unit.
-// `release: true` marks a measure only a release-mode bench takes (docs/specs/2026-10-31-light-and-fast.md, R2).
+// `release: true` marks a measure only a release-mode bench takes (docs/specs/2026-10-31-light-and-fast.md, R2); a GPUI
+// build takes the minimised ones in every mode. `reported: true` marks one that gets no limit, only its `aim` in the table.
 
-/** @typedef {{ unit: "MB" | "ms" | "count" | "fps", release?: true }} Measure */
+/** @typedef {{ unit: "MB" | "ms" | "count" | "fps" | "/s", release?: true, reported?: true, aim?: number }} Measure */
 
 /** @type {Record<string, Measure>} */
 const BASE = {
@@ -14,6 +15,10 @@ const BASE = {
   "idle.memory": { unit: "MB" },
   "idle.cpu.shown": { unit: "ms" },
   "idle.cpu.minimised": { unit: "ms", release: true },
+  // ADR 0031: Grace's own threads while minimised, against 5 a second; the GPU driver's thread apart, never judged. The
+  // first is reported, not judged, until the cut-over (migration guide R7.1): Electron Grace has never been held to it.
+  "idle.wakeups.minimised": { unit: "/s", release: true, reported: true, aim: 5 },
+  "idle.wakeups.gpu": { unit: "/s", release: true, reported: true },
 };
 
 // Measured on the 2,000-test project, and again on the 10,000-test one (`@10k`) in release mode.

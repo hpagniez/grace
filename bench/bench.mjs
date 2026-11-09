@@ -9,6 +9,8 @@
 // after one warm-up per build and alternate between the builds. Release mode adds the fresh-profile start, the minimised
 // idle CPU and the 10,000-test project, and needs bench/limits.json. A worse number never fails the bench; only a failure
 // to measure does (exit 1). The windows open on the first screen that is not the main one, when there is one.
+// A GPUI build (ADR 0031; no resources/app.asar) is started without Playwright (gpui.mjs) and takes the size, start, idle
+// and wake-up measures only, its minimised ones in every mode, until its views come (migration guide R7).
 // `--limits-from` measures nothing: it turns the rounds of a release-mode bench.json of build B into bench/limits.json.
 import { execFileSync } from "node:child_process";
 import {
@@ -26,6 +28,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { writeBigProject } from "../e2e/big-project.ts";
 import { startApp, startTimes } from "./app.mjs";
+import { isGpui, startGpui } from "./gpui.mjs";
 import { judge, makeLimits } from "./judge.mjs";
 import { MEASURES, RUN_PHASE } from "./measures.mjs";
 import {
@@ -43,10 +46,13 @@ import { median, order } from "./stats.mjs";
 import {
   folderMB,
   minimise,
+  placeWindow,
   sample,
   screens,
   startSampler,
+  threads,
   waitForQuiet,
+  wakeups,
   windowSpot,
 } from "./system.mjs";
 
@@ -177,6 +183,26 @@ async function launch(
   }
 }
 
+/**
+ * Starts a GPUI build, then puts its window where the bench puts Electron Grace's: GPUI Grace cannot be told where to
+ * open before it remembers its window (phase P2). A window that cannot be moved stays where it opened, and says so.
+ * @returns {Promise<App & { paintMs: number }>}
+ */
+async function launchGpui(/** @type {string} */ exe, /** @type {{ dataDir?: string }} */ opts) {
+  /** @type {number | undefined} */
+  let pid;
+  try {
+    const app = await startGpui(exe, { ...opts, onSpawn: (p) => starting.add((pid = p)) });
+    live.add(app);
+    await placeWindow(app.pid, { ...windowAt, width: 1400, height: 900 }).catch((e) =>
+      log(`the window stays where it opened: ${e.message}`),
+    );
+    return app;
+  } finally {
+    if (pid !== undefined) starting.delete(pid);
+  }
+}
+
 /** Stops `app`. A failure is reported and fails the bench at the end, but never hides the error that got us here. */
 async function halt(/** @type {App} */ app, /** @type {{ keepData?: boolean }} */ opts = {}) {
   await app.stop(opts).then(
@@ -193,7 +219,14 @@ async function starts(
   /** @type {string} */ exe,
   /** @type {string} */ project,
   dataDir = freshDir(),
+  gpui = false,
 ) {
+  if (gpui) {
+    // its first frame is the probe's; it has no tree yet
+    const app = await launchGpui(exe, { dataDir });
+    await halt(app, { keepData: true });
+    return { dataDir: app.dataDir, paintMs: app.paintMs, treeMs: null };
+  }
   const app = await launch(exe, { project, dataDir, cdp: true });
   try {
     const times = await startTimes(app).catch((e) => {
@@ -209,14 +242,20 @@ async function starts(
 /** CPU time the tree has used in all, app and Java. */
 const cpu = (/** @type {Awaited<ReturnType<typeof sample>>} */ s) => s.app.cpuMs + s.java.cpuMs;
 
-/** Idle on `dataDir` with no CDP: memory after 20 s, then the CPU over 60 s shown and, in release mode, minimised. */
+/**
+ * Idle on `dataDir` with no CDP: memory after 20 s, then the CPU over 60 s shown and, in release mode or for a GPUI
+ * build, minimised, with the wake-ups of the tree's threads over that minute (ADR 0031).
+ */
 async function idle(
   /** @type {string} */ exe,
   /** @type {string} */ project,
   /** @type {string} */ dataDir,
   /** @type {boolean} */ release,
+  gpui = false,
 ) {
-  const app = await launch(exe, { project, dataDir, cdp: false });
+  const app = gpui
+    ? await launchGpui(exe, { dataDir })
+    : await launch(exe, { project, dataDir, cdp: false });
   try {
     await sleep(SETTLE_MS);
     const first = await sample(app.pid);
@@ -224,12 +263,23 @@ async function idle(
     const out = { "idle.memory": round1(first.app.privateMB + first.java.privateMB) };
     await sleep(IDLE_CPU_MS);
     out["idle.cpu.shown"] = cpu(await sample(app.pid)) - cpu(first);
-    if (release) {
+    if (release || gpui) {
       await minimise(app.pid);
       await sleep(MINIMISE_SETTLE_MS);
       const before = await sample(app.pid);
+      // a reading takes seconds: the span runs from the middle of one to the middle of the next
+      const read = async () => {
+        const from = Date.now();
+        const all = await threads(app.pid);
+        return { all, at: (from + Date.now()) / 2 };
+      };
+      const first = await read();
       await sleep(IDLE_CPU_MS);
+      const last = await read();
       out["idle.cpu.minimised"] = cpu(await sample(app.pid)) - cpu(before);
+      const woke = wakeups(first.all, last.all, (last.at - first.at) / 1000);
+      out["idle.wakeups.minimised"] = woke.own;
+      out["idle.wakeups.gpu"] = woke.gpu;
     }
     return out;
   } finally {
@@ -460,25 +510,26 @@ function isAlive(/** @type {number} */ pid) {
  * @param {boolean} release
  * @returns {Promise<Values>}
  */
-async function measureRound(exe, { small, large }, release) {
+async function measureRound(exe, { small, large }, release, gpui = false) {
   /** @type {Values} */
   const values = {};
   /** @type {string | undefined} */
   let dataDir;
   try {
-    const fresh = await starts(exe, small.dir);
+    const fresh = await starts(exe, small.dir, undefined, gpui);
     dataDir = fresh.dataDir;
     if (release) {
       values["start.paint.fresh"] = fresh.paintMs;
       values["start.tree.fresh"] = fresh.treeMs;
     }
-    const reused = await starts(exe, small.dir, dataDir);
+    const reused = await starts(exe, small.dir, dataDir, gpui);
     values["start.paint.reused"] = reused.paintMs;
     values["start.tree.reused"] = reused.treeMs;
-    Object.assign(values, await idle(exe, small.dir, dataDir, release));
+    Object.assign(values, await idle(exe, small.dir, dataDir, release, gpui));
   } finally {
     if (dataDir) rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
+  if (gpui) return values; // no tree to drive yet: the run, smooth and page measures come with the views (P2)
   Object.assign(values, await interactive(exe, small, ""));
   if (large) Object.assign(values, await interactive(exe, large, "@10k"));
   return values;
@@ -598,7 +649,12 @@ async function main() {
       `machine load ${round1(load)}% after waiting ${Math.round(waitedMs / 1000)} s${load >= 35 ? ", not quiet: going ahead" : ""}`,
     );
     const started = Date.now();
-    const values = { ...sizes[key], ...(await measureRound(builds[key].exe, projects, release)) };
+    const gpui = isGpui(builds[key].exe);
+    if (gpui) log(`build ${key} is GPUI Grace: size, start, idle and wake-ups only`);
+    const values = {
+      ...sizes[key],
+      ...(await measureRound(builds[key].exe, projects, release, gpui)),
+    };
     log(`run ${i + 1} took ${Math.round((Date.now() - started) / 1000)} s`);
     results.push({ build: key, warmup, load: round1(load), values });
   }

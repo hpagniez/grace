@@ -92,7 +92,7 @@ function alive(pid) {
  * @param {number} pid
  * @param {number} started see `treePids`
  */
-async function killTree(pid, started) {
+export async function killTree(pid, started) {
   // The listed pids are killed one by one, not just the root with /T: once the root is dead (the app crashed), taskkill
   // cannot find it and so never reaches its children, which are still listed by their parent's pid. /T stays for what
   // the root started after the listing. If the listing fails, the root alone is killed.
@@ -115,7 +115,7 @@ async function killTree(pid, started) {
  * own retries do not wait on that. A folder that will not go is named and left, not an error: the measures are in.
  * @param {string} dir
  */
-async function removeDir(dir) {
+export async function removeDir(dir) {
   for (let tries = 0; ; tries++) {
     try {
       rmSync(dir, { recursive: true, force: true });

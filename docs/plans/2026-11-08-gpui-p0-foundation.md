@@ -33,13 +33,15 @@ The tooltip helper (`tooltip()`, the 500 ms pause, `side`, one at a time, shown 
 
 ## PR 3: packaging and the bench
 
-1. A packaging script (Node, `scripts/`) that builds `Grace.exe` in release and lays out the zip of ADR 0019: `Grace.exe` at the root, `resources\app-files.json`, `resources\jre\`, `karate.jar`, `listener.jar`, `licenses\`, `switch.ps1`. The zip is not released until P5; a test checks the layout against the Electron zip's.
-2. The bench launches `Grace.exe` without Playwright (guide R7.2): start, idle, run-less memory and size from processes and files. The frame probe: an environment variable turns it on, one check at start when off.
-3. `idle.wakeups.minimised` (ADR 0031): context switches a second of Grace's threads while minimised and idle, limit 5, counting every thread except those whose start address is in a GPU driver's user-mode DLL (NVIDIA `nvwgf2umx.dll`, AMD `amdxx64.dll`, Intel `igd10iumd64.dll` and their siblings), which are reported on their own line. From the prototype's `measure/windows/thread-wakeups.ps1`. Added to `bench/limits.json` with its limit; reported, not judged, for the GPUI build until the cut-over (guide R7.1).
+1. `scripts/package-gpui.mjs` (`npm run package:gpui`) builds `Grace.exe` in release and lays out the zip of ADR 0019 as Electron Grace's has it: `Grace.exe` at the root; `resources\app-files.json`, `resources\jre\`, `karate.jar`, `listener.jar` and `licenses\` (with Lucide's and IBM Plex's, as `forge.config.mts` adds them). `switch.ps1` is not in the zip: Electron Grace writes it into the staging folder at update time. The zip is not released until P5; `scripts/package-gpui.test.ts` checks the layout, the list and the zip's name against the updater's.
+2. The bench launches `Grace.exe` without Playwright (guide R7.2, `bench/gpui.mjs`): a build with no `resources\app.asar` is GPUI Grace. It takes size, start (the first frame, from the probe) and idle shown and minimised; the run, smooth and page measures wait for the views. The probe is `grace::probe`: `GRACE_PROBE` turns it on, one look at the environment at start when off. GPUI Grace cannot be told where to open until it remembers its window (P2), so the bench moves it to its screen once it has drawn.
+3. `idle.wakeups.minimised` (ADR 0031): context switches a second of Grace's threads over the minimised minute, counting every thread of the process tree except those whose start address is in a GPU driver's user-mode DLL (`system.mjs` `GPU_DRIVER`), which are `idle.wakeups.gpu`. From the prototype's `measure/windows/thread-wakeups.ps1`. Both are only reported: the catalogue shows the aim of 5 a second beside the first, and neither gets a line in `bench/limits.json` until the cut-over (guide R7.1). A limit there now would fail every Electron release bench, which has never been held to it.
+
+Found while building it, for P5: the Electron updater refuses an unpacked update without `resources\app.asar` (`src/main/updates/fetchZip.ts`), so the last Electron release must drop that check before the first GPUI release; `Grace.exe` has no icon yet (Electron's comes from `assets/icon`); and the zip must carry the licences of the Rust crates GPUI Grace is built from.
 
 ## By hand on Windows (the owner's machine)
 
-Nothing runs on the owner's PC without the owner's go-ahead. After PR 3, a runbook in `docs/checks/` for the owner, then the check record:
+Nothing runs on the owner's PC without the owner's go-ahead. After PR 3, a check record in `docs/checks/`:
 
 1. On the reference machine: the empty window minimised and shown for 60 s each, `idle.cpu.minimised`, `idle.cpu.shown`, `idle.wakeups.minimised` under 5 a second; restore from minimised and show after hide draw at once.
 2. Narrator and Accessibility Insights read the window (the Windows half of [#269](https://github.com/hpagniez/grace/issues/269)).

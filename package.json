@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bench": "npm run package && node --no-warnings bench/bench.mjs",
+    "package:gpui": "node scripts/package-gpui.mjs",
+    "bench:gpui": "node scripts/package-gpui.mjs --no-zip && node --no-warnings bench/bench.mjs --b out/gpui/Grace-win32-x64/Grace.exe",
     "e2e": "npm run package && npx electron --version && playwright test",
     "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts screens.shots",
     "screens:readme": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts readme.shots",

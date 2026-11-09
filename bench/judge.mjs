@@ -99,7 +99,7 @@ export function judge(report, limits) {
       const worse = higher ? a - b : b - a;
       verdict = worse > noise ? "worse" : worse < -noise ? "better" : "pass";
     }
-    return { id, a, b, change, limit, aim: entry?.aim ?? null, verdict };
+    return { id, a, b, change, limit, aim: entry?.aim ?? MEASURES[id]?.aim ?? null, verdict };
   });
   return { result: rows.some((r) => MISSES.includes(r.verdict)) ? "miss" : "pass", rows };
 }
@@ -112,7 +112,7 @@ function median(values) {
 }
 
 /**
- * Limits from build b's rounds after the warm-up: each limit is the median plus a noise margin, the spread of
+ * Limits from build b's rounds after the warm-up, for every measure that is not only reported: each limit is the median plus a noise margin, the spread of
  * its rounds, at least 5% of the median and at least a floor (5 ms, else 1), in whole units. A size never
  * varies, so its margin is its spread and at least 1 MB, with no 5%. The limit is rounded to the unit: one
  * decimal for MB, a whole number for the rest.
@@ -124,7 +124,8 @@ export function makeLimits(report, meta) {
   const rounds = report.rounds.filter((r) => r.build === "b" && !r.warmup);
   /** @type {Record<string, Limit>} */
   const measures = {};
-  for (const [id, { unit }] of Object.entries(MEASURES)) {
+  for (const [id, { unit, reported }] of Object.entries(MEASURES)) {
+    if (reported) continue;
     const values = rounds.map((r) => r.values[id]).filter((v) => typeof v === "number");
     if (!values.length) continue;
     const mid = median(values);
