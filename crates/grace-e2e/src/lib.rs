@@ -108,6 +108,9 @@ pub enum Key {
     PageDown,
     /// Ctrl+Enter.
     CtrlEnter,
+    /// Ctrl+A, which selects what a text box holds.
+    SelectAll,
+    Backspace,
 }
 
 /// One node of the tree, as read. `path` is its position under the app's window, which `Driver::press` finds again.
@@ -117,6 +120,8 @@ pub struct Node {
     pub name: String,
     pub description: String,
     pub value: Option<f64>,
+    /// What a text box holds.
+    pub text: Option<String>,
     pub states: States,
     /// Where it is, when the platform says: on the screen through UI Automation, in its window through AT-SPI.
     /// `Driver::hover` reads it as its backend wrote it.
@@ -159,6 +164,9 @@ impl Node {
             if let Some(v) = n.value {
                 out.push_str(&format!(" value={v}"));
             }
+            if let Some(t) = &n.text {
+                out.push_str(&format!(" text={t:?}"));
+            }
             out.push('\n');
             for c in &n.children {
                 line(c, depth + 1, out);
@@ -182,6 +190,10 @@ pub trait Driver {
     fn hover(&self, node: &Node) -> Result<()>;
     /// Presses a key on the keyboard, for the window under the pointer or with the focus.
     fn key(&self, key: Key) -> Result<()>;
+    /// Clicks the pointer on the node's centre, as a person does to put the focus in a text box.
+    fn click(&self, node: &Node) -> Result<()>;
+    /// Types `text` on the keyboard, into the control with the focus.
+    fn type_text(&self, text: &str) -> Result<()>;
     /// Asks the window to close, as its close button does: Grace then saves, stops a run and quits (Playwright's
     /// `app.close()`).
     fn close(&self) -> Result<()>;
@@ -431,6 +443,47 @@ impl App {
         self.driver.key(key)
     }
 
+    pub fn click(&self, node: &Node) -> Result<()> {
+        self.driver.click(node)
+    }
+
+    pub fn type_text(&self, text: &str) -> Result<()> {
+        self.driver.type_text(text)
+    }
+
+    /// Clicks into the text box with this role and name and types `text` over what it holds (Playwright's `fill`).
+    pub fn fill(&self, role: Role, name: &str, text: &str) -> Result<()> {
+        let node = self.wait_for_node(role.clone(), name)?;
+        self.click(&node)?;
+        self.wait_for(
+            &format!("{role:?} {name:?} to take the focus"),
+            Duration::from_secs(5),
+            |t| {
+                t.all()
+                    .iter()
+                    .any(|n| n.role == role && n.name == name && n.states.focused)
+            },
+        )?;
+        self.key(Key::SelectAll)?;
+        self.key(Key::Backspace)?;
+        if text.is_empty() { Ok(()) } else { self.type_text(text) }
+    }
+
+    /// The text box with this role and name, once it holds `text`. Through AT-SPI the pinned AccessKit adapter gives
+    /// a combo box or a spin button no text (it has no text runs) and no other way to its value, so on Linux this
+    /// only finds the box; UI Automation's Value pattern reads it on Windows.
+    pub fn wait_for_text(&self, role: Role, name: &str, text: &str) -> Result<Node> {
+        let tree = self.wait_for(
+            &format!("{role:?} {name:?} to hold {text:?}"),
+            Duration::from_secs(30),
+            |t| {
+                t.find(&role, name)
+                    .is_some_and(|n| cfg!(target_os = "linux") || n.text.as_deref().unwrap_or_default() == text)
+            },
+        )?;
+        Ok(tree.find(&role, name).cloned().expect("found above"))
+    }
+
     /// Waits until no node has this role and name.
     pub fn wait_for_no_node(&self, role: Role, name: &str) -> Result<Node> {
         self.wait_for(&format!("no {role:?} {name:?}"), Duration::from_secs(10), |t| {
@@ -522,6 +575,7 @@ mod tests {
             name: name.into(),
             description: String::new(),
             value: None,
+            text: None,
             states: States::default(),
             rect: None,
             path: vec![],
