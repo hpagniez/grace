@@ -75,13 +75,11 @@ pub struct StoredSelection {
 }
 
 /// `run.json`. Never holds a property value, an error text, a step log or a console line. Its keys are written in
-/// Electron Grace's order: `debug` (when set) first, then as below.
+/// the order of the object `runner.ts` writes: `version` to `tests` as below, then `debug` last, only when set
+/// (`history::tests::run_json_text` checks the text against `JSON.stringify`'s).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRecord {
-    /// A step debugger run; absent for any other. Flaky detection leaves it out (step debugger R2.7).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub debug: bool,
     /// Always 1.
     pub version: u32,
     #[serde(with = "crate::model::js_num")]
@@ -103,6 +101,10 @@ pub struct RunRecord {
     /// 3221225786, so it is an `i64` and not an `i32`.
     pub exit_code: Option<i64>,
     pub tests: Vec<StoredTest>,
+    /// A step debugger run; absent for any other. Flaky detection leaves it out (step debugger R2.7). Written last:
+    /// `runner.ts` adds it after `tests`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub debug: bool,
 }
 
 /// A listed run as the window gets it: the record without `tests`, with counts and its folder id.

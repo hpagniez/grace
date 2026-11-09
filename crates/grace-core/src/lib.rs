@@ -3,6 +3,8 @@
 //! `docs/plans/2026-11-09-gpui-p1-core.md`.
 pub mod batch;
 pub mod fingerprint;
+pub mod flaky;
+pub mod history;
 pub mod karate;
 pub mod mask;
 pub mod model;
@@ -11,4 +13,5 @@ pub mod properties_file;
 pub mod recent;
 pub mod secrets;
 pub mod settings;
+pub mod trends;
 pub mod window;
