@@ -177,4 +177,9 @@ impl crate::seams::Seams for E2eSeams {
             .and_then(|v| v.get("folder")?.as_str().map(std::path::PathBuf::from));
         Box::pin(async move { answer })
     }
+
+    /// Records the path instead of opening a browser on the test machine.
+    fn open_path(&self, path: &std::path::Path, _cx: &mut gpui::App) {
+        self.record(serde_json::json!({ "seam": "open", "path": path }));
+    }
 }

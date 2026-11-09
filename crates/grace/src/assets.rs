@@ -119,6 +119,10 @@ pub struct Assets;
 /// The home screen's mascot (ADR 0013), Electron Grace's own file.
 const MASCOT: &[u8] = include_bytes!("../../../assets/mascot.svg");
 
+/// The toolbar's Home button: the app's small logo, Electron Grace's own file.
+const LOGO: &[u8] = include_bytes!("../../../assets/icon-small.svg");
+pub const LOGO_PATH: &str = "grace/logo.svg";
+
 impl Assets {
     pub fn load_mascot(&self) -> &'static [u8] {
         MASCOT
@@ -129,6 +133,9 @@ impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
         if path == crate::home::MASCOT {
             return Ok(Some(Cow::Borrowed(MASCOT)));
+        }
+        if path == LOGO_PATH {
+            return Ok(Some(Cow::Borrowed(LOGO)));
         }
         if let Some(name) = path.strip_prefix("grace/icons/").and_then(|p| p.strip_suffix(".svg")) {
             return Ok(Icon::ALL

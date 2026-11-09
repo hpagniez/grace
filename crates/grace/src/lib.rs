@@ -10,8 +10,13 @@ pub mod elements;
 pub mod home;
 pub mod instance;
 pub mod probe;
+pub mod progress;
 pub mod seams;
+pub mod status_bar;
+#[cfg(test)]
+pub mod testing;
 pub mod theme;
+pub mod toolbar;
 pub mod tooltip;
 pub mod ui;
 pub mod window;

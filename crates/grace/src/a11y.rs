@@ -113,3 +113,45 @@ pub fn tab_order(root: gpui::Stateful<gpui::Div>, focus: &gpui::FocusHandle) -> 
         .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
         .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
 }
+
+/// Whether the system asks for reduced motion, as CSS's `prefers-reduced-motion` read it for Electron Grace: on
+/// Windows, Settings > Accessibility > Visual effects > Animation effects (`SPI_GETCLIENTAREAANIMATION`). Linux, not
+/// released (guide R5), reads GNOME's `enable-animations` through no API and is taken as moving. `GRACE_REDUCE_MOTION`
+/// (`1` or `0`) overrides it, for tests.
+pub fn system_reduces_motion() -> bool {
+    if let Ok(v) = std::env::var("GRACE_REDUCE_MOTION") {
+        return v == "1";
+    }
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
+        };
+        use windows::core::BOOL;
+        let mut animate = BOOL(1);
+        // SAFETY: the call writes one BOOL to the pointer it is given, which lives across the call.
+        let read = unsafe {
+            SystemParametersInfoW(
+                SPI_GETCLIENTAREAANIMATION,
+                0,
+                Some(&mut animate as *mut BOOL as *mut core::ffi::c_void),
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            )
+        };
+        read.is_ok() && !animate.as_bool()
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Applies the system's reduced motion to GPUI's animations, which then draw their end (a one-shot) or their start (a
+/// loop) and ask for no frame. Read at start and each time the window becomes active, so a change in Settings counts
+/// from the next return to Grace without anything polling (ADR 0030).
+pub fn follow_reduced_motion<T: 'static>(window: &mut Window, cx: &mut gpui::Context<T>) -> gpui::Subscription {
+    cx.set_reduce_motion(system_reduces_motion());
+    cx.observe_window_activation(window, |_, window, cx| {
+        if window.is_window_active() {
+            cx.set_reduce_motion(system_reduces_motion());
+        }
+    })
+}

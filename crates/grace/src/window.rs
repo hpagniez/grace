@@ -43,6 +43,9 @@ pub struct GraceWindow {
     painted: bool,
     /// The pending save of the window's bounds; a newer move replaces it.
     save: Option<Task<()>>,
+    /// The progress section, which keeps the run's clock.
+    progress: Option<Entity<crate::progress::Progress>>,
+    _motion: Option<gpui::Subscription>,
 }
 
 impl GraceWindow {
@@ -55,6 +58,8 @@ impl GraceWindow {
             open_focus: cx.focus_handle(),
             painted: false,
             save: None,
+            progress: None,
+            _motion: None,
         }
     }
 
@@ -72,6 +77,8 @@ impl GraceWindow {
         })
         .detach();
         let mut me = Self::new(cx);
+        me.progress = Some(cx.new(|cx| crate::progress::Progress::new(grace.clone(), cx)));
+        me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
     }
@@ -131,11 +138,21 @@ impl Render for GraceWindow {
                 )
                 .into_any_element()
             });
-            if state.home() {
+            let view = if state.home() {
                 crate::home::render(&grace, &state, shown, &self.open_focus, window, cx).into_any_element()
             } else {
-                project_view(&state, shown, cx).into_any_element()
-            }
+                let toolbar = crate::toolbar::render(&grace, &state, window, cx).into_any_element();
+                project_view(toolbar, self.progress.clone(), shown, cx).into_any_element()
+            };
+            // the view cuts off at the status bar, so a short window never hides the bar
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_h_0()
+                .child(div().flex().flex_col().flex_1().min_h_0().overflow_hidden().child(view))
+                .child(crate::status_bar::render(&state, cx))
+                .into_any_element()
         });
         a11y::tab_order(div().id("grace"), &self.focus)
             .role(Role::Application)
@@ -161,16 +178,16 @@ impl Render for GraceWindow {
     }
 }
 
-/// The project view on its sheet. Phase P2's later PRs fill it: the toolbar, the tree and the panels (P2 plan).
-fn project_view(state: &grace_core::state::AppState, shown: Option<gpui::AnyElement>, cx: &App) -> impl IntoElement {
+/// The project view: the toolbar, then the sheet (spec R3.3) with the progress section and the notice. P2's later PRs
+/// fill the rest of the sheet: the tree, the details and the bottom panel (P2 plan).
+fn project_view(
+    toolbar: gpui::AnyElement,
+    progress: Option<Entity<crate::progress::Progress>>,
+    shown: Option<gpui::AnyElement>,
+    cx: &App,
+) -> impl IntoElement {
     let t = Theme::global(cx).tokens;
     let m = crate::theme::METRICS;
-    let root = state
-        .project
-        .as_ref()
-        .map(|p| p.root.clone())
-        .or_else(|| state.opening.clone())
-        .unwrap_or_default();
     div()
         .id("project-view")
         .debug_selector(|| "project-view".into())
@@ -178,16 +195,7 @@ fn project_view(state: &grace_core::state::AppState, shown: Option<gpui::AnyElem
         .flex_col()
         .flex_1()
         .min_h_0()
-        .child(
-            div()
-                .id("project-path")
-                .role(Role::Label)
-                .aria_value(SharedString::from(root.clone()))
-                .px_3()
-                .py_2()
-                .font_family(crate::theme::MONO)
-                .child(root),
-        )
+        .child(toolbar)
         .child(
             div()
                 .id("sheet")
@@ -197,8 +205,13 @@ fn project_view(state: &grace_core::state::AppState, shown: Option<gpui::AnyElem
                 .flex_1()
                 .min_h_0()
                 .mx(px(m.sheet_inset))
+                .mb(px(m.sheet_inset))
+                .overflow_hidden()
                 .rounded(px(m.sheet_radius))
+                .border_t_1()
+                .border_color(Theme::color(t.line))
                 .bg(Theme::color(t.surface))
+                .children(progress)
                 .children(shown.map(|n| div().px_3().py_2().child(n))),
         )
 }
@@ -335,6 +348,33 @@ mod tests {
             height,
             maximized,
         }
+    }
+
+    /// `Home.test.tsx`: the project view sits on the sheet under the toolbar, the status bar below; home has no
+    /// sheet. The progress section is the sheet's first part.
+    #[gpui::test]
+    fn the_project_view_sits_on_the_sheet_under_the_toolbar(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let (h, _) = crate::testing::open(
+            cx,
+            1200.,
+            crate::testing::project("D:\\api", Layout::Maven, 2),
+            |_, _, _| div().into_any_element(),
+        );
+        let grace = h.grace.clone();
+        let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
+        let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.simulate_resize(size(px(1200.), px(700.)));
+        vcx.run_until_parked();
+        let toolbar = vcx.debug_bounds("toolbar").unwrap();
+        let sheet = vcx.debug_bounds("sheet").unwrap();
+        let progress = vcx.debug_bounds("progress").unwrap();
+        let status = vcx.debug_bounds("status-bar").unwrap();
+        assert!(toolbar.bottom() <= sheet.top());
+        assert_eq!(progress.top(), sheet.top() + px(1.)); // under the sheet's top border
+        assert!(sheet.bottom() <= status.top());
+        assert_eq!(status.bottom(), px(700.));
+        assert!(vcx.debug_bounds("home").is_none());
     }
 
     #[gpui::test]

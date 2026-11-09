@@ -1,5 +1,5 @@
 //! What Grace asks of the platform and a test answers instead (migration guide, Architecture, "Seams for tests"):
-//! the folder dialog, for now. Opening a path or a URL and the clipboard join with their first callers (P3).
+//! the folder dialog and opening a file with its program. A URL and the clipboard join with their first callers (P3).
 //!
 //! The app's seams are [`Platform`]. A build with the `e2e` feature reads `GRACE_E2E_SEAMS` and answers from it
 //! instead (`crate::e2e::E2eSeams`), as the Playwright tests stubbed `dialog.showOpenDialog`.
@@ -14,12 +14,19 @@ pub type Answer<T> = Pin<Box<dyn Future<Output = T>>>;
 pub trait Seams: 'static {
     /// Asks for a folder, starting in `start` when given (Open…, #82). `None` when the person cancels.
     fn pick_folder(&self, start: Option<PathBuf>, cx: &mut AsyncApp) -> Answer<Option<PathBuf>>;
+    /// Opens a file with the program the system gives its type, as Electron's `shell.openPath`: the HTML report in
+    /// the default browser (Report).
+    fn open_path(&self, path: &std::path::Path, cx: &mut gpui::App);
 }
 
 /// The platform's own dialogs.
 pub struct Platform;
 
 impl Seams for Platform {
+    fn open_path(&self, path: &std::path::Path, cx: &mut gpui::App) {
+        cx.open_with_system(path);
+    }
+
     #[cfg(windows)]
     fn pick_folder(&self, start: Option<PathBuf>, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
         windows_dialog::pick_folder(start)
@@ -112,6 +119,7 @@ pub mod fake {
     pub struct FakeSeams {
         answer: Option<PathBuf>,
         asked: Mutex<Vec<Option<PathBuf>>>,
+        opened: Mutex<Vec<PathBuf>>,
     }
 
     impl FakeSeams {
@@ -119,10 +127,14 @@ pub mod fake {
             Self {
                 answer: folder.map(PathBuf::from),
                 asked: Mutex::default(),
+                opened: Mutex::default(),
             }
         }
         pub fn asked(&self) -> Vec<Option<PathBuf>> {
             self.asked.lock().unwrap().clone()
+        }
+        pub fn opened(&self) -> Vec<PathBuf> {
+            self.opened.lock().unwrap().clone()
         }
     }
 
@@ -131,6 +143,9 @@ pub mod fake {
             self.asked.lock().unwrap().push(start);
             let answer = self.answer.clone();
             Box::pin(async move { answer })
+        }
+        fn open_path(&self, path: &std::path::Path, _cx: &mut gpui::App) {
+            self.opened.lock().unwrap().push(path.to_path_buf());
         }
     }
 }
