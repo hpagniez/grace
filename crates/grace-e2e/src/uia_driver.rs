@@ -44,6 +44,24 @@ impl UiaDriver {
         ))
     }
 
+    /// Brings the window to the foreground and checks that it has the focus. Windows' foreground lock can refuse a
+    /// process that had no input of late, and `SetFocus` then still answers success while the keys would go to
+    /// another window; a tap of Alt counts as input and lifts the lock, so the next try takes.
+    fn to_foreground(&self) -> Result<()> {
+        let window = self.window()?;
+        for _ in 0..5 {
+            window
+                .set_focus()
+                .map_err(|e| format!("cannot bring the window to the foreground: {e}"))?;
+            let focused = self.automation.get_focused_element().ok();
+            if focused.and_then(|f| f.get_process_id().ok()) == Some(self.pid) {
+                return Ok(());
+            }
+            Keyboard::new().send_keys("{alt}").map_err(err)?;
+        }
+        Err(format!("process {}'s window does not take the focus", self.pid))
+    }
+
     fn children(&self, of: &UIElement) -> Vec<UIElement> {
         let mut out = Vec::new();
         let mut next = self.walker.get_first_child(of).ok();
@@ -150,14 +168,21 @@ impl Driver for UiaDriver {
     /// To the app's window, brought to the foreground first: keys go to the foreground window, and a test that
     /// only pressed through the tree never made it so.
     fn key(&self, key: Key) -> Result<()> {
-        self.window()?
-            .set_focus()
-            .map_err(|e| format!("cannot bring the window to the foreground: {e}"))?;
+        self.to_foreground()?;
         Keyboard::new()
             .send_keys(match key {
                 Key::Tab => "{tab}",
                 Key::Escape => "{esc}",
             })
+            .map_err(err)
+    }
+
+    /// The window pattern's Close: `WM_CLOSE`, as the title bar's button sends.
+    fn close(&self) -> Result<()> {
+        self.window()?
+            .get_pattern::<uiautomation::patterns::UIWindowPattern>()
+            .map_err(err)?
+            .close()
             .map_err(err)
     }
 }

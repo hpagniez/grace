@@ -267,6 +267,8 @@ enum Target {
     Element(AnyElement),
     Focusable(Box<dyn FnOnce(&FocusHandle) -> AnyElement>),
     Cut(SharedString),
+    /// A line cut in the middle: `head` gives way, `tail` stays whole (`Cut.tsx`'s `Middle`).
+    Middle(SharedString, SharedString),
 }
 
 /// A tooltip trigger: the wrapper around its target. Make one with [`tooltip`] or [`cut`].
@@ -302,6 +304,30 @@ pub fn cut(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Tip {
     }
 }
 
+/// One line of `head` then `tail`, where only `head` is cut, with an ellipsis at its end, when the two do not fit:
+/// the end of a name or a path's last folder stays in sight (`Cut.tsx`'s `Middle`, toolbar spec R1.2, R2.1). The
+/// tooltip, shown only while it is cut, says the whole line; a screen reader reads it whole.
+pub fn cut_middle(id: impl Into<ElementId>, head: impl Into<SharedString>, tail: impl Into<SharedString>) -> Tip {
+    let (head, tail) = (head.into(), tail.into());
+    Tip {
+        id: id.into(),
+        text: Some(format!("{head}{tail}").into()),
+        side: Side::Below,
+        target: Target::Middle(head, tail),
+    }
+}
+
+/// Sets `cut` while `text`, in the element's text style, is wider than the element.
+fn measure(text: SharedString, cut: Rc<Cell<bool>>) -> impl Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static {
+    move |b, window, _| {
+        let style = window.text_style();
+        let size = style.font_size.to_pixels(window.rem_size());
+        let run = style.to_run(text.len());
+        let width = window.text_system().shape_line(text.clone(), size, &[run], None).width;
+        cut.set(width > b.size.width + px(0.5));
+    }
+}
+
 impl Tip {
     pub fn side(mut self, side: Side) -> Self {
         self.side = side;
@@ -330,7 +356,7 @@ impl RenderOnce for Tip {
         let focus = matches!(self.target, Target::Focusable(_))
             .then(|| window.use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle().tab_stop(true)))
             .map(|f| f.read(cx).clone());
-        let is_cut = matches!(self.target, Target::Cut(_));
+        let is_cut = matches!(self.target, Target::Cut(_) | Target::Middle(..));
         let trigger = self.id.clone();
         let side = self.side;
         let text = self.text.clone();
@@ -374,8 +400,6 @@ impl RenderOnce for Tip {
             Target::Element(e) => e,
             Target::Focusable(build) => build(focus.as_ref().expect("made above")),
             Target::Cut(text) => {
-                let cut = cut.clone();
-                let measured = text.clone();
                 // read whole by a screen reader, cut or not
                 div()
                     .id((trigger.clone(), "line"))
@@ -386,19 +410,30 @@ impl RenderOnce for Tip {
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
-                    .on_prepaint(move |b, window, _| {
-                        let style = window.text_style();
-                        let size = style.font_size.to_pixels(window.rem_size());
-                        let run = style.to_run(measured.len());
-                        let width = window
-                            .text_system()
-                            .shape_line(measured.clone(), size, &[run], None)
-                            .width;
-                        cut.set(width > b.size.width + px(0.5));
-                    })
+                    .on_prepaint(measure(text.clone(), cut.clone()))
                     .child(text)
                     .into_any_element()
             }
+            Target::Middle(head, tail) => div()
+                .id((trigger.clone(), "line"))
+                .role(Role::Label)
+                .aria_value(SharedString::from(format!("{head}{tail}")))
+                .flex()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .child(
+                    div()
+                        .id((trigger.clone(), "head"))
+                        .min_w_0()
+                        .flex_shrink(1.)
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .on_prepaint(measure(head.clone(), cut.clone()))
+                        .child(head),
+                )
+                .child(div().flex_none().child(tail))
+                .into_any_element(),
         };
 
         let hover = open.clone();

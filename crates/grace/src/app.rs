@@ -6,6 +6,7 @@
 //! first as one batch (`batch.ts`'s tick, #123) and notifies the views once. While no event comes it waits on the
 //! channel, so nothing wakes while Grace is idle (ADR 0030).
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Task};
@@ -29,6 +30,15 @@ pub trait Backend: Send + Sync + 'static {
     fn dispose(&self);
     /// What is open or opening now, as events.
     fn replay(&self) -> Vec<AppEvent>;
+    /// Lists the open project's tests again.
+    fn refresh(&self) -> std::io::Result<()>;
+    /// Runs the tests under a node: the tree's root for Run all.
+    fn run(&self, key: &str) -> std::io::Result<()>;
+    /// Runs again the tests that failed in a listed run.
+    fn rerun_failed(&self, id: &str) -> std::io::Result<()>;
+    fn cancel(&self);
+    /// The last run's HTML report, if it is there.
+    fn report_path(&self) -> Option<PathBuf>;
 }
 
 impl Backend for Runner {
@@ -53,6 +63,21 @@ impl Backend for Runner {
     fn replay(&self) -> Vec<AppEvent> {
         Runner::replay(self)
     }
+    fn refresh(&self) -> std::io::Result<()> {
+        Runner::refresh(self)
+    }
+    fn run(&self, key: &str) -> std::io::Result<()> {
+        Runner::run(self, key)
+    }
+    fn rerun_failed(&self, id: &str) -> std::io::Result<()> {
+        Runner::rerun_failed(self, id)
+    }
+    fn cancel(&self) {
+        Runner::cancel(self)
+    }
+    fn report_path(&self) -> Option<PathBuf> {
+        Runner::report_path(self)
+    }
 }
 
 /// The sending end the runner's `emit` holds.
@@ -65,7 +90,9 @@ pub fn events() -> (Events, async_channel::Receiver<AppEvent>) {
 
 /// The runner, the window's state and the platform seams.
 pub struct Grace {
-    pub state: AppState,
+    /// Shared with the views as they draw, so a redraw copies no state; an event copies it only while a view still
+    /// holds the old one, which none does between frames.
+    pub state: Rc<AppState>,
     backend: Arc<dyn Backend>,
     pub seams: Arc<dyn Seams>,
     data_dir: PathBuf,
@@ -90,7 +117,7 @@ impl Grace {
                 }
                 let applied = this.update(cx, |grace, cx| {
                     for e in &batch {
-                        grace.state.reduce(e);
+                        grace.state_mut().reduce(e);
                     }
                     cx.notify();
                 });
@@ -100,12 +127,17 @@ impl Grace {
             }
         });
         Self {
-            state: AppState::new(),
+            state: Rc::new(AppState::new()),
             backend,
             seams,
             data_dir,
             _events: task,
         }
+    }
+
+    /// The state, to change it.
+    pub fn state_mut(&mut self) -> &mut AppState {
+        Rc::make_mut(&mut self.state)
     }
 
     pub fn data_dir(&self) -> &Path {
@@ -124,7 +156,7 @@ impl Grace {
         cx.spawn(async move |this, cx| {
             if let Err(e) = task.await {
                 let _ = this.update(cx, |grace, cx| {
-                    grace.state.reduce(&AppEvent::notice(e.to_string()));
+                    grace.state_mut().reduce(&AppEvent::notice(e.to_string()));
                     cx.notify();
                 });
             }
@@ -154,7 +186,7 @@ impl Grace {
             if !events.is_empty() {
                 let _ = this.update(cx, |grace, cx| {
                     for e in &events {
-                        grace.state.reduce(e);
+                        grace.state_mut().reduce(e);
                     }
                     cx.notify();
                 });
@@ -179,7 +211,7 @@ impl Grace {
                 .await;
             if let Err(e) = opened {
                 let _ = this.update(cx, |grace, cx| {
-                    grace.state.reduce(&AppEvent::notice(e.to_string()));
+                    grace.state_mut().reduce(&AppEvent::notice(e.to_string()));
                     cx.notify();
                 });
             }
@@ -211,6 +243,47 @@ impl Grace {
             b.close();
             Ok(())
         });
+    }
+
+    /// Refresh: lists the tests again.
+    pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        self.background(cx, |b| b.refresh());
+    }
+
+    /// Run all: every test of the tree, whatever the filter hides (the runner applies the filter).
+    pub fn run_all(&mut self, cx: &mut Context<Self>) {
+        let Some(key) = self.state.tree.as_ref().map(|t| t.key.clone()) else {
+            return;
+        };
+        self.background(cx, move |b| b.run(&key));
+    }
+
+    /// Re-run failed: the failed tests of the newest listed run.
+    pub fn rerun_failed(&mut self, cx: &mut Context<Self>) {
+        let Some(id) = self.state.history.first().map(|h| h.id.clone()) else {
+            return;
+        };
+        self.background(cx, move |b| b.rerun_failed(&id));
+    }
+
+    pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        self.background(cx, |b| {
+            b.cancel();
+            Ok(())
+        });
+    }
+
+    /// Report: the last run's HTML report in the default browser, as `shell.openPath` opened it.
+    pub fn open_report(&mut self, cx: &mut Context<Self>) {
+        let backend = Arc::clone(&self.backend);
+        let seams = Arc::clone(&self.seams);
+        let path = cx.background_spawn(async move { backend.report_path() });
+        cx.spawn(async move |_, cx| {
+            if let Some(path) = path.await {
+                cx.update(|cx| seams.open_path(&path, cx));
+            }
+        })
+        .detach();
     }
 
     /// Cancels a run and waits for Java to end, off the UI thread.
@@ -292,6 +365,25 @@ pub mod fake {
         fn replay(&self) -> Vec<AppEvent> {
             self.record("replay".into());
             vec![AppEvent::Opening { root: None }, AppEvent::Busy { busy: false }]
+        }
+        fn refresh(&self) -> std::io::Result<()> {
+            self.record("refresh".into());
+            Ok(())
+        }
+        fn run(&self, key: &str) -> std::io::Result<()> {
+            self.record(format!("run {key}"));
+            Ok(())
+        }
+        fn rerun_failed(&self, id: &str) -> std::io::Result<()> {
+            self.record(format!("rerun_failed {id}"));
+            Ok(())
+        }
+        fn cancel(&self) {
+            self.record("cancel".into());
+        }
+        fn report_path(&self) -> Option<PathBuf> {
+            self.record("report_path".into());
+            Some(PathBuf::from("/out/karate-summary.html"))
         }
     }
 }

@@ -8,7 +8,6 @@ use gpui::{
     SharedString, StatefulInteractiveElement as _, Styled, Transformation, div, percentage,
     prelude::FluentBuilder as _, px, svg,
 };
-use gpui_component::Sizable as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 
 use crate::assets::Icon;
@@ -170,10 +169,13 @@ pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<Shared
     } else {
         crate::theme::METRICS.control_height
     };
+    // sized by hand: GPUI Kit's own square size would draw the icon at three quarters of it, not Lucide's 16 px
     Button::new(id)
         .icon(icon)
         .ghost()
-        .with_size(px(side))
+        .w(px(side))
+        .h(px(side))
+        .px_0()
         .accessibility_label(label)
 }
 
