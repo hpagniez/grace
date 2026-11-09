@@ -38,7 +38,11 @@ fn tab_to(app: &App, role: Role, name: &str) {
             t.all().iter().any(|n| n.states.focused)
         });
     }
-    panic!("Tab never reached {role:?} {name:?}; the focus went {seen:?}");
+    panic!(
+        "Tab never reached {role:?} {name:?}; the focus went {seen:?}\n{}\n{}",
+        app.focus_report(),
+        app.tree().map(|t| t.dump()).unwrap_or_default()
+    );
 }
 
 /// PU-20: a tooltip shows after a pause on hover, also on a disabled button.
@@ -74,7 +78,9 @@ fn escape_in_a_dialog_closes_the_tooltip_first() {
     let app = gallery();
     let open = app.wait_for_node(Role::Button, "Open dialog").unwrap();
     app.hover(&open).unwrap();
-    app.press(&open).unwrap();
+    // a real click, as a person opens it: it makes the window the active one, which an Invoke through the tree did
+    // not always do on CI, and a dialog in a window that is not active never takes the focus (#301)
+    app.click(&open).unwrap();
     app.wait_for("the dialog", Duration::from_secs(10), has_dialog).unwrap();
     tab_to(&app, Role::Button, "In dialog");
     app.wait_for_node(Role::Tooltip, "Does nothing").unwrap();
