@@ -238,3 +238,38 @@ mod tests {
         assert!(a.origin.y > e.origin.y + px(24. + 16.), "{e:?} {a:?}");
     }
 }
+
+/// A field message's kind: a hint is muted, a warning amber, an error red (premium UI R20.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldKind {
+    Hint,
+    Warning,
+    Error,
+}
+
+/// An inline message under a field (`FieldMessage.tsx`): 12 px with its 14 px icon. A screen reader reads it as the
+/// field's description (the field sets it), so it is a plain label here.
+pub fn field_message(id: impl Into<ElementId>, kind: FieldKind, text: impl Into<SharedString>, cx: &App) -> AnyElement {
+    let t = Theme::global(cx).tokens;
+    let (tone, mark) = match kind {
+        FieldKind::Hint => (t.muted, Icon::Info),
+        FieldKind::Warning => (t.cancelled, Icon::TriangleAlert),
+        FieldKind::Error => (t.failed, Icon::CircleAlert),
+    };
+    let text = text.into();
+    let id = id.into();
+    let selector: SharedString = id.to_string().into();
+    div()
+        .id(id)
+        .debug_selector(move || selector.to_string())
+        .role(Role::Label)
+        .aria_value(text.clone())
+        .flex()
+        .items_start()
+        .gap_1()
+        .text_size(px(METRICS.text_xs.size))
+        .text_color(Theme::color(tone))
+        .child(div().mt(px(1.)).child(icon(mark, 14., Theme::color(tone))))
+        .child(div().min_w_0().child(text))
+        .into_any_element()
+}

@@ -7,6 +7,7 @@ pub mod assets;
 #[cfg(feature = "e2e")]
 pub mod e2e;
 pub mod elements;
+pub mod env_picker;
 pub mod filter_bar;
 pub mod home;
 pub mod instance;
@@ -17,6 +18,7 @@ pub mod status_bar;
 #[cfg(test)]
 pub mod testing;
 pub mod theme;
+pub mod threads_box;
 pub mod toolbar;
 pub mod tooltip;
 pub mod tree;

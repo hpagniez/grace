@@ -15,7 +15,7 @@ use gpui::accesskit::{Live, Role};
 use gpui::{
     AnyElement, ClickEvent, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent,
     ParentElement as _, Pixels, Point, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Window, deferred, div, point, prelude::FluentBuilder as _, px,
+    Subscription, Window, deferred, div, prelude::FluentBuilder as _, px,
 };
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
@@ -559,18 +559,7 @@ impl FilterBar {
             })
             .collect();
         let me = cx.entity();
-        let shadow = m
-            .shadow_float
-            .iter()
-            .zip(t.shadow_float)
-            .map(|(&(y, blur), colour)| gpui::BoxShadow {
-                color: Theme::color_alpha(colour),
-                offset: point(px(0.), px(y)),
-                blur_radius: px(blur),
-                spread_radius: px(0.),
-                inset: false,
-            })
-            .collect::<Vec<_>>();
+        let shadow = crate::theme::float_shadow(cx);
         deferred(
             div()
                 .id("tag-panel")
