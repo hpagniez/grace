@@ -155,3 +155,22 @@ pub fn follow_reduced_motion<T: 'static>(window: &mut Window, cx: &mut gpui::Con
         }
     })
 }
+
+/// The interactivity of a control that is not a stateful `div`, such as GPUI Kit's `Button`, seen as one: GPUI's
+/// AccessKit setters (`aria_expanded`, `aria_description`, …) are on `StatefulInteractiveElement`, which those
+/// controls do not implement.
+pub struct Aria<'a>(&'a mut gpui::Interactivity);
+
+impl gpui::InteractiveElement for Aria<'_> {
+    fn interactivity(&mut self) -> &mut gpui::Interactivity {
+        self.0
+    }
+}
+
+impl gpui::StatefulInteractiveElement for Aria<'_> {}
+
+/// Sets AccessKit states on `control` through [`Aria`]: `aria(button, |a| a.aria_expanded(open))`.
+pub fn aria<E: gpui::InteractiveElement>(mut control: E, set: impl FnOnce(Aria<'_>) -> Aria<'_>) -> E {
+    let _ = set(Aria(control.interactivity()));
+    control
+}

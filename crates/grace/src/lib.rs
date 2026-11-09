@@ -7,6 +7,7 @@ pub mod assets;
 #[cfg(feature = "e2e")]
 pub mod e2e;
 pub mod elements;
+pub mod filter_bar;
 pub mod home;
 pub mod instance;
 pub mod probe;

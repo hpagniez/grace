@@ -47,17 +47,17 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| TF-01 | Chips list the project's tags | | ☐ |
-| TF-02 | Include and exclude dim the tree | | ☐ |
-| TF-03 | Third click turns a chip off | | ☐ |
-| TF-04 | Hide non-matching | | ☐ |
-| TF-05 | Run all runs only matching tests | | ☐ |
-| TF-06 | A feature run is filtered | | ☐ |
-| TF-07 | A tag removed before a run does not widen it | | ☐ |
-| TF-08 | Part of an outline matches | | ☐ |
-| TF-09 | Nothing matches | | ☐ |
-| TF-10 | The filter survives a restart | | ☐ |
-| TF-11 | A tag removed from the project leaves the filter | | ☐ |
+| TF-01 | Chips list the project's tags | `grace-e2e/tests/tags.rs::chips_list_the_projects_tags` | ☑ |
+| TF-02 | Include and exclude dim the tree | `grace-e2e/tests/tags.rs::include_and_exclude_dim_the_tree` | ☑ |
+| TF-03 | Third click turns a chip off | `grace-e2e/tests/tags.rs::a_third_click_turns_a_chip_off` | ☑ |
+| TF-04 | Hide non-matching | `grace-e2e/tests/tags.rs::hide_non_matching_hides_the_other_rows` | ☑ |
+| TF-05 | Run all runs only matching tests | `grace-e2e/tests/tags.rs::run_all_runs_only_matching_tests` | ☑ |
+| TF-06 | A feature run is filtered | `grace-e2e/tests/tags.rs::a_feature_run_is_filtered` | ☑ |
+| TF-07 | A tag removed before a run does not widen it | `grace-e2e/tests/tags.rs::a_tag_removed_before_a_run_does_not_widen_it` | ☑ |
+| TF-08 | Part of an outline matches | `grace-e2e/tests/tags.rs::part_of_an_outline_matches` | ☑ |
+| TF-09 | Nothing matches | `grace-e2e/tests/tags.rs::nothing_matches` (the counter); Run all disabled: `grace::toolbar::tests` (WS-10) | ☑ |
+| TF-10 | The filter survives a restart | `grace-e2e/tests/tags.rs::the_filter_survives_a_restart` | ☑ |
+| TF-11 | A tag removed from the project leaves the filter | `grace-e2e/tests/tags.rs::a_tag_removed_from_the_project_leaves_the_filter` | ☑ |
 
 ### EV · Environment switcher and run properties
 
@@ -409,7 +409,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
 | VL-18 | A new tree keeps the rows in view still (e2e) | | ☐ |
 | VL-19 | Calls arriving above the view keep the rows in view still | | ☐ |
-| VL-20 | A filter change scrolls to the selected row (e2e) | | ☐ |
+| VL-20 | A filter change scrolls to the selected row (e2e) | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | VL-21 | A cut label shows whole on keyboard focus | | ☐ |
 | VL-22 | The run shortcut can be found | | ☐ |
 | VL-23 | Tree rows carry their level and position | | ☐ |
@@ -574,13 +574,13 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| CF-01 | Chips that do not fit fold behind a count | | ☐ |
-| CF-02 | A folded tag that is on is counted | | ☐ |
-| CF-03 | No fold chip when every chip fits | | ☐ |
-| CF-04 | The panel holds every tag and cycles it | | ☐ |
-| CF-05 | The panel closes when nothing is folded | | ☐ |
-| CF-06 | During a run the panel opens with its chips disabled | | ☐ |
-| CF-07 | The bench project keeps a one-line bar (e2e) | | ☐ |
+| CF-01 | Chips that do not fit fold behind a count | `grace::filter_bar::tests::folding::folds_the_chips_past_the_line_and_keeps_the_bar_one_line`, `words::the_fold_chip_counts_the_folded_tags_and_those_that_are_on` | ☑ |
+| CF-02 | A folded tag that is on is counted | `grace::filter_bar::tests::folding::counts_the_folded_tags_that_are_on`; `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (", 1 on") | ☑ |
+| CF-03 | No fold chip when every chip fits | `grace::filter_bar::tests::folding::has_no_fold_chip_when_every_chip_fits` | ☑ |
+| CF-04 | The panel holds every tag and cycles it | `grace::filter_bar::tests::folding::opens_a_panel_of_every_tag_that_cycles_them_and_stays_open` | ☑ |
+| CF-05 | The panel closes when nothing is folded | `grace::filter_bar::tests::folding::the_panel_closes_when_nothing_is_folded` | ☑ |
+| CF-06 | During a run the panel opens with its chips disabled | `grace::filter_bar::tests::folding::during_a_run_the_panel_opens_with_its_chips_disabled` | ☑ |
+| CF-07 | The bench project keeps a one-line bar (e2e) | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
 
 ### CS · Find in the console, and step through its errors
 
@@ -1215,17 +1215,17 @@ Phase P2 · 11 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-tags-01 | Chips list the project's tags | | ☐ |
-| E-tags-02 | Include and exclude dim the tree | | ☐ |
-| E-tags-03 | Third click turns a chip off | | ☐ |
-| E-tags-04 | Hide non-matching | | ☐ |
-| E-tags-05 | Run all runs only matching tests | | ☐ |
-| E-tags-06 | A feature run is filtered | | ☐ |
-| E-tags-07 | A tag removed before a run does not widen it | | ☐ |
-| E-tags-08 | Part of an outline matches | | ☐ |
-| E-tags-09 | Nothing matches | | ☐ |
-| E-tags-10 | The filter survives a restart | | ☐ |
-| E-tags-11 | A tag removed from the project leaves the filter | | ☐ |
+| E-tags-01 | Chips list the project's tags | `grace-e2e/tests/tags.rs::chips_list_the_projects_tags` | ☑ |
+| E-tags-02 | Include and exclude dim the tree | `grace-e2e/tests/tags.rs::include_and_exclude_dim_the_tree` | ☑ |
+| E-tags-03 | Third click turns a chip off | `grace-e2e/tests/tags.rs::a_third_click_turns_a_chip_off` | ☑ |
+| E-tags-04 | Hide non-matching | `grace-e2e/tests/tags.rs::hide_non_matching_hides_the_other_rows` | ☑ |
+| E-tags-05 | Run all runs only matching tests | `grace-e2e/tests/tags.rs::run_all_runs_only_matching_tests` | ☑ |
+| E-tags-06 | A feature run is filtered | `grace-e2e/tests/tags.rs::a_feature_run_is_filtered` | ☑ |
+| E-tags-07 | A tag removed before a run does not widen it | `grace-e2e/tests/tags.rs::a_tag_removed_before_a_run_does_not_widen_it` | ☑ |
+| E-tags-08 | Part of an outline matches | `grace-e2e/tests/tags.rs::part_of_an_outline_matches` | ☑ |
+| E-tags-09 | Nothing matches | `grace-e2e/tests/tags.rs::nothing_matches` (the counter); Run all disabled: `grace::toolbar::tests` (WS-10) | ☑ |
+| E-tags-10 | The filter survives a restart | `grace-e2e/tests/tags.rs::the_filter_survives_a_restart` | ☑ |
+| E-tags-11 | A tag removed from the project leaves the filter | `grace-e2e/tests/tags.rs::a_tag_removed_from_the_project_leaves_the_filter` | ☑ |
 
 ### e2e/threads.spec.ts
 
@@ -1285,8 +1285,8 @@ Phase P2 · 9 tests
 | E-virtual-02 | A moved-to row scrolls into view | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End, in place of 40 Down presses) | ☑ |
 | E-virtual-03 | Focus survives scrolling away | | ☐ |
 | E-virtual-04 | A new tree keeps the rows in view still | | ☐ |
-| E-virtual-05 | The filter bar keeps one line with 54 tags | | ☐ |
-| E-virtual-06 | A filter change scrolls to the selected row | | ☐ |
+| E-virtual-05 | The filter bar keeps one line with 54 tags | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
+| E-virtual-06 | A filter change scrolls to the selected row | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | E-virtual-07 | A click shows neither the focus ring nor a tooltip | | ☐ |
 | E-virtual-08 | A click on an HTTP call shows no focus ring | | ☐ |
 | E-virtual-09 | The keyboard shows the focus ring and a cut label's tooltip | | ☐ |
@@ -1389,7 +1389,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless | ☐ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
 | `src/renderer/FieldMessage.test.tsx` | 2 | view `FieldMessage` (`grace::ui`), headless | ☐ |
-| `src/renderer/FilterBar.test.tsx` | 21 | view `FilterBar` (`grace::ui`), headless | ☐ |
+| `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` and, for the toolbar's three, `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons`, `order_and_shape_r13_1` and `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar` (15 of 26 so far; the tree's and the sheet's port with them in P2 PRs 3 and 5) | ☐ |
