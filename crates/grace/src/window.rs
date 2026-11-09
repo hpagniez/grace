@@ -48,6 +48,8 @@ pub struct GraceWindow {
     /// The tree, which keeps the rows a person opened and closed.
     pub tree: Option<Entity<crate::tree::Tree>>,
     pub filter_bar: Option<Entity<crate::filter_bar::FilterBar>>,
+    pub env: Option<Entity<crate::env_picker::EnvPicker>>,
+    pub threads: Option<Entity<crate::threads_box::ThreadsBox>>,
     _motion: Option<gpui::Subscription>,
 }
 
@@ -64,6 +66,8 @@ impl GraceWindow {
             progress: None,
             tree: None,
             filter_bar: None,
+            env: None,
+            threads: None,
             _motion: None,
         }
     }
@@ -85,6 +89,8 @@ impl GraceWindow {
         me.progress = Some(cx.new(|cx| crate::progress::Progress::new(grace.clone(), cx)));
         me.tree = Some(cx.new(|cx| crate::tree::Tree::new(grace.clone(), cx)));
         me.filter_bar = Some(cx.new(|cx| crate::filter_bar::FilterBar::new(grace.clone(), cx)));
+        me.env = Some(cx.new(|cx| crate::env_picker::EnvPicker::new(grace.clone(), window, cx)));
+        me.threads = Some(cx.new(|cx| crate::threads_box::ThreadsBox::new(grace.clone(), window, cx)));
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
@@ -148,7 +154,15 @@ impl Render for GraceWindow {
             let view = if state.home() {
                 crate::home::render(&grace, &state, shown, &self.open_focus, window, cx).into_any_element()
             } else {
-                let toolbar = crate::toolbar::render(&grace, &state, window, cx).into_any_element();
+                let boxes = [
+                    self.env.clone().map(gpui::AnyView::from),
+                    self.threads.clone().map(gpui::AnyView::from),
+                ]
+                .into_iter()
+                .flatten()
+                .map(|b| b.into_any_element())
+                .collect();
+                let toolbar = crate::toolbar::render(&grace, &state, boxes, window, cx).into_any_element();
                 project_view(
                     toolbar,
                     self.progress.clone(),

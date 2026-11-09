@@ -111,6 +111,9 @@ pub struct AppState {
     pub filter: FilterState,
     /// The open project's environment and run properties; `None` with no project.
     pub env: Option<EnvView>,
+    /// How many `environment` events came for the open project: the box resets on each, even when the view is the one
+    /// it held (a refused change re-sends it; `EnvPicker.tsx` reset on each new view object).
+    pub env_generation: u64,
     /// The open project's thread count, and how many `threads` events came: the box resets on each, even when the
     /// count is the one it held (`reduce.ts` used a fresh object for that).
     pub threads: Option<ThreadsView>,
@@ -174,6 +177,7 @@ impl Default for AppState {
             trees: 0,
             filter: no_filter(),
             env: None,
+            env_generation: 0,
             threads: None,
             watch: false,
             busy: false,
@@ -420,6 +424,7 @@ impl AppState {
                     self.reset_results();
                 }
                 self.env = Some(view.clone());
+                self.env_generation += 1;
             }
             AppEvent::Threads { count } => {
                 if self.project.is_none() {

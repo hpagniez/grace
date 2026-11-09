@@ -144,14 +144,23 @@ pub fn system_reduces_motion() -> bool {
     false
 }
 
+/// GPUI's animations and the text boxes' caret (`theme::cursor_blink`) follow `reduce`.
+pub fn set_reduce_motion(reduce: bool, cx: &mut App) {
+    if cx.reduce_motion() == reduce {
+        return;
+    }
+    cx.set_reduce_motion(reduce);
+    gpui_component::Theme::update(cx, |k| k.cursor_blink = crate::theme::cursor_blink(reduce));
+}
+
 /// Applies the system's reduced motion to GPUI's animations, which then draw their end (a one-shot) or their start (a
 /// loop) and ask for no frame. Read at start and each time the window becomes active, so a change in Settings counts
 /// from the next return to Grace without anything polling (ADR 0030).
 pub fn follow_reduced_motion<T: 'static>(window: &mut Window, cx: &mut gpui::Context<T>) -> gpui::Subscription {
-    cx.set_reduce_motion(system_reduces_motion());
+    set_reduce_motion(system_reduces_motion(), cx);
     cx.observe_window_activation(window, |_, window, cx| {
         if window.is_window_active() {
-            cx.set_reduce_motion(system_reduces_motion());
+            set_reduce_motion(system_reduces_motion(), cx);
         }
     })
 }

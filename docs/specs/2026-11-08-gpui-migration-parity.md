@@ -65,18 +65,18 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| EV-01 | Suggestions come from overlay files and env tags | | ☐ |
-| EV-02 | Changing the environment updates the tree | | ☐ |
-| EV-03 | Changing the environment clears results | | ☐ |
-| EV-04 | A run uses the environment | | ☐ |
-| EV-05 | An environment without an overlay file | | ☐ |
+| EV-01 | Suggestions come from overlay files and env tags | `grace-e2e/tests/env.rs::suggestions_come_from_overlay_files_and_env_tags`; `grace::env_picker::tests::words::suggests_none_then_the_environments_that_hold_the_text` | ☑ |
+| EV-02 | Changing the environment updates the tree | `grace-e2e/tests/env.rs::changing_the_environment_updates_the_tree` | ☑ |
+| EV-03 | Changing the environment clears results | `grace-e2e/tests/env.rs::changing_the_environment_clears_results` | ☑ |
+| EV-04 | A run uses the environment | `grace-e2e/tests/env.rs::a_run_uses_the_environment` | ☑ |
+| EV-05 | An environment without an overlay file | `grace-e2e/tests/env.rs::an_environment_without_an_overlay_file`; `grace::env_picker::tests::says_when_the_environment_has_no_overlay_file` | ☑ |
 | EV-06 | Shared and environment properties, environment wins | | ☐ |
 | EV-07 | A secret is used but never shown | | ☐ |
 | EV-08 | A secret stays off the command line and out of the settings file | | ☐ |
 | EV-09 | Reserved names are refused | | ☐ |
 | EV-10 | An unreadable secret blocks runs | | ☐ |
-| EV-11 | Settings survive a restart | | ☐ |
-| EV-12 | The machine's KARATE_ENV is ignored | | ☐ |
+| EV-11 | Settings survive a restart | Environment part: `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; the properties with the properties dialog (P2 PR 4b) | ☐ |
+| EV-12 | The machine's KARATE_ENV is ignored | `grace-e2e/tests/env.rs::the_machines_karate_env_is_ignored` | ☑ |
 
 ### HI · HTTP inspector
 
@@ -138,23 +138,23 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| TC-01 | A project with no saved count runs with 1 thread | | ☐ |
-| TC-02 | Run all uses the count in the box | | ☐ |
-| TC-03 | A single test's run uses the count | | ☐ |
-| TC-04 | Re-run failed uses the current count, not the run's | | ☐ |
-| TC-05 | The box overrides the thread count of a karate-pom.json | | ☐ |
-| TC-06 | The box is disabled while a run is going | | ☐ |
-| TC-07 | Typing a number sends it once (unit) | | ☐ |
-| TC-08 | Discovery passes one thread (unit) | | ☐ |
-| TC-09 | The count is saved per project | | ☐ |
-| TC-10 | A value out of range is refused | | ☐ |
-| TC-11 | Main refuses a count that is not a whole number from 1 to 32 (unit) | | ☐ |
-| TC-12 | The count is refused while busy (unit) | | ☐ |
-| TC-13 | Saving the count keeps the other settings (unit) | | ☐ |
-| TC-14 | A malformed saved count loads as 1 (unit) | | ☐ |
-| TC-15 | A reloaded window shows the count (unit) | | ☐ |
-| TC-16 | A run stored before F12 has no thread count (unit) | | ☐ |
-| TC-17 | A run.json with a malformed thread count is dropped (unit) | | ☐ |
+| TC-01 | A project with no saved count runs with 1 thread | `grace-e2e/tests/threads.rs::a_project_with_no_saved_count_runs_with_1_thread` | ☑ |
+| TC-02 | Run all uses the count in the box | `grace-e2e/tests/threads.rs::run_all_uses_the_count_in_the_box` | ☑ |
+| TC-03 | A single test's run uses the count | `grace-e2e/tests/threads.rs::a_single_tests_run_uses_the_count` | ☑ |
+| TC-04 | Re-run failed uses the current count, not the run's | `grace-e2e/tests/threads.rs::rerun_failed_uses_the_current_count`; `grace-core::runner::tests::threads::re_run_uses_the_current_count_not_the_runs` | ☑ |
+| TC-05 | The box overrides the thread count of a karate-pom.json | `grace-e2e/tests/threads.rs::the_box_starts_from_karate_pom_json_and_the_persons_count_wins` | ☑ |
+| TC-06 | The box is disabled while a run is going | `grace-e2e/tests/threads.rs::the_box_is_disabled_while_a_run_is_going`; `grace::threads_box::tests::disabled_while_busy_and_sends_nothing` | ☑ |
+| TC-07 | Typing a number sends it once (unit) | `grace::threads_box::tests::sends_a_committed_value_once` | ☑ |
+| TC-08 | Discovery passes one thread (unit) | `grace-core::runner::tests::threads::a_run_passes_the_count_and_discovery_passes_1` | ☑ |
+| TC-09 | The count is saved per project | `grace-e2e/tests/threads.rs::the_count_is_saved_per_project`; `grace-core::runner::tests::threads::restores_the_count_on_open_per_project` | ☑ |
+| TC-10 | A value out of range is refused | `grace-e2e/tests/threads.rs::a_value_out_of_range_is_refused`; `grace::threads_box::tests::a_refused_value_stays_until_the_runner_resends_its_count` | ☑ |
+| TC-11 | Main refuses a count that is not a whole number from 1 to 32 (unit) | `grace-core::runner::tests::threads::refuses_a_count_that_is_not_a_whole_number_from_1_to_32` | ☑ |
+| TC-12 | The count is refused while busy (unit) | `grace-core::runner::tests::threads::rejects_a_change_while_busy` | ☑ |
+| TC-13 | Saving the count keeps the other settings (unit) | `grace-core::settings::tests::thread_count::saving_the_count_keeps_the_other_settings` | ☑ |
+| TC-14 | A malformed saved count loads as 1 (unit) | `grace-core::settings::tests::thread_count::a_malformed_saved_count_*_loads_as_1` (5 values), `an_unreadable_file_loads_as_1` | ☑ |
+| TC-15 | A reloaded window shows the count (unit) | `grace::threads_box::tests::a_new_box_shows_the_count_in_force` (no reload in GPUI Grace: a new box reads the state the runner left) | ☑ |
+| TC-16 | A run stored before F12 has no thread count (unit) | `grace-core::model::history::tests::parse_run_record::reads_a_record_stored_before_f12_as_no_thread_count` | ☑ |
+| TC-17 | A run.json with a malformed thread count is dropped (unit) | `grace-core::model::history::tests::parse_run_record::rejects_bad_shapes` (`threads` 0, "2", 1.5) | ☑ |
 
 ### UP · UI polish
 
@@ -566,7 +566,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | TB-05 | A long path at the minimum width (e2e) | | ☐ |
 | TB-06 | The status bar shows the path while a project is open | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` | ☑ |
 | TB-07 | A cut path explains itself | `grace::status_bar::tests::explains_a_cut_path_in_a_tooltip_and_says_nothing_while_it_fits` | ☑ |
-| TB-08 | Env and Threads below 1280 px | | ☐ |
+| TB-08 | Env and Threads below 1280 px | `grace::env_picker::tests::below_1280_px_the_word_env_goes_from_sight_and_says_itself_in_a_tooltip`, `grace::threads_box::tests::below_1280_px_the_word_threads_goes_from_sight_and_says_itself_in_a_tooltip` | ☑ |
 
 ### CF · A one-line filter bar
 
@@ -998,19 +998,19 @@ Phase P2 · 13 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-env-01 | Suggestions come from overlay files and env tags | | ☐ |
-| E-env-02 | Changing the environment updates the tree | | ☐ |
-| E-env-03 | Changing the environment clears results | | ☐ |
-| E-env-04 | A run uses the environment | | ☐ |
-| E-env-05 | An environment without an overlay file | | ☐ |
+| E-env-01 | Suggestions come from overlay files and env tags | `grace-e2e/tests/env.rs::suggestions_come_from_overlay_files_and_env_tags` | ☑ |
+| E-env-02 | Changing the environment updates the tree | `grace-e2e/tests/env.rs::changing_the_environment_updates_the_tree` | ☑ |
+| E-env-03 | Changing the environment clears results | `grace-e2e/tests/env.rs::changing_the_environment_clears_results` | ☑ |
+| E-env-04 | A run uses the environment | `grace-e2e/tests/env.rs::a_run_uses_the_environment` | ☑ |
+| E-env-05 | An environment without an overlay file | `grace-e2e/tests/env.rs::an_environment_without_an_overlay_file` | ☑ |
 | E-env-06 | Shared and environment properties, environment wins | | ☐ |
 | E-env-07 | A secret is used but never shown | | ☐ |
 | E-env-08 | Import a secrets file and run with it | | ☐ |
 | E-env-09 | A secret stays off the command line and out of the settings file | | ☐ |
 | E-env-10 | Reserved names are refused | | ☐ |
 | E-env-11 | An unreadable secret blocks runs | | ☐ |
-| E-env-12 | Settings survive a restart | | ☐ |
-| E-env-13 | The machine's KARATE_ENV is ignored | | ☐ |
+| E-env-12 | Settings survive a restart | Environment part: `grace-e2e/tests/env.rs::the_environment_survives_a_restart`; the properties with the properties dialog (P2 PR 4b) | ☐ |
+| E-env-13 | The machine's KARATE_ENV is ignored | `grace-e2e/tests/env.rs::the_machines_karate_env_is_ignored` | ☑ |
 
 ### e2e/examples.spec.ts
 
@@ -1233,14 +1233,14 @@ Phase P2 · 8 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-threads-01 | A project with no saved count runs with 1 thread | | ☐ |
-| E-threads-02 | Run all uses the count in the box | | ☐ |
-| E-threads-03 | A single test's run uses the count | | ☐ |
-| E-threads-04 | Re-run failed uses the current count | | ☐ |
-| E-threads-05 | The box starts from karate-pom.json and the person's count wins | | ☐ |
-| E-threads-06 | The box is disabled while a run is going | | ☐ |
-| E-threads-07 | The count is saved per project | | ☐ |
-| E-threads-08 | A value out of range is refused | | ☐ |
+| E-threads-01 | A project with no saved count runs with 1 thread | `grace-e2e/tests/threads.rs::a_project_with_no_saved_count_runs_with_1_thread` | ☑ |
+| E-threads-02 | Run all uses the count in the box | `grace-e2e/tests/threads.rs::run_all_uses_the_count_in_the_box` | ☑ |
+| E-threads-03 | A single test's run uses the count | `grace-e2e/tests/threads.rs::a_single_tests_run_uses_the_count` | ☑ |
+| E-threads-04 | Re-run failed uses the current count | `grace-e2e/tests/threads.rs::rerun_failed_uses_the_current_count` | ☑ |
+| E-threads-05 | The box starts from karate-pom.json and the person's count wins | `grace-e2e/tests/threads.rs::the_box_starts_from_karate_pom_json_and_the_persons_count_wins` | ☑ |
+| E-threads-06 | The box is disabled while a run is going | `grace-e2e/tests/threads.rs::the_box_is_disabled_while_a_run_is_going` | ☑ |
+| E-threads-07 | The count is saved per project | `grace-e2e/tests/threads.rs::the_count_is_saved_per_project` | ☑ |
+| E-threads-08 | A value out of range is refused | `grace-e2e/tests/threads.rs::a_value_out_of_range_is_refused` | ☑ |
 
 ### e2e/trends.spec.ts
 
@@ -1386,7 +1386,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless | ☐ |
 | `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless | ☐ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
-| `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless | ☐ |
+| `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
 | `src/renderer/FieldMessage.test.tsx` | 2 | view `FieldMessage` (`grace::ui`), headless | ☐ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
@@ -1402,7 +1402,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
 | `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
-| `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless | ☐ |
+| `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` (the order, narrow, Home and Refresh, project and action tests so far; Env, Threads and Properties with P2 PR 4, Watch and the step debugger with P4) | ☐ |
 | `src/renderer/Tooltip.test.tsx` | 46 | view `Tooltip` (`grace::ui`), headless | ☐ |
 | `src/renderer/Tree.test.tsx` | 86 | view `Tree` (`grace::ui`), headless | ☐ |

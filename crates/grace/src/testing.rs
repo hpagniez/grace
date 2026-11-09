@@ -84,6 +84,17 @@ pub fn open(
     state: AppState,
     draw: impl Fn(&Entity<Grace>, &mut Window, &mut gpui::App) -> AnyElement + 'static,
 ) -> (Harness, VisualTestContext) {
+    open_with(cx, width, state, move |_, _, _| Box::new(draw))
+}
+
+/// As [`open`], with `make` building the drawing once the window is there: a view that keeps its own entities, such
+/// as a text box's state, makes them in it.
+pub fn open_with(
+    cx: &mut TestAppContext,
+    width: f32,
+    state: AppState,
+    make: impl FnOnce(&Entity<Grace>, &mut Window, &mut gpui::App) -> Draw + 'static,
+) -> (Harness, VisualTestContext) {
     cx.update(crate::init);
     let backend = Arc::new(FakeBackend::default());
     let seams = Arc::new(FakeSeams::answering(Some("/picked")));
@@ -94,10 +105,13 @@ pub fn open(
     let grace = cx.update(|cx| cx.new(|cx| Grace::new(b, s, PathBuf::new(), rx, cx)));
     grace.update(cx, |g, _| *g.state_mut() = state);
     let g = grace.clone();
-    let window = cx.add_window(move |_, _| View {
-        grace: g,
-        tips: None,
-        draw: Box::new(draw),
+    let window = cx.add_window(move |window, cx| {
+        let draw = make(&g, window, cx);
+        View {
+            grace: g,
+            tips: None,
+            draw,
+        }
     });
     let view = window.root(cx).unwrap();
     let vcx = VisualTestContext::from_window(window.into(), cx);

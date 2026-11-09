@@ -3,6 +3,7 @@
 use atspi::proxy::accessible::{AccessibleProxy, ObjectRefExt as _};
 use atspi::proxy::action::ActionProxy;
 use atspi::proxy::component::ComponentProxy;
+use atspi::proxy::text::TextProxy;
 use atspi::proxy::value::ValueProxy;
 use atspi::{AccessibilityConnection, CoordType, Interface, ObjectRefOwned, State};
 use futures_lite::future::block_on;
@@ -78,6 +79,19 @@ impl AtspiDriver {
         } else {
             None
         };
+        let text = if interfaces.contains(Interface::Text) {
+            let t = TextProxy::builder(self.conn.connection())
+                .destination(p.inner().destination().to_owned())
+                .map_err(err)?
+                .path(p.inner().path().to_owned())
+                .map_err(err)?
+                .build()
+                .await
+                .map_err(err)?;
+            t.get_text(0, -1).await.ok()
+        } else {
+            None
+        };
         let rect = if interfaces.contains(Interface::Component) {
             let c = ComponentProxy::builder(self.conn.connection())
                 .destination(p.inner().destination().to_owned())
@@ -105,6 +119,7 @@ impl AtspiDriver {
             name: p.name().await.map_err(err)?,
             description: p.description().await.unwrap_or_default(),
             value,
+            text,
             states: States {
                 enabled: state.contains(State::Enabled),
                 focusable: state.contains(State::Focusable),
@@ -198,8 +213,23 @@ impl Driver for AtspiDriver {
                 Key::PageUp => "Prior",
                 Key::PageDown => "Next",
                 Key::CtrlEnter => "ctrl+Return",
+                Key::SelectAll => "ctrl+a",
+                Key::Backspace => "BackSpace",
             },
         ])
+    }
+
+    fn click(&self, node: &Node) -> Result<()> {
+        self.hover(node)?;
+        let window = self.x_window()?;
+        xdotool(&["windowfocus", "--sync", &window])?;
+        xdotool(&["click", "1"])
+    }
+
+    fn type_text(&self, text: &str) -> Result<()> {
+        let window = self.x_window()?;
+        xdotool(&["windowfocus", "--sync", &window])?;
+        xdotool(&["type", "--delay", "20", text])
     }
 
     fn close(&self) -> Result<()> {

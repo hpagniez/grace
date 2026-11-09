@@ -40,6 +40,10 @@ pub trait Backend: Send + Sync + 'static {
     fn cancel(&self);
     /// Sets the open project's tag filter; the runner sends it back as an event.
     fn set_filter(&self, filter: FilterState);
+    /// Sets the open project's environment, `None` for none; the runner sends the one in force back.
+    fn set_env(&self, name: Option<&str>) -> std::io::Result<()>;
+    /// Sets the open project's thread count as the box holds it; the runner checks it and sends the count in force.
+    fn set_threads(&self, n: &serde_json::Value);
     /// The last run's HTML report, if it is there.
     fn report_path(&self) -> Option<PathBuf>;
 }
@@ -81,6 +85,12 @@ impl Backend for Runner {
     fn set_filter(&self, filter: FilterState) {
         Runner::set_filter(self, filter)
     }
+    fn set_env(&self, name: Option<&str>) -> std::io::Result<()> {
+        Runner::set_env(self, name)
+    }
+    fn set_threads(&self, n: &serde_json::Value) {
+        Runner::set_threads(self, n)
+    }
     fn report_path(&self) -> Option<PathBuf> {
         Runner::report_path(self)
     }
@@ -102,7 +112,19 @@ pub struct Grace {
     backend: Arc<dyn Backend>,
     pub seams: Arc<dyn Seams>,
     data_dir: PathBuf,
+    /// Closed once the last call sent to the runner has done what the next must wait for (`Grace::background`).
+    order: async_channel::Receiver<()>,
     _events: Task<()>,
+}
+
+/// What a call to the runner holds back until it is done, for the calls sent after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Order {
+    /// A quick call, such as a setting: the calls after it wait for its end, so a run after a new thread count uses it.
+    End,
+    /// A call that lasts, such as a run or a discovery: the calls after it wait only for its start, so they are not
+    /// held for the whole run (the runner refuses what a run forbids).
+    Start,
 }
 
 impl Grace {
@@ -132,11 +154,13 @@ impl Grace {
                 }
             }
         });
+        let (_, order) = async_channel::bounded(1);
         Self {
             state: Rc::new(AppState::new()),
             backend,
             seams,
             data_dir,
+            order,
             _events: task,
         }
     }
@@ -150,15 +174,40 @@ impl Grace {
         &self.data_dir
     }
 
-    /// Runs a blocking call of the runner off the UI thread. An error becomes a notice, as `main.ts`'s `handle` made
-    /// it.
+    /// Runs a blocking call of the runner off the UI thread, in the order the calls were made, as Electron's main
+    /// process took them one by one: a setting is in force before a run sent after it starts. An error becomes a
+    /// notice, as `main.ts`'s `handle` made it.
     fn background(
-        &self,
+        &mut self,
         cx: &mut Context<Self>,
+        order: Order,
         call: impl FnOnce(&dyn Backend) -> std::io::Result<()> + Send + 'static,
     ) {
         let backend = Arc::clone(&self.backend);
+        let (done, next) = async_channel::bounded::<()>(1);
+        let before = std::mem::replace(&mut self.order, next);
+        let task = cx.background_spawn(async move {
+            let _ = before.recv().await; // fails once the call before has closed it
+            if order == Order::Start {
+                drop(done);
+                call(backend.as_ref())
+            } else {
+                let result = call(backend.as_ref());
+                drop(done);
+                result
+            }
+        });
+        Self::report(task, cx);
+    }
+
+    /// Runs a call at once, ahead of any waiting: Cancel must reach a run that holds the calls behind it.
+    fn at_once(&self, cx: &mut Context<Self>, call: impl FnOnce(&dyn Backend) -> std::io::Result<()> + Send + 'static) {
+        let backend = Arc::clone(&self.backend);
         let task = cx.background_spawn(async move { call(backend.as_ref()) });
+        Self::report(task, cx);
+    }
+
+    fn report(task: Task<std::io::Result<()>>, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
             if let Err(e) = task.await {
                 let _ = this.update(cx, |grace, cx| {
@@ -226,18 +275,18 @@ impl Grace {
     }
 
     pub fn open_recent(&mut self, root: String, cx: &mut Context<Self>) {
-        self.background(cx, move |b| b.open_recent(&root));
+        self.background(cx, Order::Start, move |b| b.open_recent(&root));
     }
 
     pub fn remove_recent(&mut self, root: String, cx: &mut Context<Self>) {
-        self.background(cx, move |b| {
+        self.background(cx, Order::End, move |b| {
             b.remove_recent(&root);
             Ok(())
         });
     }
 
     pub fn send_recent(&mut self, cx: &mut Context<Self>) {
-        self.background(cx, |b| {
+        self.background(cx, Order::End, |b| {
             b.send_recent();
             Ok(())
         });
@@ -245,7 +294,7 @@ impl Grace {
 
     /// Home: closes the project and goes back to the home screen.
     pub fn close_project(&mut self, cx: &mut Context<Self>) {
-        self.background(cx, |b| {
+        self.background(cx, Order::Start, |b| {
             b.close();
             Ok(())
         });
@@ -253,7 +302,7 @@ impl Grace {
 
     /// Refresh: lists the tests again.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
-        self.background(cx, |b| b.refresh());
+        self.background(cx, Order::Start, |b| b.refresh());
     }
 
     /// Run all: every test of the tree, whatever the filter hides (the runner applies the filter).
@@ -261,7 +310,7 @@ impl Grace {
         let Some(key) = self.state.tree.as_ref().map(|t| t.key.clone()) else {
             return;
         };
-        self.background(cx, move |b| b.run(&key));
+        self.background(cx, Order::Start, move |b| b.run(&key));
     }
 
     /// Re-run failed: the failed tests of the newest listed run.
@@ -269,12 +318,12 @@ impl Grace {
         let Some(id) = self.state.history.first().map(|h| h.id.clone()) else {
             return;
         };
-        self.background(cx, move |b| b.rerun_failed(&id));
+        self.background(cx, Order::Start, move |b| b.rerun_failed(&id));
     }
 
     /// Runs the tests under a row of the tree.
     pub fn run(&mut self, key: String, cx: &mut Context<Self>) {
-        self.background(cx, move |b| b.run(&key));
+        self.background(cx, Order::Start, move |b| b.run(&key));
     }
 
     /// The tree's selection, which the details pane shows.
@@ -285,14 +334,27 @@ impl Grace {
 
     /// The tag filter. The window never edits the filter itself: the runner sends it back.
     pub fn set_filter(&mut self, filter: FilterState, cx: &mut Context<Self>) {
-        self.background(cx, move |b| {
+        self.background(cx, Order::End, move |b| {
             b.set_filter(filter);
             Ok(())
         });
     }
 
+    /// The environment box's commit. The window never edits the environment itself: the runner sends it back.
+    pub fn set_env(&mut self, name: Option<String>, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, move |b| b.set_env(name.as_deref()));
+    }
+
+    /// The threads box's commit, as the box holds it: the runner refuses anything but 1 to 32.
+    pub fn set_threads(&mut self, n: serde_json::Value, cx: &mut Context<Self>) {
+        self.background(cx, Order::End, move |b| {
+            b.set_threads(&n);
+            Ok(())
+        });
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
-        self.background(cx, |b| {
+        self.at_once(cx, |b| {
             b.cancel();
             Ok(())
         });
@@ -409,6 +471,13 @@ pub mod fake {
         fn set_filter(&self, filter: FilterState) {
             self.record(format!("set_filter {}", serde_json::to_string(&filter).unwrap()));
         }
+        fn set_env(&self, name: Option<&str>) -> std::io::Result<()> {
+            self.record(format!("set_env {}", name.unwrap_or("null")));
+            Ok(())
+        }
+        fn set_threads(&self, n: &serde_json::Value) {
+            self.record(format!("set_threads {n}"));
+        }
         fn report_path(&self) -> Option<PathBuf> {
             self.record("report_path".into());
             Some(PathBuf::from("/out/karate-summary.html"))
@@ -461,6 +530,25 @@ mod tests {
         let mut calls = backend.calls();
         calls.sort();
         assert_eq!(calls, ["open_recent D:/p", "remove_recent D:/q"]);
+    }
+
+    #[gpui::test(iterations = 20)]
+    fn a_setting_is_in_force_before_a_run_sent_after_it(cx: &mut TestAppContext) {
+        let (g, backend, _tx) = grace(cx);
+        g.update(cx, |g, cx| {
+            g.state_mut().tree = Some(crate::testing::tree(1));
+            g.set_threads(serde_json::json!(2), cx);
+            g.run_all(cx);
+            g.set_filter(grace_core::model::tags::no_filter(), cx);
+            g.refresh(cx);
+        });
+        cx.run_until_parked();
+        let calls: Vec<String> = backend
+            .calls()
+            .into_iter()
+            .map(|c| c[..c.find(' ').unwrap_or(c.len())].to_string())
+            .collect();
+        assert_eq!(calls, ["set_threads", "run", "set_filter", "refresh"]);
     }
 
     #[gpui::test]
