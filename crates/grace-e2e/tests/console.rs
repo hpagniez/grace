@@ -150,10 +150,10 @@ fn step_through_a_failing_runs_errors() {
     run_all(&app);
     app.wait_for("two errors", WAIT, |t| found(t, "2 errors")).unwrap();
     assert!(app.tree().unwrap().find(&Role::Group, "Errors").is_some());
-    // the ERROR line comes during the run, the failed test in Karate's summary at its end. A click on the console
+    // the ERROR line comes during the run, the failed test in Karate's summary at its end. A click on the Console tab
     // first, as a person's hand would: on CI's Xvfb the window did not always take an F8 sent to it unfocused
-    let log = app.wait_for_node(Role::Other("Log".into()), "Console").unwrap();
-    app.click(&log).unwrap();
+    let tab = app.wait_for_node(Role::Tab, "Console").unwrap();
+    app.click(&tab).unwrap();
     app.key(Key::F8).unwrap();
     let tree = app
         .wait_for("an error current", WAIT, |t| {
