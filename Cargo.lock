@@ -2807,6 +2807,7 @@ dependencies = [
  "gpui-pre-platform",
  "grace-core",
  "serde_json",
+ "tempfile",
  "windows 0.62.2",
 ]
 

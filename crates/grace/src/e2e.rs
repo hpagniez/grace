@@ -141,7 +141,7 @@ impl Render for Gallery {
 }
 
 /// The seams' answers for an end-to-end test (migration guide, Architecture). `GRACE_E2E_SEAMS` names a JSON file the
-/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null}`. Each ask
+/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null}`. Each ask
 /// is appended to `<data folder>/e2e-seams.jsonl`, `{"seam": "folder", "start": "<path>" | null}`, as the Playwright
 /// tests recorded `dialog.showOpenDialog`'s options.
 pub struct E2eSeams {
@@ -175,6 +175,16 @@ impl crate::seams::Seams for E2eSeams {
             .ok()
             .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
             .and_then(|v| v.get("folder")?.as_str().map(std::path::PathBuf::from));
+        Box::pin(async move { answer })
+    }
+
+    /// `{"file": "<path>" | null}`: the file Import from file… picks.
+    fn pick_file(&self, _cx: &mut gpui::AsyncApp) -> crate::seams::Answer<Option<std::path::PathBuf>> {
+        self.record(serde_json::json!({ "seam": "file" }));
+        let answer = std::fs::read_to_string(&self.answers)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("file")?.as_str().map(std::path::PathBuf::from));
         Box::pin(async move { answer })
     }
 
