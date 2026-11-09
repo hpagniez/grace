@@ -104,6 +104,9 @@ pub struct AppState {
     pub selected: Option<String>,
     /// Counts the selections the tree must show: it opens the rows above the selected test and scrolls to it.
     pub reveals: u32,
+    /// Counts the trees the runner sent: a view that builds on the tree builds again only when this or what else it
+    /// reads changes, without comparing trees.
+    pub trees: u64,
     /// The open project's tag filter, as the runner holds it.
     pub filter: FilterState,
     /// The open project's environment and run properties; `None` with no project.
@@ -168,6 +171,7 @@ impl Default for AppState {
             notice: None,
             selected: None,
             reveals: 0,
+            trees: 0,
             filter: no_filter(),
             env: None,
             threads: None,
@@ -282,6 +286,7 @@ impl AppState {
                 }
                 self.project = project.clone();
                 self.tree = tree.clone();
+                self.trees += 1;
                 self.error = error.clone();
                 self.subfolders = subfolders.clone().unwrap_or_default();
                 self.notice = None;

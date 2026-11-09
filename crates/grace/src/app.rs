@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Task};
 use grace_core::model::events::AppEvent;
+use grace_core::model::tags::FilterState;
 use grace_core::runner::Runner;
 use grace_core::state::AppState;
 
@@ -37,6 +38,8 @@ pub trait Backend: Send + Sync + 'static {
     /// Runs again the tests that failed in a listed run.
     fn rerun_failed(&self, id: &str) -> std::io::Result<()>;
     fn cancel(&self);
+    /// Sets the open project's tag filter; the runner sends it back as an event.
+    fn set_filter(&self, filter: FilterState);
     /// The last run's HTML report, if it is there.
     fn report_path(&self) -> Option<PathBuf>;
 }
@@ -74,6 +77,9 @@ impl Backend for Runner {
     }
     fn cancel(&self) {
         Runner::cancel(self)
+    }
+    fn set_filter(&self, filter: FilterState) {
+        Runner::set_filter(self, filter)
     }
     fn report_path(&self) -> Option<PathBuf> {
         Runner::report_path(self)
@@ -266,6 +272,25 @@ impl Grace {
         self.background(cx, move |b| b.rerun_failed(&id));
     }
 
+    /// Runs the tests under a row of the tree.
+    pub fn run(&mut self, key: String, cx: &mut Context<Self>) {
+        self.background(cx, move |b| b.run(&key));
+    }
+
+    /// The tree's selection, which the details pane shows.
+    pub fn select(&mut self, key: &str, cx: &mut Context<Self>) {
+        self.state_mut().select(key);
+        cx.notify();
+    }
+
+    /// The tag filter. The window never edits the filter itself: the runner sends it back.
+    pub fn set_filter(&mut self, filter: FilterState, cx: &mut Context<Self>) {
+        self.background(cx, move |b| {
+            b.set_filter(filter);
+            Ok(())
+        });
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.background(cx, |b| {
             b.cancel();
@@ -380,6 +405,9 @@ pub mod fake {
         }
         fn cancel(&self) {
             self.record("cancel".into());
+        }
+        fn set_filter(&self, filter: FilterState) {
+            self.record(format!("set_filter {}", serde_json::to_string(&filter).unwrap()));
         }
         fn report_path(&self) -> Option<PathBuf> {
             self.record("report_path".into());

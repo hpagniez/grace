@@ -18,6 +18,7 @@ pub mod testing;
 pub mod theme;
 pub mod toolbar;
 pub mod tooltip;
+pub mod tree;
 pub mod ui;
 pub mod window;
 

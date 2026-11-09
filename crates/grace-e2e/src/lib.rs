@@ -96,6 +96,18 @@ impl Rect {
 pub enum Key {
     Tab,
     Escape,
+    Enter,
+    Space,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    /// Ctrl+Enter.
+    CtrlEnter,
 }
 
 /// One node of the tree, as read. `path` is its position under the app's window, which `Driver::press` finds again.

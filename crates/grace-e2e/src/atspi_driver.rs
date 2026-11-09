@@ -187,6 +187,17 @@ impl Driver for AtspiDriver {
             match key {
                 Key::Tab => "Tab",
                 Key::Escape => "Escape",
+                Key::Enter => "Return",
+                Key::Space => "space",
+                Key::Up => "Up",
+                Key::Down => "Down",
+                Key::Left => "Left",
+                Key::Right => "Right",
+                Key::Home => "Home",
+                Key::End => "End",
+                Key::PageUp => "Prior",
+                Key::PageDown => "Next",
+                Key::CtrlEnter => "ctrl+Return",
             },
         ])
     }

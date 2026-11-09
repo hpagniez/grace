@@ -173,6 +173,17 @@ impl Driver for UiaDriver {
             .send_keys(match key {
                 Key::Tab => "{tab}",
                 Key::Escape => "{esc}",
+                Key::Enter => "{enter}",
+                Key::Space => "{space}",
+                Key::Up => "{up}",
+                Key::Down => "{down}",
+                Key::Left => "{left}",
+                Key::Right => "{right}",
+                Key::Home => "{home}",
+                Key::End => "{end}",
+                Key::PageUp => "{pgup}",
+                Key::PageDown => "{pgdn}",
+                Key::CtrlEnter => "{ctrl}{enter}",
             })
             .map_err(err)
     }
