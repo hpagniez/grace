@@ -124,10 +124,13 @@ async function compileListener(jar) {
 
 async function main() {
   await mkdir(download, { recursive: true });
-  await setupJre();
+  // `--jar`: the Karate jar alone, for GPUI Grace's tests on Linux, which run the system's Java 21 (P1 plan)
+  const jarOnly = process.argv.includes("--jar");
+  if (!jarOnly) await setupJre();
   const jar = join(vendor, "karate.jar");
   if (!(await hasSha256(jar, JAR.sha256))) await copyFile(await fetchVerified(JAR), jar);
   await verifySha256(jar, JAR.sha256);
+  if (jarOnly) return console.log("karate.jar ready");
   await compileListener(jar);
   await setupLicenses();
   console.log("vendor ready");
