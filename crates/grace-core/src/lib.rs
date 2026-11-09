@@ -4,8 +4,11 @@
 pub mod batch;
 pub mod fingerprint;
 pub mod karate;
+pub mod mask;
 pub mod model;
 pub mod paths;
 pub mod properties_file;
+pub mod recent;
 pub mod secrets;
+pub mod settings;
 pub mod window;
