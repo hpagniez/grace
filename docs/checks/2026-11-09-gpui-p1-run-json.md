@@ -27,6 +27,21 @@ The phase P1 exit check of #280 and the [P1 plan](../plans/2026-11-09-gpui-p1-co
 
 **Pass.** GPUI Grace's runner writes Electron Grace's `run.json` for the 2,000-test project.
 
-## What still needs a person
+## On Windows, the reference machine
 
-The same comparison on Windows with the bundled JRE, where Electron Grace runs unchanged: on the owner's PC, with his go-ahead. Nothing opens a window: both runners are headless.
+The same comparison on the owner's PC with his go-ahead, in a separate worktree at ea5917a, nothing changed in Electron Grace: Windows 11 Pro 10.0.26300, AMD Ryzen 7 5800X, the bundled Temurin 21.0.13+9 for both runners, Karate 2.1.4, Node 26.13.0. `grace-run` in a release build; Electron Grace's `Runner` through a one-off Vitest test on `test/runner.ts`'s `setup()`, deleted afterwards. No window opened.
+
+| Check | Result |
+|---|---|
+| Top-level keys, in order | Same |
+| Every value but the allowed four | Equal; the cleaned files are the same text, key order inside every test included (423,554 bytes) |
+| `fingerprint` | Also equal (`3dd303f5…3e85`): the same files hashed the same way |
+| Tests | 2,000, 1,960 passed and 40 failed, `finished`, exit code 1, in both |
+| Project folder | `projects/7d1fc51331c7` in both |
+| GPUI Grace's time | 7.1 s from open to the stored run, Karate's own 4.0 s (one run on a machine not kept quiet: not a measure) |
+
+**Pass** on Windows too.
+
+## Not covered
+
+One project shape and one run on each side, with no tag filter, environment, run property or thread count; `run.json` only, not the report folder. The runner tests cover those options one by one.
