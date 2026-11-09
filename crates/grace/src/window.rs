@@ -47,6 +47,7 @@ pub struct GraceWindow {
     progress: Option<Entity<crate::progress::Progress>>,
     /// The tree, which keeps the rows a person opened and closed.
     pub tree: Option<Entity<crate::tree::Tree>>,
+    pub filter_bar: Option<Entity<crate::filter_bar::FilterBar>>,
     _motion: Option<gpui::Subscription>,
 }
 
@@ -62,6 +63,7 @@ impl GraceWindow {
             save: None,
             progress: None,
             tree: None,
+            filter_bar: None,
             _motion: None,
         }
     }
@@ -82,6 +84,7 @@ impl GraceWindow {
         let mut me = Self::new(cx);
         me.progress = Some(cx.new(|cx| crate::progress::Progress::new(grace.clone(), cx)));
         me.tree = Some(cx.new(|cx| crate::tree::Tree::new(grace.clone(), cx)));
+        me.filter_bar = Some(cx.new(|cx| crate::filter_bar::FilterBar::new(grace.clone(), cx)));
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
@@ -146,7 +149,15 @@ impl Render for GraceWindow {
                 crate::home::render(&grace, &state, shown, &self.open_focus, window, cx).into_any_element()
             } else {
                 let toolbar = crate::toolbar::render(&grace, &state, window, cx).into_any_element();
-                project_view(toolbar, self.progress.clone(), self.tree.clone(), shown, cx).into_any_element()
+                project_view(
+                    toolbar,
+                    self.progress.clone(),
+                    self.filter_bar.clone(),
+                    self.tree.clone(),
+                    shown,
+                    cx,
+                )
+                .into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -188,6 +199,7 @@ impl Render for GraceWindow {
 fn project_view(
     toolbar: gpui::AnyElement,
     progress: Option<Entity<crate::progress::Progress>>,
+    filter_bar: Option<Entity<crate::filter_bar::FilterBar>>,
     tree: Option<Entity<crate::tree::Tree>>,
     shown: Option<gpui::AnyElement>,
     cx: &App,
@@ -219,6 +231,7 @@ fn project_view(
                 .bg(Theme::color(t.surface))
                 .children(progress)
                 .children(shown.map(|n| div().px_3().py_2().child(n)))
+                .children(filter_bar)
                 .child(
                     div()
                         .debug_selector(|| "main".into())

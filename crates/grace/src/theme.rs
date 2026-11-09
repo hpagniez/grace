@@ -273,6 +273,11 @@ impl Theme {
         rgba(c).into()
     }
 
+    /// No colour: a fill or border that lets what is under it show.
+    pub fn clear() -> Hsla {
+        gpui::transparent_black()
+    }
+
     pub fn px(v: f32) -> Pixels {
         px(v)
     }
