@@ -188,6 +188,41 @@ pub struct App {
     child: Child,
     data: PathBuf,
     driver: Box<dyn Driver>,
+    /// Leave the data folder when dropped, for a second start on it (`App::relaunch`).
+    keep: bool,
+}
+
+/// A fresh, empty data folder for one test.
+pub fn fresh_data_dir() -> Result<PathBuf> {
+    let data = std::env::temp_dir().join(format!("grace-e2e-{}-{}", std::process::id(), unique()));
+    std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
+    Ok(data)
+}
+
+/// A copy of a fixture project of `test/fixtures/projects`, in a folder of its own, as `e2e/helpers.ts` `project()`
+/// makes one: a test may change it.
+pub fn project(name: &str) -> Result<PathBuf> {
+    fn copy(from: &Path, to: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            let target = to.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy(&entry.path(), &target)?;
+            } else {
+                std::fs::copy(entry.path(), target)?;
+            }
+        }
+        Ok(())
+    }
+    let from = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test/fixtures/projects")
+        .join(name);
+    let to = std::env::temp_dir()
+        .join(format!("grace-e2e-project-{}-{}", std::process::id(), unique()))
+        .join(name);
+    copy(&from, &to).map_err(|e| format!("cannot copy {}: {e}", from.display()))?;
+    Ok(to)
 }
 
 impl App {
@@ -198,13 +233,25 @@ impl App {
     }
 
     pub fn launch_with(env: &[(&str, &str)]) -> Result<App> {
+        Self::launch_in(fresh_data_dir()?, env)
+    }
+
+    /// Starts Grace with `settings.json` already holding `settings`, as `e2e/helpers.ts` `launchWithSettings()`.
+    pub fn launch_with_settings(settings: &serde_json::Value, env: &[(&str, &str)]) -> Result<App> {
+        let data = fresh_data_dir()?;
+        std::fs::write(data.join("settings.json"), settings.to_string()).map_err(|e| e.to_string())?;
+        Self::launch_in(data, env)
+    }
+
+    /// Starts Grace on an existing data folder.
+    pub fn launch_in(data: PathBuf, env: &[(&str, &str)]) -> Result<App> {
         let exe = grace_exe();
         #[cfg(target_os = "linux")]
         atspi_driver::prepare()?;
-        let data = std::env::temp_dir().join(format!("grace-e2e-{}-{}", std::process::id(), unique()));
-        std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
         let mut cmd = Command::new(&exe);
-        cmd.env("GRACE_USER_DATA", &data).env("GRACE_E2E_SCREEN", "other");
+        cmd.env("GRACE_USER_DATA", &data)
+            .env("GRACE_E2E_SCREEN", "other")
+            .env("GRACE_E2E_SEAMS", seams_file(&data));
         for (k, v) in env {
             cmd.env(k, v);
         }
@@ -212,7 +259,45 @@ impl App {
             .spawn()
             .map_err(|e| format!("cannot start {}: {e}", exe.display()))?;
         let driver = driver_for(child.id())?;
-        Ok(App { child, data, driver })
+        Ok(App {
+            child,
+            data,
+            driver,
+            keep: false,
+        })
+    }
+
+    /// Ends this Grace, keeping its data folder, and starts another on it with `env`: Electron's restart.
+    pub fn relaunch(mut self, env: &[(&str, &str)]) -> Result<App> {
+        self.keep = true;
+        let data = self.data.clone();
+        drop(self);
+        Self::launch_in(data, env)
+    }
+
+    /// `settings.json` as Grace wrote it, or `null` when there is none.
+    pub fn settings(&self) -> serde_json::Value {
+        std::fs::read_to_string(self.data.join("settings.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or(serde_json::Value::Null)
+    }
+
+    /// Answers the next folder dialogs with `folder` (the app's `e2e` seams, `GRACE_E2E_SEAMS`).
+    pub fn answer_folder(&self, folder: Option<&Path>) -> Result<()> {
+        let answer = serde_json::json!({ "folder": folder });
+        std::fs::write(seams_file(&self.data), answer.to_string()).map_err(|e| e.to_string())
+    }
+
+    /// Where each folder dialog started, in order (`e2e-seams.jsonl`).
+    pub fn folder_dialogs(&self) -> Vec<Option<String>> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "folder")
+            .map(|v| v["start"].as_str().map(str::to_string))
+            .collect()
     }
 
     pub fn data_dir(&self) -> &Path {
@@ -274,8 +359,15 @@ impl Drop for App {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        let _ = std::fs::remove_dir_all(&self.data);
+        if !self.keep {
+            let _ = std::fs::remove_dir_all(&self.data);
+        }
     }
+}
+
+/// The file the app reads its seams' answers from; a test writes it with `App::answer_folder`.
+fn seams_file(data: &Path) -> PathBuf {
+    data.join("e2e-answers.json")
 }
 
 fn unique() -> u128 {
