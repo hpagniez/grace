@@ -6,6 +6,7 @@ pub mod events;
 pub mod flaky;
 pub mod history;
 pub mod http;
+pub mod js;
 pub mod node;
 pub mod status;
 pub mod tags;
