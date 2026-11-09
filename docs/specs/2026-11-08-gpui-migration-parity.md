@@ -31,11 +31,11 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WS-01 | Open a project and see its tests | | ☐ |
 | WS-02 | Maven layout with classpath resources | | ☐ |
 | WS-03 | Syntax error is reported, not hidden | | ☐ |
-| WS-04 | Run all with live progress | progress part: `grace-e2e/tests/run.rs::run_all_with_live_progress`; the rows turning running, passed and failed with the tree (P2 PR 3) | ☐ |
+| WS-04 | Run all with live progress | `grace-e2e/tests/run.rs::run_all_with_live_progress` (the rows turning running, passed and failed) | ☑ |
 | WS-05 | Run one outline row | | ☐ |
 | WS-06 | Failure details | | ☐ |
 | WS-07 | A feature edited outside the app | | ☐ |
-| WS-08 | Cancel leaves nothing behind | progress, Java and Report: `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind`; "slow loop" interrupted with the tree (P2 PR 3) | ☐ |
+| WS-08 | Cancel leaves nothing behind | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" interrupted) | ☑ |
 | WS-09 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` | ☑ |
 | WS-10 | Nothing to run | Run all part: `grace-e2e/tests/run.rs::nothing_to_run`, `grace::toolbar::tests::the_actions::run_all_is_disabled_with_nothing_to_run`; the tree's line with the tree (P2 PR 3) | ☐ |
 | WS-11 | Open the HTML report | `grace-e2e/tests/run.rs::report_opens_the_runs_html_report` | ☑ |
@@ -390,30 +390,30 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| VL-01 | Only the rows in view are drawn (e2e) | | ☐ |
+| VL-01 | Only the rows in view are drawn (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` | ☑ |
 | VL-02 | A small list draws in jsdom | | ☐ |
 | VL-03 | The tree shows the same rows as before | | ☐ |
-| VL-04 | Closed folders survive a refresh | | ☐ |
-| VL-05 | Statuses do not move rows | | ☐ |
-| VL-06 | The tree is one tab stop | | ☐ |
-| VL-07 | Arrow keys move and select | | ☐ |
-| VL-08 | Right and Left | | ☐ |
+| VL-04 | Closed folders survive a refresh | `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed` | ☑ |
+| VL-05 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
+| VL-06 | The tree is one tab stop | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (the tree is a tab stop, the focus a tree item) | ☑ |
+| VL-07 | Arrow keys move and select | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
+| VL-08 | Right and Left | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
 | VL-09 | Home, End and pages | | ☐ |
-| VL-10 | Ctrl+Enter runs the focused row | | ☐ |
+| VL-10 | Ctrl+Enter runs the focused row | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` | ☑ |
 | VL-11 | The row's buttons left the tab order but still click | | ☐ |
 | VL-12 | A click makes the row focused | | ☐ |
 | VL-13 | The HTTP list is one tab stop and arrows open calls | | ☐ |
-| VL-14 | A moved-to row scrolls into view (e2e) | | ☐ |
+| VL-14 | A moved-to row scrolls into view (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End) | ☑ |
 | VL-15 | Focus survives scrolling away (e2e) | | ☐ |
 | VL-16 | Closing a folder takes focus to it | | ☐ |
-| VL-17 | Hiding the focused row | | ☐ |
+| VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
 | VL-18 | A new tree keeps the rows in view still (e2e) | | ☐ |
 | VL-19 | Calls arriving above the view keep the rows in view still | | ☐ |
 | VL-20 | A filter change scrolls to the selected row (e2e) | | ☐ |
 | VL-21 | A cut label shows whole on keyboard focus | | ☐ |
 | VL-22 | The run shortcut can be found | | ☐ |
 | VL-23 | Tree rows carry their level and position | | ☐ |
-| VL-24 | A row's name says its status, flakiness and tags | | ☐ |
+| VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
 | VL-25 | Calls are options | | ☐ |
 | VL-26 | Opening 10,000 tests (perf) | | ☐ |
 | VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | | ☐ |
@@ -703,23 +703,23 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| TO-01 | A project opens with its features closed | | ☐ |
-| TO-02 | A refresh keeps what I opened and closed | | ☐ |
-| TO-03 | A feature new in a refresh starts closed | | ☐ |
-| TO-04 | Another project starts closed again | | ☐ |
-| TO-05 | A click on a closed feature's name opens and selects it | | ☐ |
-| TO-06 | A click on an open feature's name keeps it open | | ☐ |
-| TO-07 | The chevron still closes a feature | | ☐ |
-| TO-08 | Moving with the keys does not open features | | ☐ |
+| TO-01 | A project opens with its features closed | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`, `grace::tree::tests::a_project_opens_with_its_features_closed` | ☑ |
+| TO-02 | A refresh keeps what I opened and closed | `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed` | ☑ |
+| TO-03 | A feature new in a refresh starts closed | `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed` | ☑ |
+| TO-04 | Another project starts closed again | `grace::tree::tests::another_project_starts_closed_again` | ☑ |
+| TO-05 | A click on a closed feature's name opens and selects it | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` | ☑ |
+| TO-06 | A click on an open feature's name keeps it open | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (the second press) | ☑ |
+| TO-07 | The chevron still closes a feature | `grace-e2e/tests/tree.rs::the_chevron_opens_and_closes_a_feature` | ☑ |
+| TO-08 | Moving with the keys does not open features | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
 | TO-09 | An outline opens with its feature | | ☐ |
-| TO-10 | A run of one feature opens it as it starts | | ☐ |
-| TO-11 | Run all opens only the features with a failure | | ☐ |
-| TO-12 | A run never reopens a feature I closed during it | | ☐ |
-| TO-13 | A run opens a feature inside a closed folder, and leaves the folder closed | | ☐ |
+| TO-10 | A run of one feature opens it as it starts | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row`, `grace::tree::tests::a_run_of_one_feature_opens_it_as_it_starts` | ☑ |
+| TO-11 | Run all opens only the features with a failure | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
+| TO-12 | A run never reopens a feature I closed during it | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
+| TO-13 | A run opens a feature inside a closed folder, and leaves the folder closed | `grace::tree::tests::a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed` | ☑ |
 | TO-14 | A failure leaves a closed outline closed | | ☐ |
-| TO-15 | What a run opened stays open | | ☐ |
+| TO-15 | What a run opened stays open | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
 | TO-16 | A pause still opens the way to the paused test | | ☐ |
-| TO-17 | Statuses do not move rows | | ☐ |
+| TO-17 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
 | TO-18 | A feature opening above the view does not move it | | ☐ |
 
 ### WM · Watch mode: re-run on save
@@ -933,7 +933,7 @@ Phase P2 · 2 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-cancel-01 | Cancel leaves nothing behind | progress, Java and Report: `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind`; the slow feature's own run and "slow loop" interrupted with the tree (P2 PR 3) | ☐ |
+| E-cancel-01 | Cancel leaves nothing behind | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` (the slow feature's own run, "slow loop" interrupted) | ☑ |
 | E-cancel-02 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` (Run all in place of the slow feature's own button) | ☑ |
 
 ### e2e/console-find.spec.ts
@@ -1186,8 +1186,8 @@ Phase P2 · 4 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-run-01 | Run all with live progress | progress part: `grace-e2e/tests/run.rs::run_all_with_live_progress`; the rows with the tree (P2 PR 3) | ☐ |
-| E-run-02 | Run one outline row | | ☐ |
+| E-run-01 | Run all with live progress | `grace-e2e/tests/run.rs::run_all_with_live_progress` | ☑ |
+| E-run-02 | Run one outline row | `grace-e2e/tests/run.rs::run_one_outline_row` | ☑ |
 | E-run-03 | A feature edited outside the app | | ☐ |
 | E-run-04 | The project is not modified | `grace-e2e/tests/run.rs::the_project_is_not_modified` | ☑ |
 
@@ -1281,8 +1281,8 @@ Phase P2 · 9 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-virtual-01 | Only the rows in view are drawn | | ☐ |
-| E-virtual-02 | A moved-to row scrolls into view | | ☐ |
+| E-virtual-01 | Only the rows in view are drawn | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (300 features, generated) | ☑ |
+| E-virtual-02 | A moved-to row scrolls into view | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End, in place of 40 Down presses) | ☑ |
 | E-virtual-03 | Focus survives scrolling away | | ☐ |
 | E-virtual-04 | A new tree keeps the rows in view still | | ☐ |
 | E-virtual-05 | The filter bar keeps one line with 54 tags | | ☐ |
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
 | `src/renderer/importPlan.test.ts` | 6 | `grace::ui::importPlan` | ☐ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
-| `src/renderer/nodes.test.ts` | 3 | `grace::ui::nodes` | ☐ |
+| `src/renderer/nodes.test.ts` | 3 | `grace_core::rows::tests::feature_of` (all 3) | ☑ |
 | `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
 | `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight` | ☐ |
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs` | ☐ |
@@ -1426,10 +1426,10 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
 | `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store` (7 of 8; "subscribes before ready…" checks the state only, the IPC subscription is gone; `toggleGroup` ports with the HTTP tab in P3) | ☐ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
-| `src/renderer/treeRows.test.ts` | 5 | `grace::ui::treeRows` | ☐ |
+| `src/renderer/treeRows.test.ts` | 5 | `grace_core::rows::tests::tree_rows`, `row_name_…` (all 5) | ☑ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
 | `src/renderer/ui.test.ts` | 1 | `grace::ui::ui` | ☐ |
-| `src/renderer/virtual.test.ts` | 15 | `grace::ui::virtual` | ☐ |
+| `src/renderer/virtual.test.ts` | 15 | `grace_core::rows::tests` (10; `drawnRange`'s 5 are `uniform_list`'s) | ☑ |
 | `src/shared/env.test.ts` | 29 | `grace-core::model::env::tests` (54 tests, every Vitest test and the added ones) | ☑ |
 | `src/shared/flaky.test.ts` | 6 | `grace-core::model::flaky::tests` (7 tests, every Vitest test and the added ones) | ☑ |
 | `src/shared/history.test.ts` | 18 | `grace-core::model::history::tests` (22 tests, every Vitest test and the added ones) | ☑ |
