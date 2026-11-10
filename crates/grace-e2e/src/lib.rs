@@ -73,6 +73,8 @@ pub struct States {
     pub focusable: bool,
     pub focused: bool,
     pub selected: bool,
+    /// A check box or a radio button that is on.
+    pub checked: bool,
     pub expanded: Option<bool>,
 }
 

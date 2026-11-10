@@ -18,6 +18,7 @@ pub mod probe;
 pub mod progress;
 pub mod properties;
 pub mod seams;
+pub mod settings;
 pub mod status_bar;
 #[cfg(test)]
 pub mod testing;
@@ -40,6 +41,7 @@ pub fn init(cx: &mut App) {
     assets::load_fonts(cx);
     a11y::bind_keys(cx);
     console::bind_keys(cx);
+    settings::bind_keys(cx);
     theme::apply(false, None, cx);
     #[cfg(feature = "e2e")]
     e2e::log_keys(cx);

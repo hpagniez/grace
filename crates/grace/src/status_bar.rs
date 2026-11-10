@@ -1,14 +1,17 @@
 //! `StatusBar.tsx`: the 24 px bar along the bottom of every view, on the ground in muted 12 px text (spec R21). It
-//! starts with the project's path while its view shows (toolbar spec R2), cut so its last folder stays in sight. The
-//! update marker, the running version and Settings join with the Settings page in P2's fifth PR and the updater in
-//! phase P5 (P2 plan).
-use gpui::{App, InteractiveElement as _, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder as _, px};
+//! starts with the project's path while its view shows (toolbar spec R2), cut so its last folder stays in sight, and
+//! ends with Settings. The update marker and the running version join with the updater in phase P5 (P2 plan).
+use gpui::{
+    App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, Styled, Window, div,
+    prelude::FluentBuilder as _, px,
+};
 use grace_core::state::AppState;
 
 use crate::theme::{METRICS, MONO, Theme};
 use crate::tooltip::cut_middle;
 
 pub const HEIGHT: f32 = 24.;
+pub const SETTINGS: &str = "Settings";
 
 /// A path in two parts: the folders before the project's, which give way when it is cut, and the project's folder
 /// with the separator after it if it has one, which stays (`splitPath`).
@@ -27,7 +30,12 @@ pub fn shown_path(state: &AppState) -> Option<&str> {
         .or(state.opening.as_deref())
 }
 
-pub fn render(state: &AppState, cx: &App) -> impl IntoElement {
+/// The bar; `settings` opens the Settings page.
+pub fn render(
+    state: &AppState,
+    settings: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> impl IntoElement {
     let t = Theme::global(cx).tokens;
     div()
         .id("status-bar")
@@ -55,6 +63,21 @@ pub fn render(state: &AppState, cx: &App) -> impl IntoElement {
                     .child(cut_middle("project-path", head.to_string(), tail.to_string())),
             )
         })
+        .child(
+            div().debug_selector(|| "settings-button".into()).child(
+                crate::elements::button(
+                    "settings-button",
+                    SETTINGS,
+                    crate::elements::ButtonKind::Ghost,
+                    crate::elements::ButtonSize::Small,
+                )
+                .icon(crate::assets::Icon::Settings)
+                .h(px(20.))
+                .px(px(6.))
+                .text_color(Theme::color(t.muted))
+                .on_click(settings),
+            ),
+        )
 }
 
 #[cfg(test)]
@@ -68,7 +91,7 @@ mod tests {
     fn bar(cx: &mut TestAppContext, width: f32, state: AppState) -> (crate::testing::Harness, VisualTestContext) {
         open(cx, width, state, |grace, _, cx| {
             let state = grace.read(cx).state.clone();
-            render(&state, cx).into_any_element()
+            render(&state, |_, _, _| {}, cx).into_any_element()
         })
     }
 

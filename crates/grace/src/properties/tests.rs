@@ -421,3 +421,24 @@ fn an_import_past_the_list_limit_is_blocked(cx: &mut TestAppContext) {
     assert!(d.shows(&mut cx, "import-step"));
     assert_eq!(d.visible(&mut cx).len(), 1);
 }
+
+/// E-appearance-04: a theme change while the dialog is up redraws it in the new colours and keeps the typed draft and
+/// the focus; nothing is made afresh. The change comes from Windows' setting under Follow Windows, or from code: a
+/// person cannot reach Settings past the modal dialog.
+#[gpui::test]
+fn a_theme_change_keeps_the_draft_and_the_focus(cx: &mut TestAppContext) {
+    let (d, mut cx) = open(cx, saved());
+    d.click(&mut cx, "add-property");
+    let row = d.visible(&mut cx).last().unwrap().id;
+    cx.simulate_input("draft.name");
+    cx.run_until_parked();
+    let light = cx.update(|_, cx| crate::theme::Theme::global(cx).tokens.raised);
+    cx.update(|window, cx| crate::theme::set_appearance(crate::theme::Appearance::Dark, window, cx));
+    cx.run_until_parked();
+    let dark = cx.update(|_, cx| crate::theme::Theme::global(cx).tokens.raised);
+    assert_ne!(light, dark, "the dialog's fill follows the theme");
+    assert_eq!(d.text(&mut cx, row, false), "draft.name");
+    assert!(d.focused(&mut cx, row, false));
+    assert!(d.shows(&mut cx, &format!("prop-name-{row}")));
+    assert_eq!(d.closed(), 0);
+}

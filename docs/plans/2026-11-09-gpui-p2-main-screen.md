@@ -103,6 +103,12 @@ P1's rules hold ([P1 plan](2026-11-09-gpui-p1-core.md#porting-rules)): same fixt
 | `details` | The open logs are kept by step index in the `Details` entity and cleared when the selection changes | Solid made the rows afresh for a new test, which closed them; GPUI keeps an entity's fields | `details::tests::a_test::a_new_selection_closes_the_logs` |
 | `details` | The headless tests check the parts drawn, where they sit and the tokens they take, not class names; the names a screen reader reads are the e2e test's | GPUI has no classes, and a headless window builds no accessibility tree | `details::tests`, `grace-e2e/tests/details.rs` |
 | `details` | E-details-01's first half, a test's steps and comments from its file before a run, waits for phase P4 with the file's steps | Details shows no steps before a run until P4 ports the file's steps | E-details-01's run half in `grace-e2e/tests/details.rs::failure_details` |
+| `settings` | The Settings page lists only Appearance and opens on it; Updates joins with the updater in phase P5, and the page then opens on Updates again | The updater is P5's (migration guide) | `settings::tests::the_page` |
+| `settings` | No IPC: the page sets the theme and saves it itself (`settings::choose`), and a theme is one of three enum values, so there is nothing for main to refuse (E-appearance-06). A malformed saved value still reads as Follow Windows | GPUI Grace has one process; the type admits no other theme | `grace_core::settings` tests `appearance` (PU-17), `settings::tests::appearance_r8` |
+| `settings`, `window` | The project view's entities stay alive under the page, where Electron Grace kept its DOM mounted and hidden; the page is a new entity at each open | GPUI keeps an entity's state whether it is drawn or not | `settings::tests::appearance_r8::a_change_keeps_the_rest_of_the_views_state`, `grace-e2e/tests/appearance.rs` (Back finds the opened feature) |
+| `settings` | Escape goes back through a key binding in the page's context on the window's root; a shown tooltip takes Escape first because `tooltip` intercepts the keystroke before any binding. E-appearance-05's tooltip half waits for P5's update button, the page's only tooltip | GPUI dispatches keys through contexts, not a document listener | `grace-e2e/tests/appearance.rs::escape_goes_back_from_the_settings_page`, `grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` |
+| `settings` | A theme change with a dialog up (E-appearance-04) is a headless test: the e2e driver cannot flip Windows' setting, and a person cannot reach Settings past the modal dialog | The only path is the system's appearance under Follow Windows | `properties::tests::a_theme_change_keeps_the_draft_and_the_focus` |
+| `grace-e2e` | The theme in force is read off the window's pixels on Linux (`import`), where Playwright read the CSS and `nativeTheme.themeSource`; on Windows the e2e tests check the radios and `settings.json` | AT-SPI and UI Automation expose no colours | `grace-e2e/tests/appearance.rs` |
 
 ## PR 1: the window, the state and the home screen
 
@@ -141,7 +147,7 @@ Done in PR 4b: the draft and the import plan in `grace-core`, the dialog and its
 
 `Details.tsx` (WS-06, its P2 part), `Console.tsx` with the banner, colours, find and error stepping (CB-*, CS-*), `BottomPanel.tsx`, `Splitter.tsx`, `panelHeight.ts` (UP-*), and the Appearance section of Settings (`appearance.spec.ts`). `console*.spec.ts`, `details.spec.ts`, `panel.spec.ts`.
 
-Split in three. PR 5a, the console and the bottom panel: `grace-core::{banner, console_find, panel_height, panel_tabs}`, `grace::console` (the banner, the lines, find, errors) and `grace::bottom_panel` (the splitter, the tabs and their order), with `console.spec.ts`, `console-find.spec.ts` and `panel.spec.ts`. PR 5b, the details; PR 5c, the Appearance section of Settings.
+Split in three. PR 5a, the console and the bottom panel: `grace-core::{banner, console_find, panel_height, panel_tabs}`, `grace::console` (the banner, the lines, find, errors) and `grace::bottom_panel` (the splitter, the tabs and their order), with `console.spec.ts`, `console-find.spec.ts` and `panel.spec.ts`. PR 5b, the details; PR 5c, the Settings page with its Appearance section and the status bar's Settings button.
 
 ## PR 6: the exit check
 

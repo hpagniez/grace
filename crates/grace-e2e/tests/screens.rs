@@ -361,3 +361,16 @@ fn screens_details() {
     .unwrap();
     shot(&app, "details-group");
 }
+
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_settings() {
+    let dir = project("clean").unwrap();
+    for (dark, name) in [(false, "settings-appearance"), (true, "settings-appearance-dark")] {
+        let app = open(&dir, dark);
+        app.press_named(Role::Button, "Settings").unwrap();
+        app.wait_for("the page", WAIT, |t| t.find(&Role::Group, "Theme").is_some())
+            .unwrap();
+        shot(&app, name);
+    }
+}

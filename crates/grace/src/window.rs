@@ -54,6 +54,8 @@ pub struct GraceWindow {
     pub panel: Option<Entity<crate::bottom_panel::BottomPanel>>,
     /// The selected test's or group's details, right of the tree.
     pub details: Option<Entity<crate::details::Details>>,
+    /// The Settings page while it covers the view; made afresh each time it opens, as Electron Grace's was.
+    pub settings: Option<Entity<crate::settings::SettingsPage>>,
     _motion: Option<gpui::Subscription>,
 }
 
@@ -74,6 +76,7 @@ impl GraceWindow {
             threads: None,
             panel: None,
             details: None,
+            settings: None,
             _motion: None,
         }
     }
@@ -102,6 +105,34 @@ impl GraceWindow {
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
         me.grace = Some(grace);
         me
+    }
+
+    /// Covers the view with the Settings page (app-updates R6.1); the view's entities stay, so Back finds them as
+    /// they were.
+    pub fn open_settings(&mut self, cx: &mut Context<Self>) {
+        let Some(grace) = self.grace.clone() else {
+            return;
+        };
+        if self.settings.is_none() {
+            let me = cx.entity().downgrade();
+            self.settings = Some(cx.new(|cx| {
+                crate::settings::SettingsPage::new(
+                    grace,
+                    move |window, cx| {
+                        let _ = me.update(cx, |w, cx| w.close_settings(window, cx));
+                    },
+                    cx,
+                )
+            }));
+            cx.notify();
+        }
+    }
+
+    pub fn close_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.settings.take().is_some() {
+            window.focus(&self.focus, cx);
+            cx.notify();
+        }
     }
 }
 
@@ -141,13 +172,22 @@ impl Render for GraceWindow {
         let t = Theme::global(cx).tokens;
         // Ctrl+F and F8 work anywhere in the project view, the window's root included: the focus rests there after a
         // click on nothing, and a dialog keeps its own (console search R1, R3.1)
+        let settings = self.settings.clone();
         let console = self
             .grace
             .as_ref()
-            .filter(|g| g.read(cx).state.loaded && !g.read(cx).state.home())
+            .filter(|g| settings.is_none() && g.read(cx).state.loaded && !g.read(cx).state.home())
             .and(self.panel.as_ref())
             .map(|p| p.read(cx).console.clone());
-        let also = console.as_ref().map(|_| crate::console::CONTEXT);
+        let also = if settings.is_some() {
+            Some(crate::settings::CONTEXT)
+        } else {
+            console.as_ref().map(|_| crate::console::CONTEXT)
+        };
+        let me = cx.entity().downgrade();
+        let open_settings = move |_: &gpui::ClickEvent, _: &mut Window, cx: &mut App| {
+            let _ = me.update(cx, |w, cx| w.open_settings(cx));
+        };
         let view = self.grace.clone().map(|grace| {
             let state = grace.read(cx).state.clone();
             if !state.loaded {
@@ -168,7 +208,9 @@ impl Render for GraceWindow {
                 )
                 .into_any_element()
             });
-            let view = if state.home() {
+            let view = if let Some(page) = settings.clone() {
+                page.into_any_element()
+            } else if state.home() {
                 crate::home::render(&grace, &state, shown, &self.open_focus, window, cx).into_any_element()
             } else {
                 let boxes = [
@@ -189,7 +231,7 @@ impl Render for GraceWindow {
                 .flex_1()
                 .min_h_0()
                 .child(div().flex().flex_col().flex_1().min_h_0().overflow_hidden().child(view))
-                .child(crate::status_bar::render(&state, cx))
+                .child(crate::status_bar::render(&state, open_settings, cx))
                 .into_any_element()
         });
         a11y::tab_order(div().id("grace"), &self.focus, also)
@@ -201,6 +243,12 @@ impl Render for GraceWindow {
             .bg(Theme::color(t.ground))
             .text_color(Theme::color(t.ink))
             .text_size(px(crate::theme::METRICS.text_sm.size))
+            .when_some(settings, |d, page| {
+                d.on_action(move |_: &crate::settings::GoBack, window, cx| {
+                    let back = page.read(cx).back();
+                    back(window, cx)
+                })
+            })
             .when_some(console, |d, c| {
                 let (find, next, prev) = (c.clone(), c.clone(), c);
                 d.on_action(move |_: &crate::console::FindInConsole, w, cx| find.update(cx, |c, cx| c.open_bar(w, cx)))
