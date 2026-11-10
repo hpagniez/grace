@@ -6,6 +6,7 @@
 //! The import step, `ImportStep.tsx`, is [`import_step`].
 pub mod import_step;
 
+use crate::elements::Off as _;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -15,10 +16,10 @@ use gpui::{
     IntoElement, ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
     Window, div, prelude::FluentBuilder as _, px,
 };
+use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{Disableable as _, WindowExt as _};
+use gpui_component::input::{InputEvent, InputState};
 use grace_core::model::env::{EnvView, ImportEntry, SecretState};
 use grace_core::properties_draft::{Draft, Row};
 
@@ -443,7 +444,7 @@ impl PropertiesView {
                             ButtonKind::Plain,
                             ButtonSize::Medium,
                         )
-                        .disabled(!self.available)
+                        .off(!self.available)
                         .on_click(cx.listener(move |this, _, window, cx| this.replace(id, window, cx))),
                     ),
                 )
@@ -453,7 +454,7 @@ impl PropertiesView {
                 .flex_1()
                 .min_w(px(80.))
                 .child(
-                    Input::new(&f.value)
+                    crate::elements::input(&f.value)
                         .aria_label("Property value")
                         .h(px(METRICS.control_height)),
                 )
@@ -480,7 +481,7 @@ impl PropertiesView {
                     .debug_selector(move || format!("prop-name-{id}"))
                     .w(px(160.))
                     .child(
-                        Input::new(&f.name)
+                        crate::elements::input(&f.name)
                             .aria_label("Property name")
                             .h(px(METRICS.control_height)),
                     ),
@@ -500,7 +501,7 @@ impl PropertiesView {
                     Checkbox::new(SharedString::from(format!("prop-secret-{id}")))
                         .label("Secret")
                         .checked(row.secret)
-                        .disabled(!self.available && !row.secret)
+                        .off(!self.available && !row.secret)
                         .text_size(px(METRICS.text_sm.size))
                         .on_click(cx.listener(move |this, on: &bool, window, cx| this.set_secret(id, *on, window, cx))),
                 ),
@@ -569,7 +570,7 @@ impl Render for PropertiesView {
                             .flex_1()
                             .min_w_0()
                             .child(
-                                Input::new(&self.new_env)
+                                crate::elements::input(&self.new_env)
                                     .aria_label(NEW_ENV)
                                     .h(px(METRICS.control_height)),
                             ),
@@ -592,7 +593,7 @@ impl Render for PropertiesView {
                         ButtonKind::Plain,
                         ButtonSize::Medium,
                     )
-                    .disabled(!self.draft.can_delete_env())
+                    .off(!self.draft.can_delete_env())
                     .on_click(cx.listener(|this, _, _, cx| this.delete_env(cx))),
                 ),
             );
@@ -639,7 +640,7 @@ impl Render for PropertiesView {
                                     )
                                     .icon(Icon::FileUp)
                                     .track_focus(&import_focus)
-                                    .disabled(!available)
+                                    .off(!available)
                                     .on_click(on_import),
                                 ),
                             ),
@@ -699,14 +700,14 @@ impl Render for PropertiesView {
                                 ButtonKind::Primary,
                                 ButtonSize::Dialog,
                             )
-                            .disabled(blocked)
+                            .off(blocked)
                             .on_click(cx.listener(|this, _, window, cx| this.save(window, cx))),
                         ),
                     )
                     .child(
                         div().debug_selector(|| "cancel-properties".into()).child(
                             button("cancel-properties", "Cancel", ButtonKind::Plain, ButtonSize::Dialog)
-                                .disabled(saving)
+                                .off(saving)
                                 .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
                         ),
                     ),

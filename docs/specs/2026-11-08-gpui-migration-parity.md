@@ -174,7 +174,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
 | UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 | UP-12 | The Windows folder dialog shows the siblings (by hand) | | ☐ |
-| UP-13 | Cursors match what a control does | | ☐ |
+| UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
 | UP-14 | The busy cursor while running | | ☐ |
 | UP-15 | Scroll areas get thin themed scrollbars | | ☐ |
 | UP-16 | Scrollbars look right and are easy to use (by hand) | | ☐ |
@@ -961,7 +961,7 @@ Phase P2 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-cursor-01 | cursors match what a control does | | ☐ |
+| E-cursor-01 | cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
 | E-cursor-02 | the busy cursor while running | | ☐ |
 | E-cursor-03 | the drag cursor wins over the busy cursor | | ☐ |
 

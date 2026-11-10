@@ -5,12 +5,12 @@
 //!
 //! The environment and threads boxes are `env_picker`'s and `threads_box`'s, the Properties dialog `properties`'; the
 //! Watch toggle and the step debugger's buttons come with the runner's watch and debug runs in phase P4 (P2 plan).
+use crate::elements::Off as _;
 use gpui::accesskit::Role;
 use gpui::{
     AnyElement, App, Entity, ImageSource, InteractiveElement as _, IntoElement, ParentElement, Resource, SharedString,
     StatefulInteractiveElement as _, Styled, Window, div, img, prelude::FluentBuilder as _, px,
 };
-use gpui_component::Disableable as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use grace_core::model::node::Layout;
 use grace_core::model::tags::matching_leaves;
@@ -131,7 +131,7 @@ pub fn render(
             .justify_center()
             .accessibility_label(HOME)
             .track_focus(f)
-            .disabled(!a.home)
+            .off(!a.home)
             .child(
                 img(ImageSource::Resource(Resource::Embedded(LOGO_PATH.into())))
                     .size(px(20.))
@@ -143,7 +143,7 @@ pub fn render(
     let refresh = tooltip("tip-refresh", Some(REFRESH.into())).focusable(move |f| {
         crate::elements::icon_button("refresh-button", Icon::RefreshCw, REFRESH, false)
             .track_focus(f)
-            .disabled(!a.refresh)
+            .off(!a.refresh)
             .on_click(move |_, _, cx| g.update(cx, |g, cx| g.refresh(cx)))
     });
 
@@ -245,7 +245,7 @@ pub fn render(
     let run_all = div().debug_selector(|| "run-all-button".into()).child(
         button("run-all-button", RUN_ALL, ButtonKind::Primary, ButtonSize::Medium)
             .icon(Icon::Play)
-            .disabled(!a.run_all)
+            .off(!a.run_all)
             .on_click(move |_, _, cx| g.update(cx, |g, cx| g.run_all(cx))),
     );
 
@@ -336,7 +336,7 @@ fn labelled(
             button(id, label, ButtonKind::Plain, ButtonSize::Medium).icon(icon)
         };
         b.track_focus(f)
-            .disabled(!enabled)
+            .off(!enabled)
             .children(extra)
             .on_click(move |_, window, cx| press(window, cx))
     });

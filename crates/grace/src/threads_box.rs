@@ -11,7 +11,7 @@ use gpui::{
     App, AppContext as _, Context, Entity, Focusable as _, InteractiveElement as _, IntoElement, ParentElement as _,
     Render, SharedString, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _, px,
 };
-use gpui_component::input::{Input, InputEvent, InputState, MoveDown, MoveUp};
+use gpui_component::input::{InputEvent, InputState, MoveDown, MoveUp};
 use grace_core::model::threads::MAX_THREADS;
 use grace_core::state::AppState;
 use serde_json::Value;
@@ -154,7 +154,7 @@ impl Render for ThreadsBox {
         let tip = narrow.then(|| SharedString::from(LABEL));
         let boxed = tooltip("tip-threads", tip).side(Side::Left).child(
             div().debug_selector(|| "threads-input".into()).w(px(WIDTH)).child(
-                Input::new(&self.input)
+                crate::elements::input(&self.input)
                     .role(Role::SpinButton)
                     .aria_label(LABEL)
                     .h(px(METRICS.control_height))

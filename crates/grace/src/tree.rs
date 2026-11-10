@@ -8,6 +8,7 @@
 //!
 //! The debug button, the breakpoint dot (phase P4), "Open in VS Code" from a row's menu (P3) and the sub-folder
 //! buttons of an empty project (P4) come with their phases (P2 plan, Redesigns).
+use crate::elements::Off as _;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -17,7 +18,6 @@ use gpui::{
     Render, ScrollStrategy, SharedString, StatefulInteractiveElement as _, Styled, Subscription,
     UniformListScrollHandle, Window, div, point, prelude::FluentBuilder as _, px, uniform_list,
 };
-use gpui_component::Disableable as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use grace_core::model::flaky::FLAKY_TITLE;
 use grace_core::model::node::{NodeKind, Status};
@@ -646,7 +646,7 @@ impl Tree {
                                 .size(px(14.))
                                 .text_color(Theme::color(if selected { t.passed } else { t.muted })),
                         )
-                        .disabled(busy(state))
+                        .off(busy(state))
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             me.update(cx, |tree, cx| tree.clicked(&run_key, window, cx));
@@ -661,6 +661,7 @@ impl Tree {
         div()
             .id(part("row", &key))
             .debug_selector(|| "tree-row".into())
+            .cursor_pointer()
             .role(Role::TreeItem)
             .aria_label(row_name(&label, status, flaky.as_deref(), &node.tags))
             .aria_level(r.level)

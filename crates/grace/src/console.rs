@@ -18,7 +18,7 @@ use gpui::{
     Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Window,
     canvas, div, list, prelude::FluentBuilder as _, px,
 };
-use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::input::{InputEvent, InputState};
 use grace_core::banner::{BannerState, banner_state, tests_text};
 use grace_core::console_find::{Match, error_lines, find_matches, is_error_line, start_index, step_index};
 use grace_core::state::{AppState, Panel};
@@ -379,7 +379,7 @@ impl Console {
             })
             .child(
                 div().w(px(192.)).child(
-                    Input::new(&self.field)
+                    crate::elements::input(&self.field)
                         .aria_label(FIND_IN_CONSOLE)
                         .h(px(METRICS.control_height_small)),
                 ),

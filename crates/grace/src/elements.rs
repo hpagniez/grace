@@ -147,6 +147,7 @@ pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>, kind: Bu
         ButtonSize::Dialog => (m.control_height, 12., m.text_base.size),
     };
     let b = Button::new(id)
+        .cursor_pointer()
         .label(label)
         .h(px(height))
         .px(px(pad))
@@ -171,6 +172,7 @@ pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<Shared
     };
     // sized by hand: GPUI Kit's own square size would draw the icon at three quarters of it, not Lucide's 16 px
     Button::new(id)
+        .cursor_pointer()
         .icon(icon)
         .ghost()
         .w(px(side))
@@ -179,9 +181,45 @@ pub fn icon_button(id: impl Into<ElementId>, icon: Icon, label: impl Into<Shared
         .accessibility_label(label)
 }
 
+/// A button's state, with the cursor that says it (`buttons.ts`): the hand while it can be pressed, the
+/// not-allowed sign while it cannot. GPUI Kit's own `disabled` leaves the arrow.
+pub trait Off: gpui_component::Disableable + Styled + Sized {
+    fn off(self, off: bool) -> Self {
+        let b = self.disabled(off);
+        if off {
+            b.cursor(gpui::CursorStyle::OperationNotAllowed)
+        } else {
+            b
+        }
+    }
+}
+
+impl Off for Button {}
+impl Off for gpui_component::checkbox::Checkbox {}
+
+/// A text box, with the text cursor over it, as a browser's `<input>` has. GPUI Kit gives it only inside an
+/// `InputGroup`.
+pub fn input(state: &gpui::Entity<gpui_component::input::InputState>) -> gpui_component::input::Input {
+    gpui_component::input::Input::new(state).cursor_text()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// UP-13, E-cursor-01: the hand over a button that can be pressed, the not-allowed sign over one that cannot.
+    #[test]
+    fn a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign() {
+        use gpui::CursorStyle;
+        let cursor = |mut b: Button| b.style().mouse_cursor;
+        let plain = || button("b", "Run all", ButtonKind::Primary, ButtonSize::Medium);
+        assert_eq!(cursor(plain()), Some(CursorStyle::PointingHand));
+        assert_eq!(cursor(plain().off(false)), Some(CursorStyle::PointingHand));
+        assert_eq!(cursor(plain().off(true)), Some(CursorStyle::OperationNotAllowed));
+        let icon = || icon_button("i", Icon::Play, "Run", true);
+        assert_eq!(cursor(icon()), Some(CursorStyle::PointingHand));
+        assert_eq!(cursor(icon().off(true)), Some(CursorStyle::OperationNotAllowed));
+    }
 
     /// `StatusMark.tsx`'s `MARK` table, row by row: icon, colour and label.
     #[test]
