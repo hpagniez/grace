@@ -11,8 +11,8 @@ use std::time::Duration;
 use gpui::accesskit::Role;
 use gpui::{
     Animation, AnimationExt as _, App, Context, Entity, InteractiveElement as _, IntoElement, ParentElement, Render,
-    SharedString, SpringAnimation, SpringConfig, StatefulInteractiveElement as _, Styled, Task, Transformation, Window,
-    div, ease_in_out, percentage, prelude::FluentBuilder as _, px, relative,
+    SharedString, SpringAnimation, SpringConfig, StatefulInteractiveElement as _, Styled, Task, Window, div,
+    ease_in_out, prelude::FluentBuilder as _, px, relative,
 };
 use grace_core::model::events::RunOutcome;
 use grace_core::model::tags::{matching_leaves, no_filter};
@@ -369,10 +369,7 @@ impl Render for Progress {
         let outcome = outcome(&state).map(|o| {
             let mark = icon(o.icon, 16., Theme::color(o.tone.token(cx)));
             let mark = if o.turning && !still {
-                mark.with_animation("turn", Animation::new(Duration::from_secs(1)).repeat(), |svg, d| {
-                    svg.with_transformation(Transformation::rotate(percentage(d)))
-                })
-                .into_any_element()
+                crate::spin::turning(mark).into_any_element()
             } else {
                 mark.into_any_element()
             };

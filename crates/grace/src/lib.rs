@@ -19,6 +19,7 @@ pub mod progress;
 pub mod properties;
 pub mod seams;
 pub mod settings;
+pub mod spin;
 pub mod status_bar;
 #[cfg(test)]
 pub mod testing;

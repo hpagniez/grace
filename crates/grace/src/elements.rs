@@ -1,12 +1,10 @@
 //! The small pieces every view shares (premium UI spec): icons, status marks and buttons. Each one is built
 //! here once, as `Icon`, `StatusMark` and `buttons.ts` are in Electron Grace (R9.1).
-use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
-    Animation, AnimationExt as _, App, ElementId, Hsla, InteractiveElement as _, IntoElement, ParentElement,
-    SharedString, StatefulInteractiveElement as _, Styled, Transformation, div, percentage,
-    prelude::FluentBuilder as _, px, svg,
+    App, ElementId, Hsla, InteractiveElement as _, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement as _, Styled, div, prelude::FluentBuilder as _, px, svg,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 
@@ -108,10 +106,7 @@ pub fn status_mark(
     let color = Theme::color(status.color(Theme::global(cx)));
     let mark = icon(status.icon(), size, color);
     let mark = if turns(status, reduce_motion) {
-        mark.with_animation("turn", Animation::new(Duration::from_secs(1)).repeat(), |svg, delta| {
-            svg.with_transformation(Transformation::rotate(percentage(delta)))
-        })
-        .into_any_element()
+        crate::spin::turning(mark).into_any_element()
     } else {
         mark.into_any_element()
     };
