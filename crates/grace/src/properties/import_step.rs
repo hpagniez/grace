@@ -195,11 +195,10 @@ impl Render for ImportStep {
             .when(env_var, |d| {
                 d.child(
                     div().flex().items_center().gap_2().child(PREFIX).child(
-                        div().w(px(160.)).debug_selector(|| "import-prefix".into()).child(
-                            crate::elements::input(&self.prefix)
-                                .aria_label(PREFIX)
-                                .h(px(METRICS.control_height)),
-                        ),
+                        div()
+                            .w(px(160.))
+                            .debug_selector(|| "import-prefix".into())
+                            .child(crate::elements::input(&self.prefix, METRICS.control_height).aria_label(PREFIX)),
                     ),
                 )
                 .when_some(prefix_error, |d, e| {

@@ -204,8 +204,16 @@ impl Off for gpui_component::checkbox::Checkbox {}
 
 /// A text box, with the text cursor over it, as a browser's `<input>` has. GPUI Kit gives it only inside an
 /// `InputGroup`.
-pub fn input(state: &gpui::Entity<gpui_component::input::InputState>) -> gpui_component::input::Input {
-    gpui_component::input::Input::new(state).cursor_text()
+/// A one-line text box `height` px high (`ui.ts`'s `input`, 28 px; 24 px in the console's find bar). GPUI Kit's
+/// `Input::h` sizes only a box of many lines, so the height goes through `Styled`, over the small size's 24 px frame.
+pub fn input(state: &gpui::Entity<gpui_component::input::InputState>, height: f32) -> gpui_component::input::Input {
+    use gpui_component::Sizable as _;
+    gpui::Styled::h(
+        gpui_component::input::Input::new(state)
+            .cursor_text()
+            .with_size(gpui_component::Size::Small),
+        px(height),
+    )
 }
 
 #[cfg(test)]

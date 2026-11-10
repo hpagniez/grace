@@ -380,9 +380,7 @@ impl Console {
             })
             .child(
                 div().w(px(192.)).child(
-                    crate::elements::input(&self.field)
-                        .aria_label(FIND_IN_CONSOLE)
-                        .h(px(METRICS.control_height_small)),
+                    crate::elements::input(&self.field, METRICS.control_height_small).aria_label(FIND_IN_CONSOLE),
                 ),
             )
             .child(
