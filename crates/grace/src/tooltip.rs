@@ -15,10 +15,10 @@ use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
-    AnyElement, App, AppContext as _, Bounds, Context, ElementId, Entity, FocusHandle, Global, InteractiveElement as _,
-    IntoElement, MouseButton, ParentElement as _, Pixels, Render, RenderOnce, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Task, WeakEntity, Window, WindowId, deferred, div,
-    point, px,
+    AnyElement, App, AppContext as _, Bounds, Context, DispatchPhase, ElementId, Entity, FocusHandle, Global,
+    InteractiveElement as _, IntoElement, MouseButton, MouseMoveEvent, ParentElement as _, Pixels, Render, RenderOnce,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Task, WeakEntity, Window, WindowId,
+    canvas, deferred, div, point, px,
 };
 use gpui_base::{ElementExt as _, Placement, Positioner};
 
@@ -198,6 +198,9 @@ impl Render for Tips {
         let over = open.side == Side::Over;
         let me = cx.weak_entity();
         let leave = me.clone();
+        let moved = me.clone();
+        let from_keyboard = self.focused.as_ref() == Some(&open.trigger);
+        let shown_at = self.drawn.clone();
         let shadow = m
             .shadow_float
             .iter()
@@ -244,7 +247,30 @@ impl Render for Tips {
                             cx.stop_propagation();
                         }
                     })
-                    .child(div().id("grace-tooltip-text").child(open.text)),
+                    .child(div().id("grace-tooltip-text").child(open.text))
+                    // A pointer anywhere but on the target or the tooltip closes one it opened: its target may have
+                    // gone from under it, a row scrolled away or a view closed, with no leave to tell.
+                    .child(
+                        canvas(
+                            |_, _, _| {},
+                            move |_, _, window, _| {
+                                let moved = moved.clone();
+                                let shown_at = shown_at.clone();
+                                window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                                    let on_tip = shown_at.get().is_some_and(|b| b.contains(&event.position));
+                                    if phase == DispatchPhase::Bubble
+                                        && !from_keyboard
+                                        && !on_tip
+                                        && !target.contains(&event.position)
+                                    {
+                                        let _ = moved.update(cx, |tips, cx| tips.hide(cx));
+                                    }
+                                });
+                            },
+                        )
+                        .absolute()
+                        .size_0(),
+                    ),
             ),
         )
         .with_priority(PRIORITY)
@@ -530,6 +556,22 @@ mod tests {
                             .child(div().w(px(100.)).h(px(30.))),
                     ),
                 )
+                .child(beside(400., 560.).child(
+                    tooltip("flip-up", Some(SharedString::from("Flips up"))).child(div().w(px(100.)).h(px(30.))),
+                ))
+                .child(
+                    beside(760., 450.).child(
+                        tooltip("clamp", Some(SharedString::from("Kept inside the window")))
+                            .child(div().w(px(30.)).h(px(30.))),
+                    ),
+                )
+                .child(
+                    beside(10., 500.).child(
+                        tooltip("flip-right", Some(SharedString::from("Flips right")))
+                            .side(Side::Left)
+                            .child(div().w(px(30.)).h(px(24.))),
+                    ),
+                )
                 .child(
                     beside(300., 300.)
                         .w(px(60.))
@@ -811,5 +853,50 @@ mod tests {
         view.update(&mut cx, |_, cx| cx.notify());
         cx.run_until_parked();
         assert_eq!(shown(&view, &mut cx), None, "not back while the keyboard stays");
+    }
+
+    /// `placeTip.test.ts`: below and centred, flipped above with no room below, kept 8 px inside the window, and a
+    /// side tooltip flipped to the other side with no room on its own.
+    #[gpui::test]
+    fn stays_in_the_window_flipping_where_it_has_no_room(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 450., 575.);
+        let up = drawn(&view, &mut cx);
+        assert_eq!(up.bottom(), px(560. - GAP), "above: {up:?}");
+        assert!((f32::from(up.center().x) - 450.).abs() <= 1., "centred: {up:?}");
+        rest_on(&mut cx, 775., 465.);
+        let clamped = drawn(&view, &mut cx);
+        assert!(clamped.right() <= px(800. - EDGE), "{clamped:?}");
+        rest_on(&mut cx, 25., 512.);
+        let right = drawn(&view, &mut cx);
+        assert_eq!(right.left(), px(40. + GAP), "flipped right: {right:?}");
+        assert!(
+            right.top() < px(524.) && right.bottom() > px(500.),
+            "on its row: {right:?}"
+        );
+    }
+
+    /// A target gone from under the tooltip (a row scrolled away, a view closed) cannot say the pointer left it: the
+    /// next move of the pointer elsewhere closes the tooltip. One the keyboard opened stays.
+    #[gpui::test]
+    fn closes_when_the_pointer_moves_elsewhere_though_its_target_is_gone(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        assert!(shown(&view, &mut cx).is_some());
+        // as if the target went elsewhere: the pointer is now over nothing that tells it left
+        cx.update(|window, cx| {
+            let tips = view.read(cx).tips.clone().unwrap();
+            tips.update(cx, |tips, _| {
+                tips.open.as_mut().unwrap().target = Bounds::new(point(px(600.), px(300.)), size(px(10.), px(10.)))
+            });
+            window.refresh();
+        });
+        cx.run_until_parked();
+        cx.simulate_mouse_move(point(px(52.), px(16.)), None, Modifiers::none());
+        assert_eq!(shown(&view, &mut cx), None);
+
+        pin(&view, true, &mut cx);
+        cx.simulate_mouse_move(point(px(700.), px(400.)), None, Modifiers::none());
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
     }
 }
