@@ -28,18 +28,18 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| WS-01 | Open a project and see its tests | | ☐ |
-| WS-02 | Maven layout with classpath resources | | ☐ |
-| WS-03 | Syntax error is reported, not hidden | | ☐ |
+| WS-01 | Open a project and see its tests | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` | ☑ |
+| WS-02 | Maven layout with classpath resources | `grace-e2e/tests/open.rs::maven_layout_with_classpath_resources` | ☑ |
+| WS-03 | Syntax error is reported, not hidden | `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` | ☑ |
 | WS-04 | Run all with live progress | `grace-e2e/tests/run.rs::run_all_with_live_progress` (the rows turning running, passed and failed) | ☑ |
-| WS-05 | Run one outline row | | ☐ |
+| WS-05 | Run one outline row | `grace-e2e/tests/run.rs::run_one_outline_row` | ☑ |
 | WS-06 | Failure details | `grace-e2e/tests/details.rs::failure_details` (the place, the error with Karate's comment, the 5 steps and a step's log after a run) | ☑ |
-| WS-07 | A feature edited outside the app | | ☐ |
+| WS-07 | A feature edited outside the app | `grace-e2e/tests/run.rs::a_feature_edited_outside_the_app` | ☑ |
 | WS-08 | Cancel leaves nothing behind | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" interrupted) | ☑ |
 | WS-09 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` | ☑ |
-| WS-10 | Nothing to run | Run all part: `grace-e2e/tests/run.rs::nothing_to_run`, `grace::toolbar::tests::the_actions::run_all_is_disabled_with_nothing_to_run`; the tree's line with the tree (P2 PR 3) | ☐ |
+| WS-10 | Nothing to run | `grace-e2e/tests/run.rs::nothing_to_run` (the toolbar and the tree's "No feature files found"), `grace::toolbar::tests::the_actions::run_all_is_disabled_with_nothing_to_run` | ☑ |
 | WS-11 | Open the HTML report | `grace-e2e/tests/run.rs::report_opens_the_runs_html_report` | ☑ |
-| WS-12 | The project is not modified | | ☐ |
+| WS-12 | The project is not modified | `grace-e2e/tests/run.rs::the_project_is_not_modified` | ☑ |
 
 ### TF · Tag filter: run by tag
 
@@ -170,9 +170,9 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-06 | The height survives a restart | `grace-e2e/tests/panel.rs::the_height_survives_a_restart`; `settings::tests::panel_height` | ☑ |
 | UP-07 | A smaller window shrinks the panel without forgetting its height | `bottom_panel::tests::splitter::a_smaller_window_shrinks_the_panel_without_forgetting_its_height` | ☑ |
 | UP-08 | A bad saved height falls back to the default | `grace-e2e/tests/panel.rs::a_bad_saved_height_falls_back_to_the_default`; `settings::tests::panel_height` | ☑ |
-| UP-09 | Open… starts in the last project's parent folder | | ☐ |
-| UP-10 | Open… with no last project | | ☐ |
-| UP-11 | The last project folder was deleted | | ☐ |
+| UP-09 | Open… starts in the last project's parent folder | `grace-e2e/tests/open.rs::open_starts_in_the_last_projects_parent_folder` | ☑ |
+| UP-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
+| UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 | UP-12 | The Windows folder dialog shows the siblings (by hand) | | ☐ |
 | UP-13 | Cursors match what a control does | | ☐ |
 | UP-14 | The busy cursor while running | | ☐ |
@@ -264,14 +264,14 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | HS-07 | Removing the missing last project forgets it (unit) | `grace-core::settings::tests::recent_projects::remove_recent_project_drops_the_row_and_a_matching_last_project` | ☑ |
 | HS-08 | A missing last project shows the home screen | `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` | ☑ |
 | HS-09 | A failed open from the home screen goes back to it (unit) | `grace-core::runner::tests::home::a_failed_open_from_the_home_screen_changes_nothing` | ☑ |
-| HS-10 | A dry-run error still opens the project | | ☐ |
+| HS-10 | A dry-run error still opens the project | `grace-e2e/tests/home.rs::a_dry_run_error_still_opens_the_project` | ☑ |
 | HS-11 | Reopening a folder from the list | `grace-e2e/tests/home.rs::reopening_a_folder_from_the_list` | ☑ |
 | HS-12 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder`; on Windows the Shell dialog's `SetFolder` (`grace::seams`), checked by hand in PR 6 | ☑ |
 | HS-13 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
-| HS-14 | The list works from the keyboard | | ☐ |
+| HS-14 | The list works from the keyboard | `grace-e2e/tests/home.rs::the_list_works_from_the_keyboard` | ☑ |
 | HS-15 | The home screen follows the dark theme (by hand) | | ☐ |
-| HS-16 | Home closes the project and survives a restart | | ☐ |
-| HS-17 | Home is disabled during a run | | ☐ |
+| HS-16 | Home closes the project and survives a restart | `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
+| HS-17 | Home is disabled during a run | `grace-e2e/tests/home.rs::home_is_disabled_during_a_run`, `grace::console::tests::lines::a_closed_project_clears_the_lines_with_none_dropped` | ☑ |
 | HS-18 | Main refuses to close a busy project (unit) | `grace-core::runner::tests::home::close_is_refused_while_busy` | ☑ |
 | HS-19 | A reload after Home stays home | | ☐ |
 | HS-20 | The list keeps the 10 newest folders (unit) | `grace-core::settings::tests::recent_projects::keeps_the_10_newest_folders` | ☑ |
@@ -1073,16 +1073,16 @@ Phase P2 · 14 tests
 | E-home-02 | Opening a folder from the home screen | `grace-e2e/tests/home.rs::opening_a_folder_from_the_home_screen` | ☑ |
 | E-home-03 | The last project opens at start without the home screen | `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` | ☑ |
 | E-home-04 | A missing last project shows the home screen | `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` | ☑ |
-| E-home-05 | A dry-run error still opens the project | | ☐ |
+| E-home-05 | A dry-run error still opens the project | `grace-e2e/tests/home.rs::a_dry_run_error_still_opens_the_project` | ☑ |
 | E-home-06 | The home screen is on the ground in light and in dark | | ☐ |
-| E-home-07 | Reopening a folder from the list | | ☐ |
+| E-home-07 | Reopening a folder from the list | `grace-e2e/tests/home.rs::reopening_a_folder_from_the_list` | ☑ |
 | E-home-08 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder` | ☑ |
 | E-home-09 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
-| E-home-10 | The list works from the keyboard | | ☐ |
-| E-home-11 | Home closes the project and survives a restart | | ☐ |
-| E-home-12 | Home is disabled during a run | | ☐ |
-| E-home-13 | A reload after Home stays home | | ☐ |
-| E-home-14 | A path not in the list is refused | | ☐ |
+| E-home-10 | The list works from the keyboard | `grace-e2e/tests/home.rs::the_list_works_from_the_keyboard` | ☑ |
+| E-home-11 | Home closes the project and survives a restart | `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
+| E-home-12 | Home is disabled during a run | `grace-e2e/tests/home.rs::home_is_disabled_during_a_run` | ☑ |
+| E-home-13 | A reload after Home stays home | GPUI Grace has no page to reload: the window is drawn from the state, so Home stays until the state changes. Home surviving a restart: `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | n/a |
+| E-home-14 | A path not in the list is refused | No renderer and no IPC: the view calls the project code itself, and only the home list's own rows open a recent project | n/a |
 
 ### e2e/http.spec.ts
 
@@ -1125,17 +1125,17 @@ Phase P2 · 11 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-open-01 | Open a project and see its tests | | ☐ |
+| E-open-01 | Open a project and see its tests | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` | ☑ |
 | E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | | ☐ |
 | E-open-03 | A narrow window keeps every toolbar button on screen, with its name | | ☐ |
 | E-open-04 | A long project path stays readable at the minimum width | | ☐ |
 | E-open-05 | The Env and Threads boxes show their longest likely values whole | | ☐ |
-| E-open-06 | Maven layout with classpath resources | | ☐ |
-| E-open-07 | Syntax error is reported, not hidden | | ☐ |
-| E-open-08 | Nothing to run | | ☐ |
-| E-open-09 | Open… starts in the last project's parent folder | | ☐ |
-| E-open-10 | Open… with no last project | | ☐ |
-| E-open-11 | the last project folder was deleted | | ☐ |
+| E-open-06 | Maven layout with classpath resources | `grace-e2e/tests/open.rs::maven_layout_with_classpath_resources` | ☑ |
+| E-open-07 | Syntax error is reported, not hidden | `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` | ☑ |
+| E-open-08 | Nothing to run | `grace-e2e/tests/run.rs::nothing_to_run` | ☑ |
+| E-open-09 | Open… starts in the last project's parent folder | `grace-e2e/tests/open.rs::open_starts_in_the_last_projects_parent_folder` | ☑ |
+| E-open-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
+| E-open-11 | the last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 
 ### e2e/panel.spec.ts
 
@@ -1188,7 +1188,7 @@ Phase P2 · 4 tests
 |---|---|---|---|
 | E-run-01 | Run all with live progress | `grace-e2e/tests/run.rs::run_all_with_live_progress` | ☑ |
 | E-run-02 | Run one outline row | `grace-e2e/tests/run.rs::run_one_outline_row` | ☑ |
-| E-run-03 | A feature edited outside the app | | ☐ |
+| E-run-03 | A feature edited outside the app | `grace-e2e/tests/run.rs::a_feature_edited_outside_the_app` | ☑ |
 | E-run-04 | The project is not modified | `grace-e2e/tests/run.rs::the_project_is_not_modified` | ☑ |
 
 ### e2e/scrollbar.spec.ts

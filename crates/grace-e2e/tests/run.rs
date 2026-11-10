@@ -115,6 +115,34 @@ fn run_one_outline_row() {
     .unwrap();
 }
 
+/// WS-07, E-run-03: a scenario inserted above another outside the app; a run of the other finds the file again.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_feature_edited_outside_the_app() {
+    let (dir, app) = open_clean();
+    open_features(&app);
+    let file = dir.join("tests").join("basic.feature");
+    let text = std::fs::read_to_string(&file).unwrap();
+    let at = text.find("* url baseUrl").unwrap();
+    let end = at + text[at..].find('\n').unwrap() + 1;
+    let text = format!(
+        "{}\nScenario: inserted on top\n  * def y = 2\n{}",
+        &text[..end],
+        &text[end..]
+    );
+    std::fs::write(&file, text).unwrap();
+
+    app.press_named(Role::Button, "Run failing match").unwrap();
+    app.wait_for("the new scenario shown, the one run failed alone", RUN, |t| {
+        label(t, "Finished").is_some()
+            && label(t, "1 / 1").is_some()
+            && says(t, "failing match", "failed")
+            && says(t, "inserted on top", "not run")
+            && says(t, "passing hello", "not run")
+    })
+    .unwrap();
+}
+
 /// Every file of the project with its contents' size and bytes, folders as such.
 fn snapshot(dir: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
     fn walk(root: &Path, at: &Path, out: &mut BTreeMap<String, Option<Vec<u8>>>) {
@@ -211,9 +239,11 @@ fn nothing_to_run() {
     std::fs::create_dir_all(&dir).unwrap();
     let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
     let tree = app
-        .wait_for("0 tests", Duration::from_secs(30), |t| {
-            label(t, "0 tests · Not run yet").is_some()
-        })
+        .wait_for(
+            "0 tests, and the tree saying why (WS-10)",
+            Duration::from_secs(30),
+            |t| label(t, "0 tests · Not run yet").is_some() && label(t, "No feature files found").is_some(),
+        )
         .unwrap();
     assert!(tree.find(&Role::Button, "Run all").is_some(), "{}", tree.dump());
     // Run all is disabled: a press starts nothing
