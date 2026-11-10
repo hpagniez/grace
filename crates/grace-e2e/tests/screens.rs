@@ -408,3 +408,22 @@ fn screens_long_tree() {
         shot(&app, if dark { "long-tree-dark" } else { "long-tree" });
     }
 }
+
+/// The toolbar in a window narrower than 1280 px: four buttons as icons, their names in tooltips.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_narrow_toolbar() {
+    let dir = project("clean").unwrap();
+    let app = open(&dir, false);
+    app.set_window_rect(0, 0, 1000, 640).unwrap();
+    let open = app
+        .wait_for("the narrow toolbar", WAIT, |t| {
+            t.find(&Role::Button, "Open…")
+                .and_then(|b| b.rect)
+                .is_some_and(|r| r.width < 40)
+        })
+        .unwrap();
+    app.hover(open.find(&Role::Button, "Open…").unwrap()).unwrap();
+    app.wait_for_node(Role::Tooltip, "Open…").unwrap();
+    shot(&app, "toolbar-narrow");
+}
