@@ -89,6 +89,11 @@ impl MarkStatus {
     }
 }
 
+/// Whether a mark turns: only a running one, and never with reduced motion (ADR 0030).
+fn turns(status: MarkStatus, reduce_motion: bool) -> bool {
+    status == MarkStatus::Running && !reduce_motion
+}
+
 /// A status by shape, colour and accessible name. `decorative` (beside the word that names the status) leaves
 /// it out of the accessibility tree. A running mark turns, which only happens during a run (ADR 0030), and not
 /// when reduced motion is on.
@@ -102,7 +107,7 @@ pub fn status_mark(
 ) -> impl IntoElement {
     let color = Theme::color(status.color(Theme::global(cx)));
     let mark = icon(status.icon(), size, color);
-    let mark = if status == MarkStatus::Running && !reduce_motion {
+    let mark = if turns(status, reduce_motion) {
         mark.with_animation("turn", Animation::new(Duration::from_secs(1)).repeat(), |svg, delta| {
             svg.with_transformation(Transformation::rotate(percentage(delta)))
         })
@@ -245,6 +250,15 @@ mod tests {
             );
         }
         assert_eq!(MarkStatus::ALL.len(), expected.len());
+    }
+
+    /// `StatusMark.test.tsx`'s "turns only while running".
+    #[test]
+    fn turns_only_while_running_and_never_with_reduced_motion() {
+        for status in MarkStatus::ALL {
+            assert_eq!(turns(status, false), status == MarkStatus::Running, "{status:?}");
+            assert!(!turns(status, true), "{status:?}");
+        }
     }
 
     /// Never by colour alone: two statuses that share a colour differ in shape or name.

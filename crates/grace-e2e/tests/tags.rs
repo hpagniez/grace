@@ -132,6 +132,11 @@ fn chips_list_the_projects_tags() {
     );
     assert!(tree.find(&Role::CheckBox, "Hide non-matching").is_some());
     assert!(tree.find(&Role::Button, "Clear").is_none());
+    // the tooltip's next click, read with the chip as its description (`Tooltip`'s `describe`)
+    assert_eq!(
+        chip(&tree, "slow").unwrap().description,
+        "Not filtered. Click to include."
+    );
 }
 
 /// TF-02

@@ -387,12 +387,17 @@ pub fn cut_middle(id: impl Into<ElementId>, head: impl Into<SharedString>, tail:
 
 /// Sets `cut` while `text`, in the element's text style, is wider than the element.
 fn measure(text: SharedString, cut: Rc<Cell<bool>>) -> impl Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static {
-    move |b, window, _| {
+    move |b, window, cx| {
         let style = window.text_style();
         let size = style.font_size.to_pixels(window.rem_size());
         let run = style.to_run(text.len());
         let width = window.text_system().shape_line(text.clone(), size, &[run], None).width;
-        cut.set(width > b.size.width + px(0.5));
+        let now = width > b.size.width + px(0.5);
+        // a line the keyboard stands on shows its tooltip once it is cut: draw again to tell it, on a change only
+        // (after this frame, as a refresh while drawing is dropped)
+        if cut.replace(now) != now {
+            window.defer(cx, |window, _| window.refresh());
+        }
     }
 }
 
@@ -579,6 +584,9 @@ mod tests {
         /// Whether the keyboard stands on the `scrolled` target, in a box that scrolls.
         scrolled_pinned: bool,
         scroll: ScrollHandle,
+        /// Whether the keyboard stands on the `grows` line, and whether its box is narrow enough to cut it.
+        grows_pinned: bool,
+        narrow: bool,
         /// Clicks that reached the window's root.
         clicks: Rc<Cell<u32>>,
         /// Right presses and Escapes that reached the window's root.
@@ -670,6 +678,11 @@ mod tests {
                     ),
                 )
                 .child(
+                    beside(0., 500.)
+                        .w(px(if self.narrow { 60. } else { 400. }))
+                        .child(cut("grows", "A line cut once its box narrows").keyboard(self.grows_pinned)),
+                )
+                .child(
                     beside(300., 300.)
                         .w(px(60.))
                         .child(cut("over", "A long line that is cut over its row").side(Side::Over)),
@@ -711,6 +724,8 @@ mod tests {
             blank: false,
             pinned_drawn: true,
             scrolled_pinned: false,
+            grows_pinned: false,
+            narrow: false,
             scroll: ScrollHandle::new(),
             clicks: Rc::default(),
             rights: Rc::default(),
@@ -1043,6 +1058,39 @@ mod tests {
         assert_eq!(drawn(&view, &mut cx).top(), before.top() - px(10.), "placed again");
         scroll_box(&view, 40., &mut cx);
         assert_eq!(shown(&view, &mut cx), None, "its target left the box");
+    }
+
+    /// The keyboard stands on a line that fits: nothing shows, until the line is cut.
+    #[gpui::test]
+    fn a_pinned_tooltip_shows_once_its_text_comes(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        view.update(&mut cx, |v, cx| {
+            v.grows_pinned = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+        view.update(&mut cx, |v, cx| {
+            v.narrow = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            shown(&view, &mut cx).as_deref(),
+            Some("A line cut once its box narrows")
+        );
+    }
+
+    /// The pointer leaving a target the keyboard stands on closes its tooltip too.
+    #[gpui::test]
+    fn a_pointer_leaving_closes_a_pinned_tooltip(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 350., 215.);
+        pin(&view, true, &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+        cx.simulate_mouse_move(point(px(500.), px(400.)), None, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
     }
 
     /// The pointer crosses the gap between the target and its tooltip without closing it.
