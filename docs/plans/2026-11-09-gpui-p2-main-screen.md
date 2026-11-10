@@ -119,6 +119,9 @@ P1's rules hold ([P1 plan](2026-11-09-gpui-p1-core.md#porting-rules)): same fixt
 | `tree` | Focus surviving a scroll away (VL-15, E-virtual-03) is a headless test: the wheel is GPUI's simulated scroll event, and the focus row is the tree's, which keeps the keyboard focus as one tab stop while the row is out of view | The e2e driver has no wheel, and a row out of view is not drawn, so it is not in the accessibility tree | `grace::tree::tests::focus_survives_scrolling_away` |
 | `theme`, scroll areas | The scrollbars are GPUI Kit's, drawn over the area's right edge, always shown (`ScrollbarMode::Always`), on a clear track with the thumb `control` at 60 %; the thumb widens under the pointer | CSS's thin scrollbar has no GPUI counterpart; GPUI Kit's fade after scrolling would need a timer (ADR 0030) | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown`; the look by hand, PR 6 (UP-16) |
 | `env_picker`, `threads_box` | Whether the boxes hold "production" and 32 whole (E-open-05) is a headless measure of the text in the text box's font against the box's fixed width less GPUI Kit's padding, where Playwright compared the input's `scrollWidth`; the Threads box has no spin buttons to take room | The driver cannot read a text box's text on Linux, and the boxes' width does not follow the window | `grace::env_picker::tests::the_env_and_threads_boxes_show_their_longest_likely_values_whole` |
+| `elements`, text boxes | A one-line text box is GPUI Kit's small `Input` given its height through GPUI's `Styled::h` (`elements::input(state, height)`): the toolbar's Env and Threads boxes are 28 px like its buttons, the dialogs' boxes their own height. They were 32 px, GPUI Kit's medium box, since its `Input::h` sets only a multi-line box's height | GPUI Kit sizes a one-line box from its `Size`, not from a height; Electron Grace's shared input class gave every box the controls' height | `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height`; the e2e tests of the environment, threads, properties and console boxes |
+| `toolbar`, `status_bar`, `window` | The toolbar is the banner landmark, the main area the main landmark and the status bar the content-info one, as Electron Grace's `<header>`, `<main>` and `<footer>` were. AT-SPI reads all three as landmarks, UI Automation as groups | GPUI has no HTML elements: a landmark is an AccessKit role set by hand | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (three landmarks, on Linux) |
+| `status_bar` | The Settings button is the bar's full 24 px high (R10.3), where the first port drew it 20 px | No target under 24 px, as `h-6` gave it | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` |
 
 ## PR 1: the window, the state and the home screen
 
@@ -390,6 +393,212 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | Vitest test | Class | Rust test or reason |
 |---|---|---|
 | 92. reveal opens a closed feature | ported | `grace::tree::tests::a_reveal_opens_the_rows_above_the_selected_test` (the selected test is a row, its feature opens, the other stays closed). The "Next test with this error" button is P3 (failures grouped, #229, GF-*). |
+
+#### `Home.test.tsx` (26)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 draws nothing until main says what is open | ported | `grace_core::state::tests::reduce::home_screen::starts_not_loaded_with_nothing_opening_and_no_list`, `...::an_opening_event_sets_opening_and_loaded_and_null_clears_opening`; `grace::app::tests::a_first_start_says_nothing_is_open_and_sends_the_recent_folders`; `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` (polls: home never shows before the project, HS-05). The `#startup` div is gone (Redesigns, `window`) |
+| 2 a first start shows home without a list | ported | `grace::home::tests::a_first_start_shows_the_home_screen_without_a_list` (home drawn, no recent-list, the line); `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` (heading, sentence, Open folder…, no Recent folders heading or list, no unnamed control). By eye: primary fill, FolderOpen icon |
+| 3 the mascot is decorative | ported | `grace::home::tests::the_mascot_is_decorative` (240x180, asset loads, no id/role); `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` (no Image node) |
+| 4 an open project hides the mascot | ported | `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar` (`home`, which holds the mascot, is not drawn with a project open); `grace_core::state::tests::added::the_home_screen_shows_the_opens_error_as_a_notice` (`home()` false with a project) |
+| 5 Open folder… opens the dialog | ported | `grace::home::tests::open_folder_opens_the_folder_dialog`; `grace::app::tests::open_asks_for_a_folder_and_opens_it`; `grace-e2e/tests/home.rs::opening_a_folder_from_the_home_screen` |
+| 6 lists the recent folders | ported | `grace::home::tests::lists_the_recent_folders`, `reopening_a_row_opens_its_folder`, `says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled`; `grace-e2e/tests/home.rs::reopening_a_folder_from_the_list`; `grace-e2e/tests/home.rs::removing_a_row` (the list "Recent folders" and its items, and its heading on Linux, where the driver reads headings) |
+| 7 one surface box, a rule between rows (R12.3) | ported | `grace::home::tests::shows_the_list_in_one_surface_box_with_a_rule_between_rows_r12_3` (rows inside the box). By eye: surface fill, radius, rule, folder icon, name 500, mono muted path, hover fill, inset focus ring, missing name muted and not dimmed ( |
+| 8 Not found in a cancelled badge with the icon, row disabled | ported | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled` (badge only on the missing row, a click opens nothing); `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` (name holds "Not found"). By eye: tint, 12 px icon |
+| 9 a missing folder explained in a tooltip though disabled | ported | `grace::home::tests::explains_a_missing_folder_in_a_tooltip_though_its_row_is_disabled` ("Folder not found" over the row; nothing on a folder that is there) |
+| 10 a cut path shows whole in a tooltip, and only then (R9.4) | ported | `grace::home::tests::shows_a_cut_path_whole_in_a_tooltip_and_only_then` |
+| 11 remove: 24 px icon button with name and tooltip (R10.3) | ported | `grace::home::tests::removes_a_row_with_its_button_and_takes_the_focus_to_open_folder` (each row's button 24 × 24 px, its tooltip "Remove from list", a click removes that row's path); `grace-e2e/tests/home.rs::removing_a_row` (the name). `title=` is `n/a` |
+| 12 removing a row moves the focus to Open folder… | ported | `grace::home::tests::removes_a_row_with_its_button_and_takes_the_focus_to_open_folder` (the focus is on Open folder… and stays there when the new list comes) |
+| 13 names a folder by its last segment | ported | `grace::home::tests::names_a_folder_by_its_last_segment_whichever_slash_it_uses` (same three paths) |
+| 14 opening with no project shows the project view, not home | ported | `grace_core::state::tests::reduce::home_screen::an_opening_event_sets_opening_and_loaded_and_null_clears_opening`; `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` (path = the opening folder); `grace::toolbar::tests::the_actions::keeps_run_all_cancel_open_and_report_as_before` (busy: Cancel on, Home off); `grace-e2e/tests/open.rs::finding_tests_for_the_first_time` ("Finding tests…" in the tree); `grace::progress::tests::after_a_run_r14_2::shows_finding_tests_with_the_turning_icon_while_the_runner_discovers` |
+| 15 a stale folder error does not show while the next opens | ported | `grace_core::state::tests::reduce::home_screen::opening_a_folder_with_no_project_open_drops_the_last_opens_error` |
+| 16 opening another folder keeps the open project on screen | ported | `grace_core::state::tests::reduce::home_screen::opening_another_folder_keeps_the_open_projects_error`; `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` ("the open project stays shown while another opens") |
+| 17 a cancelled open goes back home with the notice | ported | `grace_core::runner::tests::home::a_failed_open_from_the_home_screen_changes_nothing` (the runner's events: project null, "Cancelled", opening null); `grace_core::state::tests::reduce::notice_sets_the_notice_a_warning_unless_main_says_it_reports_a_success`; `...::added::the_home_screen_shows_the_opens_error_as_a_notice`. The notice drawn on home: `grace::home::tests::a_notice_shows_above_the_column_inside_home` |
+| 18 a missing folder shows its reason on home | ported | `grace::home::tests::a_missing_folder_shows_its_reason_on_home`; `grace_core::state::tests::added::the_home_screen_shows_the_opens_error_as_a_notice` |
+| 19 the notice is a warning: status, cancelled tint, icon | ported | `grace::ui::tests::a_warning_is_a_status_tinted_cancelled`, `draws_a_different_icon_per_kind` |
+| 20 a notice shows above the column, inside home | ported | `grace::home::tests::a_notice_shows_above_the_column_inside_home` |
+| 21 home on the ground in both themes, no sheet (R12.1) | ported | `grace::window::tests::home_is_drawn_alone_with_no_toolbar_and_no_sheet`; the ground colour: `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start`, `follow_windows_is_the_default` |
+| 22 project view on the sheet under the toolbar; home has none | ported | `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar`, `the_notice_the_main_area_and_the_panel_are_on_the_sheet` (notice, main and bottom panel inside the sheet, the toolbar outside), `home_is_drawn_alone_with_no_toolbar_and_no_sheet`. `relative` and `overflow-clip` are `n/a` (CSS) |
+| 23 the app root is ground and ink, no `dark:` | ported | `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start`, `choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart` (ground pixel in both themes, Linux); `grace::theme::tests::colours_come_only_from_the_theme` (no literal colour; `dark:` has no GPUI twin). By eye: ink text |
+| 24 a dry-run error shows in the project view, not as a notice | ported | `grace_core::state::tests::added::the_home_screen_shows_the_opens_error_as_a_notice` (`!home()`, no shown notice with a project); `grace-e2e/tests/home.rs::a_dry_run_error_still_opens_the_project`; `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` |
+| 25 Home closes the project | ported | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_goes_home_and_is_off_while_busy`; `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart`, `home_is_disabled_during_a_run` |
+| 26 Home is the first item of the toolbar | ported | `grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last` (Home leftmost); `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` (named Home); the banner landmark: `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (banner, main and content info) |
+
+#### `FieldMessage.test.tsx` (5: an `it.each` of 3 and 2)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 hint: 12 px text in its tone with its own icon | ported | `grace::ui::tests::a_field_message_takes_its_kinds_tone_and_icon_or_the_one_asked` (muted, Info). The `id` is `n/a` (Redesigns, `ui`) |
+| 2 warning: same, cancelled tone, TriangleAlert | ported | `a_field_message_takes_its_kinds_tone_and_icon_or_the_one_asked` (cancelled, TriangleAlert) |
+| 3 error: same, failed tone, CircleAlert | ported | `a_field_message_takes_its_kinds_tone_and_icon_or_the_one_asked` (failed, CircleAlert) |
+| 4 takes another icon, and a class for its place | ported | `a_field_message_takes_its_kinds_tone_and_icon_or_the_one_asked` (the lock asked for). `class` and "no id" are `n/a` (DOM) |
+| 5 wraps long text beside its icon instead of overflowing | ported | `grace::ui::tests::a_long_field_message_wraps_beside_its_icon` |
+
+#### `store.test.tsx` (8)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 subscribes before ready, applies events, selects, disposes | ported | `grace_core::state::tests::create_app_store::applies_events_and_selects` (notice set, a null project clears it, error, `select`). The IPC subscribe-before-ready order and `dispose` are gone (Redesigns, `state`, `app`: no `ready` handshake) |
+| 2 trims console and drops stale keys through a real store draft | ported | `grace_core::state::tests::create_app_store::trims_console_and_drops_stale_keys_through_a_real_store_draft` |
+| 3 dismissPrompt drops the startup modal's release | ported | `grace_core::state::tests::create_app_store::dismiss_prompt_drops_the_startup_modals_release` |
+| 4 tag filter: starts with no filter | ported | `grace_core::state::tests::create_app_store::tag_filter::starts_with_no_filter` |
+| 5 tag filter: filter event replaces the filter | ported | `...::tag_filter::filter_event_replaces_the_filter` |
+| 6 tag filter: opening another project resets the filter | ported | `...::tag_filter::opening_another_project_resets_the_filter` ("own copy, never the shared constant" is by value in Rust) |
+| 7 http calls: selectCall, select and showPanel | ported | `...::create_app_store::http_calls::select_call_select_and_show_panel` |
+| 8 http calls: toggleGroup drops a call it hides | P3 | `AppState` has `http_groups` but no `toggle_group` yet; it ports with the HTTP tab (plan, PR 1 item 1) |
+
+#### `Toolbar.test.tsx` (36)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 is one 44 px row on the ground | ported | `grace::toolbar::tests::order_and_shape_r13_1::is_one_44_px_row_on_the_ground`. By eye: ground fill |
+| 2 puts the controls in the order of the spec, Run all last | ported | `grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`, `...::properties::sits_after_the_boxes_and_before_refresh`; with Env and Threads: `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height`. Watch with P4 |
+| 3 separates Properties from Refresh and Open from Report with 1 px dividers | ported | `...::separates_the_project_from_refresh_and_open_from_report_with_1_px_dividers` (1 px, 20 px high, between) |
+| 4 every button keeps its label, 28 px tall or a 28 px icon | ported | `...::every_button_is_28_px_tall_and_the_icon_buttons_square`; labels as names: `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (the `TOOLBAR` list) |
+| 5 never wraps a button's label | n/a | CSS class `whitespace-nowrap`; a wrapped label would break the 28 px height asserted in `...::every_button_is_28_px_tall_...` and the widths in `a_narrow_window::*` |
+| 6 below 1280 px hides the label of five buttons, not their names | ported | `grace::toolbar::tests::a_narrow_window::below_1280_px_shrinks_open_report_and_cancel_to_a_28_px_icon`, `keeps_the_count_pill_of_re_run_failed`; `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (Properties…, Open…, Report, Cancel under 40 px at 780, 1200, 1279, each found by name) |
+| 7 shrinks four to a 28 px icon, keeps Re-run failed's pill | ported | `a_narrow_window::below_1280_px_shrinks_...`, `keeps_the_count_pill_of_re_run_failed` |
+| 8 keeps Run all's label in sight | ported | `a_narrow_window::keeps_run_alls_label_in_sight` |
+| 9 asks for the width the classes use | ported | `a_narrow_window::asks_for_the_width_the_electron_classes_use` (`NARROW_BELOW` = 1280); `grace-e2e::open` (1279 narrow, 1281 wide) |
+| 10 a tooltip with the label while hidden, also when disabled | ported | `a_narrow_window::gives_each_a_tooltip_with_its_label_while_the_label_is_hidden_also_when_disabled` (open, report, cancel, re-run) |
+| 11 no tooltip while the label shows | ported | `a_narrow_window::gives_them_no_tooltip_while_the_label_shows`; Home and Refresh keep theirs: `home_and_refresh_the_icon_only_buttons::*` at 1400 px |
+| 12 follows the window as it is resized, stops listening | ported | `a_narrow_window::follows_the_window_as_it_is_resized` (both ways). The `matchMedia` listener count is `n/a`: GPUI reads the viewport at each render |
+| 13 below 1280 px hides the words Env and Threads, not the boxes' names | ported | `grace::env_picker::tests::below_1280_px_the_word_env_goes_from_sight_and_says_itself_in_a_tooltip`, `grace::threads_box::tests::below_1280_px_the_word_threads_goes_from_sight_and_says_itself_in_a_tooltip` (the word takes no room); names: `grace-e2e::env`, `grace-e2e::threads` (combo box "Env", spin button "Threads" at the default 1200 px, a narrow window) |
+| 14 then says Env and Threads in a tooltip beside the box, nothing while words show | ported | The same two tests (tooltip text "Env", "Threads" when narrow) |
+| 15 Home holds the logo, is named Home, tooltip | ported | `home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip` (tip "Home", logo asset). By eye: 20 px logo |
+| 16 Home goes home, off while busy | ported | `home_and_refresh_the_icon_only_buttons::home_goes_home_and_is_off_while_busy`; `grace-e2e/tests/home.rs::home_is_disabled_during_a_run` |
+| 17 Refresh named, icon, tooltip also while disabled | ported | `home_and_refresh_the_icon_only_buttons::refresh_shows_its_word_in_a_tooltip_also_while_disabled` (tip while busy, a click does nothing, then calls refresh) |
+| 18 shows the folder name and the layout, not the path (R1.1) | ported | `grace::toolbar::tests::the_project::shows_the_folder_name_and_the_layout_and_leaves_the_path_to_the_status_bar_r1_1`, `draws_the_name_and_the_chip`; the path in the status bar: `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen`. By eye: name 500 |
+| 19 names a folder with forward slashes or a trailing separator | ported | `the_project::names_a_folder_opened_with_forward_slashes_too_and_one_with_a_trailing_separator` |
+| 20 cuts a long name in the middle, last 12 characters stay (R1.2) | ported | `the_project::cuts_a_long_name_in_the_middle_its_start_gives_way_its_last_12_characters_stay_r1_2`; `grace::window::tests::a_long_path_at_the_minimum_width` (name keeps room before Env). `shrink-100000` is `n/a` (CSS) |
+| 21 keeps a name of 12 characters or fewer in its end part | ported | `the_project::keeps_a_name_of_12_characters_or_fewer_in_its_end_part` |
+| 22 explains a cut name in a tooltip, nothing while it fits (R1.3) | ported | `the_project::explains_a_cut_name_in_a_tooltip_and_says_nothing_while_it_fits_r1_3` |
+| 23 lets the chip go, whole, before the name is cut (R1.2) | ported | `the_project::lets_the_chip_go_whole_before_the_name_is_cut_r1_2`; `grace::window::tests::the_name_shows_whole_at_the_default_size`, `a_long_path_at_the_minimum_width` |
+| 24 has no title attribute left | n/a | No `title=` in GPUI (parity: `palette.test.ts` row); tooltips only through `grace::tooltip` |
+| 25 Run all is the only primary button, play icon in on-primary ink | by eye | Fill and icon ink are colours; by construction `ButtonKind::Primary` on `run-all-button` only (`toolbar.rs`). Token values: `grace::theme::tests` |
+| 26 the failed count in a pill on Re-run failed | ported | `the_actions::shows_the_newest_runs_failed_count_on_re_run_failed`, `re_run_failed_reruns_the_newest_run` (pill drawn, click reruns the newest run) |
+| 27 no pill while nothing to re-run | ported | `the_actions::shows_no_pill_while_there_is_nothing_to_re_run` |
+| 28 keeps Run all, Cancel and Open as before | ported | `the_actions::run_all_runs_the_trees_root`, `keeps_run_all_cancel_open_and_report_as_before`, `cancel_and_report_ask_the_runner`, `open_asks_for_a_folder` |
+| 29 draws an icon on the text buttons, decoratively | by eye | `.icon(..)` on the six buttons in `toolbar.rs`; presence of an icon is not read headless; "decoratively" is by construction |
+| 30 Env and Threads use the shared input style | ported | `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height` (both boxes 28 px, fixed here). By eye: border, fill, radius |
+| 31 a normal run keeps Run all; a debug run shows Pause | P4 | Step debugger (Redesigns, `toolbar`) |
+| 32 paused: Continue, Step over, Step into; F5, F10, F11 | P4 | Step debugger |
+| 33 Watch: icon button named Watch, off until main says on | P4 | Watch (Redesigns, `toolbar`) |
+| 34 Watch asks main for the other state | P4 | Watch |
+| 35 Watch says what it does in its tooltip | P4 | Watch |
+| 36 Watch stays enabled during a run, off during an open | P4 | Watch |
+
+#### `StatusBar.test.tsx` (18)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 shows the running version and Settings | P5 | Version needs the updater's view. The Settings half: the button named "Settings" is found and pressed in `grace-e2e/tests/appearance.rs::open_appearance` |
+| 2 the marker and Update while out of date | P5 | |
+| 3 keeps the marker for a skipped version | P5 | |
+| 4 no marker when the channel has nothing newer | P5 | |
+| 5 names the marker with the running and latest version | P5 | |
+| 6 Update installs latest with the current data | P5 | |
+| 7 Update disabled while a run or discovery is active (R6.4) | P5 | |
+| 8 Update disabled in a build that is not packaged (R13.1) | P5 | |
+| 9 Update enabled when packaged and idle | P5 | |
+| 10 the marker, the version and Settings open the settings | P5 | Marker and version are P5. The Settings click: `grace-e2e/tests/appearance.rs::open_appearance`, `escape_goes_back_from_the_settings_page` |
+| 11 a 24 px bar on the ground, muted 12 px text (R21) | ported | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` (the 24 px bar and the Settings button's 24 px target, fixed here from 20 px); the content-info landmark: `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests`. By eye: ground, muted 12 px text |
+| 12 the update marker as a running tinted badge | P5 | |
+| 13 shows nothing before main sends the update view | P5 | The bar itself always draws (`window.rs`); the null-view case is the updater's |
+| 14 starts the bar with the full path, mono muted, in two parts | ported | `grace::status_bar::tests::splits_a_path_at_the_project_folder`, `shows_the_path_while_a_project_is_open_and_none_on_the_home_screen`; `grace::window::tests::a_long_path_at_the_minimum_width` (the path ends before the Settings button) |
+| 15 splits forward slashes and a trailing separator | ported | `grace::status_bar::tests::splits_a_path_at_the_project_folder` (`/home/me/api/` gives `/home/me/` and `api/`) |
+| 16 shows the folder being opened, and the open project while another opens | ported | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` (`shown_path`, both cases) |
+| 17 shows no path on the home screen | ported | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` (last assertion) |
+| 18 explains a cut path in a tooltip, nothing while it fits | ported | `grace::status_bar::tests::explains_a_cut_path_in_a_tooltip_and_says_nothing_while_it_fits` |
+
+#### `Settings.test.tsx` (43)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 the running version, the marker and Update to the latest | P5 | Updates section |
+| 2 neither marker nor Update when up to date | P5 | |
+| 3 Update to <latest> installs with the current data | P5 | |
+| 4 goes back with Back and with Escape | ported | `grace::settings::tests::the_page::the_back_button_goes_back`; `grace-e2e/tests/appearance.rs::escape_goes_back_from_the_settings_page` (from the page and from a radio) |
+| 5 leaves Escape to an open dialog | P5 | The page's only dialog is the switch dialog |
+| 6 leaves Escape to a tooltip, which closes alone (R9.4) | P5 | Redesigns, `settings`: "E-appearance-05's tooltip half waits for P5's update button". Tooltip then Escape in general: `grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` |
+| 7 lists the releases on the channel, newest first | P5 | Version table |
+| 8 adds the running version the channel does not list | P5 | |
+| 9 hides pre-releases on stable, keeps the running row | P5 | |
+| 10 tags the running row installed, a saved copy data saved | P5 | |
+| 11 Install above the running version, Roll back below | P5 | |
+| 12 an empty date for a release without one | P5 | |
+| 13 holds the running version only before a check | P5 | |
+| 14 does not ask for a check after one | P5 | |
+| 15 Install on a newer version without a saved copy installs at once | P5 | Switching |
+| 16 Install with a saved copy asks which data first | P5 | |
+| 17 Roll back opens the confirmation, "Roll back and restart" switches | P5 | |
+| 18 Roll back without a saved copy keeps the data | P5 | |
+| 19 Cancel closes the confirmation, installs nothing | P5 | |
+| 20 gives focus back to the row's button when the dialog closes | P5 | |
+| 21 disables every switch button while a run or discovery is active | P5 | |
+| 22 disables them in a build that is not packaged | P5 | |
+| 23 enables them when packaged and idle | P5 | |
+| 24 selects the channel the settings hold | P5 | The settings (R2, R5, R6.2) |
+| 25 changing the channel saves it | P5 | |
+| 26 saves the startup check and auto-update, one key at a time | P5 | |
+| 27 disables auto-update while the startup check is off | P5 | |
+| 28 checks for updates on request, Checking… meanwhile | P5 | |
+| 29 says when it last checked | P5 | |
+| 30 a failed check's reason with the last good check | P5 | |
+| 31 no error after a good check | P5 | |
+| 32 only the header and the section's title before main sends the update view | P5 | The null update view. The P2 half, the heading "Settings": `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` |
+| 33 the page on a sheet under a header on the ground | ported | `grace::settings::tests::the_page::puts_the_sections_on_a_sheet_under_the_header` (header above the sheet, sheet inset). By eye: sheet fill and radius, header min 44 px |
+| 34 the sections in the selectable row style, the open one selected | ported | `grace::settings::tests::the_page::opens_on_appearance_with_its_entry_selected` (the entry exists, left of the section, `section` is Appearance); the navigation "Settings sections" and its selected entry: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`. By eye: 28 px row, selected fill, accent stripe |
+| 35 titles the section in text-lg | P5 | The Updates heading and region; Appearance's own are in 39 |
+| 36 tags the versions with tinted badges | P5 | |
+| 37 a failed check's reason as an error message | P5 | |
+| 38 keeps the dialog's words while it fades out, asks afresh | P5 | The fade-out half goes (Redesigns, `properties` row: GPUI Kit drops a dialog's view with it) |
+| 39 opens on Updates, the list switches to Appearance and back | P5 | One section only until P5. The P2 half (opens on Appearance, entry selected, section drawn): `grace::settings::tests::the_page::opens_on_appearance_with_its_entry_selected`. Appearance's heading: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` |
+| 40 three themes in a Theme group, Follow Windows checked | ported | `grace::settings::tests::appearance_r8::lists_the_three_themes_in_a_theme_group` (order, 24 px rows, group); `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` (checked states, nothing saved); `appearance_r8::choosing_the_theme_in_force_saves_nothing` |
+| 41 selects the saved theme once main answers | ported | `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (Dark checked), `choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart` (Light checked after a restart); `grace_core::settings` tests `appearance` (PU-17) |
+| 42 choosing a theme saves it and selects it at once | ported | `grace::settings::tests::appearance_r8::choosing_a_theme_applies_it_at_once_and_saves_it`, `a_change_keeps_the_rest_of_the_views_state`; `grace-e2e/tests/appearance.rs::choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart` |
+| 43 styles the radios like the channel's, with the accent | by eye | The accent colour of GPUI Kit's `Radio`; the 24 px rows are asserted in `appearance_r8::lists_the_three_themes_in_a_theme_group` |
+
+#### `Details.test.tsx` (34 tests, one an `it.each` of 2)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1 a test: name, tinted badge with icon and word, meta line | ported | `grace::details::tests::a_test::heads_it_with_its_name_a_tinted_badge_and_the_meta_line` (name, badge, place, time, and the tags as chips after them; none on a test without tags); `grace-e2e/tests/details.rs::failure_details`. By eye: tint, mono |
+| 2 a status badge for a failed and a not-run test | ported | `a_test::tints_the_badge_for_a_passed_a_failed_and_a_pending_test` (`badge_tint`, label "Pending", badge drawn for all three) |
+| 3 a failed test's error in a failed box titled Error | ported | `a_test::puts_a_failed_tests_error_in_a_box_and_none_for_a_passed_one`; `grace-e2e/tests/details.rs::failure_details` (Group "Error" holds the message alone). By eye: failed tint, mono, icon |
+| 4 each step with a mark named by its status | ported | `a_test::shows_each_step_with_a_mark_named_by_its_status` (labels incl. "Interrupted" for an unknown status, rows in order, Background chip only on the background step); `grace-e2e/tests/details.rs::failure_details` (5 steps in a list "Steps"); marks: `grace::elements::tests::marks_each_status_as_electron_grace_does` |
+| 5 a step's comments above it, muted, as written | ported | `a_test::shows_a_steps_comments_above_it` (none on a step without; above the text; one line per comment); `grace-e2e/tests/details.rs::failure_details` (the comment in the error text). By eye: muted mono |
+| 6 toggles a step's log: ghost button, chevron that turns | ported | `a_test::toggles_a_steps_log_with_its_button` (names "Show/Hide log of ..", none without a log, open and close, log under its step); the chevron changes icon (Right, Down); `grace-e2e/tests/details.rs::failure_details` (press "Show log of method get", the log shows). By eye: sunken log |
+| 7 steps come when the feature finishes, spinner while a run is on | ported | `a_test::says_steps_come_when_the_feature_finishes_with_the_spinner_while_a_run_is_on` (spinner only while running; not for a test not reached) |
+| 8 a group counts the tests per status, mark, figure and word | ported | `grace::details::tests::a_group::counts_the_tests_per_status_in_tree_order`; the words: `grace-e2e/tests/details.rs::failure_details` ("N scenarios", "1 Failed", "N Passed" on the feature) |
+| 9 works out the group's status once per update | n/a | Counts `deriveStatus` calls of a Solid memo; Redesigns, `details` row ("no memo, a group's status is worked out once per frame": cited proof `a_group`). The live badge update is `cx.observe(&grace)` redraw |
+| 10 nothing selected is an empty state | ported | `grace::details::tests::nothing_selected::is_an_empty_state`, `a_selection_gone_from_the_tree_shows_nothing`; `grace-e2e/tests/details.rs::failure_details` (text "Select a test to see its details") |
+| 11 the location whole in a tooltip only when cut | ported | `grace::details::tests::long_text::shows_the_location_whole_only_when_it_is_cut` |
+| 12 a step whole in a tooltip only when cut | ported | `grace::details::tests::long_text::shows_a_step_whole_in_a_tooltip_only_when_it_is_cut` ("Given ...") |
+| 13 no raw palette class, no `dark:`, no title | ported | `grace::theme::tests::colours_come_only_from_the_theme` (scans `details.rs` too); `dark:` and `title=` have no GPUI twin |
+| 14 lists the steps from the file before a run | P4 | Redesigns, `details` (E-details-01's first half waits for the file's steps) |
+| 15 toggles a breakpoint on a step | P4 | Breakpoints |
+| 16 marks the step the run is paused before | P4 | Debugger |
+| 17 the run's steps replace the file's, same toggles | P4 | Breakpoint toggles |
+| 18 opens the test at its line, during a run too | P3 | Open in VS Code |
+| 19 no button for a row with no line | P3 | |
+| 20 the place on the error's first line is a link | P3 | |
+| 21 takes a lowercase drive and `/` separators | P3 | |
+| 22a error without a place as text: "Config evaluation failed..." | P3 | `it.each` case 1 |
+| 22b error without a place as text: "boom at x.feature:7" | P3 | `it.each` case 2 (the error as plain text is `a_test::puts_a_failed_tests_error_in_a_box_...`) |
+| 23 says where the test sits in its group (#229 R4) | P3 | Failure groups and stepping |
+| 24 Next selects the next test, keeps the focus | P3 | |
+| 25 announces where the selected test sits | P3 | |
+| 26 Previous wraps round | P3 | |
+| 27 a lone failure has no stepping | P3 | |
+| 28 no stepping while a run goes on | P3 | |
+| 29 no breakpoint dot on a step below line 1 (#229 R1.4) | P4 | Breakpoints |
+| 30 lists the folder's groups, largest first (#229 R5) | P3 | |
+| 31 Go to first selects the group's first test | P3 | |
+| 32 Go to first moves the focus to the test's heading | P3 | |
+| 33 cuts a reason after 4 lines | P3 | |
+| 34 no list without a group | P3 | |
 
 #### The small files
 
