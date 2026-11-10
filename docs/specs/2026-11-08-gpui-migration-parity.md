@@ -173,15 +173,15 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-09 | Open… starts in the last project's parent folder | `grace-e2e/tests/open.rs::open_starts_in_the_last_projects_parent_folder` | ☑ |
 | UP-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
 | UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
-| UP-12 | The Windows folder dialog shows the siblings (by hand) | | ☐ |
+| UP-12 | The Windows folder dialog shows the siblings (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): opens in the parent folder with the siblings listed, modal | ☑ |
 | UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
 | UP-14 | The busy cursor while running | | ☐ |
 | UP-15 | Scroll areas get thin themed scrollbars | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown` (the tree, details, console and lists; History and HTTP with phase P3) | ☑ |
-| UP-16 | Scrollbars look right and are easy to use (by hand) | | ☐ |
+| UP-16 | Scrollbars look right and are easy to use (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): the tree in dark, thin thumb, hover and drag | ☑ |
 | UP-17 | The window opens painted in the app's theme | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (the ground in each theme); the window shows once its first frame is drawn (#90) | ☑ |
-| UP-18 | No white flash (by hand) | | ☐ |
-| UP-19 | The window appears even if the page fails (by hand) | | ☐ |
-| UP-20 | A second launch brings the window up (by hand) | | ☐ |
+| UP-18 | No white flash (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 10 starts, 5 dark and 5 light, no white or wrong-theme frame (Windows' own theme switch is for a person) | ☑ |
+| UP-19 | The window appears even if the page fails (by hand) | n/a: GPUI Grace draws its window itself and has no page that could fail ([the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md)) | ☑ |
+| UP-20 | A second launch brings the window up (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): while the first window starts and while it is minimised | ☑ |
 
 ### WB · Window bounds
 
@@ -203,10 +203,10 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WB-12 | A window on a screen that is gone opens on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
 | WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` (the maximized case) | ☑ |
 | WB-14 | Placement on two screens (unit) | `grace-core::window::tests` (13 tests: two screens, edges, flush, shrink) | ☑ |
-| WB-15 | Two screens (by hand) | | ☐ |
-| WB-16 | The second screen is gone (by hand) | | ☐ |
-| WB-17 | Partly off the screen (by hand) | | ☐ |
-| WB-18 | A snapped window (by hand) | | ☐ |
+| WB-15 | Two screens (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): bounds and maximized on screen 2 | ☑ |
+| WB-16 | The second screen is gone (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): passes with saved bounds where no screen is; unplugging a real screen is for a person | ☐ |
+| WB-17 | Partly off the screen (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md) | ☑ |
+| WB-18 | A snapped window (by hand) | Fails in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): a Win+Left snap is not kept (#318) | ☐ |
 
 ### BD · Bundled dependency updates
 
@@ -246,7 +246,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | CB-09 | A run starts and Karate has not printed yet | `banner::tests::is_starting_once_a_run_is_active_and_karate_has_not_printed` | ☑ |
 | CB-10 | The banner survives the line cap | `console::tests::lines::keeps_the_banner_above_the_lines_past_the_line_cap` | ☑ |
 | CB-11 | Open, run and run again (e2e) | `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
-| CB-12 | The console is darker than the window in dark mode (e2e) | | ☐ |
+| CB-12 | The console is darker than the window in dark mode (e2e) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): console `#0b0d11` on `#101217` in dark, as in Electron Grace | ☑ |
 | CB-13 | The banner names the pinned versions | `console::tests::banner::names_the_pinned_versions`; `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
 
 ### HS · Home screen
@@ -269,7 +269,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | HS-12 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder`; on Windows the Shell dialog's `SetFolder` (`grace::seams`), checked by hand in PR 6 | ☑ |
 | HS-13 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
 | HS-14 | The list works from the keyboard | `grace-e2e/tests/home.rs::the_list_works_from_the_keyboard` | ☑ |
-| HS-15 | The home screen follows the dark theme (by hand) | | ☐ |
+| HS-15 | The home screen follows the dark theme (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md) | ☑ |
 | HS-16 | Home closes the project and survives a restart | `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
 | HS-17 | Home is disabled during a run | `grace-e2e/tests/home.rs::home_is_disabled_during_a_run`, `grace::console::tests::lines::a_closed_project_clears_the_lines_with_none_dropped` | ☑ |
 | HS-18 | Main refuses to close a busy project (unit) | `grace-core::runner::tests::home::close_is_refused_while_busy` | ☑ |
@@ -415,10 +415,10 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | VL-23 | Tree rows carry their level and position | `grace_core::rows::tests::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings` (each tree item takes its level, position and set size from its row); the tree named "Tests" in `grace-e2e/tests/tree.rs` | ☑ |
 | VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
 | VL-25 | Calls are options | Waits for the HTTP tab, phase P3 | ☐ |
-| VL-26 | Opening 10,000 tests (perf) | Measured in PR 6's check on the reference machine | ☐ |
-| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | Measured in PR 6's check on the reference machine; the HTTP tab with phase P3 | ☐ |
-| VL-28 | Run all at 10,000 tests (perf) | Measured in PR 6's check on the reference machine | ☐ |
-| VL-29 | 2,000 tests are not slower (perf) | Measured in PR 6's check on the reference machine | ☐ |
+| VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
+| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
+| VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
+| VL-29 | 2,000 tests are not slower (perf) | Misses in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): app CPU 6,875 ms against Electron's 4,625 ms during Run all (#320) | ☐ |
 
 ### LF · Light and fast: numbers on every PR, a benchmark before every release
 
