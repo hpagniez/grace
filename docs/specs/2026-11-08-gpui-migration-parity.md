@@ -273,12 +273,12 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | HS-16 | Home closes the project and survives a restart | `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
 | HS-17 | Home is disabled during a run | `grace-e2e/tests/home.rs::home_is_disabled_during_a_run`, `grace::console::tests::lines::a_closed_project_clears_the_lines_with_none_dropped` | ☑ |
 | HS-18 | Main refuses to close a busy project (unit) | `grace-core::runner::tests::home::close_is_refused_while_busy` | ☑ |
-| HS-19 | A reload after Home stays home | | ☐ |
+| HS-19 | A reload after Home stays home | GPUI Grace has no page to reload: the window is drawn from the state, so Home stays until the state changes. Home surviving a restart: `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | n/a |
 | HS-20 | The list keeps the 10 newest folders (unit) | `grace-core::settings::tests::recent_projects::keeps_the_10_newest_folders` | ☑ |
 | HS-21 | The same folder in another case is one entry (unit) | `grace-core::settings::tests::recent_projects::same_folder_with_a_trailing_separator_or_another_case_is_one_entry` | ☑ |
 | HS-22 | A broken list reads as what can be kept (unit) | `grace-core::settings::tests::recent_projects::a_broken_list_reads_as_what_can_be_kept` | ☑ |
 | HS-23 | A failed list save keeps the project open (unit) | `grace-core::runner::tests::home::a_failed_list_save_keeps_the_project_open` | ☑ |
-| HS-24 | A path not in the list is refused | | ☐ |
+| HS-24 | A path not in the list is refused | No renderer and no IPC: the view calls the project code itself, and only the home list's own rows open a recent project | n/a |
 
 ### AU · App updates
 
