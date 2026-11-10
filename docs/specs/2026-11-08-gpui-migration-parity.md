@@ -189,17 +189,17 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| WB-01 | The window comes back where it was | | ☐ |
-| WB-02 | A maximized window comes back maximized | | ☐ |
-| WB-03 | A move by the person is saved before the app closes | | ☐ |
+| WB-01 | The window comes back where it was | `grace-e2e/tests/window.rs::the_window_comes_back_where_it_was` | ☑ |
+| WB-02 | A maximized window comes back maximized | `grace-e2e/tests/window.rs::a_maximized_window_comes_back_maximized` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| WB-03 | A move by the person is saved before the app closes | `grace-e2e/tests/window.rs::a_move_by_the_person_is_saved_before_the_app_closes` | ☑ |
 | WB-04 | The saved state keeps the other settings (unit) | `grace-core::settings::tests::window_state::saving_the_window_keeps_the_other_settings` | ☑ |
-| WB-05 | A window closed while minimized opens normal | | ☐ |
-| WB-06 | A failed save does not stop the app from closing | | ☐ |
+| WB-05 | A window closed while minimized opens normal | `grace-e2e/tests/window.rs::a_window_closed_while_minimized_opens_normal` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| WB-06 | A failed save does not stop the app from closing | `grace-e2e/tests/window.rs::a_failed_save_does_not_stop_the_app_from_closing` | ☑ |
 | WB-07 | A cut-off save leaves the old settings whole (unit) | `grace-core::settings::tests::window_state::a_failed_rename_leaves_the_file_as_it_was` | ☑ |
 | WB-08 | A short saved window is held at the minimum height | `grace::window::tests::a_short_saved_window_is_held_at_the_minimum_height` | ☑ |
 | WB-09 | A broken saved state opens the window as on a first start | `grace-core::settings::tests::window_state::load_window_state_reads_a_broken_state_as_nothing_saved`, `grace::window::tests::a_broken_or_missing_state_opens_as_on_a_first_start` | ☑ |
-| WB-10 | A window partly off the screen is pulled onto it | | ☐ |
-| WB-11 | A window bigger than the screen is shrunk to fit | | ☐ |
+| WB-10 | A window partly off the screen is pulled onto it | `grace-e2e/tests/window.rs::a_window_partly_off_the_screen_is_pulled_onto_it` | ☑ |
+| WB-11 | A window bigger than the screen is shrunk to fit | `grace-e2e/tests/window.rs::a_window_bigger_than_the_screen_is_shrunk_to_fit` | ☑ |
 | WB-12 | A window on a screen that is gone opens on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
 | WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` (the maximized case) | ☑ |
 | WB-14 | Placement on two screens (unit) | `grace-core::window::tests` (13 tests: two screens, edges, flush, shrink) | ☑ |
@@ -407,7 +407,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | VL-15 | Focus survives scrolling away (e2e) | | ☐ |
 | VL-16 | Closing a folder takes focus to it | | ☐ |
 | VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
-| VL-18 | A new tree keeps the rows in view still (e2e) | | ☐ |
+| VL-18 | A new tree keeps the rows in view still (e2e) | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it`, `grace-core::rows::tests::anchored_scroll_top` (headless: plan, Redesigns) | ☑ |
 | VL-19 | Calls arriving above the view keep the rows in view still | | ☐ |
 | VL-20 | A filter change scrolls to the selected row (e2e) | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | VL-21 | A cut label shows whole on keyboard focus | | ☐ |
@@ -711,16 +711,16 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | TO-06 | A click on an open feature's name keeps it open | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (the second press) | ☑ |
 | TO-07 | The chevron still closes a feature | `grace-e2e/tests/tree.rs::the_chevron_opens_and_closes_a_feature` | ☑ |
 | TO-08 | Moving with the keys does not open features | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
-| TO-09 | An outline opens with its feature | | ☐ |
+| TO-09 | An outline opens with its feature | `grace::tree::tests::an_outline_opens_with_its_feature`, `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (the outline and its rows) | ☑ |
 | TO-10 | A run of one feature opens it as it starts | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row`, `grace::tree::tests::a_run_of_one_feature_opens_it_as_it_starts` | ☑ |
 | TO-11 | Run all opens only the features with a failure | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
 | TO-12 | A run never reopens a feature I closed during it | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
 | TO-13 | A run opens a feature inside a closed folder, and leaves the folder closed | `grace::tree::tests::a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed` | ☑ |
-| TO-14 | A failure leaves a closed outline closed | | ☐ |
+| TO-14 | A failure leaves a closed outline closed | `grace::tree::tests::a_failure_leaves_a_closed_outline_closed` | ☑ |
 | TO-15 | What a run opened stays open | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
-| TO-16 | A pause still opens the way to the paused test | | ☐ |
+| TO-16 | A pause still opens the way to the paused test | Waits for the step debugger, phase P4: a pause needs it | ☐ |
 | TO-17 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
-| TO-18 | A feature opening above the view does not move it | | ☐ |
+| TO-18 | A feature opening above the view does not move it | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` | ☑ |
 
 ### WM · Watch mode: re-run on save
 
@@ -1284,7 +1284,7 @@ Phase P2 · 9 tests
 | E-virtual-01 | Only the rows in view are drawn | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (300 features, generated) | ☑ |
 | E-virtual-02 | A moved-to row scrolls into view | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End, in place of 40 Down presses) | ☑ |
 | E-virtual-03 | Focus survives scrolling away | | ☐ |
-| E-virtual-04 | A new tree keeps the rows in view still | | ☐ |
+| E-virtual-04 | A new tree keeps the rows in view still | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` (headless: plan, Redesigns) | ☑ |
 | E-virtual-05 | The filter bar keeps one line with 54 tags | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
 | E-virtual-06 | A filter change scrolls to the selected row | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | E-virtual-07 | A click shows neither the focus ring nor a tooltip | | ☐ |
@@ -1305,18 +1305,18 @@ Phase P2 · 12 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-window-01 | the window comes back where it was | | ☐ |
-| E-window-02 | a maximized window comes back maximized | | ☐ |
-| E-window-03 | a move by the person is saved before the app closes | | ☐ |
-| E-window-04 | a window closed while minimized opens normal | | ☐ |
-| E-window-05 | a failed save does not stop the app from closing | | ☐ |
-| E-window-06 | a short saved window is held at the minimum height | | ☐ |
-| E-window-07 | a broken saved state opens the window as on a first start | | ☐ |
-| E-window-08 | a window partly off the screen is pulled onto it | | ☐ |
-| E-window-09 | a window flush with the screen edges keeps its size and place | | ☐ |
-| E-window-10 | a window bigger than the screen is shrunk to fit | | ☐ |
-| E-window-11 | a window on a screen that is gone opens on the main screen | | ☐ |
-| E-window-12 | a maximized window on a screen that is gone opens maximized on the main screen | | ☐ |
+| E-window-01 | the window comes back where it was | `grace-e2e/tests/window.rs::the_window_comes_back_where_it_was` | ☑ |
+| E-window-02 | a maximized window comes back maximized | `grace-e2e/tests/window.rs::a_maximized_window_comes_back_maximized` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| E-window-03 | a move by the person is saved before the app closes | `grace-e2e/tests/window.rs::a_move_by_the_person_is_saved_before_the_app_closes` | ☑ |
+| E-window-04 | a window closed while minimized opens normal | `grace-e2e/tests/window.rs::a_window_closed_while_minimized_opens_normal` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| E-window-05 | a failed save does not stop the app from closing | `grace-e2e/tests/window.rs::a_failed_save_does_not_stop_the_app_from_closing` | ☑ |
+| E-window-06 | a short saved window is held at the minimum height | `grace-e2e/tests/window.rs::a_short_saved_window_is_held_at_the_minimum_height` | ☑ |
+| E-window-07 | a broken saved state opens the window as on a first start | `grace-e2e/tests/window.rs::a_broken_saved_state_opens_the_window_as_on_a_first_start` | ☑ |
+| E-window-08 | a window partly off the screen is pulled onto it | `grace-e2e/tests/window.rs::a_window_partly_off_the_screen_is_pulled_onto_it` | ☑ |
+| E-window-09 | a window flush with the screen edges keeps its size and place | `grace-e2e/tests/window.rs::a_window_flush_with_the_screen_edges_keeps_its_size_and_place` | ☑ |
+| E-window-10 | a window bigger than the screen is shrunk to fit | `grace-e2e/tests/window.rs::a_window_bigger_than_the_screen_is_shrunk_to_fit` | ☑ |
+| E-window-11 | a window on a screen that is gone opens on the main screen | `grace-e2e/tests/window.rs::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
+| E-window-12 | a maximized window on a screen that is gone opens maximized on the main screen | `grace-e2e/tests/window.rs::a_maximized_window_on_a_screen_that_is_gone_opens_maximized_on_the_main_screen` (Windows only: Xvfb has no window manager to maximize) | ☑ |
 
 ## Unit and component tests
 

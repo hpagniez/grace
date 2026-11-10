@@ -174,6 +174,79 @@ fn run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it
     assert!(cx.update(|_, cx| tree.read(cx).is_open("f:tests/a.feature")));
 }
 
+/// `tests/o.feature`: an outline of two rows.
+fn outline_state() -> AppState {
+    let file = "tests/o.feature";
+    let rows = (1..=2)
+        .map(|i| node(&format!("r:{file}#0.{i}"), NodeKind::Row, vec![]))
+        .collect();
+    let outline = node(&format!("o:{file}#0"), NodeKind::Outline, rows);
+    let feature = node(&format!("f:{file}"), NodeKind::Feature, vec![outline]);
+    let mut s = testing::project("/p", Layout::Standalone, 0);
+    s.tree = Some(node(
+        "d:",
+        NodeKind::Folder,
+        vec![node("d:tests", NodeKind::Folder, vec![feature])],
+    ));
+    s
+}
+
+/// TO-09: opening a feature shows its outline open, with its rows.
+#[gpui::test]
+fn an_outline_opens_with_its_feature(cx: &mut TestAppContext) {
+    let (_h, mut cx, tree) = setup(cx, outline_state());
+    toggle(&tree, "f:tests/o.feature", &mut cx);
+    assert_eq!(
+        keys(&tree, &mut cx),
+        [
+            "d:tests",
+            "f:tests/o.feature",
+            "o:tests/o.feature#0",
+            "r:tests/o.feature#0.1",
+            "r:tests/o.feature#0.2"
+        ]
+    );
+}
+
+/// TO-14
+#[gpui::test]
+fn a_failure_leaves_a_closed_outline_closed(cx: &mut TestAppContext) {
+    let (h, mut cx, tree) = setup(cx, outline_state());
+    toggle(&tree, "f:tests/o.feature", &mut cx);
+    toggle(&tree, "o:tests/o.feature#0", &mut cx);
+    run(&h, &mut cx, "r1", "d:");
+    fail(&h, &mut cx, "r:tests/o.feature#0.2");
+    assert_eq!(
+        keys(&tree, &mut cx),
+        ["d:tests", "f:tests/o.feature", "o:tests/o.feature#0"]
+    );
+}
+
+/// TO-18: a run that opens a feature above the view moves the list by its new rows, so the rows in view stay.
+#[gpui::test]
+fn a_feature_opening_above_the_view_does_not_move_it(cx: &mut TestAppContext) {
+    let names: Vec<String> = (0..80).map(|i| format!("f{i:02}")).collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let (h, mut cx, tree) = setup(cx, state("/p", &names));
+    let offset = |tree: &Entity<Tree>, cx: &mut VisualTestContext| cx.update(|_, cx| tree.read(cx).view().scroll_top);
+    // "f00.feature" is the second row; 20 rows down it is above the view
+    let top = PAD + 20. * ROW_HEIGHT;
+    tree.update(&mut cx, |t, _| {
+        t.scroll
+            .0
+            .borrow()
+            .base_handle
+            .set_offset(gpui::point(gpui::px(0.), gpui::px(-top)));
+    });
+    cx.run_until_parked();
+    assert_eq!(offset(&tree, &mut cx), top);
+    run(&h, &mut cx, "r1", "d:");
+    fail(&h, &mut cx, "s:tests/f00.feature#1");
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| tree.read(cx).is_open("f:tests/f00.feature")));
+    assert_eq!(offset(&tree, &mut cx), top + 2. * ROW_HEIGHT);
+}
+
 #[gpui::test]
 fn a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed(cx: &mut TestAppContext) {
     let (h, mut cx, tree) = setup(cx, state("/p", &["a"]));

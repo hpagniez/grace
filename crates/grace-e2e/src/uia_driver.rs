@@ -290,6 +290,30 @@ impl Driver for UiaDriver {
             .close()
             .map_err(err)
     }
+
+    /// The window pattern's Transform: Windows moves and sizes the window itself, as a drag would.
+    fn set_window_rect(&self, x: i32, y: i32, width: i32, height: i32) -> Result<()> {
+        let transform = self
+            .window()?
+            .get_pattern::<uiautomation::patterns::UITransformPattern>()
+            .map_err(err)?;
+        transform.resize(f64::from(width), f64::from(height)).map_err(err)?;
+        transform.move_to(f64::from(x), f64::from(y)).map_err(err)
+    }
+
+    fn show_window(&self, show: crate::Show) -> Result<()> {
+        use uiautomation::types::WindowVisualState;
+        let state = match show {
+            crate::Show::Normal => WindowVisualState::Normal,
+            crate::Show::Maximized => WindowVisualState::Maximized,
+            crate::Show::Minimized => WindowVisualState::Minimized,
+        };
+        self.window()?
+            .get_pattern::<uiautomation::patterns::UIWindowPattern>()
+            .map_err(err)?
+            .set_window_visual_state(state)
+            .map_err(err)
+    }
 }
 
 /// UI Automation's control types to the driver's roles.

@@ -418,6 +418,8 @@ fn e2e_display(_cx: &App) -> Option<gpui::DisplayId> {
 /// end, then quits (WS-09, WB-03).
 pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHandle<Root> {
     let saved = load_window_state(&data_dir);
+    #[cfg(feature = "e2e")]
+    crate::e2e::record_screen(&data_dir, cx);
     cx.open_window(options(saved, cx), move |window, cx| {
         crate::theme::follow_system(window, cx);
         #[cfg(feature = "e2e")]
