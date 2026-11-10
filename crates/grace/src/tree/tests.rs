@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Entity, IntoElement as _, TestAppContext, VisualTestContext};
+use gpui::{AppContext as _, Entity, TestAppContext, VisualTestContext};
 use grace_core::model::node::{Layout, NodeKind, Status, TestNode};
 use grace_core::state::AppState;
 

@@ -6,10 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gpui::{
-    AppContext as _, Bounds, IntoElement as _, Modifiers, ParentElement as _, Pixels, Styled as _, TestAppContext,
-    VisualTestContext, div, point, px,
-};
+use gpui::{AppContext as _, Bounds, Modifiers, Pixels, TestAppContext, VisualTestContext, div, point, px};
 use grace_core::model::node::Layout;
 use grace_core::state::TestResult;
 
