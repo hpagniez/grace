@@ -122,6 +122,12 @@ impl Tips {
         self.open.as_ref().map(|o| o.text.clone())
     }
 
+    /// Where the open tooltip was drawn, for tests.
+    #[cfg(test)]
+    pub fn drawn(&self) -> Option<Bounds<Pixels>> {
+        self.drawn.get()
+    }
+
     /// Closes the open tooltip and forgets one waiting for its pause.
     pub fn hide(&mut self, cx: &mut Context<Self>) {
         self.pending = None;

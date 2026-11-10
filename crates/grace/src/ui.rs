@@ -213,6 +213,24 @@ mod tests {
         assert!(c.origin.x > n.origin.x + px(150.), "after the text: {c:?}");
     }
 
+    /// `Tree.test.tsx` "gives tags the 20 px tag chip, so they clear the rows above and below".
+    #[gpui::test]
+    fn a_tag_chip_is_20_px_high_inside_a_tree_row(cx: &mut TestAppContext) {
+        struct Chip;
+        impl Render for Chip {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                div().child(tag_chip("smoke", cx).debug_selector(|| "chip".into()))
+            }
+        }
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| Chip);
+        let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.run_until_parked();
+        let b = vcx.debug_bounds("chip").unwrap();
+        assert_eq!(b.size.height, px(20.));
+        assert!(b.size.height < px(crate::tree::ROW_HEIGHT));
+    }
+
     #[test]
     fn draws_a_different_icon_per_kind() {
         let cx = gpui::TestAppContext::single();

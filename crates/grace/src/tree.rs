@@ -71,6 +71,8 @@ pub struct Tree {
     pub(crate) active: Option<String>,
     /// The focus row came there from the keyboard, so it shows the ring.
     keyboard: bool,
+    /// The row under the pointer: its run button shows green, as on the selected and the focus row.
+    hovered: Option<String>,
     run: RunTrack,
     seen_reveals: u32,
     seen_pause: (Option<String>, u32),
@@ -101,6 +103,7 @@ impl Tree {
             built: None,
             active: None,
             keyboard: false,
+            hovered: None,
             run: RunTrack::default(),
             seen_reveals: state.reveals,
             seen_pause: (None, 0),
@@ -394,6 +397,22 @@ impl Tree {
     }
 }
 
+/// A folder's or a feature's icon beside its name; a scenario, an outline and its rows have none.
+fn kind_icon(kind: NodeKind, open: bool) -> Option<Icon> {
+    match kind {
+        NodeKind::Feature => Some(Icon::FileText),
+        NodeKind::Folder if open => Some(Icon::FolderOpen),
+        NodeKind::Folder => Some(Icon::Folder),
+        _ => None,
+    }
+}
+
+/// A row's run button is muted, and green on the selected row, the row under the pointer and the focus row
+/// (`Tree.tsx`'s `group-hover`, `group-focus-within`).
+fn run_is_green(selected: bool, hovered: bool, focus_row: bool) -> bool {
+    selected || hovered || focus_row
+}
+
 fn busy(state: &AppState) -> bool {
     state.run.active || state.busy
 }
@@ -542,12 +561,8 @@ impl Tree {
         let ink = if matches { t.ink } else { t.muted };
         let is_feature = node.kind == NodeKind::Feature;
 
-        let kind_icon = match node.kind {
-            NodeKind::Feature => Some(Icon::FileText),
-            NodeKind::Folder if open => Some(Icon::FolderOpen),
-            NodeKind::Folder => Some(Icon::Folder),
-            _ => None,
-        };
+        let kind_icon = kind_icon(node.kind, open);
+        let hovered = self.hovered.as_deref() == Some(key.as_str());
         let me = cx.entity();
         let toggle_key = key.clone();
         let chevron = Button::new(part("toggle", &key))
@@ -562,7 +577,6 @@ impl Tree {
                     .size(px(14.))
                     .text_color(Theme::color(t.muted)),
             )
-            .when(!kids, |b| b.invisible())
             .on_click(move |_, window, cx| {
                 cx.stop_propagation();
                 me.update(cx, |tree, cx| {
@@ -570,6 +584,12 @@ impl Tree {
                     tree.toggle(&toggle_key, cx);
                 });
             });
+        // a test has no chevron, only its room, and nothing for a screen reader to read
+        let chevron = if kids {
+            chevron.into_any_element()
+        } else {
+            div().flex_none().w(px(ROW_HEIGHT)).h(px(ROW_HEIGHT)).into_any_element()
+        };
         let shown_mark = if paused { MarkStatus::Paused } else { mark(status) };
         let mark_tip = if paused { "Paused" } else { status_label(status) };
         let mark = tooltip(part("mark-tip", &key), Some(SharedString::from(mark_tip)))
@@ -661,7 +681,11 @@ impl Tree {
                         .icon(
                             gpui_component::Icon::new(Icon::Play)
                                 .size(px(14.))
-                                .text_color(Theme::color(if selected { t.passed } else { t.muted })),
+                                .text_color(Theme::color(if run_is_green(selected, hovered, ring) {
+                                    t.passed
+                                } else {
+                                    t.muted
+                                })),
                         )
                         .off(busy(state))
                         .on_click(move |_, window, cx| {
@@ -710,6 +734,16 @@ impl Tree {
                 }
             })
             .when(ring, |d| d.border_2().border_color(Theme::color(t.focus)))
+            .on_hover(cx.listener({
+                let key = key.clone();
+                move |tree, on: &bool, _, cx| {
+                    let now = on.then(|| key.clone());
+                    if *on || tree.hovered.as_ref() == Some(&key) {
+                        tree.hovered = now;
+                        cx.notify();
+                    }
+                }
+            }))
             .on_click(move |_, window, cx| {
                 me.update(cx, |tree, cx| {
                     tree.clicked(&click_key, window, cx);

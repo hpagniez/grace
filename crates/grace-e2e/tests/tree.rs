@@ -73,6 +73,13 @@ fn features_start_closed_and_a_click_opens_one() {
         })
         .unwrap();
     }
+    // a test has no chevron to read, only the room it would take
+    let tree = app.tree().unwrap();
+    assert!(
+        tree.find(&Role::Button, "Expand passing hello").is_none(),
+        "{}",
+        tree.dump()
+    );
 }
 
 /// TO-07: the chevron still closes a feature.
