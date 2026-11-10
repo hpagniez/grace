@@ -21,3 +21,12 @@ x11rb = { version = "=0.13.2", features = ["xtest"] }
 
 [target.'cfg(windows)'.dependencies]
 uiautomation = "=0.25.1"
+
+[features]
+# the screenshots for pull requests (`tests/screens.rs`): a capture, not a check, so the e2e suite leaves it out; on
+# Linux, with ImageMagick's `import`. `scripts/e2e-gpui.sh` turns it on when `GRACE_SCREENS` is set
+screens = []
+
+[[test]]
+name = "screens"
+required-features = ["screens"]

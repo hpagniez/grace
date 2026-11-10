@@ -6,6 +6,7 @@ pub mod app;
 pub mod assets;
 pub mod bottom_panel;
 pub mod console;
+pub mod details;
 #[cfg(feature = "e2e")]
 pub mod e2e;
 pub mod elements;

@@ -33,7 +33,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WS-03 | Syntax error is reported, not hidden | | ☐ |
 | WS-04 | Run all with live progress | `grace-e2e/tests/run.rs::run_all_with_live_progress` (the rows turning running, passed and failed) | ☑ |
 | WS-05 | Run one outline row | | ☐ |
-| WS-06 | Failure details | | ☐ |
+| WS-06 | Failure details | `grace-e2e/tests/details.rs::failure_details` (the place, the error with Karate's comment, the 5 steps and a step's log after a run) | ☑ |
 | WS-07 | A feature edited outside the app | | ☐ |
 | WS-08 | Cancel leaves nothing behind | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" interrupted) | ☑ |
 | WS-09 | Closing the app during a run | `grace-e2e/tests/run.rs::closing_the_app_during_a_run` | ☑ |
@@ -379,7 +379,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | PU-27 | A missing recent folder says so in words | | ☐ |
 | PU-28 | A project with no feature files shows an empty state | | ☐ |
 | PU-29 | Before any run the progress line says so | | ☐ |
-| PU-30 | Details with nothing selected | | ☐ |
+| PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
 | PU-31 | Empty history and HTTP tabs | | ☐ |
 | PU-32 | Dialogs keep their order and keyboard behaviour | | ☐ |
 | PU-33 | Before and after screenshots exist (by hand) | | ☐ |
@@ -980,7 +980,7 @@ Phase P2 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-details-01 | Failure details | | ☐ |
+| E-details-01 | Failure details | Run half: `grace-e2e/tests/details.rs::failure_details`; the steps from the file before a run come with P4 (plan, Redesigns) | ☐ |
 
 ### e2e/editor.spec.ts
 
@@ -1384,7 +1384,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless | ☐ |
+| `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless: `details::tests` (13 tests: a test, a group, nothing selected, long text); the steps before a run, breakpoints, Open in VS Code and the failure groups with P3 and P4 | ☐ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
