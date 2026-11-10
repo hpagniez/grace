@@ -105,7 +105,9 @@ fn follow_windows_is_the_default() {
     assert_eq!(checked(&tree), [true, false, false]);
     assert!(app.settings().get("appearance").is_none(), "{}", app.settings());
     // `Settings.test.tsx`: the page's structure, its entry for the open section selected
-    let entry = tree.find(&Role::Button, "Appearance").unwrap_or_else(|| panic!("{}", tree.dump()));
+    let entry = tree
+        .find(&Role::Button, "Appearance")
+        .unwrap_or_else(|| panic!("{}", tree.dump()));
     assert!(entry.states.selected, "{}", tree.dump());
     if cfg!(not(windows)) {
         // AT-SPI reads headings; the navigation and the region are landmarks there
