@@ -28,10 +28,13 @@ fn says(tree: &Node, label: &str, status: &str) -> bool {
         .is_some_and(|r| r.name == format!("{label}, {status}") || r.name.starts_with(&format!("{label}, {status}, ")))
 }
 
-/// Opens the clean project's three features (`openFeatures`): a feature starts closed.
+/// Opens the clean project's three features (`openFeatures`): a feature starts closed. Each in turn, waiting for it
+/// to open before the next, as `tags.rs` does: the rows a feature opens move the buttons below it, and Windows CI
+/// lost a press sent while they moved.
 fn open_features(app: &App) {
     for f in ["basic.feature", "outline.feature", "slow.feature"] {
         app.press_named(Role::Button, &format!("Expand {f}")).unwrap();
+        app.wait_for_node(Role::Button, &format!("Collapse {f}")).unwrap();
     }
     app.wait_for("the features open", Duration::from_secs(15), |t| {
         row(t, "passing hello").is_some() && row(t, "add 1 and 2").is_some() && row(t, "slow loop").is_some()

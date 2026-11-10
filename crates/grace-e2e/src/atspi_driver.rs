@@ -215,6 +215,13 @@ impl Driver for AtspiDriver {
                 Key::CtrlEnter => "ctrl+Return",
                 Key::SelectAll => "ctrl+a",
                 Key::Backspace => "BackSpace",
+                Key::ShiftEnter => "shift+Return",
+                Key::CtrlF => "ctrl+f",
+                // xdotool picks F8 at a level that needs Alt on CI's Xvfb, and Grace then took Alt+F8
+                Key::F8 => return fake_key(XK_F8, false),
+                Key::ShiftF8 => return fake_key(XK_F8, true),
+                Key::AltLeft => "alt+Left",
+                Key::AltRight => "alt+Right",
             },
         ])
     }
@@ -254,6 +261,52 @@ fn ask_to_close(window: u32) -> Result<()> {
         .map_err(err)?
         .check()
         .map_err(err)
+}
+
+const XK_F8: u32 = 0xffc5;
+const XK_SHIFT_L: u32 = 0xffe1;
+
+/// Presses the key whose first level is `keysym`, with Shift when `shift`, through XTest: no other modifier, which
+/// `xdotool key` adds when it finds the keysym at a higher level of the keymap first.
+fn fake_key(keysym: u32, shift: bool) -> Result<()> {
+    use x11rb::connection::Connection as _;
+    use x11rb::protocol::xproto::{ConnectionExt as _, KEY_PRESS_EVENT, KEY_RELEASE_EVENT};
+    use x11rb::protocol::xtest::ConnectionExt as _;
+    let (conn, screen) = x11rb::connect(None).map_err(err)?;
+    let root = conn.setup().roots[screen].root;
+    let (min, max) = (conn.setup().min_keycode, conn.setup().max_keycode);
+    let map = conn
+        .get_keyboard_mapping(min, max - min + 1)
+        .map_err(err)?
+        .reply()
+        .map_err(err)?;
+    let per = map.keysyms_per_keycode as usize;
+    let code = |sym: u32| -> Result<u8> {
+        map.keysyms
+            .chunks(per)
+            .position(|syms| syms.first() == Some(&sym))
+            .map(|i| min + i as u8)
+            .ok_or_else(|| format!("no key gives keysym {sym:#x} at its first level"))
+    };
+    let key = code(keysym)?;
+    let events = if shift {
+        let shift = code(XK_SHIFT_L)?;
+        vec![
+            (KEY_PRESS_EVENT, shift),
+            (KEY_PRESS_EVENT, key),
+            (KEY_RELEASE_EVENT, key),
+            (KEY_RELEASE_EVENT, shift),
+        ]
+    } else {
+        vec![(KEY_PRESS_EVENT, key), (KEY_RELEASE_EVENT, key)]
+    };
+    for (kind, detail) in events {
+        conn.xtest_fake_input(kind, detail, x11rb::CURRENT_TIME, root, 0, 0, 0)
+            .map_err(err)?;
+    }
+    // a round trip, so the events are sent before the connection closes
+    conn.get_input_focus().map_err(err)?.reply().map_err(err)?;
+    Ok(())
 }
 
 fn xdotool(args: &[&str]) -> Result<()> {

@@ -111,6 +111,17 @@ pub enum Key {
     /// Ctrl+A, which selects what a text box holds.
     SelectAll,
     Backspace,
+    /// Shift+Enter.
+    ShiftEnter,
+    /// Ctrl+F.
+    CtrlF,
+    F8,
+    /// Shift+F8.
+    ShiftF8,
+    /// Alt+Left.
+    AltLeft,
+    /// Alt+Right.
+    AltRight,
 }
 
 /// One node of the tree, as read. `path` is its position under the app's window, which `Driver::press` finds again.

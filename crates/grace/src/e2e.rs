@@ -16,6 +16,19 @@ use crate::elements::{ButtonKind, ButtonSize, MarkStatus, button, icon_button, s
 use crate::theme::Theme;
 use crate::tooltip::{Tips, cut, tooltip};
 
+/// With `GRACE_E2E_KEYS` set, every keystroke a window takes and the action it ran, on stderr: what a test that
+/// sends keys prints when a key seems lost.
+pub fn log_keys(cx: &mut gpui::App) {
+    if std::env::var_os("GRACE_E2E_KEYS").is_none() {
+        return;
+    }
+    cx.observe_keystrokes(|event, _, _| {
+        let action = event.action.as_ref().map(|a| a.name());
+        eprintln!("E2E key {:?} -> {action:?}", event.keystroke);
+    })
+    .detach();
+}
+
 /// Which view the window shows.
 pub fn wants_gallery() -> bool {
     std::env::var("GRACE_E2E_VIEW").as_deref() == Ok("elements")
@@ -71,7 +84,7 @@ impl Render for Gallery {
         for (i, status) in MarkStatus::ALL.into_iter().enumerate() {
             marks = marks.child(status_mark(("mark", i), status, 16., false, false, cx));
         }
-        crate::a11y::tab_order(div().id("gallery"), &self.focus)
+        crate::a11y::tab_order(div().id("gallery"), &self.focus, None)
             .role(Role::Group)
             .aria_label("Elements")
             .size_full()

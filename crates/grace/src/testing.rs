@@ -95,6 +95,17 @@ pub fn open_with(
     state: AppState,
     make: impl FnOnce(&Entity<Grace>, &mut Window, &mut gpui::App) -> Draw + 'static,
 ) -> (Harness, VisualTestContext) {
+    open_in(cx, PathBuf::new(), width, state, make)
+}
+
+/// As [`open_with`], with `data_dir` as Grace's data folder: a view that saves settings saves them there.
+pub fn open_in(
+    cx: &mut TestAppContext,
+    data_dir: PathBuf,
+    width: f32,
+    state: AppState,
+    make: impl FnOnce(&Entity<Grace>, &mut Window, &mut gpui::App) -> Draw + 'static,
+) -> (Harness, VisualTestContext) {
     cx.update(crate::init);
     let backend = Arc::new(FakeBackend::default());
     let seams = Arc::new(FakeSeams::answering(Some("/picked")));
@@ -102,7 +113,7 @@ pub fn open_with(
     std::mem::forget(tx); // the channel stays open, so the events task waits
     let b: Arc<dyn Backend> = backend.clone();
     let s: Arc<dyn crate::seams::Seams> = seams.clone();
-    let grace = cx.update(|cx| cx.new(|cx| Grace::new(b, s, PathBuf::new(), rx, cx)));
+    let grace = cx.update(|cx| cx.new(|cx| Grace::new(b, s, data_dir, rx, cx)));
     grace.update(cx, |g, _| *g.state_mut() = state);
     let g = grace.clone();
     let window = cx.add_window(move |window, cx| {

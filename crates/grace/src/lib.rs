@@ -4,6 +4,8 @@
 pub mod a11y;
 pub mod app;
 pub mod assets;
+pub mod bottom_panel;
+pub mod console;
 #[cfg(feature = "e2e")]
 pub mod e2e;
 pub mod elements;
@@ -36,7 +38,10 @@ pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     assets::load_fonts(cx);
     a11y::bind_keys(cx);
+    console::bind_keys(cx);
     theme::apply(false, None, cx);
+    #[cfg(feature = "e2e")]
+    e2e::log_keys(cx);
 }
 
 /// Where the bundled Java and Karate are: `resources` beside `Grace.exe` in the release zip (ADR 0019), else the

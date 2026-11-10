@@ -162,14 +162,14 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| UP-01 | The bottom panel starts at its default height | | ☐ |
-| UP-02 | Dragging the splitter resizes the bottom panel | | ☐ |
-| UP-03 | The splitter works from the keyboard | | ☐ |
-| UP-04 | The panel stays within its limits | | ☐ |
-| UP-05 | The window cannot get too short for the layout | | ☐ |
-| UP-06 | The height survives a restart | | ☐ |
-| UP-07 | A smaller window shrinks the panel without forgetting its height | | ☐ |
-| UP-08 | A bad saved height falls back to the default | | ☐ |
+| UP-01 | The bottom panel starts at its default height | `grace-e2e/tests/panel.rs::the_bottom_panel_starts_at_its_default_height`; `bottom_panel::tests::splitter::starts_at_the_default_height` | ☑ |
+| UP-02 | Dragging the splitter resizes the bottom panel | `bottom_panel::tests::splitter::dragging_resizes_within_the_limits_and_saves_on_release` (GPUI's simulated pointer; a real drag by hand, PR 6) | ☑ |
+| UP-03 | The splitter works from the keyboard | `grace-e2e/tests/panel.rs::the_splitter_works_from_the_keyboard`; `bottom_panel::tests::splitter::the_keys_step_and_jump_and_save` | ☑ |
+| UP-04 | The panel stays within its limits | `panel_height::tests`; `bottom_panel::tests::splitter::dragging_resizes_within_the_limits_and_saves_on_release`; `grace-e2e/tests/panel.rs::a_saved_height_taller_than_the_window_is_clamped_at_start` | ☑ |
+| UP-05 | The window cannot get too short for the layout | `grace::window::MIN_SIZE` (760 × 480) and the main area's `min_h(MAIN_MIN)`; `bottom_panel::tests::splitter::a_smaller_window_shrinks_the_panel_without_forgetting_its_height` | ☑ |
+| UP-06 | The height survives a restart | `grace-e2e/tests/panel.rs::the_height_survives_a_restart`; `settings::tests::panel_height` | ☑ |
+| UP-07 | A smaller window shrinks the panel without forgetting its height | `bottom_panel::tests::splitter::a_smaller_window_shrinks_the_panel_without_forgetting_its_height` | ☑ |
+| UP-08 | A bad saved height falls back to the default | `grace-e2e/tests/panel.rs::a_bad_saved_height_falls_back_to_the_default`; `settings::tests::panel_height` | ☑ |
 | UP-09 | Open… starts in the last project's parent folder | | ☐ |
 | UP-10 | Open… with no last project | | ☐ |
 | UP-11 | The last project folder was deleted | | ☐ |
@@ -235,19 +235,19 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| CB-01 | No project open | | ☐ |
-| CB-02 | A project is open and nothing has run | | ☐ |
-| CB-03 | One scenario in one feature | | ☐ |
-| CB-04 | A project with no tests | | ☐ |
-| CB-05 | Finding tests for the first time | | ☐ |
-| CB-06 | Discovery failed | | ☐ |
-| CB-07 | Nothing to run | | ☐ |
-| CB-08 | The cursor stays still with reduced motion | | ☐ |
-| CB-09 | A run starts and Karate has not printed yet | | ☐ |
-| CB-10 | The banner survives the line cap | | ☐ |
-| CB-11 | Open, run and run again (e2e) | | ☐ |
+| CB-01 | No project open | `banner::tests::asks_for_a_project_with_none_open`; `console::tests::banner::says_what_the_app_is_doing` | ☑ |
+| CB-02 | A project is open and nothing has run | `banner::tests::is_ready_with_a_project_and_nothing_running`; `grace-e2e/tests/console.rs::open_run_and_run_again` ("Ready.") | ☑ |
+| CB-03 | One scenario in one feature | `banner::tests::uses_the_singular_for_one_of_each` | ☑ |
+| CB-04 | A project with no tests | `banner::tests::says_when_there_are_no_tests` | ☑ |
+| CB-05 | Finding tests for the first time | `banner::tests::says_it_is_finding_tests_while_busy_with_no_tree`, `is_finding_while_busy_and_no_run_is_active` | ☑ |
+| CB-06 | Discovery failed | `banner::tests::points_at_the_tree_after_a_discovery_error` | ☑ |
+| CB-07 | Nothing to run | `banner::tests::has_no_state_line_when_run_all_has_nothing_to_run` | ☑ |
+| CB-08 | The cursor stays still with reduced motion | `console::tests::banner::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion` | ☑ |
+| CB-09 | A run starts and Karate has not printed yet | `banner::tests::is_starting_once_a_run_is_active_and_karate_has_not_printed` | ☑ |
+| CB-10 | The banner survives the line cap | `console::tests::lines::keeps_the_banner_above_the_lines_past_the_line_cap` | ☑ |
+| CB-11 | Open, run and run again (e2e) | `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
 | CB-12 | The console is darker than the window in dark mode (e2e) | | ☐ |
-| CB-13 | The banner names the pinned versions | | ☐ |
+| CB-13 | The banner names the pinned versions | `console::tests::banner::names_the_pinned_versions`; `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
 
 ### HS · Home screen
 
@@ -588,23 +588,23 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| CS-01 | ERROR lines and failed tests are errors, WARN lines are not | | ☐ |
-| CS-02 | The errors group shows the count and steps through the errors | | ☐ |
-| CS-03 | No errors, no group | | ☐ |
-| CS-04 | The errors group belongs to the Console tab | | ☐ |
-| CS-05 | A failing run's errors (e2e) | | ☐ |
-| CS-06 | Ctrl+F opens the find bar from another tab | | ☐ |
-| CS-07 | Matches are counted, case aside, without overlap | | ☐ |
-| CS-08 | Enter and Shift+Enter step through the matches and wrap | | ☐ |
-| CS-09 | No results | | ☐ |
-| CS-10 | Matches are painted without redrawing the rows (highlight API stubbed) | | ☐ |
-| CS-11 | Escape closes the bar, keeps the text, and gives the focus back | | ☐ |
-| CS-12 | The text survives a tab switch and a new run | | ☐ |
-| CS-13 | Lines that arrive during a run do not move the view | | ☐ |
-| CS-14 | Find in a real run (e2e) | | ☐ |
-| CS-15 | The bar does not search while it is closed | | ☐ |
-| CS-16 | A line keeps its place when older lines drop at the cap | | ☐ |
-| CS-17 | A full console (e2e) | | ☐ |
+| CS-01 | ERROR lines and failed tests are errors, WARN lines are not | `console_find::tests` (`takes_error_lines_and_failed_tests_not_warn_lines`); `console::tests::lines::styles_error_and_warn_lines` | ☑ |
+| CS-02 | The errors group shows the count and steps through the errors | `console::tests::errors::shows_the_count_and_steps_through_the_errors_wrapping`, `counts_one_error_in_the_singular`, `paints_the_current_errors_line` | ☑ |
+| CS-03 | No errors, no group | `console::tests::errors::has_no_group_and_steps_nowhere_without_errors` | ☑ |
+| CS-04 | The errors group belongs to the Console tab | `console::tests::errors::belongs_to_the_console_tab` | ☑ |
+| CS-05 | A failing run's errors (e2e) | `grace-e2e/tests/console.rs::step_through_a_failing_runs_errors` | ☑ |
+| CS-06 | Ctrl+F opens the find bar from another tab | `console::tests::find::opening_the_bar_shows_the_console_tab_and_focuses_its_field`; `grace-e2e/tests/console.rs::ctrl_f_opens_the_bar_from_another_tab` | ☑ |
+| CS-07 | Matches are counted, case aside, without overlap | `console_find::tests::counts_every_occurrence_case_aside_without_overlap` | ☑ |
+| CS-08 | Enter and Shift+Enter step through the matches and wrap | `console::tests::find::counts_matches_and_steps_with_enter_and_shift_enter_wrapping`; `grace-e2e/tests/console.rs::find_in_a_real_run` | ☑ |
+| CS-09 | No results | `console::tests::find::shows_no_results_and_nothing_for_no_text` | ☑ |
+| CS-10 | Matches are painted without redrawing the rows (highlight API stubbed) | `console::tests::find::paints_matches_and_the_current_one_brighter` (only the lines in view are drawn: plan, Redesigns) | ☑ |
+| CS-11 | Escape closes the bar, keeps the text, and gives the focus back | `console::tests::find::escape_closes_the_bar_keeps_the_text_and_gives_the_focus_back`; `grace-e2e/tests/console.rs::ctrl_f_opens_the_bar_from_another_tab` | ☑ |
+| CS-12 | The text survives a tab switch and a new run | `console::tests::find::keeps_the_text_across_a_tab_switch_and_a_new_run` | ☑ |
+| CS-13 | Lines that arrive during a run do not move the view | `console::tests::find::a_step_stops_following_the_bottom`, `keeps_the_current_match_on_its_line_as_lines_arrive` | ☑ |
+| CS-14 | Find in a real run (e2e) | `grace-e2e/tests/console.rs::find_in_a_real_run` | ☑ |
+| CS-15 | The bar does not search while it is closed | `console::tests::find::does_not_search_while_another_tab_shows_or_the_bar_is_closed` | ☑ |
+| CS-16 | A line keeps its place when older lines drop at the cap | `console::tests::find::keeps_the_current_matchs_line_when_older_lines_drop_at_the_cap` | ☑ |
+| CS-17 | A full console (e2e) | `console::tests::lines::keeps_following_once_the_store_holds_the_line_cap`, `find::keeps_the_current_matchs_line_when_older_lines_drop_at_the_cap` (the driver cannot send events: plan, Redesigns) | ☑ |
 
 ### DD · Data-driven view: an outline's Examples as a table
 
@@ -942,9 +942,9 @@ Phase P2 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-console-find-01 | find in a real run | | ☐ |
-| E-console-find-02 | step through a failing run's errors | | ☐ |
-| E-console-find-03 | a full console | | ☐ |
+| E-console-find-01 | find in a real run | `grace-e2e/tests/console.rs::find_in_a_real_run` | ☑ |
+| E-console-find-02 | step through a failing run's errors | `grace-e2e/tests/console.rs::step_through_a_failing_runs_errors` | ☑ |
+| E-console-find-03 | a full console | `console::tests::lines::keeps_following_once_the_store_holds_the_line_cap` (headless: plan, Redesigns) | ☑ |
 
 ### e2e/console.spec.ts
 
@@ -952,7 +952,7 @@ Phase P2 · 2 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-console-01 | open, run and run again | | ☐ |
+| E-console-01 | open, run and run again | `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
 | E-console-02 | the console is on the sunken colour in both themes | | ☐ |
 
 ### e2e/cursor.spec.ts
@@ -1143,19 +1143,19 @@ Phase P2 · 13 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-panel-01 | the bottom panel starts at its default height | | ☐ |
-| E-panel-02 | dragging the splitter resizes the bottom panel | | ☐ |
-| E-panel-03 | the splitter works from the keyboard | | ☐ |
-| E-panel-04 | the panel stays within its limits | | ☐ |
-| E-panel-05 | the window cannot get too short for the layout | | ☐ |
-| E-panel-06 | the height survives a restart | | ☐ |
-| E-panel-07 | a smaller window shrinks the panel without forgetting its height | | ☐ |
-| E-panel-08 | a bad saved height falls back to the default | | ☐ |
-| E-panel-09 | a saved height taller than the window is clamped at start | | ☐ |
-| E-panel-10 | releasing a drag above the window keeps the maximum and ends the drag | | ☐ |
-| E-panel-11 | focus cannot scroll the toolbar out of a cut-off layout | | ☐ |
-| E-panel-12 | Tab moves focus past the splitter | | ☐ |
-| E-panel-13 | the tabs can be dragged or moved with Alt+Left and Alt+Right, and their order survives a restart | | ☐ |
+| E-panel-01 | the bottom panel starts at its default height | `grace-e2e/tests/panel.rs::the_bottom_panel_starts_at_its_default_height` | ☑ |
+| E-panel-02 | dragging the splitter resizes the bottom panel | `bottom_panel::tests::splitter::dragging_resizes_within_the_limits_and_saves_on_release` (headless: plan, Redesigns) | ☑ |
+| E-panel-03 | the splitter works from the keyboard | `grace-e2e/tests/panel.rs::the_splitter_works_from_the_keyboard` | ☑ |
+| E-panel-04 | the panel stays within its limits | `bottom_panel::tests::splitter::dragging_resizes_within_the_limits_and_saves_on_release`, `the_keys_step_and_jump_and_save` | ☑ |
+| E-panel-05 | the window cannot get too short for the layout | `bottom_panel::tests::splitter::a_smaller_window_shrinks_the_panel_without_forgetting_its_height` (headless: plan, Redesigns) | ☑ |
+| E-panel-06 | the height survives a restart | `grace-e2e/tests/panel.rs::the_height_survives_a_restart` | ☑ |
+| E-panel-07 | a smaller window shrinks the panel without forgetting its height | `bottom_panel::tests::splitter::a_smaller_window_shrinks_the_panel_without_forgetting_its_height` | ☑ |
+| E-panel-08 | a bad saved height falls back to the default | `grace-e2e/tests/panel.rs::a_bad_saved_height_falls_back_to_the_default` | ☑ |
+| E-panel-09 | a saved height taller than the window is clamped at start | `grace-e2e/tests/panel.rs::a_saved_height_taller_than_the_window_is_clamped_at_start`; `bottom_panel::tests::splitter::a_saved_height_taller_than_the_window_is_clamped` | ☑ |
+| E-panel-10 | releasing a drag above the window keeps the maximum and ends the drag | `bottom_panel::tests::splitter::dragging_resizes_within_the_limits_and_saves_on_release` (released far above the window) | ☑ |
+| E-panel-11 | focus cannot scroll the toolbar out of a cut-off layout | GPUI never scrolls the layout to the focus (plan, Redesigns) | ☑ |
+| E-panel-12 | Tab moves focus past the splitter | `grace-e2e/tests/panel.rs::the_splitter_works_from_the_keyboard` | ☑ |
+| E-panel-13 | the tabs can be dragged or moved with Alt+Left and Alt+Right, and their order survives a restart | `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart`; `bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` | ☑ |
 
 ### e2e/project-setup.spec.ts
 
@@ -1379,11 +1379,11 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/updates/updater.test.ts` | 36 | `grace-core::updates::updater` | ☐ |
 | `src/main/watch.test.ts` | 13 | `grace-core::watch` | ☐ |
 | `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
-| `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless | ☐ |
-| `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless | ☐ |
+| `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
+| `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
 | `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
-| `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless | ☐ |
+| `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
 | `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless | ☐ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
@@ -1411,17 +1411,17 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
 | `src/renderer/VirtualList.test.tsx` | 28 | view `VirtualList` (`grace::ui`), headless | ☐ |
-| `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText` | ☐ |
+| `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::ui::buttons` | ☐ |
-| `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind` | ☐ |
+| `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
 | `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
 | `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
 | `src/renderer/importPlan.test.ts` | 6 | `grace-core::import_plan::tests` (6 tests) | ☑ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
 | `src/renderer/nodes.test.ts` | 3 | `grace_core::rows::tests::feature_of` (all 3) | ☑ |
 | `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
-| `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight` | ☐ |
-| `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs` | ☐ |
+| `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight`: `grace-core::panel_height::tests`; `settings::tests::panel_height` | ☑ |
+| `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs`: `grace-core::panel_tabs::tests`; `settings::tests::panel_tabs` | ☑ |
 | `src/renderer/placeTip.test.ts` | 16 | `grace::ui::placeTip` | ☐ |
 | `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
 | `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store` (7 of 8; "subscribes before ready…" checks the state only, the IPC subscription is gone; `toggleGroup` ports with the HTTP tab in P3) | ☐ |
