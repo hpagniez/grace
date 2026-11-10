@@ -374,3 +374,37 @@ fn screens_settings() {
         shot(&app, name);
     }
 }
+
+/// A tree longer than the window, its scrollbar, and a cut label shown whole on keyboard focus.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_long_tree() {
+    for dark in [false, true] {
+        let dir = grace_e2e::fresh_data_dir().unwrap().join("big");
+        std::fs::create_dir_all(dir.join("tests")).unwrap();
+        let long =
+            "feature-000-the-checkout-keeps-the-basket-when-the-session-ends-and-the-customer-signs-in-again-later";
+        for name in (1..120).map(|i| format!("feature-{i:03}")).chain([long.to_owned()]) {
+            std::fs::write(
+                dir.join("tests").join(format!("{name}.feature")),
+                format!("Feature: {name}\n\nScenario: works\n  * def x = 1\n"),
+            )
+            .unwrap();
+        }
+        let app = open(&dir, dark);
+        let tests = app
+            .wait_for("the features", WAIT, |t| starting(t, "feature-001.feature").is_some())
+            .unwrap();
+        let folder = tests
+            .all()
+            .into_iter()
+            .find(|n| n.role == Role::TreeItem && n.name.starts_with("tests, "))
+            .unwrap()
+            .clone();
+        app.press(&folder).unwrap();
+        app.key(Key::Down).unwrap();
+        app.wait_for_node(Role::Tooltip, &format!("{long}.feature · {long}"))
+            .unwrap();
+        shot(&app, if dark { "long-tree-dark" } else { "long-tree" });
+    }
+}

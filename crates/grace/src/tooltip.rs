@@ -278,6 +278,8 @@ pub struct Tip {
     text: Option<SharedString>,
     side: Side,
     target: Target,
+    /// Whether the target holds the keyboard focus, for one that takes no focus of its own (`Tip::keyboard`).
+    keyboard: Option<bool>,
 }
 
 /// A tooltip saying `text` for a target. No text (a disabled control with no reason to give) means no tooltip.
@@ -288,6 +290,7 @@ pub fn tooltip(id: impl Into<ElementId>, text: impl Into<Option<SharedString>>) 
         text: text.into(),
         side: Side::Below,
         target: Target::Element(div().into_any_element()),
+        keyboard: None,
     }
 }
 
@@ -301,6 +304,7 @@ pub fn cut(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Tip {
         text: Some(text.clone()),
         side: Side::Below,
         target: Target::Cut(text),
+        keyboard: None,
     }
 }
 
@@ -314,6 +318,7 @@ pub fn cut_middle(id: impl Into<ElementId>, head: impl Into<SharedString>, tail:
         text: Some(format!("{head}{tail}").into()),
         side: Side::Below,
         target: Target::Middle(head, tail),
+        keyboard: None,
     }
 }
 
@@ -331,6 +336,20 @@ fn measure(text: SharedString, cut: Rc<Cell<bool>>) -> impl Fn(Bounds<Pixels>, &
 impl Tip {
     pub fn side(mut self, side: Side) -> Self {
         self.side = side;
+        self
+    }
+
+    /// What the tooltip of a cut line says in place of the line: more than it, such as a feature's file name and
+    /// its title (`Tree.tsx`'s `full`).
+    pub fn whole(mut self, text: impl Into<SharedString>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    /// Shows the tooltip as keyboard focus does, while `on` holds: for the active row of a list that is one tab stop,
+    /// where the list holds the focus and the row only stands for it (VL-21).
+    pub fn keyboard(mut self, on: bool) -> Self {
+        self.keyboard = Some(on);
         self
     }
 
@@ -377,8 +396,11 @@ impl RenderOnce for Tip {
         };
 
         // Keyboard focus shows it once; the next frame after the focus goes closes it.
-        if let (Some(focus), Some(tips)) = (&focus, tips_of(window, cx)) {
-            let focused = focus.contains_focused(window, cx) && window.last_input_was_keyboard();
+        let focused = match &focus {
+            Some(focus) => Some(focus.contains_focused(window, cx) && window.last_input_was_keyboard()),
+            None => self.keyboard,
+        };
+        if let (Some(focused), Some(tips)) = (focused, tips_of(window, cx)) {
             let was = tips.read(cx).focused.as_ref() == Some(&trigger);
             if focused != was
                 && let Some(open) = open().or_else(|| {

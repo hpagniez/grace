@@ -8,8 +8,8 @@
 //!
 //! The debug button, the breakpoint dot (phase P4), "Open in VS Code" from a row's menu (P3) and the sub-folder
 //! buttons of an empty project (P4) come with their phases (P2 plan, Redesigns).
-use gpui_component::scroll::ScrollableElement as _;
 use crate::elements::Off as _;
+use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -586,14 +586,28 @@ impl Tree {
             .flex()
             .flex_1()
             .min_w_0()
+            .overflow_hidden()
             .items_center()
             .gap_2()
             .text_size(px(METRICS.text_sm.size))
-            .child(cut(part("label", &key), label.clone()).side(Side::Over))
+            .child(
+                cut(part("label", &key), label.clone())
+                    .whole(match &title {
+                        Some(title) => format!("{label} · {title}"),
+                        None => label.clone(),
+                    })
+                    .side(Side::Over)
+                    .keyboard(ring),
+            )
             .when_some(title, |d, title| {
+                // the title gives way first, then the file name, which the person navigates by
                 d.child(
                     div()
-                        .flex_none()
+                        .min_w_0()
+                        .flex_shrink(1000.)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
                         .text_size(px(METRICS.text_xs.size))
                         .text_color(Theme::color(t.muted))
                         .child(title),
@@ -661,7 +675,7 @@ impl Tree {
 
         let me = cx.entity();
         let click_key = key.clone();
-        div()
+        let row = div()
             .id(part("row", &key))
             .debug_selector(|| "tree-row".into())
             .cursor_pointer()
@@ -675,8 +689,8 @@ impl Tree {
             .aria_keyshortcuts(SHORTCUTS)
             .when(is_focus_row, |d| d.aria_active_descendant())
             .h(px(ROW_HEIGHT))
-            .ml(px(8. + (r.level - 1) as f32 * INDENT))
-            .mr(px(8.))
+            .flex_1()
+            .min_w_0()
             .pr_1()
             .flex()
             .items_center()
@@ -709,7 +723,16 @@ impl Tree {
             .child(name)
             .children(tags)
             .children(flaky_badge)
-            .children(run)
+            .children(run);
+        // A list lays its rows out alone, as wide as their content: the wrapper takes the list's width, so a long
+        // label is cut, with its tooltip, rather than drawn past the window.
+        div()
+            .w_full()
+            .h(px(ROW_HEIGHT))
+            .flex()
+            .pl(px(8. + (r.level - 1) as f32 * INDENT))
+            .pr(px(8.))
+            .child(row)
             .into_any_element()
     }
 }

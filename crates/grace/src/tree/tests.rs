@@ -304,3 +304,146 @@ fn hide_non_matching_leaves_the_matching_rows(cx: &mut TestAppContext) {
     });
     assert_eq!(keys(&tree, &mut cx), ["d:tests", "f:tests/b.feature"]);
 }
+
+/// 80 features, the tree focused from the keyboard on its first row.
+fn many(cx: &mut TestAppContext) -> (Harness, VisualTestContext, Entity<Tree>) {
+    let names: Vec<String> = (0..80).map(|i| format!("f{i:02}")).collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let (h, mut cx, tree) = setup(cx, state("/p", &names));
+    focus(&tree, &mut cx);
+    (h, cx, tree)
+}
+
+fn focus(tree: &Entity<Tree>, cx: &mut VisualTestContext) {
+    cx.update(|window, cx| {
+        let f = tree.read(cx).focus.clone();
+        window.focus(&f, cx);
+    });
+    cx.run_until_parked();
+}
+
+fn active(tree: &Entity<Tree>, cx: &mut VisualTestContext) -> Option<usize> {
+    cx.update(|_, cx| {
+        let t = tree.read(cx);
+        t.active.as_ref().and_then(|a| t.keys.iter().position(|k| k == a))
+    })
+}
+
+fn selected(h: &Harness, cx: &mut VisualTestContext) -> Option<String> {
+    cx.update(|_, cx| h.grace.read(cx).state.selected.clone())
+}
+
+/// Whether row `i` is wholly in the tree's view.
+fn in_view(tree: &Entity<Tree>, i: usize, cx: &mut VisualTestContext) -> bool {
+    let v = cx.update(|_, cx| tree.read(cx).view());
+    let top = PAD + i as f32 * ROW_HEIGHT;
+    top >= v.scroll_top - 0.5 && top + ROW_HEIGHT <= v.scroll_top + v.height + 0.5
+}
+
+fn at_row(i: usize, level: usize, x: f32) -> gpui::Point<gpui::Pixels> {
+    gpui::point(
+        gpui::px(8. + (level - 1) as f32 * INDENT + x),
+        gpui::px(PAD + (i as f32 + 0.5) * ROW_HEIGHT),
+    )
+}
+
+/// VL-09: End goes to the last row, Page Up one view above, Page Down one view below, Home to the first; each
+/// selects its row and brings it into view.
+#[gpui::test]
+fn home_end_and_pages(cx: &mut TestAppContext) {
+    let (h, mut cx, tree) = many(cx);
+    let last = keys(&tree, &mut cx).len() - 1;
+    cx.simulate_keystrokes("end");
+    assert_eq!(active(&tree, &mut cx), Some(last));
+    assert_eq!(selected(&h, &mut cx).as_deref(), Some("f:tests/f79.feature"));
+    assert!(in_view(&tree, last, &mut cx));
+    let page = page_rows(cx.update(|_, cx| tree.read(cx).view()));
+    assert!(page > 5, "a page of {page} rows");
+    cx.simulate_keystrokes("pageup");
+    assert_eq!(active(&tree, &mut cx), Some(last - page));
+    assert!(in_view(&tree, last - page, &mut cx));
+    cx.simulate_keystrokes("pageup pagedown");
+    assert_eq!(active(&tree, &mut cx), Some(last - page));
+    cx.simulate_keystrokes("home");
+    assert_eq!(active(&tree, &mut cx), Some(0));
+    assert_eq!(selected(&h, &mut cx).as_deref(), Some("d:tests"));
+    assert!(in_view(&tree, 0, &mut cx));
+}
+
+/// VL-15, E-virtual-03: the wheel scrolls the focus row away and the focus stays on it; the next key brings the list
+/// back to it and moves on.
+#[gpui::test]
+fn focus_survives_scrolling_away(cx: &mut TestAppContext) {
+    let (_h, mut cx, tree) = many(cx);
+    for _ in 0..9 {
+        cx.simulate_keystrokes("down");
+    }
+    assert_eq!(active(&tree, &mut cx), Some(9));
+    cx.simulate_event(gpui::ScrollEvent {
+        position: at_row(3, 2, 100.),
+        delta: gpui::ScrollDelta::Pixels(gpui::point(gpui::px(0.), gpui::px(-100. * ROW_HEIGHT))),
+        ..Default::default()
+    });
+    cx.run_until_parked();
+    assert!(!in_view(&tree, 9, &mut cx), "scrolled away");
+    assert!(cx.update(|window, cx| tree.read(cx).focus.is_focused(window)));
+    assert_eq!(active(&tree, &mut cx), Some(9));
+    cx.simulate_keystrokes("down");
+    assert_eq!(active(&tree, &mut cx), Some(10));
+    assert!(in_view(&tree, 10, &mut cx));
+}
+
+/// VL-12, E-virtual-07: a click on a row makes it the focus row, without the ring; the next Down moves on from it.
+#[gpui::test]
+fn a_click_makes_the_row_focused(cx: &mut TestAppContext) {
+    let (h, mut cx, tree) = many(cx);
+    cx.simulate_click(at_row(4, 2, 150.), gpui::Modifiers::none());
+    assert_eq!(active(&tree, &mut cx), Some(4));
+    assert!(cx.update(|window, cx| tree.read(cx).focus.is_focused(window)));
+    assert!(!cx.update(|_, cx| tree.read(cx).keyboard), "no ring after a click");
+    cx.simulate_keystrokes("down");
+    let (i, key) = (5, keys(&tree, &mut cx)[5].clone());
+    assert_eq!(active(&tree, &mut cx), Some(i));
+    assert_eq!(selected(&h, &mut cx), Some(key));
+    assert!(
+        cx.update(|_, cx| tree.read(cx).keyboard),
+        "the ring once a key moves it"
+    );
+}
+
+/// VL-16: the chevron that closes the focus row's feature takes the focus to the feature and keeps the selection.
+#[gpui::test]
+fn closing_a_feature_with_its_chevron_takes_the_focus_to_it(cx: &mut TestAppContext) {
+    let (h, mut cx, tree) = setup(cx, state("/p", &["a", "b"]));
+    toggle(&tree, "f:tests/a.feature", &mut cx);
+    cx.simulate_click(at_row(2, 3, 150.), gpui::Modifiers::none());
+    assert_eq!(selected(&h, &mut cx).as_deref(), Some("s:tests/a.feature#0"));
+    cx.simulate_click(at_row(1, 2, ROW_HEIGHT / 2.), gpui::Modifiers::none());
+    assert!(!cx.update(|_, cx| tree.read(cx).is_open("f:tests/a.feature")));
+    assert_eq!(active(&tree, &mut cx), Some(1));
+    assert_eq!(selected(&h, &mut cx).as_deref(), Some("s:tests/a.feature#0"));
+}
+
+/// VL-21, E-virtual-09: the keyboard moving to a row whose label is cut shows the whole label and the feature's title;
+/// moving on closes it.
+/// A click on that row shows it neither at once nor after the pause (E-virtual-07).
+#[gpui::test]
+fn a_cut_label_shows_whole_on_keyboard_focus(cx: &mut TestAppContext) {
+    let long = "a".repeat(400);
+    let (h, mut cx, tree) = setup(cx, state("/p", &["b", &long]));
+    // the file name, then the feature's title (here its key)
+    let whole = format!("{long}.feature · f:tests/{long}.feature");
+    focus(&tree, &mut cx);
+    cx.simulate_keystrokes("down");
+    assert_eq!(h.tip(&mut cx), None, "b.feature is whole");
+    cx.simulate_keystrokes("down");
+    assert_eq!(h.tip(&mut cx).as_deref(), Some(whole.as_str()));
+    cx.simulate_keystrokes("up");
+    assert_eq!(h.tip(&mut cx), None);
+
+    cx.simulate_click(at_row(2, 2, 150.), gpui::Modifiers::none());
+    cx.executor().advance_clock(crate::tooltip::DELAY);
+    cx.run_until_parked();
+    assert_eq!(active(&tree, &mut cx), Some(2));
+    assert_eq!(h.tip(&mut cx), None);
+}

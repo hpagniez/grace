@@ -273,3 +273,18 @@ fn a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name() {
         toolbar_fits(&tree);
     }
 }
+
+/// LV-02: while the first discovery runs, the tree says it is finding the tests; then the tests show.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn finding_tests_for_the_first_time() {
+    let app = open(&project("clean").unwrap());
+    app.wait_for("Finding tests…", WAIT, |t| {
+        named(t, "Finding tests…").is_some() && row(t, "tests").is_none()
+    })
+    .unwrap();
+    app.wait_for("the tests", WAIT, |t| {
+        row(t, "basic.feature").is_some() && named(t, "Finding tests…").is_none()
+    })
+    .unwrap();
+}
