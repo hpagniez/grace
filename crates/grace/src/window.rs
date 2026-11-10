@@ -157,8 +157,15 @@ pub fn save_bounds(data_dir: &Path, state: &WindowState) {
     }
 }
 
+/// The rem, in px: Tailwind's root size, which Electron Grace keeps.
+pub const REM: f32 = 16.;
+
 impl Render for GraceWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A rem is 16 px, as in Electron Grace (`index.css` sets the text on body, not html, for this): GPUI Kit's
+        // root sets it to its text size, 13 px, which shrank every rem size (`gap_2`, `text_xs`, ...) by a fifth
+        // (#321). Kit's root sets it before this view renders, and the frame lays out after both.
+        window.set_rem_size(px(REM));
         if !self.painted {
             self.painted = true;
             if probe::on() {
