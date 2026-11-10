@@ -386,13 +386,27 @@ pub fn bounds(saved: Option<WindowState>, cx: &App) -> WindowBounds {
     }
 }
 
+/// The screen a window with these bounds opens on: the one that holds their middle, or else the main one (or the
+/// e2e screen). Windows' GPUI opens a window with no screen named on the main one and moves bounds that lie on
+/// another there, so a window saved on a second screen came back on the main one (WB-15).
+pub fn display_for(bounds: &WindowBounds, cx: &App) -> Option<gpui::DisplayId> {
+    let middle = bounds.get_bounds().center();
+    cx.displays()
+        .into_iter()
+        .find(|d| d.bounds().contains(&middle))
+        .map(|d| d.id())
+        .or_else(|| e2e_display(cx))
+}
+
 pub fn options(saved: Option<WindowState>, cx: &App) -> WindowOptions {
+    let window_bounds = bounds(saved, cx);
     WindowOptions {
+        display_id: display_for(&window_bounds, cx),
         titlebar: Some(TitlebarOptions {
             title: Some("Grace".into()),
             ..Default::default()
         }),
-        window_bounds: Some(bounds(saved, cx)),
+        window_bounds: Some(window_bounds),
         window_min_size: Some(size(px(MIN_SIZE.0), px(MIN_SIZE.1))),
         app_id: Some("Grace".into()),
         ..Default::default()
@@ -691,6 +705,29 @@ mod tests {
             let max = bounds(Some(state(x, y, 900., 600., true)), cx);
             assert!(matches!(max, WindowBounds::Maximized(_)));
             assert_eq!(max.get_bounds().size, size(px(900.), px(600.)));
+        });
+    }
+
+    #[gpui::test]
+    fn the_window_opens_on_the_screen_that_holds_its_saved_bounds(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let screen = &cx.displays()[0];
+            let area = screen.visible_bounds();
+            let (x, y) = (
+                f64::from(f32::from(area.origin.x)) + 50.,
+                f64::from(f32::from(area.origin.y)) + 40.,
+            );
+            let opts = options(Some(state(x, y, 900., 600., false)), cx);
+            assert_eq!(
+                opts.display_id,
+                Some(screen.id()),
+                "the saved screen is named, not left to the platform"
+            );
+            assert_eq!(
+                options(None, cx).display_id,
+                Some(screen.id()),
+                "a first start on the main screen"
+            );
         });
     }
 
