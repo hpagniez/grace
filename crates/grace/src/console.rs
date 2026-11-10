@@ -167,8 +167,9 @@ impl Console {
         let (dropped, len) = (state.console_dropped, state.console.len());
         let (was_dropped, was_len) = self.told;
         let gone = dropped.wrapping_sub(was_dropped) as usize;
-        if dropped < was_dropped || gone > was_len {
-            self.list.reset(1 + len); // a new run cleared the console
+        // a closed project clears the console and its count, which may have been 0 already: fewer lines, none dropped
+        if dropped < was_dropped || gone > was_len || len < was_len - gone {
+            self.list.reset(1 + len); // a new run or a closed project cleared the console
         } else if (dropped, len) != self.told {
             // drops the oldest lines, then adds the new ones at the end; item 0 is the banner
             self.list.splice(1..1 + gone, 0);

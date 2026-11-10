@@ -156,6 +156,20 @@ mod lines {
         add(&h, &mut cx, &["first of the new run"]);
         assert_eq!(cx.update(|_, cx| c.read(cx).list.item_count()), 2);
     }
+
+    /// Home after a run: the console and its count of dropped lines go back to nothing, none dropped yet.
+    #[gpui::test]
+    fn a_closed_project_clears_the_lines_with_none_dropped(cx: &mut TestAppContext) {
+        let (h, mut cx, c) = setup(cx);
+        add_numbered(&h, &mut cx, 50, 0);
+        h.update(&mut cx, |s| {
+            s.console.clear();
+            s.console_dropped = 0;
+        });
+        assert_eq!(cx.update(|_, cx| c.read(cx).list.item_count()), 1);
+        add(&h, &mut cx, &["after"]);
+        assert_eq!(cx.update(|_, cx| c.read(cx).list.item_count()), 2);
+    }
 }
 
 mod banner {
