@@ -677,7 +677,10 @@ impl Tree {
         let click_key = key.clone();
         let row = div()
             .id(part("row", &key))
-            .debug_selector(|| "tree-row".into())
+            .debug_selector({
+                let key = key.clone();
+                move || format!("tree-row:{key}")
+            })
             .cursor_pointer()
             .role(Role::TreeItem)
             .aria_label(row_name(&label, status, flaky.as_deref(), &node.tags))

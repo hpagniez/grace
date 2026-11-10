@@ -447,3 +447,16 @@ fn a_cut_label_shows_whole_on_keyboard_focus(cx: &mut TestAppContext) {
     assert_eq!(active(&tree, &mut cx), Some(2));
     assert_eq!(h.tip(&mut cx), None);
 }
+
+/// #153: the focus ring, the row's border, starts at the row's indent, on a feature as on a folder.
+#[gpui::test]
+fn the_focus_ring_starts_at_the_rows_indent(cx: &mut TestAppContext) {
+    let (_h, mut cx, tree) = many(cx);
+    cx.simulate_keystrokes("down");
+    assert!(cx.update(|_, cx| tree.read(cx).keyboard));
+    let folder = cx.debug_bounds("tree-row:d:tests").unwrap();
+    let feature = cx.debug_bounds("tree-row:f:tests/f00.feature").unwrap();
+    assert_eq!(folder.left(), gpui::px(8.));
+    assert_eq!(feature.left(), gpui::px(8. + INDENT));
+    assert_eq!(feature.right(), folder.right(), "both end before the list's edge");
+}

@@ -159,6 +159,16 @@ Split in three. PR 5a, the console and the bottom panel: `grace-core::{banner, c
 
 The P2 e2e tests left, the regressions of P2 (#144, #153, #170, #208, #223, #263), and `npm run bench:gpui` on the GPUI build against Electron Grace's limits, recorded in `docs/checks/`.
 
+### The regressions of P2
+
+| Bug | Test |
+|---|---|
+| #144 | `grace::progress::tests::the_bar_r14_1::the_passed_part_fills_during_a_big_run`: 20 updates of 200 results 100 ms apart, the passed part wider after each |
+| #153 | `grace::tree::tests::the_focus_ring_starts_at_the_rows_indent` |
+| #170 | `grace::console::tests::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; `idle.wakeups.minimised` in `npm run bench:gpui` |
+| #208, #223 | `grace-e2e/tests/open.rs::running_one_test_of_a_maven_project_shows_its_result`; Karate's file names relative to its root in `grace_core::karate::command`'s tests |
+| #263 | `grace::progress::tests::the_bar_r14_1::the_stripe_hides_the_last_runs_segments_and_they_show_again_after` (LV-04) |
+
 ## Exit check (from #281)
 
 The parity rows of phase P2 ticked; `npm run bench` on the GPUI build within every limit it shares with Electron Grace, reported in the PR.

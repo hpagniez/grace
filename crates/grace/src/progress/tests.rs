@@ -242,6 +242,37 @@ mod the_bar_r14_1 {
         assert_eq!(seg[2].left() - seg[1].right(), px(2.));
     }
 
+    /// #144: on a big run the passed part grows with each update, every 100 ms, though each one moves its target.
+    #[gpui::test]
+    fn the_passed_part_fills_during_a_big_run(cx: &mut TestAppContext) {
+        let mut s = loaded(10_000);
+        started(&mut s, 10_000);
+        let (h, _, mut cx) = view(cx, s);
+        let passed = |cx: &mut VisualTestContext| {
+            cx.debug_bounds("progress-segment-0")
+                .map_or(0., |b| f32::from(b.size.width))
+        };
+        let mut last = 0.;
+        for _ in 0..20 {
+            h.update(&mut cx, |s| {
+                for i in 0..200 {
+                    result(s, i % 50 != 0);
+                }
+            });
+            // 100 ms of frames, as the window draws them while a spring moves
+            for _ in 0..6 {
+                cx.executor().advance_clock(Duration::from_millis(16));
+                cx.update(|window, _| window.refresh());
+                cx.run_until_parked();
+            }
+            let now = passed(&mut cx);
+            assert!(now > last, "the passed part grew from {last} to {now}");
+            last = now;
+        }
+        let bar = f32::from(cx.debug_bounds("progress-bar").unwrap().size.width);
+        assert!(last > bar * 0.3, "{last} of {bar} px for 39 % passed");
+    }
+
     #[test]
     fn widths_are_each_counts_share_of_the_total() {
         let mut s = loaded(4);

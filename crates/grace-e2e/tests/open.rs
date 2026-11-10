@@ -114,6 +114,35 @@ fn maven_layout_with_classpath_resources() {
     .unwrap();
 }
 
+/// #208, #223: running one test of a Maven project runs it, and its result shows in the tree, the top bar and Details.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn running_one_test_of_a_maven_project_shows_its_result() {
+    let dir = project("maven").unwrap();
+    let app = open(&dir);
+    app.wait_for("the Maven test", WAIT, |t| named(t, "1 test · Not run yet").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Expand users.feature").unwrap();
+    let name = "config, classpath data and classpath call";
+    let tree = app.wait_for("the scenario", WAIT, |t| row(t, name).is_some()).unwrap();
+    app.press(row(&tree, name).unwrap()).unwrap();
+    app.press_named(Role::Button, &format!("Run {name}")).unwrap();
+    let tree = app
+        .wait_for("its result", RUN, |t| {
+            named(t, "Finished").is_some()
+                && named(t, "1 / 1").is_some()
+                && named(t, "1 passed").is_some()
+                && row(t, name).is_some_and(|r| r.name.contains("passed"))
+        })
+        .unwrap();
+    let details = tree.find(&Role::Group, "Details").unwrap();
+    assert!(
+        details.all().iter().any(|n| n.name == "Passed"),
+        "Details shows it passed: {}",
+        details.dump()
+    );
+}
+
 /// WS-03, E-open-07
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
