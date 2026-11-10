@@ -41,6 +41,9 @@ pub enum Role {
     Text,
     Dialog,
     Tooltip,
+    /// A landmark: the toolbar's banner, the main area, the status bar's content info. AT-SPI says only that it
+    /// is one; UI Automation gives it the `Group` control type, so on Windows it reads as a `Group`.
+    Landmark,
     Other(String),
 }
 

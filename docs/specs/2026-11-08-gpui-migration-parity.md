@@ -1384,35 +1384,35 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | view `Details` (`grace::ui`), headless: `details::tests` (13 tests: a test, a group, nothing selected, long text); the steps before a run, breakpoints, Open in VS Code and the failure groups with P3 and P4 | ☐ |
+| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 12 ported, 1 `n/a` that counts Solid memo calls; 17 wait for P3, Open in VS Code and the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
-| `src/renderer/FieldMessage.test.tsx` | 2 | view `FieldMessage` (`grace::ui`), headless | ☐ |
+| `src/renderer/FieldMessage.test.tsx` | 2 | `grace::ui::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (5 runs with the `it.each` cases, all ported) | ☑ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
-| `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` and, for the toolbar's three, `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons`, `order_and_shape_r13_1` and `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar` (15 of 26 so far; the tree's and the sheet's port with them in P2 PRs 3 and 5) | ☐ |
+| `src/renderer/Home.test.tsx` | 26 | `grace::home::tests`, `grace::window::tests`, `grace::toolbar::tests`, `grace_core::state::tests` and `grace-e2e/tests/home.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (all 26 ported) | ☑ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | view `HttpCalls` (`grace::ui`), headless | ☐ |
-| `src/renderer/Icon.test.tsx` | 3 | view `Icon` (`grace::ui`), headless | ☐ |
+| `src/renderer/Icon.test.tsx` | 3 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes`, `grace::assets::tests` ("one child per node" is `n/a`: GPUI draws the Lucide file); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
 | `src/renderer/PropertiesDialog.test.tsx` | 54 | `grace-core::properties_draft::tests` (20) and `grace::properties::tests` (18), headless; the fade-out group goes (P2 plan, Redesigns); the look tests (spec R19) wait for P2 PR 6's check by eye | ☐ |
-| `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless: `settings::tests` (the page, Back and Appearance); the Updates tests with P5 | ☐ |
-| `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
-| `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
+| `src/renderer/Settings.test.tsx` | 43 | `grace::settings::tests` and `grace-e2e/tests/appearance.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (6 ported, the radios' accent by eye in PR 6d; 36 wait for P5's Updates section) | ☑ |
+| `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (6 ported; 12 wait for P5's update marker and version) | ☑ |
+| `src/renderer/StatusMark.test.tsx` | 8 | `grace::elements::tests` (the statuses, shapes, colours, turning and sizes); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
-| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` (the order, narrow, Home and Refresh, project and action tests so far; Env, Threads and Properties with P2 PR 4, Watch and the step debugger with P4) | ☐ |
-| `src/renderer/Tooltip.test.tsx` | 46 | view `Tooltip` (`grace::ui`), headless | ☐ |
-| `src/renderer/Tree.test.tsx` | 86 | view `Tree` (`grace::ui`), headless | ☐ |
+| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
+| `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 73 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 15 wait for P3, the VS Code menu, and P4, the debugger, Build and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
-| `src/renderer/VirtualList.test.tsx` | 28 | view `VirtualList` (`grace::ui`), headless | ☐ |
+| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 2 wait for P3's lists (the data-driven view, the HTTP tab) | ☑ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
-| `src/renderer/buttons.test.ts` | 2 | `grace::ui::buttons` | ☐ |
+| `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
 | `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
 | `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
@@ -1422,13 +1422,13 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
 | `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight`: `grace-core::panel_height::tests`; `settings::tests::panel_height` | ☑ |
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs`: `grace-core::panel_tabs::tests`; `settings::tests::panel_tabs` | ☑ |
-| `src/renderer/placeTip.test.ts` | 16 | `grace::ui::placeTip` | ☐ |
+| `src/renderer/placeTip.test.ts` | 16 | `grace::tooltip::tests::goes_beside_its_target_on_the_side_asked_and_below_by_default`, `stays_in_the_window_flipping_where_it_has_no_room`, `a_click_on_an_over_tooltip_within_its_target_reaches_the_target` (GPUI Kit's `Positioner` places it); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
-| `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store` (7 of 8; "subscribes before ready…" checks the state only, the IPC subscription is gone; `toggleGroup` ports with the HTTP tab in P3) | ☐ |
+| `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (7 ported; `toggleGroup` ports with the HTTP tab in P3) | ☑ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace_core::rows::tests::tree_rows`, `row_name_…` (all 5) | ☑ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
-| `src/renderer/ui.test.ts` | 1 | `grace::ui::ui` | ☐ |
+| `src/renderer/ui.test.ts` | 1 | `n/a`: a closed GPUI dialog is not drawn, so it takes no pointer events | n/a |
 | `src/renderer/virtual.test.ts` | 15 | `grace_core::rows::tests` (10; `drawnRange`'s 5 are `uniform_list`'s) | ☑ |
 | `src/shared/env.test.ts` | 29 | `grace-core::model::env::tests` (54 tests, every Vitest test and the added ones) | ☑ |
 | `src/shared/flaky.test.ts` | 6 | `grace-core::model::flaky::tests` (7 tests, every Vitest test and the added ones) | ☑ |

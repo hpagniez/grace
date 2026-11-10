@@ -355,10 +355,9 @@ impl Render for EnvPicker {
         let tip = narrow.then(|| SharedString::from(LABEL));
         let boxed = tooltip("tip-env", tip).side(Side::Left).child(
             div().debug_selector(|| "env-input".into()).w(px(WIDTH)).child(
-                crate::elements::input(&input)
+                crate::elements::input(&input, METRICS.control_height)
                     .role(Role::EditableComboBox)
                     .aria_label(LABEL)
-                    .h(px(METRICS.control_height))
                     .disabled(disabled),
             ),
         );

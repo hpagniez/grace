@@ -169,6 +169,12 @@ mod a_test {
         let (badge, place) = (at(&mut cx, "details-status"), at(&mut cx, "details-location"));
         assert!(badge.bottom() <= place.top());
         assert!(place.right() <= at(&mut cx, "details-duration").left());
+        // `Details.test.tsx`: the test's tags as chips, after the place and the time
+        let time = at(&mut cx, "details-duration");
+        let (smoke, slow) = (at(&mut cx, "details-tag-0"), at(&mut cx, "details-tag-1"));
+        assert!(time.right() <= smoke.left() && smoke.right() <= slow.left());
+        select(&h, &mut cx, BAD);
+        assert!(!drawn(&mut cx, "details-tag-0"), "a test without tags has none");
     }
 
     #[gpui::test]

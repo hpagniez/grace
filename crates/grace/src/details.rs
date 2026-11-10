@@ -229,7 +229,9 @@ impl Details {
                     .font_family(MONO)
                     .child(d)
             }))
-            .children(node.tags.iter().map(|tag| crate::ui::tag_chip(tag.clone(), cx)));
+            .children(node.tags.iter().enumerate().map(|(i, tag)| {
+                crate::ui::tag_chip(tag.clone(), cx).debug_selector(move || format!("details-tag-{i}"))
+            }));
         let error = result
             .and_then(|r| r.error.clone())
             .filter(|_| status == Status::Failed)

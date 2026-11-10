@@ -89,6 +89,11 @@ impl MarkStatus {
     }
 }
 
+/// Whether a mark turns: only a running one, and never with reduced motion (ADR 0030).
+fn turns(status: MarkStatus, reduce_motion: bool) -> bool {
+    status == MarkStatus::Running && !reduce_motion
+}
+
 /// A status by shape, colour and accessible name. `decorative` (beside the word that names the status) leaves
 /// it out of the accessibility tree. A running mark turns, which only happens during a run (ADR 0030), and not
 /// when reduced motion is on.
@@ -102,7 +107,7 @@ pub fn status_mark(
 ) -> impl IntoElement {
     let color = Theme::color(status.color(Theme::global(cx)));
     let mark = icon(status.icon(), size, color);
-    let mark = if status == MarkStatus::Running && !reduce_motion {
+    let mark = if turns(status, reduce_motion) {
         mark.with_animation("turn", Animation::new(Duration::from_secs(1)).repeat(), |svg, delta| {
             svg.with_transformation(Transformation::rotate(percentage(delta)))
         })
@@ -199,8 +204,16 @@ impl Off for gpui_component::checkbox::Checkbox {}
 
 /// A text box, with the text cursor over it, as a browser's `<input>` has. GPUI Kit gives it only inside an
 /// `InputGroup`.
-pub fn input(state: &gpui::Entity<gpui_component::input::InputState>) -> gpui_component::input::Input {
-    gpui_component::input::Input::new(state).cursor_text()
+/// A one-line text box `height` px high (`ui.ts`'s `input`, 28 px; 24 px in the console's find bar). GPUI Kit's
+/// `Input::h` sizes only a box of many lines, so the height goes through `Styled`, over the small size's 24 px frame.
+pub fn input(state: &gpui::Entity<gpui_component::input::InputState>, height: f32) -> gpui_component::input::Input {
+    use gpui_component::Sizable as _;
+    gpui::Styled::h(
+        gpui_component::input::Input::new(state)
+            .cursor_text()
+            .with_size(gpui_component::Size::Small),
+        px(height),
+    )
 }
 
 #[cfg(test)]
@@ -247,6 +260,15 @@ mod tests {
         assert_eq!(MarkStatus::ALL.len(), expected.len());
     }
 
+    /// `StatusMark.test.tsx`'s "turns only while running".
+    #[test]
+    fn turns_only_while_running_and_never_with_reduced_motion() {
+        for status in MarkStatus::ALL {
+            assert_eq!(turns(status, false), status == MarkStatus::Running, "{status:?}");
+            assert!(!turns(status, true), "{status:?}");
+        }
+    }
+
     /// Never by colour alone: two statuses that share a colour differ in shape or name.
     #[test]
     fn tells_statuses_apart_by_shape_or_name() {
@@ -257,5 +279,41 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// `buttons.test.ts`, `Icon.test.tsx` and `StatusMark.test.tsx`'s sizes: a dialog button is 28 px high with
+    /// 14 px text, a small icon button 24 × 24, an icon 16 px unless asked, a status mark the size asked.
+    #[gpui::test]
+    fn draws_buttons_icons_and_marks_at_their_sizes(cx: &mut gpui::TestAppContext) {
+        use gpui::VisualTestContext;
+        struct View;
+        impl gpui::Render for View {
+            fn render(&mut self, _: &mut gpui::Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+                let at = |name: &'static str| div().flex().debug_selector(move || name.into());
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_start()
+                    .child(at("dialog").child(button("d", "Save", ButtonKind::Primary, ButtonSize::Dialog)))
+                    .child(at("small").child(icon_button("s", Icon::Play, "Run", true)))
+                    .child(at("icon").child(icon(Icon::Play, 16., Theme::color(Theme::global(cx).tokens.ink))))
+                    .child(at("mark-14").child(status_mark("m14", MarkStatus::Passed, 14., false, true, cx)))
+                    .child(at("mark-16").child(status_mark("m16", MarkStatus::Passed, 16., false, true, cx)))
+            }
+        }
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| View);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        let size = |cx: &mut VisualTestContext, name: &'static str| {
+            let b = cx.debug_bounds(name).unwrap();
+            (f32::from(b.size.width), f32::from(b.size.height))
+        };
+        assert_eq!(size(&mut cx, "dialog").1, crate::theme::METRICS.control_height);
+        assert_eq!(size(&mut cx, "small"), (24., 24.));
+        assert_eq!(size(&mut cx, "icon"), (16., 16.));
+        assert_eq!(size(&mut cx, "mark-14"), (14., 14.));
+        assert_eq!(size(&mut cx, "mark-16"), (16., 16.));
+        assert_eq!(crate::theme::METRICS.text_base.size, 14., "a dialog button's text");
     }
 }

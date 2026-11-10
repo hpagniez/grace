@@ -242,6 +242,7 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
                             .font_family(crate::theme::MONO)
                             .text_size(px(METRICS.text_xs.size))
                             .text_color(muted)
+                            .debug_selector(move || format!("recent-path-{i}"))
                             .child(cut(("recent-path", i), path).side(Side::Over)),
                     ),
                 ),
@@ -274,7 +275,13 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
                     .child(row),
             ),
         )
-        .child(div().ml_2().flex_none().child(remove))
+        .child(
+            div()
+                .ml_2()
+                .flex_none()
+                .debug_selector(move || format!("recent-remove-{i}"))
+                .child(remove),
+        )
         .into_any_element()
 }
 
@@ -286,7 +293,9 @@ mod tests {
     use crate::seams::fake::FakeSeams;
     use gpui::{Context, Render, TestAppContext, VisualTestContext};
     use grace_core::model::events::AppEvent;
+    use std::cell::RefCell;
     use std::path::PathBuf;
+    use std::rc::Rc;
     use std::sync::Arc;
 
     struct HomeView {
@@ -486,5 +495,111 @@ mod tests {
         let (_, _, vcx) = setup(cx, vec![opening()]);
         assert!(vcx.debug_bounds("home").is_some());
         assert!(vcx.debug_bounds("sheet").is_none());
+    }
+
+    /// Home with its tooltips, `width` wide: the recent `entries` and, when given, a notice.
+    fn with_tips(
+        cx: &mut TestAppContext,
+        width: f32,
+        entries: Vec<RecentEntry>,
+        notice: Option<&'static str>,
+    ) -> (
+        crate::testing::Harness,
+        VisualTestContext,
+        Rc<RefCell<Option<FocusHandle>>>,
+    ) {
+        let mut state = grace_core::state::AppState::new();
+        state.loaded = true;
+        state.recent = Some(entries);
+        let slot: Rc<RefCell<Option<FocusHandle>>> = Rc::default();
+        let s = slot.clone();
+        let (h, vcx) = crate::testing::open(cx, width, state, move |grace, window, cx| {
+            let open = s.borrow_mut().get_or_insert_with(|| cx.focus_handle()).clone();
+            let state = grace.read(cx).state.clone();
+            let shown = notice.map(|text| {
+                crate::ui::notice("notice", crate::ui::NoticeKind::Warning, text, vec![], cx).into_any_element()
+            });
+            render(grace, &state, shown, &open, window, cx).into_any_element()
+        });
+        (h, vcx, slot)
+    }
+
+    fn rest_on(cx: &mut VisualTestContext, at: gpui::Point<gpui::Pixels>) {
+        cx.simulate_mouse_move(gpui::point(px(1.), px(1.)), None, gpui::Modifiers::none());
+        cx.simulate_mouse_move(at, None, gpui::Modifiers::none());
+        cx.executor().advance_clock(crate::tooltip::DELAY);
+        cx.run_until_parked();
+    }
+
+    /// `Home.test.tsx` "explains a missing folder in a tooltip, though its row is disabled".
+    #[gpui::test]
+    fn explains_a_missing_folder_in_a_tooltip_though_its_row_is_disabled(cx: &mut TestAppContext) {
+        let (h, mut vcx, _) = with_tips(cx, 1200., entries(), None);
+        let name = vcx.debug_bounds("recent-name-1").unwrap();
+        rest_on(&mut vcx, name.center());
+        assert_eq!(h.tip(&mut vcx).as_deref(), Some(MISSING));
+        let row = vcx.debug_bounds("recent-row-1").unwrap();
+        assert!(row.contains(&h.tip_bounds(&mut vcx).unwrap().origin), "over the row");
+        let name = vcx.debug_bounds("recent-name-0").unwrap();
+        rest_on(&mut vcx, name.center());
+        assert_eq!(h.tip(&mut vcx), None, "a folder that is there says nothing");
+    }
+
+    /// `Home.test.tsx` "shows a path that is cut in a tooltip, and only then" (R9.4).
+    #[gpui::test]
+    fn shows_a_cut_path_whole_in_a_tooltip_and_only_then(cx: &mut TestAppContext) {
+        let long = format!("D:\\{}\\api", "deep\\".repeat(40));
+        let list = vec![RecentEntry {
+            path: long.clone(),
+            exists: true,
+        }];
+        let (h, mut vcx, _) = with_tips(cx, 800., list.clone(), None);
+        let path = vcx.debug_bounds("recent-path-0").unwrap();
+        rest_on(&mut vcx, path.center());
+        assert_eq!(h.tip(&mut vcx).as_deref(), Some(long.as_str()));
+        let (h, mut vcx, _) = with_tips(cx, 800., entries(), None);
+        let path = vcx.debug_bounds("recent-path-0").unwrap();
+        rest_on(&mut vcx, path.center());
+        assert_eq!(h.tip(&mut vcx), None, "a path that fits");
+    }
+
+    /// `Home.test.tsx` "removes a row with a 24 px icon button that has a name and a tooltip" and "removing a row
+    /// moves the focus to Open folder…".
+    #[gpui::test]
+    fn removes_a_row_with_its_button_and_takes_the_focus_to_open_folder(cx: &mut TestAppContext) {
+        let (h, mut vcx, open) = with_tips(cx, 1200., entries(), None);
+        for i in 0..2 {
+            let b = vcx
+                .debug_bounds(if i == 0 { "recent-remove-0" } else { "recent-remove-1" })
+                .unwrap();
+            assert_eq!((b.size.width, b.size.height), (px(24.), px(24.)), "row {i}");
+        }
+        let b = vcx.debug_bounds("recent-remove-1").unwrap();
+        rest_on(&mut vcx, b.center());
+        assert_eq!(h.tip(&mut vcx).as_deref(), Some(REMOVE));
+        vcx.simulate_click(b.center(), gpui::Modifiers::none());
+        vcx.run_until_parked();
+        assert_eq!(h.backend.calls(), ["remove_recent E:\\usb\\old"]);
+        let open = open.borrow().clone().unwrap();
+        assert!(
+            vcx.update(|window, _| open.is_focused(window)),
+            "the focus on Open folder…"
+        );
+        // the new list arrives: the focus stays there
+        h.update(&mut vcx, |s| s.recent = Some(entries()[..1].to_vec()));
+        assert!(vcx.update(|window, _| open.is_focused(window)));
+    }
+
+    /// `Home.test.tsx` "a notice shows above the column, inside home".
+    #[gpui::test]
+    fn a_notice_shows_above_the_column_inside_home(cx: &mut TestAppContext) {
+        let (_h, mut vcx, _) = with_tips(cx, 1200., entries(), Some("Folder not found: D:\\x"));
+        let (home, notice, column) = (
+            vcx.debug_bounds("home").unwrap(),
+            vcx.debug_bounds("notice").unwrap(),
+            vcx.debug_bounds("home-column").unwrap(),
+        );
+        assert!(home.contains(&notice.origin), "{home:?} {notice:?}");
+        assert!(notice.bottom() <= column.top(), "{notice:?} {column:?}");
     }
 }

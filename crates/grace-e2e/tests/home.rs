@@ -166,6 +166,21 @@ fn removing_a_row() {
     )
     .unwrap();
     let remove = app.wait_for_node(Role::Button, "Remove from list").unwrap();
+    // the list and its heading, as `Home.test.tsx` reads them
+    let tree = app.tree().unwrap();
+    let list = tree
+        .find(&Role::List, "Recent folders")
+        .unwrap_or_else(|| panic!("{}", tree.dump()));
+    assert_eq!(list.all().into_iter().filter(|n| n.role == Role::ListItem).count(), 1);
+    if cfg!(not(windows)) {
+        assert!(
+            tree.all()
+                .into_iter()
+                .any(|n| n.role == Role::Other("Heading".into()) && n.name == "Recent folders"),
+            "{}",
+            tree.dump()
+        );
+    }
     if let Some(r) = remove.rect {
         assert!(r.width >= 24 && r.height >= 24, "R10.3: {r:?}");
     }

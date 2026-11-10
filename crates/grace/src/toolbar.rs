@@ -252,6 +252,8 @@ pub fn render(
     div()
         .id("toolbar")
         .debug_selector(|| "toolbar".into())
+        // `<header>`: the page's banner landmark
+        .role(Role::Banner)
         .flex()
         .flex_none()
         .items_center()

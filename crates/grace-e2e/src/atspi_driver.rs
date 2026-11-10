@@ -361,6 +361,7 @@ fn role(role: atspi::Role) -> Role {
         A::Label | A::Static | A::Text => Role::Text,
         A::Dialog | A::Alert => Role::Dialog,
         A::ToolTip => Role::Tooltip,
+        A::Landmark => Role::Landmark,
         other => Role::Other(format!("{other:?}")),
     }
 }

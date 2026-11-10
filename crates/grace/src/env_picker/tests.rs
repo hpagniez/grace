@@ -329,7 +329,7 @@ fn the_env_and_threads_boxes_show_their_longest_likely_values_whole(cx: &mut Tes
                     .width,
             )
         };
-        let inside = |box_width: f32| box_width - 2. * f32::from(gpui_component::Size::Medium.input_px()) - 2.;
+        let inside = |box_width: f32| box_width - 2. * f32::from(gpui_component::Size::Small.input_px()) - 2.;
         let production = width("production");
         assert!(production > 40., "the font is there: {production}");
         assert!(production <= inside(WIDTH), "{production} in {}", inside(WIDTH));

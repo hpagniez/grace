@@ -56,11 +56,21 @@ fn open_a_project_and_see_its_tests() {
     app.answer_folder(Some(&dir)).unwrap();
     app.press(home.find(&Role::Button, "Open folder…").unwrap()).unwrap();
     let features = ["basic.feature", "outline.feature", "slow.feature"];
+    let path = dir.to_string_lossy().to_string();
+    // the rows, the path and the layout chip, read together: the chip can come a frame after the rows
     let tree = app
-        .wait_for("the tests folder and its features", WAIT, |t| {
-            row(t, "tests").is_some() && features.iter().all(|f| row(t, f).is_some())
+        .wait_for("the tests folder, its features, the path and the layout", WAIT, |t| {
+            row(t, "tests").is_some()
+                && features.iter().all(|f| row(t, f).is_some())
+                && named(t, &path).is_some()
+                && named(t, "Standalone").is_some()
         })
         .unwrap();
+    // the toolbar, the main area and the status bar are landmarks, as `<header>`, `<main>` and `<footer>` were
+    if cfg!(not(windows)) {
+        let landmarks = tree.all().into_iter().filter(|n| n.role == Role::Landmark).count();
+        assert_eq!(landmarks, 3, "{}", tree.dump());
+    }
     // folders and feature files only, until a feature opens (#224 R1.1)
     assert_eq!(
         rows(&tree),
@@ -75,9 +85,6 @@ fn open_a_project_and_see_its_tests() {
             tree.dump()
         );
     }
-    let path = dir.to_string_lossy().to_string();
-    assert!(named(&tree, &path).is_some(), "the project's path: {}", tree.dump());
-    assert!(named(&tree, "Standalone").is_some(), "the layout: {}", tree.dump());
 
     app.press_named(Role::Button, "Expand outline.feature").unwrap();
     let tree = app

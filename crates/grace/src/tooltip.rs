@@ -15,10 +15,10 @@ use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
-    AnyElement, App, AppContext as _, Bounds, Context, ElementId, Entity, FocusHandle, Global, InteractiveElement as _,
-    IntoElement, MouseButton, ParentElement as _, Pixels, Render, RenderOnce, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Task, WeakEntity, Window, WindowId, deferred, div,
-    point, px,
+    AnyElement, App, AppContext as _, Bounds, Context, DispatchPhase, ElementId, Entity, FocusHandle, Global,
+    InteractiveElement as _, IntoElement, MouseButton, MouseMoveEvent, ParentElement as _, Pixels, Render, RenderOnce,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Task, WeakEntity, Window, WindowId,
+    canvas, deferred, div, point, px,
 };
 use gpui_base::{ElementExt as _, Placement, Positioner};
 
@@ -52,6 +52,9 @@ struct Open {
     side: Side,
 }
 
+/// Where a target was laid out, and whether any of it shows.
+type Seen = (Bounds<Pixels>, bool);
+
 /// A window's tooltip: at most one open, at most one waiting for its pause.
 pub struct Tips {
     open: Option<Open>,
@@ -64,6 +67,9 @@ pub struct Tips {
     focused: Option<ElementId>,
     /// Where the open tooltip was drawn, so the pointer can move onto it without closing it.
     drawn: Rc<Cell<Option<Bounds<Pixels>>>>,
+    /// Where the open tooltip's target was laid out this frame, and whether any of it shows inside the boxes that
+    /// hold it; `None` when it was not laid out at all, a row gone from a list.
+    seen: Rc<Cell<Option<Seen>>>,
     _escape: Subscription,
 }
 
@@ -95,6 +101,7 @@ pub fn install(window: &mut Window, cx: &mut App) -> Entity<Tips> {
             pressed: None,
             focused: None,
             drawn: Rc::default(),
+            seen: Rc::default(),
             _escape: escape,
         }
     });
@@ -113,6 +120,12 @@ impl Tips {
     /// The text of the open tooltip, if one is open.
     pub fn text(&self) -> Option<SharedString> {
         self.open.as_ref().map(|o| o.text.clone())
+    }
+
+    /// Where the open tooltip was drawn, for tests.
+    #[cfg(test)]
+    pub fn drawn(&self) -> Option<Bounds<Pixels>> {
+        self.drawn.get()
     }
 
     /// Closes the open tooltip and forgets one waiting for its pause.
@@ -149,9 +162,21 @@ impl Tips {
             self.pressed = None;
         }
         self.pending = None;
-        let onto_tip = self.drawn.get().is_some_and(|b| b.contains(&window.mouse_position()));
+        // the gap between the target and the tooltip counts as the tooltip, so the pointer can cross it
+        let onto_tip = self
+            .drawn
+            .get()
+            .is_some_and(|b| b.dilate(px(GAP)).contains(&window.mouse_position()));
         if self.is_open_for(trigger) && !onto_tip {
             self.hide(cx);
+        }
+    }
+
+    /// Places the open tooltip again by its target, which moved.
+    fn follow(&mut self, target: Bounds<Pixels>, cx: &mut Context<Self>) {
+        if let Some(open) = &mut self.open {
+            open.target = target;
+            cx.notify();
         }
     }
 
@@ -198,6 +223,11 @@ impl Render for Tips {
         let over = open.side == Side::Over;
         let me = cx.weak_entity();
         let leave = me.clone();
+        let moved = me.clone();
+        let from_keyboard = self.focused.as_ref() == Some(&open.trigger);
+        let shown_at = self.drawn.clone();
+        let seen = self.seen.clone();
+        let follow = me.clone();
         let shadow = m
             .shadow_float
             .iter()
@@ -238,13 +268,56 @@ impl Render for Tips {
                     })
                     // A click on it closes it rather than reaching what lies under it; one over its target lies on
                     // it, so a click within the target's box is the target's.
+                    // A right-click reaches what lies under it, as on the target, and its press closes it.
+                    .on_mouse_down(MouseButton::Right, {
+                        let me = me.clone();
+                        move |_, _, cx| {
+                            let _ = me.update(cx, |tips, cx| tips.hide(cx));
+                        }
+                    })
                     .on_mouse_down(MouseButton::Left, move |event, _, cx| {
                         let _ = me.update(cx, |tips, cx| tips.hide(cx));
                         if !(over && target.contains(&event.position)) {
                             cx.stop_propagation();
                         }
                     })
-                    .child(div().id("grace-tooltip-text").child(open.text)),
+                    .child(div().id("grace-tooltip-text").child(open.text))
+                    // A pointer anywhere but on the target or the tooltip closes one it opened: its target may have
+                    // gone from under it, a row scrolled away or a view closed, with no leave to tell.
+                    .child(
+                        canvas(
+                            |_, _, _| {},
+                            move |_, _, window, cx| {
+                                // A target that moved or went: a scroll, a list that dropped its row. One the
+                                // keyboard stands on is followed while some of it shows; any other closes.
+                                match seen.take() {
+                                    Some((now, true)) if now == target => {}
+                                    Some((now, true)) if from_keyboard => cx.defer(move |cx| {
+                                        let _ = follow.update(cx, |tips, cx| tips.follow(now, cx));
+                                    }),
+                                    _ => cx.defer(move |cx| {
+                                        let _ = follow.update(cx, |tips, cx| tips.hide(cx));
+                                    }),
+                                }
+                                let moved = moved.clone();
+                                let shown_at = shown_at.clone();
+                                window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                                    let on_tip = shown_at
+                                        .get()
+                                        .is_some_and(|b| b.dilate(px(GAP)).contains(&event.position));
+                                    if phase == DispatchPhase::Bubble
+                                        && !from_keyboard
+                                        && !on_tip
+                                        && !target.contains(&event.position)
+                                    {
+                                        let _ = moved.update(cx, |tips, cx| tips.hide(cx));
+                                    }
+                                });
+                            },
+                        )
+                        .absolute()
+                        .size_0(),
+                    ),
             ),
         )
         .with_priority(PRIORITY)
@@ -320,12 +393,17 @@ pub fn cut_middle(id: impl Into<ElementId>, head: impl Into<SharedString>, tail:
 
 /// Sets `cut` while `text`, in the element's text style, is wider than the element.
 fn measure(text: SharedString, cut: Rc<Cell<bool>>) -> impl Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static {
-    move |b, window, _| {
+    move |b, window, cx| {
         let style = window.text_style();
         let size = style.font_size.to_pixels(window.rem_size());
         let run = style.to_run(text.len());
         let width = window.text_system().shape_line(text.clone(), size, &[run], None).width;
-        cut.set(width > b.size.width + px(0.5));
+        let now = width > b.size.width + px(0.5);
+        // a line the keyboard stands on shows its tooltip once it is cut: draw again to tell it, on a change only
+        // (after this frame, as a refresh while drawing is dropped)
+        if cut.replace(now) != now {
+            window.defer(cx, |window, _| window.refresh());
+        }
     }
 }
 
@@ -458,11 +536,21 @@ impl RenderOnce for Tip {
         let left = trigger.clone();
         let under = bounds.clone();
         let pressed = trigger.clone();
+        let laid_out = trigger.clone();
         div()
             .id(self.id)
             .flex()
             .min_w_0()
-            .on_prepaint(move |b, _, _| bounds.set(b))
+            .on_prepaint(move |b, window, cx| {
+                bounds.set(b);
+                if let Some(tips) = tips_of(window, cx) {
+                    let tips = tips.read(cx);
+                    if tips.is_open_for(&laid_out) {
+                        let shows = !b.intersect(&window.content_mask().bounds).is_empty();
+                        tips.seen.set(Some((b, shows)));
+                    }
+                }
+            })
             .on_hover(move |hovered, window, cx| {
                 let Some(tips) = tips_of(window, cx) else { return };
                 if *hovered {
@@ -488,14 +576,29 @@ impl RenderOnce for Tip {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{Modifiers, TestAppContext, VisualTestContext, size};
+    use gpui::prelude::FluentBuilder as _;
+    use gpui::{Modifiers, ScrollHandle, TestAppContext, VisualTestContext, size};
 
     struct View {
         tips: Option<Entity<Tips>>,
         /// Whether the keyboard stands on the `pinned` target.
         pinned: bool,
+        /// Whether the keyboard stands on the `none` target, which has no text.
+        blank: bool,
+        /// Whether the `pinned` target is drawn: a row scrolled out of view is not.
+        pinned_drawn: bool,
+        /// Whether the keyboard stands on the `scrolled` target, in a box that scrolls.
+        scrolled_pinned: bool,
+        scroll: ScrollHandle,
+        /// Whether the keyboard stands on the `grows` line, and whether its box is narrow enough to cut it.
+        grows_pinned: bool,
+        narrow: bool,
         /// Clicks that reached the window's root.
         clicks: Rc<Cell<u32>>,
+        /// Right presses and Escapes that reached the window's root.
+        rights: Rc<Cell<u32>>,
+        escapes: Rc<Cell<u32>>,
+        root: Option<FocusHandle>,
     }
 
     impl Render for View {
@@ -504,10 +607,20 @@ mod tests {
             let at = |y: f32| div().absolute().left(px(0.)).top(px(y));
             let beside = |x: f32, y: f32| div().absolute().left(px(x)).top(px(y));
             let clicks = self.clicks.clone();
+            let rights = self.rights.clone();
+            let escapes = self.escapes.clone();
+            let root = self.root.get_or_insert_with(|| cx.focus_handle()).clone();
             div()
                 .id("root")
+                .track_focus(&root)
                 .size_full()
                 .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                .on_mouse_down(MouseButton::Right, move |_, _, _| rights.set(rights.get() + 1))
+                .on_key_down(move |e, _, _| {
+                    if e.keystroke.key == "escape" {
+                        escapes.set(escapes.get() + 1)
+                    }
+                })
                 .child(
                     beside(300., 0.).child(
                         tooltip("left", Some(SharedString::from("Left")))
@@ -522,13 +635,58 @@ mod tests {
                             .child(div().w(px(100.)).h(px(30.))),
                     ),
                 )
-                .child(beside(300., 100.).child(tooltip("none", None).child(div().w(px(100.)).h(px(30.)))))
                 .child(
-                    beside(300., 200.).child(
-                        tooltip("pinned", Some(SharedString::from("Pinned")))
-                            .keyboard(self.pinned)
+                    beside(300., 100.).child(
+                        tooltip("none", None)
+                            .keyboard(self.blank)
                             .child(div().w(px(100.)).h(px(30.))),
                     ),
+                )
+                .when(self.pinned_drawn, |root| {
+                    root.child(
+                        beside(300., 200.).child(
+                            tooltip("pinned", Some(SharedString::from("Pinned")))
+                                .keyboard(self.pinned)
+                                .child(div().w(px(100.)).h(px(30.))),
+                        ),
+                    )
+                })
+                .child(beside(400., 560.).child(
+                    tooltip("flip-up", Some(SharedString::from("Flips up"))).child(div().w(px(100.)).h(px(30.))),
+                ))
+                .child(
+                    beside(760., 450.).child(
+                        tooltip("clamp", Some(SharedString::from("Kept inside the window")))
+                            .child(div().w(px(30.)).h(px(30.))),
+                    ),
+                )
+                .child(
+                    beside(10., 500.).child(
+                        tooltip("flip-right", Some(SharedString::from("Flips right")))
+                            .side(Side::Left)
+                            .child(div().w(px(30.)).h(px(24.))),
+                    ),
+                )
+                .child(
+                    beside(620., 150.).child(
+                        div()
+                            .id("box")
+                            .w(px(120.))
+                            .h(px(60.))
+                            .overflow_y_scroll()
+                            .track_scroll(&self.scroll)
+                            .child(
+                                tooltip("scrolled", Some(SharedString::from("Scrolled")))
+                                    .keyboard(self.scrolled_pinned)
+                                    .child(div().w(px(100.)).h(px(30.))),
+                            )
+                            .child(div().h(px(300.))),
+                    ),
+                )
+                .child(
+                    beside(0., 500.)
+                        .w(px(if self.narrow { 60. } else { 400. }))
+                        .child(cut("grows", "A line cut once its box narrows").keyboard(self.grows_pinned)),
                 )
                 .child(
                     beside(300., 300.)
@@ -569,7 +727,16 @@ mod tests {
         let window = cx.add_window(|_, _| View {
             tips: None,
             pinned: false,
+            blank: false,
+            pinned_drawn: true,
+            scrolled_pinned: false,
+            grows_pinned: false,
+            narrow: false,
+            scroll: ScrollHandle::new(),
             clicks: Rc::default(),
+            rights: Rc::default(),
+            escapes: Rc::default(),
+            root: None,
         });
         let view = window.root(cx).unwrap();
         let vcx = VisualTestContext::from_window(window.into(), cx);
@@ -618,10 +785,22 @@ mod tests {
         cx.executor().advance_clock(DELAY);
         cx.run_until_parked();
         assert!(shown(&view, &mut cx).is_some());
+        // the window's root has the focus, as a dialog would
+        cx.update(|window, cx| {
+            let root = view.read(cx).root.clone().unwrap();
+            window.focus(&root, cx)
+        });
         cx.simulate_keystrokes("a");
         assert!(shown(&view, &mut cx).is_some(), "another key leaves it");
         cx.simulate_keystrokes("escape");
         assert_eq!(shown(&view, &mut cx), None);
+        assert_eq!(escapes(&view, &mut cx), 0, "the first Escape is the tooltip's only");
+        cx.simulate_keystrokes("escape");
+        assert_eq!(
+            escapes(&view, &mut cx),
+            1,
+            "the next reaches the window: a dialog closes"
+        );
 
         cx.simulate_mouse_move(point(px(500.), px(400.)), None, Modifiers::none());
         cx.simulate_mouse_move(point(px(50.), px(15.)), None, Modifiers::none());
@@ -722,6 +901,14 @@ mod tests {
         cx.update(|_, cx| view.read(cx).clicks.get())
     }
 
+    fn rights(view: &Entity<View>, cx: &mut VisualTestContext) -> u32 {
+        cx.update(|_, cx| view.read(cx).rights.get())
+    }
+
+    fn escapes(view: &Entity<View>, cx: &mut VisualTestContext) -> u32 {
+        cx.update(|_, cx| view.read(cx).escapes.get())
+    }
+
     #[gpui::test]
     fn keeps_open_while_the_pointer_moves_from_the_target_onto_it(cx: &mut TestAppContext) {
         let (view, mut cx) = open(cx);
@@ -745,6 +932,23 @@ mod tests {
         cx.simulate_click(tip.center(), Modifiers::none());
         assert_eq!(shown(&view, &mut cx), None);
         assert_eq!(clicks(&view, &mut cx), 0);
+    }
+
+    #[gpui::test]
+    fn a_right_click_on_it_reaches_what_lies_under_and_closes_it(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        let tip = drawn(&view, &mut cx);
+        cx.simulate_event(gpui::MouseDownEvent {
+            position: tip.center(),
+            button: MouseButton::Right,
+            modifiers: Modifiers::none(),
+            click_count: 1,
+            first_mouse: false,
+        });
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+        assert_eq!(rights(&view, &mut cx), 1, "the window's root had the press");
     }
 
     #[gpui::test]
@@ -795,6 +999,127 @@ mod tests {
         cx.run_until_parked();
     }
 
+    /// The keyboard moves from a row with a tooltip, scrolled out of view as it goes, to one without: the first
+    /// closes, though it is no longer drawn to say so (the owner's cleanup in `Tooltip.tsx`).
+    #[gpui::test]
+    fn the_keyboard_moving_to_a_row_without_a_tooltip_closes_the_last(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        pin(&view, true, &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+        view.update(&mut cx, |v, cx| {
+            v.pinned_drawn = false;
+            v.blank = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+    }
+
+    fn scroll_box(view: &Entity<View>, by: f32, cx: &mut VisualTestContext) {
+        view.update(cx, |v, cx| {
+            let y = v.scroll.offset().y;
+            v.scroll.set_offset(point(px(0.), y - px(by)));
+            cx.notify();
+        });
+        cx.run_until_parked();
+    }
+
+    /// A scroll of a box that holds its target moves the target from under the pointer: the tooltip closes.
+    #[gpui::test]
+    fn hides_when_a_scroll_moves_its_target(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 650., 165.);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Scrolled"));
+        cx.simulate_event(gpui::ScrollEvent {
+            position: point(px(650.), px(165.)),
+            delta: gpui::ScrollDelta::Pixels(point(px(0.), px(-20.))),
+            ..Default::default()
+        });
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+    }
+
+    /// A console following its tail scrolls while the pointer rests on a button elsewhere: its tooltip stays.
+    #[gpui::test]
+    fn stays_open_when_a_box_that_does_not_hold_its_target_scrolls(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        scroll_box(&view, 20., &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Refresh the tree"));
+    }
+
+    /// A row the keyboard stands on scrolls: its tooltip follows it while it is in the box, and closes once it is
+    /// out.
+    #[gpui::test]
+    fn a_pinned_tooltip_follows_its_target_on_a_scroll_and_closes_once_it_is_out(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        view.update(&mut cx, |v, cx| {
+            v.scrolled_pinned = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        let before = drawn(&view, &mut cx);
+        scroll_box(&view, 10., &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Scrolled"));
+        assert_eq!(drawn(&view, &mut cx).top(), before.top() - px(10.), "placed again");
+        scroll_box(&view, 40., &mut cx);
+        assert_eq!(shown(&view, &mut cx), None, "its target left the box");
+    }
+
+    /// The keyboard stands on a line that fits: nothing shows, until the line is cut.
+    #[gpui::test]
+    fn a_pinned_tooltip_shows_once_its_text_comes(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        view.update(&mut cx, |v, cx| {
+            v.grows_pinned = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+        view.update(&mut cx, |v, cx| {
+            v.narrow = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            shown(&view, &mut cx).as_deref(),
+            Some("A line cut once its box narrows")
+        );
+    }
+
+    /// The pointer leaving a target the keyboard stands on closes its tooltip too.
+    #[gpui::test]
+    fn a_pointer_leaving_closes_a_pinned_tooltip(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 350., 215.);
+        pin(&view, true, &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+        cx.simulate_mouse_move(point(px(500.), px(400.)), None, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None);
+    }
+
+    /// The pointer crosses the gap between the target and its tooltip without closing it.
+    #[gpui::test]
+    fn keeps_open_while_the_pointer_crosses_the_gap(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        let tip = drawn(&view, &mut cx);
+        // below the target (0..30), the tooltip from 30 + GAP
+        for y in [29., 31., 33., 35.] {
+            cx.simulate_mouse_move(point(px(50.), px(y)), None, Modifiers::none());
+            cx.run_until_parked();
+            assert!(shown(&view, &mut cx).is_some(), "closed at y = {y}, tooltip {tip:?}");
+        }
+        cx.simulate_mouse_move(
+            point(tip.center().x.min(px(90.)), tip.top() + px(2.)),
+            None,
+            Modifiers::none(),
+        );
+        cx.run_until_parked();
+        assert!(shown(&view, &mut cx).is_some());
+    }
+
     /// A row the keyboard stands on (`Tip::keyboard`): its tooltip shows at once while it does, and Escape closes it
     /// for as long as it does.
     #[gpui::test]
@@ -811,5 +1136,50 @@ mod tests {
         view.update(&mut cx, |_, cx| cx.notify());
         cx.run_until_parked();
         assert_eq!(shown(&view, &mut cx), None, "not back while the keyboard stays");
+    }
+
+    /// `placeTip.test.ts`: below and centred, flipped above with no room below, kept 8 px inside the window, and a
+    /// side tooltip flipped to the other side with no room on its own.
+    #[gpui::test]
+    fn stays_in_the_window_flipping_where_it_has_no_room(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 450., 575.);
+        let up = drawn(&view, &mut cx);
+        assert_eq!(up.bottom(), px(560. - GAP), "above: {up:?}");
+        assert!((f32::from(up.center().x) - 450.).abs() <= 1., "centred: {up:?}");
+        rest_on(&mut cx, 775., 465.);
+        let clamped = drawn(&view, &mut cx);
+        assert!(clamped.right() <= px(800. - EDGE), "{clamped:?}");
+        rest_on(&mut cx, 25., 512.);
+        let right = drawn(&view, &mut cx);
+        assert_eq!(right.left(), px(40. + GAP), "flipped right: {right:?}");
+        assert!(
+            right.top() < px(524.) && right.bottom() > px(500.),
+            "on its row: {right:?}"
+        );
+    }
+
+    /// A target gone from under the tooltip (a row scrolled away, a view closed) cannot say the pointer left it: the
+    /// next move of the pointer elsewhere closes the tooltip. One the keyboard opened stays.
+    #[gpui::test]
+    fn closes_when_the_pointer_moves_elsewhere_though_its_target_is_gone(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        assert!(shown(&view, &mut cx).is_some());
+        // as if the target went elsewhere: the pointer is now over nothing that tells it left
+        cx.update(|window, cx| {
+            let tips = view.read(cx).tips.clone().unwrap();
+            tips.update(cx, |tips, _| {
+                tips.open.as_mut().unwrap().target = Bounds::new(point(px(600.), px(300.)), size(px(10.), px(10.)))
+            });
+            window.refresh();
+        });
+        cx.run_until_parked();
+        cx.simulate_mouse_move(point(px(52.), px(16.)), None, Modifiers::none());
+        assert_eq!(shown(&view, &mut cx), None);
+
+        pin(&view, true, &mut cx);
+        cx.simulate_mouse_move(point(px(700.), px(400.)), None, Modifiers::none());
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
     }
 }

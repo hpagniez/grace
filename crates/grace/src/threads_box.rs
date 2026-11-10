@@ -154,10 +154,9 @@ impl Render for ThreadsBox {
         let tip = narrow.then(|| SharedString::from(LABEL));
         let boxed = tooltip("tip-threads", tip).side(Side::Left).child(
             div().debug_selector(|| "threads-input".into()).w(px(WIDTH)).child(
-                crate::elements::input(&self.input)
+                crate::elements::input(&self.input, METRICS.control_height)
                     .role(Role::SpinButton)
                     .aria_label(LABEL)
-                    .h(px(METRICS.control_height))
                     .disabled(disabled),
             ),
         );

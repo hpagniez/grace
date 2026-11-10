@@ -75,6 +75,11 @@ impl Harness {
     pub fn tip(&self, cx: &mut VisualTestContext) -> Option<SharedString> {
         cx.update(|_, cx| self.view.read(cx).tips.as_ref()?.read(cx).text())
     }
+
+    /// Where the tooltip showing now was drawn.
+    pub fn tip_bounds(&self, cx: &mut VisualTestContext) -> Option<gpui::Bounds<gpui::Pixels>> {
+        cx.update(|_, cx| self.view.read(cx).tips.as_ref()?.read(cx).drawn())
+    }
 }
 
 /// A window `width` wide drawing `draw` on a `Grace` holding `state`.

@@ -5,7 +5,7 @@ use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern, UISelectionItemPattern,
     UITogglePattern, UIValuePattern,
 };
-use uiautomation::types::{ControlType, ExpandCollapseState, Point, ToggleState};
+use uiautomation::types::{ControlType, ExpandCollapseState, Point, ToggleState, UIProperty};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
@@ -115,11 +115,19 @@ impl UiaDriver {
                 ExpandCollapseState::Collapsed => Some(false),
                 _ => None,
             });
+        // AccessKit gives a node's description as UI Automation's full description; the legacy description
+        // (which UI Automation works out from MSAA, and does not always fill) and the help text stay as fallbacks
         let description = e
-            .get_pattern::<UILegacyIAccessiblePattern>()
+            .get_property_value(UIProperty::FullDescription)
             .ok()
-            .and_then(|p| p.get_description().ok())
+            .and_then(|v| v.get_string().ok())
             .filter(|d| !d.is_empty())
+            .or_else(|| {
+                e.get_pattern::<UILegacyIAccessiblePattern>()
+                    .ok()
+                    .and_then(|p| p.get_description().ok())
+                    .filter(|d| !d.is_empty())
+            })
             .or_else(|| e.get_help_text().ok())
             .unwrap_or_default();
         // a text box's text, through the Value pattern a button or a check box does not have

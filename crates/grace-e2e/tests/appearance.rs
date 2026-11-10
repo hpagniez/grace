@@ -104,6 +104,19 @@ fn follow_windows_is_the_default() {
     let tree = open_appearance(&app);
     assert_eq!(checked(&tree), [true, false, false]);
     assert!(app.settings().get("appearance").is_none(), "{}", app.settings());
+    // `Settings.test.tsx`: the page's structure, its entry for the open section selected
+    let entry = tree
+        .find(&Role::Button, "Appearance")
+        .unwrap_or_else(|| panic!("{}", tree.dump()));
+    if cfg!(not(windows)) {
+        // UI Automation reads a selection only through a selection item, which a button is not
+        assert!(entry.states.selected, "{}", tree.dump());
+        // AT-SPI reads headings; the navigation and the region are landmarks there
+        let named = |role: Role, name: &str| tree.all().into_iter().any(|n| n.role == role && n.name == name);
+        assert!(named(Role::Other("Heading".into()), "Settings"), "{}", tree.dump());
+        assert!(named(Role::Other("Heading".into()), "Appearance"), "{}", tree.dump());
+        assert!(named(Role::Landmark, "Settings sections"), "{}", tree.dump());
+    }
     // Xvfb has no dark preference: Follow Windows shows the light theme
     wait_ground(&app, LIGHT_GROUND);
 }

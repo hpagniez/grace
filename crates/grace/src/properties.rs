@@ -454,11 +454,7 @@ impl PropertiesView {
                 .debug_selector(move || format!("prop-value-{id}"))
                 .flex_1()
                 .min_w(px(80.))
-                .child(
-                    crate::elements::input(&f.value)
-                        .aria_label("Property value")
-                        .h(px(METRICS.control_height)),
-                )
+                .child(crate::elements::input(&f.value, METRICS.control_height).aria_label("Property value"))
                 .into_any_element(),
         };
         let delete = format!("Delete {label}");
@@ -481,11 +477,7 @@ impl PropertiesView {
                 div()
                     .debug_selector(move || format!("prop-name-{id}"))
                     .w(px(160.))
-                    .child(
-                        crate::elements::input(&f.name)
-                            .aria_label("Property name")
-                            .h(px(METRICS.control_height)),
-                    ),
+                    .child(crate::elements::input(&f.name, METRICS.control_height).aria_label("Property name")),
             )
             .child(value)
             .child(
@@ -570,11 +562,7 @@ impl Render for PropertiesView {
                             .debug_selector(|| "add-env-input".into())
                             .flex_1()
                             .min_w_0()
-                            .child(
-                                crate::elements::input(&self.new_env)
-                                    .aria_label(NEW_ENV)
-                                    .h(px(METRICS.control_height)),
-                            ),
+                            .child(crate::elements::input(&self.new_env, METRICS.control_height).aria_label(NEW_ENV)),
                     )
                     .child(
                         div().debug_selector(|| "add-env".into()).child(

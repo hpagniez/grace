@@ -1,9 +1,10 @@
 //! `StatusBar.tsx`: the 24 px bar along the bottom of every view, on the ground in muted 12 px text (spec R21). It
 //! starts with the project's path while its view shows (toolbar spec R2), cut so its last folder stays in sight, and
 //! ends with Settings. The update marker and the running version join with the updater in phase P5 (P2 plan).
+use gpui::accesskit::Role;
 use gpui::{
-    App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, Styled, Window, div,
-    prelude::FluentBuilder as _, px,
+    App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, StatefulInteractiveElement as _, Styled,
+    Window, div, prelude::FluentBuilder as _, px,
 };
 use grace_core::state::AppState;
 
@@ -40,6 +41,8 @@ pub fn render(
     div()
         .id("status-bar")
         .debug_selector(|| "status-bar".into())
+        // `<footer>`: the page's content-info landmark
+        .role(Role::ContentInfo)
         .flex()
         .flex_none()
         .items_center()
@@ -72,7 +75,8 @@ pub fn render(
                     crate::elements::ButtonSize::Small,
                 )
                 .icon(crate::assets::Icon::Settings)
-                .h(px(20.))
+                // R10.3: no target under 24 px, the bar's own height
+                .h(px(HEIGHT))
                 .px(px(6.))
                 .text_color(Theme::color(t.muted))
                 .on_click(settings),
@@ -101,6 +105,8 @@ mod tests {
         let (h, mut cx) = bar(cx, 1200., project("D:\\work\\api", Layout::Maven, 1));
         assert_eq!(cx.debug_bounds("status-bar").unwrap().size.height, px(HEIGHT));
         assert!(cx.debug_bounds("project-path").is_some());
+        // `StatusBar.test.tsx` "Settings is a 24 px target" (R10.3)
+        assert_eq!(cx.debug_bounds("settings-button").unwrap().size.height, px(24.));
         // the open project stays shown while another opens
         h.update(&mut cx, |s| s.opening = Some("E:\\next".into()));
         assert_eq!(
