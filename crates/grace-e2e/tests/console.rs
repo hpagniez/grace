@@ -158,22 +158,13 @@ fn step_through_a_failing_runs_errors() {
     run_all(&app);
     app.wait_for("two errors", WAIT, |t| found(t, "2 errors")).unwrap();
     assert!(app.tree().unwrap().find(&Role::Group, "Errors").is_some());
-    // the ERROR line comes during the run, the failed test in Karate's summary at its end. A click on the Console tab
-    // first, as a person's hand would: on CI's Xvfb the window did not always take an F8 sent to it unfocused
-    let tab = app.wait_for_node(Role::Tab, "Console").unwrap();
-    app.click(&tab).unwrap();
-    // CI's Linux runner lost the first F8 after the click now and then: one more try, counted in the message
-    let current = |t: &Node| status_among(t, &["1 of 2 errors", "2 of 2 errors"]).is_some();
-    let mut tries = 0;
-    let tree = loop {
-        tries += 1;
-        app.key(Key::F8).unwrap();
-        match app.wait_for("an error current", Duration::from_secs(10), current) {
-            Ok(tree) => break tree,
-            Err(e) if tries == 2 => panic!("{e}\nF8 pressed {tries} times; focus: {}", app.focus_report()),
-            Err(_) => eprintln!("F8 #{tries} made no error current; pressing it again"),
-        }
-    };
+    // the ERROR line comes during the run, the failed test in Karate's summary at its end
+    app.key(Key::F8).unwrap();
+    let tree = app
+        .wait_for("an error current", WAIT, |t| {
+            status_among(t, &["1 of 2 errors", "2 of 2 errors"]).is_some()
+        })
+        .unwrap();
     if status_among(&tree, &["1 of 2 errors"]).is_some() {
         app.key(Key::F8).unwrap();
     }

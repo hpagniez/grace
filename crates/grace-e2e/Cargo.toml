@@ -16,8 +16,8 @@ atspi = { version = "=0.29.0", default-features = false, features = [
   "zbus",
 ] }
 futures-lite = "=2.6.1"
-# WM_DELETE_WINDOW for `Driver::close`: the version GPUI's X11 backend already brings
-x11rb = "=0.13.2"
+# WM_DELETE_WINDOW for `Driver::close`, XTest for F8: the version GPUI's X11 backend already brings
+x11rb = { version = "=0.13.2", features = ["xtest"] }
 
 [target.'cfg(windows)'.dependencies]
 uiautomation = "=0.25.1"
