@@ -252,6 +252,11 @@ fn home_closes_the_project_and_survives_a_restart() {
     let dir = project("clean").unwrap();
     let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
     project_shown(&app, &dir);
+    // Home is disabled while the tests are being found: a press then does nothing (Windows CI pressed too soon)
+    app.wait_for("the tests found", Duration::from_secs(30), |t| {
+        named(t, "9 tests · Not run yet").is_some()
+    })
+    .unwrap();
     app.press_named(Role::Button, "Home").unwrap();
     app.wait_for("home, the project in the list", Duration::from_secs(15), |t| {
         named(t, HEADING).is_some() && row(t, &dir).is_some()
