@@ -4,13 +4,11 @@
 //! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases).
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
-use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
-    Animation, AnimationExt as _, App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    Transformation, Window, div, percentage, prelude::FluentBuilder as _, px,
+    App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _, px,
 };
 use grace_core::karate::tree::find_node;
 use grace_core::model::events::Step;
@@ -279,10 +277,7 @@ impl Details {
                     if cx.reduce_motion() {
                         mark.into_any_element()
                     } else {
-                        mark.with_animation("spin", Animation::new(Duration::from_secs(1)).repeat(), |svg, d| {
-                            svg.with_transformation(Transformation::rotate(percentage(d)))
-                        })
-                        .into_any_element()
+                        crate::spin::turning(mark).into_any_element()
                     }
                 });
                 div()
@@ -482,6 +477,7 @@ impl Render for Details {
             .debug_selector(|| "details".into())
             .role(Role::Group)
             .aria_label("Details")
+            .size_full()
             .flex()
             .flex_col()
             .flex_1()
