@@ -91,4 +91,17 @@ fn failure_details() {
                 .any(|n| n.name.contains("GET") && n.name.contains("200"))
     })
     .unwrap();
+
+    // a feature: its scenarios counted, and how many ended each way (`Details.test.tsx`)
+    let tree = app.tree().unwrap();
+    app.click(row(&tree, "basic.feature").unwrap()).unwrap();
+    app.wait_for("the feature's counts", WAIT, |t| {
+        t.find(&Role::Group, "Details").is_some_and(|d| {
+            let names: Vec<_> = d.all().into_iter().map(|n| n.name.clone()).collect();
+            names.iter().any(|n| n.ends_with(" scenarios"))
+                && names.iter().any(|n| n == "1 Failed")
+                && names.iter().any(|n| n.ends_with(" Passed"))
+        })
+    })
+    .unwrap();
 }

@@ -213,6 +213,43 @@ mod tests {
         assert!(c.origin.x > n.origin.x + px(150.), "after the text: {c:?}");
     }
 
+    /// `FieldMessage.test.tsx`: each kind in its tone with its own icon; another icon in place of it.
+    #[test]
+    fn a_field_message_takes_its_kinds_tone_and_icon_or_the_one_asked() {
+        let cx = gpui::TestAppContext::single();
+        cx.update(|cx| {
+            crate::init(cx);
+            let t = Theme::global(cx).tokens;
+            assert_eq!(FieldKind::Hint.look(None, cx), (t.muted, Icon::Info));
+            assert_eq!(FieldKind::Warning.look(None, cx), (t.cancelled, Icon::TriangleAlert));
+            assert_eq!(FieldKind::Error.look(None, cx), (t.failed, Icon::CircleAlert));
+            assert_eq!(FieldKind::Hint.look(Some(Icon::Lock), cx), (t.muted, Icon::Lock));
+        });
+    }
+
+    /// `FieldMessage.test.tsx` "wraps long text beside its icon instead of overflowing", and its 12 px text.
+    #[gpui::test]
+    fn a_long_field_message_wraps_beside_its_icon(cx: &mut TestAppContext) {
+        struct Msg;
+        impl Render for Msg {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                div()
+                    .w(px(200.))
+                    .child(field_message("msg", FieldKind::Error, "x ".repeat(150), cx))
+            }
+        }
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| Msg);
+        let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.run_until_parked();
+        let b = vcx.debug_bounds("msg").unwrap();
+        assert!(b.size.width <= px(200.), "{b:?}");
+        assert!(
+            b.size.height > px(METRICS.text_xs.line_height * 2.),
+            "wraps onto lines: {b:?}"
+        );
+    }
+
     /// `Tree.test.tsx` "gives tags the 20 px tag chip, so they clear the rows above and below".
     #[gpui::test]
     fn a_tag_chip_is_20_px_high_inside_a_tree_row(cx: &mut TestAppContext) {
@@ -284,6 +321,19 @@ pub enum FieldKind {
     Error,
 }
 
+impl FieldKind {
+    /// The tone and the icon of a message of this kind, or the icon asked for in place of the kind's own.
+    fn look(self, mark: Option<Icon>, cx: &App) -> (u32, Icon) {
+        let t = Theme::global(cx).tokens;
+        let (tone, own) = match self {
+            FieldKind::Hint => (t.muted, Icon::Info),
+            FieldKind::Warning => (t.cancelled, Icon::TriangleAlert),
+            FieldKind::Error => (t.failed, Icon::CircleAlert),
+        };
+        (tone, mark.unwrap_or(own))
+    }
+}
+
 /// An inline message under a field (`FieldMessage.tsx`): 12 px with its 14 px icon. A screen reader reads it as the
 /// field's description (the field sets it), so it is a plain label here.
 pub fn field_message(id: impl Into<ElementId>, kind: FieldKind, text: impl Into<SharedString>, cx: &App) -> AnyElement {
@@ -298,13 +348,7 @@ pub fn field_message_marked(
     text: impl Into<SharedString>,
     cx: &App,
 ) -> AnyElement {
-    let t = Theme::global(cx).tokens;
-    let (tone, own) = match kind {
-        FieldKind::Hint => (t.muted, Icon::Info),
-        FieldKind::Warning => (t.cancelled, Icon::TriangleAlert),
-        FieldKind::Error => (t.failed, Icon::CircleAlert),
-    };
-    let mark = mark.unwrap_or(own);
+    let (tone, mark) = kind.look(mark, cx);
     let text = text.into();
     let id = id.into();
     let selector: SharedString = id.to_string().into();
