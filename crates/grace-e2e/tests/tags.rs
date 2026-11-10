@@ -123,7 +123,14 @@ fn remove_wip_tags(dir: &Path) {
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn chips_list_the_projects_tags() {
     let (_, app) = open_clean();
-    let tree = app.tree().unwrap();
+    // the chips with the tooltip's next click as their description (`Tooltip`'s `describe`), read together: UI
+    // Automation can answer a read before it has a node's description
+    let hint = "Not filtered. Click to include.";
+    let tree = app
+        .wait_for("the chips and their hints", WAIT, |t| {
+            chip(t, "slow").is_some_and(|c| c.description == hint)
+        })
+        .unwrap();
     assert_eq!(
         chips(&tree),
         ["@slow, not filtered", "@smoke, not filtered", "@wip, not filtered"],
@@ -132,11 +139,6 @@ fn chips_list_the_projects_tags() {
     );
     assert!(tree.find(&Role::CheckBox, "Hide non-matching").is_some());
     assert!(tree.find(&Role::Button, "Clear").is_none());
-    // the tooltip's next click, read with the chip as its description (`Tooltip`'s `describe`)
-    assert_eq!(
-        chip(&tree, "slow").unwrap().description,
-        "Not filtered. Click to include."
-    );
 }
 
 /// TF-02
