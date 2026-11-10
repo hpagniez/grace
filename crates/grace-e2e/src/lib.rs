@@ -214,6 +214,37 @@ pub trait Driver {
     fn focus_report(&self) -> String {
         String::new()
     }
+    /// Moves and sizes the window, as a person dragging it and its edge does (Electron's `setBounds`).
+    fn set_window_rect(&self, x: i32, y: i32, width: i32, height: i32) -> Result<()>;
+    /// Maximizes, minimizes or restores the window, as its title bar's buttons do. Only on Windows: Xvfb has no
+    /// window manager to do it.
+    fn show_window(&self, _show: Show) -> Result<()> {
+        Err("no window manager to maximize or minimize the window".into())
+    }
+}
+
+/// How the window shows, for `Driver::show_window`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Show {
+    Normal,
+    Maximized,
+    Minimized,
+}
+
+/// A rectangle in GPUI's own coordinates: the saved window's bounds, or a screen's work area.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Area {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// The window as `settings.json` keeps it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SavedWindow {
+    pub bounds: Area,
+    pub maximized: bool,
 }
 
 /// The built `Grace` binary: `GRACE_EXE` when set, else the workspace's debug build.
@@ -387,6 +418,44 @@ impl App {
     /// Asks the window to close, as its close button does.
     pub fn close(&self) -> Result<()> {
         self.driver.close()
+    }
+
+    /// Asks the window to close and waits for Grace to end: its bounds are then saved.
+    pub fn close_and_wait(&mut self) -> Result<()> {
+        self.driver.close()?;
+        if self.exited(Duration::from_secs(30)) {
+            Ok(())
+        } else {
+            Err("Grace did not end within 30 s of its window's close".into())
+        }
+    }
+
+    /// See `Driver::set_window_rect`.
+    pub fn set_window_rect(&self, x: i32, y: i32, width: i32, height: i32) -> Result<()> {
+        self.driver.set_window_rect(x, y, width, height)
+    }
+
+    /// See `Driver::show_window`.
+    pub fn show_window(&self, show: Show) -> Result<()> {
+        self.driver.show_window(show)
+    }
+
+    /// The main screen's work area, as the `e2e` build records it at start (`grace::e2e::record_screen`).
+    pub fn work_area(&self) -> Result<Area> {
+        let file = self.data.join("e2e-screen.json");
+        self.wait_until("the screen recorded", Duration::from_secs(15), || file.exists())?;
+        let v: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        area(&v).ok_or_else(|| format!("e2e-screen.json: {v}"))
+    }
+
+    /// The window saved in `settings.json`, or None.
+    pub fn saved_window(&self) -> Option<SavedWindow> {
+        let w = self.settings().get("window")?.clone();
+        Some(SavedWindow {
+            bounds: area(&w)?,
+            maximized: w.get("maximized")?.as_bool()?,
+        })
     }
 
     /// Waits for Grace's process to end, up to `timeout`; true if it did.
@@ -612,6 +681,16 @@ fn driver_for(pid: u32) -> Result<Box<dyn Driver>> {
 #[cfg(not(any(target_os = "linux", windows)))]
 fn driver_for(_pid: u32) -> Result<Box<dyn Driver>> {
     Err("no accessibility driver on this platform".into())
+}
+
+fn area(v: &serde_json::Value) -> Option<Area> {
+    let n = |k: &str| v.get(k).and_then(serde_json::Value::as_f64);
+    Some(Area {
+        x: n("x")?,
+        y: n("y")?,
+        width: n("width")?,
+        height: n("height")?,
+    })
 }
 
 #[cfg(test)]

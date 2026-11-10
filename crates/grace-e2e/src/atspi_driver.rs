@@ -245,6 +245,13 @@ impl Driver for AtspiDriver {
         let window = self.x_window()?;
         ask_to_close(window.parse().map_err(err)?)
     }
+
+    /// Through `xdotool`: with no window manager under Xvfb, the window takes the place and size it is given.
+    fn set_window_rect(&self, x: i32, y: i32, width: i32, height: i32) -> Result<()> {
+        let window = self.x_window()?;
+        xdotool(&["windowsize", "--sync", &window, &width.to_string(), &height.to_string()])?;
+        xdotool(&["windowmove", "--sync", &window, &x.to_string(), &y.to_string()])
+    }
 }
 
 /// `WM_DELETE_WINDOW`, what a window manager sends when the close button is pressed. `xdotool windowclose` would

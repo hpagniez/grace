@@ -189,17 +189,17 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| WB-01 | The window comes back where it was | | ☐ |
-| WB-02 | A maximized window comes back maximized | | ☐ |
-| WB-03 | A move by the person is saved before the app closes | | ☐ |
+| WB-01 | The window comes back where it was | `grace-e2e/tests/window.rs::the_window_comes_back_where_it_was` | ☑ |
+| WB-02 | A maximized window comes back maximized | `grace-e2e/tests/window.rs::a_maximized_window_comes_back_maximized` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| WB-03 | A move by the person is saved before the app closes | `grace-e2e/tests/window.rs::a_move_by_the_person_is_saved_before_the_app_closes` | ☑ |
 | WB-04 | The saved state keeps the other settings (unit) | `grace-core::settings::tests::window_state::saving_the_window_keeps_the_other_settings` | ☑ |
-| WB-05 | A window closed while minimized opens normal | | ☐ |
-| WB-06 | A failed save does not stop the app from closing | | ☐ |
+| WB-05 | A window closed while minimized opens normal | `grace-e2e/tests/window.rs::a_window_closed_while_minimized_opens_normal` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| WB-06 | A failed save does not stop the app from closing | `grace-e2e/tests/window.rs::a_failed_save_does_not_stop_the_app_from_closing` | ☑ |
 | WB-07 | A cut-off save leaves the old settings whole (unit) | `grace-core::settings::tests::window_state::a_failed_rename_leaves_the_file_as_it_was` | ☑ |
 | WB-08 | A short saved window is held at the minimum height | `grace::window::tests::a_short_saved_window_is_held_at_the_minimum_height` | ☑ |
 | WB-09 | A broken saved state opens the window as on a first start | `grace-core::settings::tests::window_state::load_window_state_reads_a_broken_state_as_nothing_saved`, `grace::window::tests::a_broken_or_missing_state_opens_as_on_a_first_start` | ☑ |
-| WB-10 | A window partly off the screen is pulled onto it | | ☐ |
-| WB-11 | A window bigger than the screen is shrunk to fit | | ☐ |
+| WB-10 | A window partly off the screen is pulled onto it | `grace-e2e/tests/window.rs::a_window_partly_off_the_screen_is_pulled_onto_it` | ☑ |
+| WB-11 | A window bigger than the screen is shrunk to fit | `grace-e2e/tests/window.rs::a_window_bigger_than_the_screen_is_shrunk_to_fit` | ☑ |
 | WB-12 | A window on a screen that is gone opens on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
 | WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` (the maximized case) | ☑ |
 | WB-14 | Placement on two screens (unit) | `grace-core::window::tests` (13 tests: two screens, edges, flush, shrink) | ☑ |
@@ -1305,18 +1305,18 @@ Phase P2 · 12 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-window-01 | the window comes back where it was | | ☐ |
-| E-window-02 | a maximized window comes back maximized | | ☐ |
-| E-window-03 | a move by the person is saved before the app closes | | ☐ |
-| E-window-04 | a window closed while minimized opens normal | | ☐ |
-| E-window-05 | a failed save does not stop the app from closing | | ☐ |
-| E-window-06 | a short saved window is held at the minimum height | | ☐ |
-| E-window-07 | a broken saved state opens the window as on a first start | | ☐ |
-| E-window-08 | a window partly off the screen is pulled onto it | | ☐ |
-| E-window-09 | a window flush with the screen edges keeps its size and place | | ☐ |
-| E-window-10 | a window bigger than the screen is shrunk to fit | | ☐ |
-| E-window-11 | a window on a screen that is gone opens on the main screen | | ☐ |
-| E-window-12 | a maximized window on a screen that is gone opens maximized on the main screen | | ☐ |
+| E-window-01 | the window comes back where it was | `grace-e2e/tests/window.rs::the_window_comes_back_where_it_was` | ☑ |
+| E-window-02 | a maximized window comes back maximized | `grace-e2e/tests/window.rs::a_maximized_window_comes_back_maximized` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| E-window-03 | a move by the person is saved before the app closes | `grace-e2e/tests/window.rs::a_move_by_the_person_is_saved_before_the_app_closes` | ☑ |
+| E-window-04 | a window closed while minimized opens normal | `grace-e2e/tests/window.rs::a_window_closed_while_minimized_opens_normal` (Windows only: Xvfb has no window manager to maximize) | ☑ |
+| E-window-05 | a failed save does not stop the app from closing | `grace-e2e/tests/window.rs::a_failed_save_does_not_stop_the_app_from_closing` | ☑ |
+| E-window-06 | a short saved window is held at the minimum height | `grace-e2e/tests/window.rs::a_short_saved_window_is_held_at_the_minimum_height` | ☑ |
+| E-window-07 | a broken saved state opens the window as on a first start | `grace-e2e/tests/window.rs::a_broken_saved_state_opens_the_window_as_on_a_first_start` | ☑ |
+| E-window-08 | a window partly off the screen is pulled onto it | `grace-e2e/tests/window.rs::a_window_partly_off_the_screen_is_pulled_onto_it` | ☑ |
+| E-window-09 | a window flush with the screen edges keeps its size and place | `grace-e2e/tests/window.rs::a_window_flush_with_the_screen_edges_keeps_its_size_and_place` | ☑ |
+| E-window-10 | a window bigger than the screen is shrunk to fit | `grace-e2e/tests/window.rs::a_window_bigger_than_the_screen_is_shrunk_to_fit` | ☑ |
+| E-window-11 | a window on a screen that is gone opens on the main screen | `grace-e2e/tests/window.rs::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` | ☑ |
+| E-window-12 | a maximized window on a screen that is gone opens maximized on the main screen | `grace-e2e/tests/window.rs::a_maximized_window_on_a_screen_that_is_gone_opens_maximized_on_the_main_screen` (Windows only: Xvfb has no window manager to maximize) | ☑ |
 
 ## Unit and component tests
 

@@ -29,6 +29,23 @@ pub fn log_keys(cx: &mut gpui::App) {
     .detach();
 }
 
+/// Writes the main screen's work area to `<data folder>/e2e-screen.json`, in GPUI's coordinates, the window's
+/// bounds' own: the window tests place their windows from it, as `window.spec.ts` read Electron's `workArea`.
+pub fn record_screen(data_dir: &std::path::Path, cx: &gpui::App) {
+    let Some(display) = cx.primary_display() else {
+        return;
+    };
+    let b = display.visible_bounds();
+    let n = |p: gpui::Pixels| f64::from(f32::from(p));
+    let area = serde_json::json!({
+        "x": n(b.origin.x),
+        "y": n(b.origin.y),
+        "width": n(b.size.width),
+        "height": n(b.size.height),
+    });
+    let _ = std::fs::write(data_dir.join("e2e-screen.json"), area.to_string());
+}
+
 /// Which view the window shows.
 pub fn wants_gallery() -> bool {
     std::env::var("GRACE_E2E_VIEW").as_deref() == Ok("elements")
