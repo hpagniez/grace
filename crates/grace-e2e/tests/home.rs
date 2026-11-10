@@ -204,3 +204,110 @@ fn a_second_start_on_the_same_data_folder_hands_over_to_the_first() {
     assert!(second.success(), "the second Grace quits on its own");
     home(&app); // the first is still there
 }
+
+/// HS-10, E-home-05
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_dry_run_error_still_opens_the_project() {
+    let dir = project("broken").unwrap();
+    let app = App::launch().unwrap();
+    app.answer_folder(Some(&dir)).unwrap();
+    app.press(home(&app).find(&Role::Button, OPEN).unwrap()).unwrap();
+    let path = dir.to_string_lossy().to_string();
+    app.wait_for("the error and the project's path", Duration::from_secs(30), |t| {
+        named(t, &path).is_some() && t.all().iter().any(|n| n.name.contains("syntax.feature"))
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Home").unwrap();
+    app.wait_for("home, the project first in the list", Duration::from_secs(15), |t| {
+        named(t, HEADING).is_some() && row(t, &dir).is_some()
+    })
+    .unwrap();
+}
+
+/// HS-14, E-home-10
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn the_list_works_from_the_keyboard() {
+    let dir = project("clean").unwrap();
+    let app = App::launch_with_settings(&json!({ "recentProjects": [dir.to_string_lossy()] }), &[]).unwrap();
+    app.wait_for("the row", Duration::from_secs(15), |t| row(t, &dir).is_some())
+        .unwrap();
+    let on_row = |t: &Node| row(t, &dir).is_some_and(|r| r.states.focused);
+    let mut tabs = 0;
+    while !app.tree().is_ok_and(|t| on_row(&t)) {
+        assert!(tabs < 5, "Tab never reached the row: {}", app.tree().unwrap().dump());
+        app.key(grace_e2e::Key::Tab).unwrap();
+        tabs += 1;
+        let _ = app.wait_for("the focus to move", Duration::from_secs(2), |t| on_row(t));
+    }
+    app.key(grace_e2e::Key::Enter).unwrap();
+    project_shown(&app, &dir);
+}
+
+/// HS-16, E-home-11
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn home_closes_the_project_and_survives_a_restart() {
+    let dir = project("clean").unwrap();
+    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    project_shown(&app, &dir);
+    // Home is disabled while the tests are being found: a press then does nothing (Windows CI pressed too soon)
+    app.wait_for("the tests found", Duration::from_secs(30), |t| {
+        named(t, "9 tests · Not run yet").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Home").unwrap();
+    app.wait_for("home, the project in the list", Duration::from_secs(15), |t| {
+        named(t, HEADING).is_some() && row(t, &dir).is_some()
+    })
+    .unwrap();
+    app.wait_until("lastProject forgotten", Duration::from_secs(10), || {
+        app.settings().get("lastProject").is_none()
+    })
+    .unwrap();
+
+    let app = app.relaunch(&[]).unwrap();
+    let tree = app
+        .wait_for("home again, the project in the list", Duration::from_secs(15), |t| {
+            named(t, HEADING).is_some() && row(t, &dir).is_some()
+        })
+        .unwrap();
+    assert!(
+        tree.find(&Role::Button, "Run all").is_none(),
+        "home, not the project: {}",
+        tree.dump()
+    );
+}
+
+/// HS-17, E-home-12
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn home_is_disabled_during_a_run() {
+    let dir = project("clean").unwrap();
+    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    project_shown(&app, &dir);
+    app.wait_for("slow.feature", Duration::from_secs(30), |t| {
+        t.find(&Role::Button, "Run slow.feature").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Run slow.feature").unwrap();
+    app.wait_for("the run going", Duration::from_secs(30), |t| {
+        named(t, "Running…").is_some()
+    })
+    .unwrap();
+    // a press on Home does nothing while the run goes
+    let _ = app.press_named(Role::Button, "Home");
+    std::thread::sleep(Duration::from_millis(1000));
+    let tree = app.tree().unwrap();
+    assert!(named(&tree, HEADING).is_none(), "home during a run: {}", tree.dump());
+
+    app.wait_for("the run finished", Duration::from_secs(60), |t| {
+        named(t, "Finished").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Home").unwrap();
+    home(&app);
+    app.wait_until("no Java", Duration::from_secs(15), || app.java_pids().is_empty())
+        .unwrap();
+}

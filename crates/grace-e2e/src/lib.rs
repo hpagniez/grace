@@ -259,13 +259,17 @@ pub fn project(name: &str) -> Result<PathBuf> {
         }
         Ok(())
     }
-    let from = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test/fixtures/projects")
-        .join(name);
+    let projects = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/fixtures/projects");
+    // `broken` is `clean` plus `broken/syntax.feature`, as `test/fixtures/copy.ts` makes it
+    let from = projects.join(if name == "broken" { "clean" } else { name });
     let to = std::env::temp_dir()
         .join(format!("grace-e2e-project-{}-{}", std::process::id(), unique()))
         .join(name);
     copy(&from, &to).map_err(|e| format!("cannot copy {}: {e}", from.display()))?;
+    if name == "broken" {
+        let extra = projects.join("broken-extra");
+        copy(&extra, &to).map_err(|e| format!("cannot copy {}: {e}", extra.display()))?;
+    }
     Ok(to)
 }
 
