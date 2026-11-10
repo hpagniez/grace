@@ -752,3 +752,43 @@ fn a_rows_tooltips_stay_on_its_row(cx: &mut TestAppContext) {
     let tip = h.tip_bounds(&mut cx).unwrap();
     assert!(tip.right() < run_x && on_row(tip), "left of the run button: {tip:?}");
 }
+
+/// `Tree.test.tsx`'s flaky marks, drawn ahead of P3's proof: a flaky test has its mark, its feature counts it, the
+/// mark's tooltip goes on its left, and a test the filter dims keeps it.
+#[gpui::test]
+fn a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left(cx: &mut TestAppContext) {
+    let mut s = state("/p", &["a"]);
+    s.flaky.insert(
+        "s:tests/a.feature#0".into(),
+        vec![grace_core::model::flaky::FlakyEnv {
+            env: None,
+            passed: 2,
+            failed: 1,
+            runs: vec![],
+        }],
+    );
+    let (h, mut cx, tree) = setup(cx, s);
+    toggle(&tree, "f:tests/a.feature", &mut cx);
+    assert!(
+        cx.debug_bounds("flaky-mark:f:tests/a.feature").is_some(),
+        "counted on its feature"
+    );
+    assert!(cx.debug_bounds("flaky-mark:s:tests/a.feature#1").is_none());
+    let mark = cx
+        .debug_bounds("flaky-mark:s:tests/a.feature#0")
+        .expect("the test's mark");
+    cx.simulate_mouse_move(mark.center(), None, gpui::Modifiers::none());
+    cx.executor().advance_clock(crate::tooltip::DELAY);
+    cx.run_until_parked();
+    assert_eq!(h.tip(&mut cx).as_deref(), Some(grace_core::model::flaky::FLAKY_TITLE));
+    let tip = h.tip_bounds(&mut cx).unwrap();
+    assert!(
+        tip.right() < mark.left(),
+        "left of the mark, not over the next row: {tip:?}"
+    );
+    h.update(&mut cx, |s| s.filter.include = vec!["nothing".into()]);
+    assert!(
+        cx.debug_bounds("flaky-mark:s:tests/a.feature#0").is_some(),
+        "a dimmed test keeps it"
+    );
+}

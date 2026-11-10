@@ -636,6 +636,10 @@ impl Tree {
         let tags = node.tags.iter().map(|tag| crate::ui::tag_chip(tag.clone(), cx));
         let flaky_badge = flaky.clone().map(|words| {
             let badge = div()
+                .debug_selector({
+                    let key = key.clone();
+                    move || format!("flaky-mark:{key}")
+                })
                 .flex()
                 .flex_none()
                 .items_center()

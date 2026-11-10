@@ -449,6 +449,40 @@ mod reduce {
         assert_eq!(run_view(&s), reset());
     }
 
+    fn proof() -> Vec<crate::model::flaky::FlakyEnv> {
+        vec![crate::model::flaky::FlakyEnv {
+            env: None,
+            passed: 2,
+            failed: 1,
+            runs: vec![],
+        }]
+    }
+
+    /// `Tree.test.tsx` "clears the marks for a new project": another folder's project drops every flaky mark.
+    #[test]
+    fn project_event_for_another_folder_clears_the_flaky_marks() {
+        let mut s = AppState::new();
+        apply(&mut s, [project()]);
+        s.flaky.insert(keys()[0].clone(), proof());
+        apply(&mut s, [project()]);
+        assert_eq!(s.flaky.len(), 1, "the same project keeps them");
+        apply(&mut s, [project_with(Some(other()), Some(TREE.clone()), None)]);
+        assert!(s.flaky.is_empty());
+    }
+
+    /// `Tree.test.tsx` "drops the mark of a key that now holds another test, keeps the rest".
+    #[test]
+    fn project_event_drops_the_flaky_mark_of_a_key_that_now_names_another_test() {
+        let mut s = AppState::new();
+        apply(&mut s, [project()]);
+        let (same, moved) = (keys()[0].clone(), keys()[1].clone());
+        s.flaky.insert(same.clone(), proof());
+        s.flaky.insert(moved.clone(), proof());
+        apply(&mut s, [project_tree(Some(renamed(&moved)))]);
+        assert_eq!(s.flaky.get(&same), Some(&proof()));
+        assert!(!s.flaky.contains_key(&moved));
+    }
+
     #[test]
     fn project_event_keeps_a_selection_that_still_exists_and_clears_one_that_is_gone() {
         let mut s = AppState::new();
