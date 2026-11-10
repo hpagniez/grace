@@ -407,7 +407,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | VL-15 | Focus survives scrolling away (e2e) | | ☐ |
 | VL-16 | Closing a folder takes focus to it | | ☐ |
 | VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
-| VL-18 | A new tree keeps the rows in view still (e2e) | | ☐ |
+| VL-18 | A new tree keeps the rows in view still (e2e) | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it`, `grace-core::rows::tests::anchored_scroll_top` (headless: plan, Redesigns) | ☑ |
 | VL-19 | Calls arriving above the view keep the rows in view still | | ☐ |
 | VL-20 | A filter change scrolls to the selected row (e2e) | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | VL-21 | A cut label shows whole on keyboard focus | | ☐ |
@@ -711,16 +711,16 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | TO-06 | A click on an open feature's name keeps it open | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (the second press) | ☑ |
 | TO-07 | The chevron still closes a feature | `grace-e2e/tests/tree.rs::the_chevron_opens_and_closes_a_feature` | ☑ |
 | TO-08 | Moving with the keys does not open features | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
-| TO-09 | An outline opens with its feature | | ☐ |
+| TO-09 | An outline opens with its feature | `grace::tree::tests::an_outline_opens_with_its_feature`, `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (the outline and its rows) | ☑ |
 | TO-10 | A run of one feature opens it as it starts | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row`, `grace::tree::tests::a_run_of_one_feature_opens_it_as_it_starts` | ☑ |
 | TO-11 | Run all opens only the features with a failure | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
 | TO-12 | A run never reopens a feature I closed during it | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
 | TO-13 | A run opens a feature inside a closed folder, and leaves the folder closed | `grace::tree::tests::a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed` | ☑ |
-| TO-14 | A failure leaves a closed outline closed | | ☐ |
+| TO-14 | A failure leaves a closed outline closed | `grace::tree::tests::a_failure_leaves_a_closed_outline_closed` | ☑ |
 | TO-15 | What a run opened stays open | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
-| TO-16 | A pause still opens the way to the paused test | | ☐ |
+| TO-16 | A pause still opens the way to the paused test | Waits for the step debugger, phase P4: a pause needs it | ☐ |
 | TO-17 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
-| TO-18 | A feature opening above the view does not move it | | ☐ |
+| TO-18 | A feature opening above the view does not move it | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` | ☑ |
 
 ### WM · Watch mode: re-run on save
 
@@ -1284,7 +1284,7 @@ Phase P2 · 9 tests
 | E-virtual-01 | Only the rows in view are drawn | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (300 features, generated) | ☑ |
 | E-virtual-02 | A moved-to row scrolls into view | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End, in place of 40 Down presses) | ☑ |
 | E-virtual-03 | Focus survives scrolling away | | ☐ |
-| E-virtual-04 | A new tree keeps the rows in view still | | ☐ |
+| E-virtual-04 | A new tree keeps the rows in view still | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` (headless: plan, Redesigns) | ☑ |
 | E-virtual-05 | The filter bar keeps one line with 54 tags | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
 | E-virtual-06 | A filter change scrolls to the selected row | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | E-virtual-07 | A click shows neither the focus ring nor a tooltip | | ☐ |
