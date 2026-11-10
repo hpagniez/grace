@@ -1129,7 +1129,7 @@ Phase P2 · 11 tests
 | E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`, `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` (a run opens its feature) | ☑ |
 | E-open-03 | A narrow window keeps every toolbar button on screen, with its name | `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (the floor on Windows only: Xvfb has no window manager to hold the minimum) | ☑ |
 | E-open-04 | A long project path stays readable at the minimum width | `grace::window::tests::a_long_path_at_the_minimum_width`, `grace::window::tests::the_name_shows_whole_at_the_default_size` (headless: plan, Redesigns); the words and tooltips: TB-07, TB-08 | ☑ |
-| E-open-05 | The Env and Threads boxes show their longest likely values whole | | ☐ |
+| E-open-05 | The Env and Threads boxes show their longest likely values whole | `grace::env_picker::tests::the_env_and_threads_boxes_show_their_longest_likely_values_whole` (headless: plan, Redesigns) | ☑ |
 | E-open-06 | Maven layout with classpath resources | `grace-e2e/tests/open.rs::maven_layout_with_classpath_resources` | ☑ |
 | E-open-07 | Syntax error is reported, not hidden | `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` | ☑ |
 | E-open-08 | Nothing to run | `grace-e2e/tests/run.rs::nothing_to_run` | ☑ |

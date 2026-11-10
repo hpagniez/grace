@@ -303,3 +303,41 @@ fn a_press_elsewhere_commits_what_was_typed_before_its_click(cx: &mut TestAppCon
     );
     assert_eq!(b.sent(), ["set_env staging"]);
 }
+
+/// E-open-05: the boxes keep their width at any window width, and it holds "production" and a count of 32 whole,
+/// in the text box's font and size, inside GPUI Kit's padding and the border.
+#[gpui::test]
+fn the_env_and_threads_boxes_show_their_longest_likely_values_whole(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let window = cx.add_empty_window();
+    window.update(|window, _| {
+        let width = |text: &str| {
+            let run = gpui::TextRun {
+                len: text.len(),
+                font: gpui::font(crate::theme::SANS),
+                color: gpui::Hsla::default(),
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            };
+            // GPUI Kit's text box draws at `text_sm`, 0.875 rem
+            let size = window.rem_size() * 0.875;
+            f32::from(
+                window
+                    .text_system()
+                    .shape_line(text.to_owned().into(), size, &[run], None)
+                    .width,
+            )
+        };
+        let inside = |box_width: f32| box_width - 2. * f32::from(gpui_component::Size::Medium.input_px()) - 2.;
+        let production = width("production");
+        assert!(production > 40., "the font is there: {production}");
+        assert!(production <= inside(WIDTH), "{production} in {}", inside(WIDTH));
+        let threads = width("32");
+        assert!(
+            threads <= inside(crate::threads_box::WIDTH),
+            "{threads} in {}",
+            inside(crate::threads_box::WIDTH)
+        );
+    });
+}
