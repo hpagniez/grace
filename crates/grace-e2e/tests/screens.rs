@@ -1,5 +1,6 @@
 //! Screenshots of GPUI Grace for a pull request: each test drives the app to a state and saves the window as a PNG
-//! in `GRACE_SCREENS` (default `target/screens`). Run with `sh scripts/e2e-gpui.sh screens_`.
+//! in `GRACE_SCREENS`. Run on Linux with `GRACE_SCREENS="$PWD/target/screens" sh scripts/e2e-gpui.sh screens_`: the
+//! `screens` feature, which the e2e suite leaves out, since a screenshot checks nothing.
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -11,9 +12,7 @@ const WAIT: Duration = Duration::from_secs(30);
 const RUN: Duration = Duration::from_secs(90);
 
 fn out() -> PathBuf {
-    let dir = std::env::var("GRACE_SCREENS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/screens"));
+    let dir = PathBuf::from(std::env::var("GRACE_SCREENS").expect("GRACE_SCREENS, the folder for the screenshots"));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
