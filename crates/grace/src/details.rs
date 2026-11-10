@@ -477,6 +477,7 @@ impl Render for Details {
             .debug_selector(|| "details".into())
             .role(Role::Group)
             .aria_label("Details")
+            .size_full()
             .flex()
             .flex_col()
             .flex_1()

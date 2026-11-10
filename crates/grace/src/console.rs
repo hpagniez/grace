@@ -656,6 +656,7 @@ impl Render for Console {
             .vertical_scrollbar(&self.list);
         div()
             .relative()
+            .size_full()
             .flex()
             .flex_col()
             .flex_1()

@@ -621,6 +621,32 @@ mod tests {
         assert!(vcx.debug_bounds("toolbar").unwrap().bottom() <= sheet.top());
     }
 
+    /// #320: the tree, the details and the console are cached views, laid out from their own root, as a window with
+    /// no screen reader draws them (`cached`): each fills its room, and the tree draws its rows.
+    #[gpui::test]
+    fn the_cached_panes_fill_their_room(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let mut vcx = whole_window(cx, crate::testing::project("D:\\api", Layout::Maven, 2));
+        let main = vcx.debug_bounds("main").unwrap();
+        for pane in ["tree", "details"] {
+            let b = vcx.debug_bounds(pane).unwrap_or_else(|| panic!("{pane}"));
+            assert_eq!(
+                b.size.height, main.size.height,
+                "{pane} {b:?} fills the main area {main:?}"
+            );
+        }
+        assert!(
+            vcx.debug_bounds("tree-row:f:a.feature").is_some(),
+            "the tree draws its rows"
+        );
+        let panel = vcx.debug_bounds("bottom-panel").unwrap();
+        let console = vcx.debug_bounds("console").unwrap();
+        assert!(
+            console.bottom() >= panel.bottom() - px(1.) && console.size.height > px(48.),
+            "the console {console:?} fills the panel {panel:?}"
+        );
+    }
+
     /// `Toolbar.test.tsx` "keeps its items in order" and "the Env and Threads boxes are the controls' height": Home,
     /// the project, Env, Threads, Properties…, Refresh, Open…, Report, Re-run failed, Cancel, Run all, left to right.
     #[gpui::test]
