@@ -6,6 +6,7 @@
 //! (R4.1). GPUI draws only the lines in view (`gpui::list`, which measures wrapped lines), so painting a match is
 //! drawing its line's few runs again: the cost is the view's, not the console's. The list follows the bottom while it
 //! is at the bottom, as the scroller's `pinned` did (`FollowMode::Tail`).
+use gpui_component::scroll::ScrollableElement as _;
 use std::cell::Cell;
 use std::ops::Range;
 use std::rc::Rc;
@@ -651,7 +652,8 @@ impl Render for Console {
                 canvas(move |b, _, _| view.set(b), |_, _, _, _| {})
                     .absolute()
                     .size_full(),
-            );
+            )
+            .vertical_scrollbar(&self.list);
         div()
             .relative()
             .flex()

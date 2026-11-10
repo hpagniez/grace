@@ -381,6 +381,8 @@ pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
         k.radius_lg = px(m.radius_lg);
         k.shadow = true;
         k.cursor_blink = cursor_blink(reduced);
+        // scrollbars always shown, as Windows shows them, with no fade that a timer would end (ADR 0030)
+        k.scrollbar_mode = gpui_component::scroll::ScrollbarMode::Always;
         let k = &mut k.colors;
         k.background = c(t.surface);
         k.foreground = c(t.ink);
@@ -431,6 +433,8 @@ pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
         k.tab_foreground = c(t.muted);
         k.scrollbar = Hsla { a: 0., ..c(t.surface) };
         k.scrollbar_thumb = Hsla { a: 0.6, ..c(t.control) };
+        // CSS's thin scrollbar keeps its colour under the pointer
+        k.scrollbar_thumb_hover = k.scrollbar_thumb;
         k.overlay = Theme::color_alpha(t.backdrop);
     });
 }
@@ -699,5 +703,29 @@ mod tests {
             }
         }
         out
+    }
+
+    /// UP-15: the scroll areas' scrollbars are always shown, with no fade, on a clear track, the thumb `control` at
+    /// 60 % in both themes (R1.7).
+    #[gpui::test]
+    fn scrollbars_are_thin_themed_and_always_shown(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::init(cx);
+            for dark in [false, true] {
+                apply(dark, None, cx);
+                let t = Theme::global(cx).tokens;
+                let k = KitTheme::global(cx);
+                assert_eq!(k.scrollbar_mode, gpui_component::scroll::ScrollbarMode::Always);
+                assert_eq!(k.colors.scrollbar.a, 0.);
+                assert_eq!(
+                    k.colors.scrollbar_thumb,
+                    Hsla {
+                        a: 0.6,
+                        ..Theme::color(t.control)
+                    }
+                );
+                assert_eq!(k.colors.scrollbar_thumb_hover, k.colors.scrollbar_thumb);
+            }
+        });
     }
 }

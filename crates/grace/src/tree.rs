@@ -8,6 +8,7 @@
 //!
 //! The debug button, the breakpoint dot (phase P4), "Open in VS Code" from a row's menu (P3) and the sub-folder
 //! buttons of an empty project (P4) come with their phases (P2 plan, Redesigns).
+use gpui_component::scroll::ScrollableElement as _;
 use crate::elements::Off as _;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -485,6 +486,7 @@ impl Render for Tree {
             .aria_label("Tests")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key))
+            .relative()
             .flex()
             .flex_col()
             .flex_1()
@@ -503,6 +505,7 @@ impl Render for Tree {
                 .flex_1()
                 .min_h_0(),
             )
+            .vertical_scrollbar(&self.scroll)
             .into_any_element()
     }
 }

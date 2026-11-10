@@ -7,6 +7,7 @@ use gpui::{
     SharedString, StatefulInteractiveElement as _, Styled, Window, div, img, prelude::FluentBuilder as _, px,
 };
 use gpui_component::button::ButtonVariants as _;
+use gpui_component::scroll::ScrollableElement as _;
 use grace_core::model::events::RecentEntry;
 use grace_core::state::AppState;
 
@@ -134,7 +135,7 @@ pub fn render(
                 .id("home-scroll")
                 .flex_1()
                 .min_h_0()
-                .overflow_y_scroll()
+                .overflow_y_scrollbar()
                 .px_4()
                 .py_12()
                 .child(column),

@@ -7,6 +7,7 @@
 pub mod import_step;
 
 use crate::elements::Off as _;
+use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -615,7 +616,7 @@ impl Render for PropertiesView {
                             .role(Role::List)
                             .aria_label(PROPERTIES)
                             .max_h(list_height)
-                            .overflow_y_scroll()
+                            .overflow_y_scrollbar()
                             .px_1()
                             .children(items),
                     )

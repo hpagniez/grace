@@ -2,6 +2,7 @@
 //! keys go, as which kind and under which names, and what that adds, replaces and skips. It shows names and reasons,
 //! never a value. The plan is `grace_core::import_plan`'s.
 use crate::elements::Off as _;
+use gpui_component::scroll::ScrollableElement as _;
 use std::rc::Rc;
 
 use gpui::accesskit::Role;
@@ -228,7 +229,7 @@ impl Render for ImportStep {
                                 .role(Role::List)
                                 .aria_label("Skipped keys")
                                 .max_h(px(160.))
-                                .overflow_y_scroll()
+                                .overflow_y_scrollbar()
                                 .text_size(px(METRICS.text_xs.size))
                                 .text_color(Theme::color(t.muted))
                                 .children(listed.into_iter().enumerate().map(|(i, s)| {
