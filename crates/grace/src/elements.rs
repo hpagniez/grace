@@ -258,4 +258,40 @@ mod tests {
             }
         }
     }
+
+    /// `buttons.test.ts`, `Icon.test.tsx` and `StatusMark.test.tsx`'s sizes: a dialog button is 28 px high with
+    /// 14 px text, a small icon button 24 × 24, an icon 16 px unless asked, a status mark the size asked.
+    #[gpui::test]
+    fn draws_buttons_icons_and_marks_at_their_sizes(cx: &mut gpui::TestAppContext) {
+        use gpui::VisualTestContext;
+        struct View;
+        impl gpui::Render for View {
+            fn render(&mut self, _: &mut gpui::Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+                let at = |name: &'static str| div().flex().debug_selector(move || name.into());
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_start()
+                    .child(at("dialog").child(button("d", "Save", ButtonKind::Primary, ButtonSize::Dialog)))
+                    .child(at("small").child(icon_button("s", Icon::Play, "Run", true)))
+                    .child(at("icon").child(icon(Icon::Play, 16., Theme::color(Theme::global(cx).tokens.ink))))
+                    .child(at("mark-14").child(status_mark("m14", MarkStatus::Passed, 14., false, true, cx)))
+                    .child(at("mark-16").child(status_mark("m16", MarkStatus::Passed, 16., false, true, cx)))
+            }
+        }
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| View);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        let size = |cx: &mut VisualTestContext, name: &'static str| {
+            let b = cx.debug_bounds(name).unwrap();
+            (f32::from(b.size.width), f32::from(b.size.height))
+        };
+        assert_eq!(size(&mut cx, "dialog").1, crate::theme::METRICS.control_height);
+        assert_eq!(size(&mut cx, "small"), (24., 24.));
+        assert_eq!(size(&mut cx, "icon"), (16., 16.));
+        assert_eq!(size(&mut cx, "mark-14"), (14., 14.));
+        assert_eq!(size(&mut cx, "mark-16"), (16., 16.));
+        assert_eq!(crate::theme::METRICS.text_base.size, 14., "a dialog button's text");
+    }
 }
