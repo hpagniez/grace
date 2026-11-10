@@ -185,3 +185,91 @@ fn the_last_project_folder_was_deleted() {
     app.press_named(Role::Button, "Open folder…").unwrap();
     assert_eq!(first_dialog(&app), None);
 }
+
+/// The toolbar's buttons, in their order (`TOOLBAR_BUTTONS`; Watch comes with phase P4).
+const TOOLBAR: [&str; 8] = [
+    "Home",
+    "Properties…",
+    "Refresh",
+    "Open…",
+    "Report",
+    "Re-run failed",
+    "Cancel",
+    "Run all",
+];
+
+/// Where Grace's view is: its root, named Grace inside the window (the window itself has no place through AT-SPI).
+fn view(tree: &Node) -> Option<grace_e2e::Rect> {
+    tree.all()
+        .into_iter()
+        .find(|n| n.name == "Grace" && n.role != Role::Window)
+        .and_then(|n| n.rect)
+        .filter(|r| r.width > 0)
+}
+
+/// Sizes the window and waits until the tree shows it at that width, give or take Windows' frame, and `ok`.
+fn window_width(app: &App, width: i32, ok: impl Fn(&Node) -> bool) -> Node {
+    app.set_window_rect(0, 0, width, 700).unwrap();
+    app.wait_for(&format!("the window {width} px wide"), WAIT, |t| {
+        view(t).is_some_and(|r| (r.width - width).abs() <= 40) && ok(t)
+    })
+    .unwrap()
+}
+
+fn button_width(tree: &Node, name: &str) -> Option<i32> {
+    tree.find(&Role::Button, name).and_then(|b| b.rect).map(|r| r.width)
+}
+
+/// Every toolbar button is named and inside the window (`expectToolbarFits`).
+fn toolbar_fits(tree: &Node) {
+    let window = view(tree).expect("the view's place");
+    for name in TOOLBAR {
+        let b = tree
+            .find(&Role::Button, name)
+            .unwrap_or_else(|| panic!("{name}: {}", tree.dump()));
+        let r = b.rect.unwrap_or_else(|| panic!("{name} has no place"));
+        assert!(
+            r.x >= window.x && r.x + r.width <= window.x + window.width,
+            "{name} at {r:?} inside the window {window:?}"
+        );
+    }
+}
+
+/// E-open-03: below 1280 px four buttons are their icon, with the name spoken; at the floor every button
+/// is still in the window.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name() {
+    let dir = project("clean").unwrap();
+    let app = open(&dir);
+    app.wait_for("the tests found", WAIT, |t| row(t, "tests").is_some())
+        .unwrap();
+    for width in [780, 1200, 1279] {
+        let tree = window_width(&app, width, |t| button_width(t, "Open…").is_some_and(|w| w < 40));
+        toolbar_fits(&tree);
+        for name in ["Properties…", "Open…", "Report", "Cancel"] {
+            let w = button_width(&tree, name).unwrap();
+            assert!(w < 40, "{name} is its icon at {width}: {w} px");
+        }
+        let name = tree.find(&Role::Text, "clean").and_then(|n| n.rect);
+        assert!(
+            name.is_some_and(|r| r.width > 25),
+            "the folder's name at {width}: {}",
+            tree.dump()
+        );
+    }
+    for width in [1281, 1500] {
+        let tree = window_width(&app, width, |t| button_width(t, "Open…").is_some_and(|w| w > 60));
+        toolbar_fits(&tree);
+    }
+    // the floor: only a window manager holds the minimum width, and Xvfb has none
+    if cfg!(windows) {
+        app.set_window_rect(0, 0, 1, 700).unwrap();
+        let tree = app
+            .wait_for("the window at its minimum", WAIT, |t| {
+                view(t).is_some_and(|r| r.width >= 720 && r.width < 780)
+            })
+            .unwrap();
+        toolbar_fits(&tree);
+    }
+}

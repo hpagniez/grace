@@ -562,8 +562,8 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | TB-01 | The toolbar holds the name and the chip, not the path | `grace::toolbar::tests::the_project::shows_the_folder_name_and_the_layout_and_leaves_the_path_to_the_status_bar_r1_1`, `grace::toolbar::tests::the_project::draws_the_name_and_the_chip` | ☑ |
 | TB-02 | The name is cut in the middle, keeping its end | `grace::toolbar::tests::the_project::cuts_a_long_name_in_the_middle_its_start_gives_way_its_last_12_characters_stay_r1_2`, `grace::toolbar::tests::the_project::lets_the_chip_go_whole_before_the_name_is_cut_r1_2` | ☑ |
 | TB-03 | A cut name explains itself | `grace::toolbar::tests::the_project::explains_a_cut_name_in_a_tooltip_and_says_nothing_while_it_fits_r1_3` | ☑ |
-| TB-04 | The name shows whole at the default size (e2e) | | ☐ |
-| TB-05 | A long path at the minimum width (e2e) | | ☐ |
+| TB-04 | The name shows whole at the default size (e2e) | `grace::window::tests::the_name_shows_whole_at_the_default_size` (headless: plan, Redesigns) | ☑ |
+| TB-05 | A long path at the minimum width (e2e) | `grace::window::tests::a_long_path_at_the_minimum_width` (headless: plan, Redesigns); the path's tooltip TB-07, the words TB-08 | ☑ |
 | TB-06 | The status bar shows the path while a project is open | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` | ☑ |
 | TB-07 | A cut path explains itself | `grace::status_bar::tests::explains_a_cut_path_in_a_tooltip_and_says_nothing_while_it_fits` | ☑ |
 | TB-08 | Env and Threads below 1280 px | `grace::env_picker::tests::below_1280_px_the_word_env_goes_from_sight_and_says_itself_in_a_tooltip`, `grace::threads_box::tests::below_1280_px_the_word_threads_goes_from_sight_and_says_itself_in_a_tooltip` | ☑ |
@@ -1126,9 +1126,9 @@ Phase P2 · 11 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-open-01 | Open a project and see its tests | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` | ☑ |
-| E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | | ☐ |
-| E-open-03 | A narrow window keeps every toolbar button on screen, with its name | | ☐ |
-| E-open-04 | A long project path stays readable at the minimum width | | ☐ |
+| E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`, `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` (a run opens its feature) | ☑ |
+| E-open-03 | A narrow window keeps every toolbar button on screen, with its name | `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (the floor on Windows only: Xvfb has no window manager to hold the minimum) | ☑ |
+| E-open-04 | A long project path stays readable at the minimum width | `grace::window::tests::a_long_path_at_the_minimum_width`, `grace::window::tests::the_name_shows_whole_at_the_default_size` (headless: plan, Redesigns); the words and tooltips: TB-07, TB-08 | ☑ |
 | E-open-05 | The Env and Threads boxes show their longest likely values whole | | ☐ |
 | E-open-06 | Maven layout with classpath resources | `grace-e2e/tests/open.rs::maven_layout_with_classpath_resources` | ☑ |
 | E-open-07 | Syntax error is reported, not hidden | `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` | ☑ |

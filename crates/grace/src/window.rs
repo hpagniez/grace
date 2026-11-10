@@ -509,6 +509,78 @@ mod tests {
         assert!(vcx.debug_bounds("home").is_none());
     }
 
+    /// The whole window on a project whose folder sits deep, more than 150 characters in (`open.spec.ts`).
+    fn long_path_window(cx: &mut TestAppContext, width: f32) -> gpui::VisualTestContext {
+        use grace_core::model::node::Layout;
+        let path = "C:\\Users\\someone\\OneDrive - Acme Corporation\\Documents\\source\\repos\\platform\\services\\\
+                    payments-gateway\\integration-tests\\payments-gateway-contract-tests";
+        assert!(path.len() > 150);
+        let (h, _) = crate::testing::open(
+            cx,
+            width,
+            crate::testing::project(path, Layout::Standalone, 3),
+            |_, _, _| div().into_any_element(),
+        );
+        let grace = h.grace.clone();
+        let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
+        let vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.simulate_resize(size(px(width), px(700.)));
+        vcx.run_until_parked();
+        vcx
+    }
+
+    /// TB-04: at the default 1200 px the chip stays on the name's line, so neither is cut (the chip goes to the
+    /// hidden second line before the name is cut, R1.2), and both end before the Env box.
+    #[gpui::test]
+    fn the_name_shows_whole_at_the_default_size(cx: &mut TestAppContext) {
+        let mut vcx = long_path_window(cx, FIRST_SIZE.0);
+        let project = vcx.debug_bounds("project").unwrap();
+        let name = vcx.debug_bounds("project-name").unwrap();
+        let chip = vcx.debug_bounds("project-layout").unwrap();
+        let env = vcx.debug_bounds("env-input").unwrap();
+        assert!(
+            chip.top() < project.bottom(),
+            "the chip on the name's line: {chip:?} {project:?}"
+        );
+        assert!(name.right() <= chip.left());
+        assert!(chip.right() <= env.left());
+    }
+
+    /// TB-05: at the 760 px minimum every toolbar button is inside the window, the name's end shows before the Env
+    /// box, the chip is whole or out of sight, and the status bar's path ends before its button.
+    #[gpui::test]
+    fn a_long_path_at_the_minimum_width(cx: &mut TestAppContext) {
+        let mut vcx = long_path_window(cx, MIN_SIZE.0);
+        for id in [
+            "home-button",
+            "refresh-button",
+            "open-button",
+            "report-button",
+            "rerun-failed-button",
+            "cancel-button",
+            "run-all-button",
+        ] {
+            let b = vcx.debug_bounds(id).unwrap_or_else(|| panic!("{id}"));
+            assert!(b.left() >= px(0.) && b.right() <= px(MIN_SIZE.0), "{id} at {b:?}");
+        }
+        let project = vcx.debug_bounds("project").unwrap();
+        let name = vcx.debug_bounds("project-name").unwrap();
+        let env = vcx.debug_bounds("env-input").unwrap();
+        assert!(name.size.width > px(40.), "the name's last 12 characters: {name:?}");
+        assert!(name.right() <= env.left());
+        let chip = vcx.debug_bounds("project-layout").unwrap();
+        assert!(
+            chip.top() >= project.bottom() || chip.right() <= env.left(),
+            "the chip whole or out of sight: {chip:?}"
+        );
+        let path = vcx.debug_bounds("project-path").unwrap();
+        let settings = vcx.debug_bounds("settings-button").unwrap();
+        assert!(
+            path.left() >= px(0.) && path.right() <= settings.left(),
+            "{path:?} {settings:?}"
+        );
+    }
+
     #[gpui::test]
     fn a_broken_or_missing_state_opens_as_on_a_first_start(cx: &mut TestAppContext) {
         cx.update(|cx| {
