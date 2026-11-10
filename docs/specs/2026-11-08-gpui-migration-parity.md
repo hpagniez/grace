@@ -1394,17 +1394,17 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests` and, for the toolbar's three, `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons`, `order_and_shape_r13_1` and `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar` (15 of 26 so far; the tree's and the sheet's port with them in P2 PRs 3 and 5) | ☐ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | view `HttpCalls` (`grace::ui`), headless | ☐ |
-| `src/renderer/Icon.test.tsx` | 3 | view `Icon` (`grace::ui`), headless | ☐ |
+| `src/renderer/Icon.test.tsx` | 3 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes`, `grace::assets::tests` ("one child per node" is `n/a`: GPUI draws the Lucide file); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
 | `src/renderer/PropertiesDialog.test.tsx` | 54 | `grace-core::properties_draft::tests` (20) and `grace::properties::tests` (18), headless; the fade-out group goes (P2 plan, Redesigns); the look tests (spec R19) wait for P2 PR 6's check by eye | ☐ |
 | `src/renderer/Settings.test.tsx` | 43 | view `Settings` (`grace::ui`), headless: `settings::tests` (the page, Back and Appearance); the Updates tests with P5 | ☐ |
 | `src/renderer/StatusBar.test.tsx` | 18 | `grace::status_bar::tests` (the 6 path and bar tests so far; the update marker, version and Settings with P2 PR 5 and P5) | ☐ |
-| `src/renderer/StatusMark.test.tsx` | 8 | view `StatusMark` (`grace::ui`), headless | ☐ |
+| `src/renderer/StatusMark.test.tsx` | 8 | `grace::elements::tests` (the statuses, shapes, colours, turning and sizes); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` (the order, narrow, Home and Refresh, project and action tests so far; Env, Threads and Properties with P2 PR 4, Watch and the step debugger with P4) | ☐ |
-| `src/renderer/Tooltip.test.tsx` | 46 | view `Tooltip` (`grace::ui`), headless | ☐ |
+| `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
 | `src/renderer/Tree.test.tsx` | 86 | view `Tree` (`grace::ui`), headless | ☐ |
 | `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
@@ -1412,7 +1412,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
 | `src/renderer/VirtualList.test.tsx` | 28 | view `VirtualList` (`grace::ui`), headless | ☐ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
-| `src/renderer/buttons.test.ts` | 2 | `grace::ui::buttons` | ☐ |
+| `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
 | `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
 | `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
@@ -1422,13 +1422,13 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/palette.test.ts` | 6 | `crates/grace::theme::tests::colours_come_only_from_the_theme`, which scans every file but `theme.rs` and knows its patterns. Its `dark:` and `title=` checks have nothing to find in GPUI, which has neither | ☑ |
 | `src/renderer/panelHeight.test.ts` | 8 | `grace::ui::panelHeight`: `grace-core::panel_height::tests`; `settings::tests::panel_height` | ☑ |
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs`: `grace-core::panel_tabs::tests`; `settings::tests::panel_tabs` | ☑ |
-| `src/renderer/placeTip.test.ts` | 16 | `grace::ui::placeTip` | ☐ |
+| `src/renderer/placeTip.test.ts` | 16 | `grace::tooltip::tests::goes_beside_its_target_on_the_side_asked_and_below_by_default`, `stays_in_the_window_flipping_where_it_has_no_room`, `a_click_on_an_over_tooltip_within_its_target_reaches_the_target` (GPUI Kit's `Positioner` places it); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
 | `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store` (7 of 8; "subscribes before ready…" checks the state only, the IPC subscription is gone; `toggleGroup` ports with the HTTP tab in P3) | ☐ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace_core::rows::tests::tree_rows`, `row_name_…` (all 5) | ☑ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
-| `src/renderer/ui.test.ts` | 1 | `grace::ui::ui` | ☐ |
+| `src/renderer/ui.test.ts` | 1 | `n/a`: a closed GPUI dialog is not drawn, so it takes no pointer events | n/a |
 | `src/renderer/virtual.test.ts` | 15 | `grace_core::rows::tests` (10; `drawnRange`'s 5 are `uniform_list`'s) | ☑ |
 | `src/shared/env.test.ts` | 29 | `grace-core::model::env::tests` (54 tests, every Vitest test and the added ones) | ☑ |
 | `src/shared/flaky.test.ts` | 6 | `grace-core::model::flaky::tests` (7 tests, every Vitest test and the added ones) | ☑ |

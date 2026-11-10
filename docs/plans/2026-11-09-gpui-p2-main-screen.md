@@ -48,6 +48,7 @@ P1's rules hold ([P1 plan](2026-11-09-gpui-p1-core.md#porting-rules)): same fixt
 | `seams` | Open… on Windows uses the Shell's `IFileOpenDialog` with `SetFolder`, not GPUI's `prompt_for_paths`, which has no starting folder | HS-12 and `E-open-09`: the dialog starts next to the newest existing recent folder | `seams::tests`; `E-home-08`, `E-open-09` through the `e2e` seam. On Linux GPUI's portal dialog opens where the desktop chooses (Linux is not released, guide R5) |
 | `app` | `Grace` holds its `AppState` in an `Rc`: a view takes a clone of the `Rc` to draw, and an event batch copies the state only while a view still holds the old one, which none does between frames | Each redraw would otherwise copy the whole state, the 10,000 console lines and the tree included | Every view test; `grace::app::tests` |
 | `tooltip` | `cut_middle` cuts a line's start and keeps its end whole: the head is an ellipsized block beside the tail, the tooltip only while the head is cut. GPUI's own `TruncateMiddle` is not used | `Cut.tsx`'s `Middle` keeps an exact end (the name's last 12 characters, the path's project folder); `TruncateMiddle` balances both ends | `toolbar::tests::the_project`, `status_bar::tests` |
+| `tooltip` | A press on a tooltip closes it; Electron Grace closed it on the click that the press starts. A tooltip whose target moved is checked once per frame against where its target was laid out, not through scroll listeners on the boxes that hold it | GPUI has no `popover` element and no scroll events of a box: the tooltip is one deferred element of the window, and a frame is when GPUI knows where every target went. Closing on the press needs no tracking of the click across the press and release | `tooltip::tests` (the clicks, the scrolls, a target no longer drawn); the click on an `over` tooltip still reaches its target |
 | `progress` | The segments ease to their width on a spring (GPUI's `with_spring`), not a 300 ms CSS transition; the hold Chromium needed beside a starting spinner is gone | A spring keeps its speed when a new result moves its end, so a fast run never restarts the ease; GPUI starts every animation in the frame it is asked for | `progress::tests::the_bar_r14_1` (LV-06 by its spring, the 2 px gaps) |
 | `progress` | The stripe and the turning icon run only while they show, and the clock ticks once a second only during a run that is not paused | ADR 0030: nothing animates or ticks while idle; `setInterval` and CSS animations ran the same way | `progress::tests::the_clock` |
 | `progress` | The bar has no `aria-busy`: while it waits it has no values, as Electron's did, which a screen reader reads as busy | GPUI 0.3.11 writes no busy state to AccessKit | `run_all_with_live_progress` (no value at `0 / 9`) |
@@ -169,6 +170,75 @@ The P2 e2e tests left, the regressions of P2 (#144, #153, #170, #208, #223, #263
 | #170 | `grace::console::tests::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; `idle.wakeups.minimised` in `npm run bench:gpui` |
 | #208, #223 | `grace-e2e/tests/open.rs::running_one_test_of_a_maven_project_shows_its_result`; Karate's file names relative to its root in `grace_core::karate::command`'s tests |
 | #263 | `grace::progress::tests::the_bar_r14_1::the_stripe_hides_the_last_runs_segments_and_they_show_again_after` (LV-04) |
+
+### The component tests
+
+The Vitest component files of P2, test for test. A test of the DOM, CSS or Solid with nothing to port is `n/a`, with why.
+
+#### `Tooltip.test.tsx` (46) in `grace::tooltip::tests`
+
+| Vitest test | Rust test |
+|---|---|
+| is in the DOM only while open: a manual popover inside the wrapper | `n/a`: no DOM and no `popover`; `opens_nothing_without_a_text` and every test's `shown` read the open tooltip |
+| puts `class` on the wrapper | `n/a`: no CSS classes |
+| opens nothing for an empty or missing text | `opens_nothing_without_a_text` |
+| resets the text styles a row would pass down | `n/a`: the tooltip is a deferred element of the window's root and inherits nothing from a row |
+| shows 500 ms after the pointer enters, not at 499 | `shows_after_the_pause_not_before` |
+| does not show when the pointer leaves first, and hides when it leaves after | `does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after` |
+| keeps open while the pointer moves from the target onto the tooltip | `keeps_open_while_the_pointer_moves_from_the_target_onto_it` |
+| shows at once on keyboard focus and hides on blur | `shows_at_once_on_keyboard_focus_and_once_per_focus` |
+| ignores focus that is not `:focus-visible` | `does_not_show_on_a_focus_from_the_mouse` |
+| shows on focus when the engine cannot tell `:focus-visible` | `n/a`: GPUI always knows the last input (`last_input_was_keyboard`) |
+| shows even over a disabled button | `toolbar::tests::home_and_refresh_the_icon_only_buttons::refresh_shows_its_word_in_a_tooltip_also_while_disabled`, `toolbar::tests::a_narrow_window::gives_each_a_tooltip_with_its_label_while_the_label_is_hidden_also_when_disabled` |
+| closes the other tooltip when a second one opens | `shows_one_at_a_time` |
+| hides when a scroll moves its target | `hides_when_a_scroll_moves_its_target` |
+| stays open when a box that does not hold its target scrolls | `stays_open_when_a_box_that_does_not_hold_its_target_scrolls` |
+| hides on a press of its target | `closes_on_escape_and_on_a_press_of_its_target` |
+| hides on a click inside it, not on the press that starts one | `a_click_on_it_closes_it_and_reaches_nothing_under_it`; closes on the press (Redesigns) |
+| does not come back under a pointer that has not moved since the press | `closes_on_escape_and_on_a_press_of_its_target` |
+| calls `showPopover` once the tooltip exists | `n/a`: no `popover` |
+| stays closed, not thrown, when the engine refuses to show it | `n/a`: no `popover` |
+| pinned: shows at once while true, and hides when it turns false | `shows_at_once_while_the_keyboard_stands_on_it` |
+| pinned: shows from the start when it is true on mount | `shows_at_once_while_the_keyboard_stands_on_it` (the first frame that has it pinned) |
+| pinned: shows nothing without a text, and shows once the text comes | `a_pinned_tooltip_shows_once_its_text_comes` (fixed here: the line is cut a frame after it is drawn) |
+| pinned: opens with a ternary text | `n/a`: Solid's compiler |
+| pinned: leaves hover as it was | `does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after` (hover takes the same path) and `a_pointer_leaving_closes_a_pinned_tooltip` |
+| pinned: hides at the cleanup of its owner | `the_keyboard_moving_to_a_row_without_a_tooltip_closes_the_last`, `closes_when_the_pointer_moves_elsewhere_though_its_target_is_gone` (fixed here: a target no longer drawn closes its tooltip) |
+| placed: shows once and places it below the target when pinned turns true | `shows_at_once_while_the_keyboard_stands_on_it`, `goes_beside_its_target_on_the_side_asked_and_below_by_default` |
+| placed: the same when pinned is true on mount | as the row above |
+| placed: stays up and is placed again when a box that holds it scrolls, while pinned | `a_pinned_tooltip_follows_its_target_on_a_scroll_and_closes_once_it_is_out` (fixed here) |
+| placed: hides, though pinned, once that scroll takes its target out of the box | as the row above |
+| placed: still hides on that scroll when it is not pinned | `hides_when_a_scroll_moves_its_target` |
+| placed: hides on Escape and on a pointer leave even while pinned | `shows_at_once_while_the_keyboard_stands_on_it`, `a_pointer_leaving_closes_a_pinned_tooltip` |
+| clicks: do not reach a handler on an ancestor | `a_click_on_it_closes_it_and_reaches_nothing_under_it` |
+| clicks: a right-click does, and its press closes it | `a_right_click_on_it_reaches_what_lies_under_and_closes_it` (fixed here) |
+| clicks: on an `over` tooltip inside its target's box, reach the target | `a_click_on_an_over_tooltip_within_its_target_reaches_the_target` |
+| clicks: on an `over` tooltip beyond its target's box, only close it | as the row above |
+| clicks: on a tooltip beside its target, only close it | `a_click_on_it_closes_it_and_reaches_nothing_under_it` |
+| side: below by default | `goes_beside_its_target_on_the_side_asked_and_below_by_default` |
+| side: goes where it is asked and says where it went | as the row above; the side is the caller's, nothing reads it back |
+| side: bridges the gap to its target | `keeps_open_while_the_pointer_crosses_the_gap` (fixed here) |
+| Escape: closes only the tooltip, then the next reaches the dialog | `closes_on_escape_and_on_a_press_of_its_target` |
+| Escape: leaves other keys alone while open | `closes_on_escape_and_on_a_press_of_its_target` |
+| Escape: stops listening once the component is gone | `n/a`: the listener is a `Subscription` the window's `Tips` holds, dropped with it |
+| describe: adds the tooltip's id to the target | `grace-e2e/tests/tags.rs::chips_list_the_projects_tags` reads a chip's hint as its description: AccessKit has a description, not an id to point at. The other `describe` users are the Updates section and marker, phase P5 |
+| describe: leaves the target alone by default | `n/a`: no ids; a target has a description only where its view sets one |
+| describe: keeps an id the target already points at | `n/a`: no ids |
+| describe: gives two tooltips two ids | `n/a`: no ids |
+
+#### The small files
+
+| File | Vitest test | Rust test |
+|---|---|---|
+| `placeTip.test.ts` (16) | the 6 below, the 8 beside and the 2 over | `grace::tooltip::tests::goes_beside_its_target_on_the_side_asked_and_below_by_default` and `stays_in_the_window_flipping_where_it_has_no_room`: the 6 px gap, the flips and the 8 px edge, through GPUI Kit's `Positioner`, which places it; `a_click_on_an_over_tooltip_within_its_target_reaches_the_target` (on the target's top left) |
+| `StatusMark.test.tsx` (8) | covers every status; names the words; colours by status | `grace::elements::tests::marks_each_status_as_electron_grace_does` |
+| | draws a shape of its own, except interrupted and cancelled | `tells_statuses_apart_by_shape_or_name` |
+| | turns only while running | `turns_only_while_running_and_never_with_reduced_motion` |
+| | is 14 px unless asked for 16 | `draws_buttons_icons_and_marks_at_their_sizes` |
+| `Icon.test.tsx` (3) | a decorative 16 px Lucide svg by default; takes its size | `draws_buttons_icons_and_marks_at_their_sizes`; `grace::assets::tests::has_the_icons_of_electron_grace` (the same Lucide files) |
+| | draws one child per node of the icon | `n/a`: GPUI draws the Lucide file, `grace::assets::tests::serves_every_icon` |
+| `buttons.test.ts` (2) | dialog buttons in 14 px text; `btnIconSmall` is 24 × 24 | `draws_buttons_icons_and_marks_at_their_sizes` |
+| `ui.test.ts` (1) | a dialog takes no pointer events unless it is open | `n/a`: a closed GPUI dialog is not drawn |
 
 ## Exit check (from #281)
 
