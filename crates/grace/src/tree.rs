@@ -675,13 +675,7 @@ impl Tree {
             tooltip(part("run-tip", &key), Some(SharedString::from(tip)))
                 .side(Side::Left)
                 .child(
-                    Button::new(part("run", &key))
-                        .ghost()
-                        .tab_stop(false)
-                        .w(px(ROW_HEIGHT))
-                        .h(px(ROW_HEIGHT))
-                        .px_0()
-                        .accessibility_label(format!("Run {label}"))
+                    run_button(part("run", &key), &label)
                         .icon(
                             gpui_component::Icon::new(Icon::Play)
                                 .size(px(14.))
@@ -776,6 +770,19 @@ impl Tree {
             .child(row)
             .into_any_element()
     }
+}
+
+/// A row's run button: out of the Tab order (the row's Ctrl+Enter runs it), the row's height, and the hand under
+/// the pointer as on every button (`Tree.tsx`); `Off::off` turns it to the not-allowed sign during a run.
+fn run_button(id: impl Into<gpui::ElementId>, label: &str) -> Button {
+    Button::new(id)
+        .ghost()
+        .tab_stop(false)
+        .w(px(ROW_HEIGHT))
+        .h(px(ROW_HEIGHT))
+        .px_0()
+        .cursor_pointer()
+        .accessibility_label(format!("Run {label}"))
 }
 
 #[cfg(test)]

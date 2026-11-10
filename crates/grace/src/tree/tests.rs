@@ -792,3 +792,22 @@ fn a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left(cx: &mut Te
         "a dimmed test keeps it"
     );
 }
+
+/// UP-13 (#319): a row's run button shows the hand, and the not-allowed sign during a run, as `Tree.tsx`'s does.
+#[test]
+fn a_rows_run_button_shows_the_hand() {
+    use gpui::{CursorStyle, Styled as _};
+    let cursor = |mut b: Button| b.style().mouse_cursor;
+    assert_eq!(
+        cursor(run_button("run", "basic.feature")),
+        Some(CursorStyle::PointingHand)
+    );
+    assert_eq!(
+        cursor(run_button("run", "basic.feature").off(false)),
+        Some(CursorStyle::PointingHand)
+    );
+    assert_eq!(
+        cursor(run_button("run", "basic.feature").off(true)),
+        Some(CursorStyle::OperationNotAllowed)
+    );
+}
