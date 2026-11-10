@@ -454,9 +454,11 @@ fn a_filter_change_scrolls_to_the_selected_row() {
             label(t, "1 of 54 tests match").is_none()
                 && t.all().iter().all(|n| !n.name.starts_with("@module-53, included"))
                 && row(t, "feature-53.feature").is_some_and(|r| r.states.selected)
+                && row(t, "feature-00.feature").is_none()
         })
         .unwrap();
-    assert!(row(&tree, "feature-00.feature").is_none(), "scrolled: {}", tree.dump());
+    // one wait for the filter and the scroll: on Windows CI the list had not moved yet when the filter was read
+    assert!(row(&tree, "feature-53.feature").is_some(), "{}", tree.dump());
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
 }

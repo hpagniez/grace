@@ -180,12 +180,18 @@ impl Driver for UiaDriver {
         // gets the focus, and the keys after it went nowhere (#301)
         self.to_foreground()?;
         // as a click would: AccessKit gives Invoke to a button, Toggle to a check box, and neither to a button that
-        // opens something (ExpandCollapse) or to a tree item; those take a click of the pointer on their centre
+        // opens something (ExpandCollapse) or to a tree item; a tree item takes a click of the pointer on its centre
         if let Ok(invoke) = at.get_pattern::<UIInvokePattern>() {
             return invoke.invoke().map_err(err);
         }
         if let Ok(toggle) = at.get_pattern::<UITogglePattern>() {
             return toggle.toggle().map_err(err);
+        }
+        // a button that opens something takes the focus and Space, as from the keyboard: its centre can be under
+        // another part of the window when its scroll area clips it (a step's log button below a long error)
+        if node.role == Role::Button && at.get_pattern::<UIExpandCollapsePattern>().is_ok() {
+            at.set_focus().map_err(err)?;
+            return Keyboard::new().send_keys("{space}").map_err(err);
         }
         let r = at
             .get_bounding_rectangle()
