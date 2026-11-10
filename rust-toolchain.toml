@@ -1,5 +1,5 @@
 # The Rust toolchain of GPUI Grace (ADR 0031): the newest stable Rust, which scripts/bump-cargo.mjs moves it to (ADR 0032).
 [toolchain]
-channel = "1.97.0"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
