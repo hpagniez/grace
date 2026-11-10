@@ -70,6 +70,7 @@ impl Gallery {
 
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(gpui::px(crate::window::REM));
         let tips = self
             .tips
             .get_or_insert_with(|| crate::tooltip::install(window, cx))
