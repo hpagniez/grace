@@ -174,11 +174,11 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
 | UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 | UP-12 | The Windows folder dialog shows the siblings (by hand) | | ☐ |
-| UP-13 | Cursors match what a control does | | ☐ |
+| UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
 | UP-14 | The busy cursor while running | | ☐ |
-| UP-15 | Scroll areas get thin themed scrollbars | | ☐ |
+| UP-15 | Scroll areas get thin themed scrollbars | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown` (the tree, details, console and lists; History and HTTP with phase P3) | ☑ |
 | UP-16 | Scrollbars look right and are easy to use (by hand) | | ☐ |
-| UP-17 | The window opens painted in the app's theme | | ☐ |
+| UP-17 | The window opens painted in the app's theme | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (the ground in each theme); the window shows once its first frame is drawn (#90) | ☑ |
 | UP-18 | No white flash (by hand) | | ☐ |
 | UP-19 | The window appears even if the page fails (by hand) | | ☐ |
 | UP-20 | A second launch brings the window up (by hand) | | ☐ |
@@ -335,7 +335,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
 | LV-01 | Finding tests shows the stripe | `grace::progress::tests::the_bar_r14_1::finding_tests_shows_the_stripe_until_the_runner_is_no_longer_busy`, `grace::progress::tests::after_a_run_r14_2::shows_finding_tests_with_the_turning_icon_while_the_runner_discovers` | ☑ |
-| LV-02 | Finding tests for the first time | | ☐ |
+| LV-02 | Finding tests for the first time | `grace-e2e/tests/open.rs::finding_tests_for_the_first_time` | ☑ |
 | LV-03 | Tests found | `grace::progress::tests::the_bar_r14_1::finding_tests_shows_the_stripe_until_the_runner_is_no_longer_busy` | ☑ |
 | LV-04 | The stripe never covers a run's results | `grace::progress::tests::the_bar_r14_1::the_stripe_hides_the_last_runs_segments_and_they_show_again_after` | ☑ |
 | LV-05 | The stripe stays until the first result | `grace::progress::tests::the_bar_r14_1::the_stripe_stays_until_the_first_result_and_a_cancel_stops_it` | ☑ |
@@ -391,34 +391,34 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
 | VL-01 | Only the rows in view are drawn (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` | ☑ |
-| VL-02 | A small list draws in jsdom | | ☐ |
-| VL-03 | The tree shows the same rows as before | | ☐ |
+| VL-02 | A small list draws in jsdom | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (every row of a small project drawn); GPUI Grace has no jsdom | ☑ |
+| VL-03 | The tree shows the same rows as before | `grace_core::rows::tests::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings`, `grace::tree::tests::hide_non_matching_leaves_the_matching_rows` | ☑ |
 | VL-04 | Closed folders survive a refresh | `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed` | ☑ |
 | VL-05 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
 | VL-06 | The tree is one tab stop | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (the tree is a tab stop, the focus a tree item) | ☑ |
 | VL-07 | Arrow keys move and select | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
 | VL-08 | Right and Left | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
-| VL-09 | Home, End and pages | | ☐ |
+| VL-09 | Home, End and pages | `grace::tree::tests::home_end_and_pages`, `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (Home and End) | ☑ |
 | VL-10 | Ctrl+Enter runs the focused row | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` | ☑ |
-| VL-11 | The row's buttons left the tab order but still click | | ☐ |
-| VL-12 | A click makes the row focused | | ☐ |
-| VL-13 | The HTTP list is one tab stop and arrows open calls | | ☐ |
+| VL-11 | The row's buttons left the tab order but still click | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` | ☑ |
+| VL-12 | A click makes the row focused | `grace::tree::tests::a_click_makes_the_row_focused` | ☑ |
+| VL-13 | The HTTP list is one tab stop and arrows open calls | Waits for the HTTP tab, phase P3 | ☐ |
 | VL-14 | A moved-to row scrolls into view (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End) | ☑ |
-| VL-15 | Focus survives scrolling away (e2e) | | ☐ |
-| VL-16 | Closing a folder takes focus to it | | ☐ |
+| VL-15 | Focus survives scrolling away (e2e) | `grace::tree::tests::focus_survives_scrolling_away` (headless: plan, Redesigns) | ☑ |
+| VL-16 | Closing a folder takes focus to it | `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` | ☑ |
 | VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
 | VL-18 | A new tree keeps the rows in view still (e2e) | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it`, `grace-core::rows::tests::anchored_scroll_top` (headless: plan, Redesigns) | ☑ |
-| VL-19 | Calls arriving above the view keep the rows in view still | | ☐ |
+| VL-19 | Calls arriving above the view keep the rows in view still | Waits for the HTTP tab, phase P3 | ☐ |
 | VL-20 | A filter change scrolls to the selected row (e2e) | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
-| VL-21 | A cut label shows whole on keyboard focus | | ☐ |
-| VL-22 | The run shortcut can be found | | ☐ |
-| VL-23 | Tree rows carry their level and position | | ☐ |
+| VL-21 | A cut label shows whole on keyboard focus | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` | ☑ |
+| VL-22 | The run shortcut can be found | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` (the tooltip "Run passing hello (Ctrl+Enter)"); every row carries `tree::SHORTCUTS`, "Control+Enter", which AT-SPI does not pass on | ☑ |
+| VL-23 | Tree rows carry their level and position | `grace_core::rows::tests::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings` (each tree item takes its level, position and set size from its row); the tree named "Tests" in `grace-e2e/tests/tree.rs` | ☑ |
 | VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
-| VL-25 | Calls are options | | ☐ |
-| VL-26 | Opening 10,000 tests (perf) | | ☐ |
-| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | | ☐ |
-| VL-28 | Run all at 10,000 tests (perf) | | ☐ |
-| VL-29 | 2,000 tests are not slower (perf) | | ☐ |
+| VL-25 | Calls are options | Waits for the HTTP tab, phase P3 | ☐ |
+| VL-26 | Opening 10,000 tests (perf) | Measured in PR 6's check on the reference machine | ☐ |
+| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | Measured in PR 6's check on the reference machine; the HTTP tab with phase P3 | ☐ |
+| VL-28 | Run all at 10,000 tests (perf) | Measured in PR 6's check on the reference machine | ☐ |
+| VL-29 | 2,000 tests are not slower (perf) | Measured in PR 6's check on the reference machine | ☐ |
 
 ### LF · Light and fast: numbers on every PR, a benchmark before every release
 
@@ -562,8 +562,8 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | TB-01 | The toolbar holds the name and the chip, not the path | `grace::toolbar::tests::the_project::shows_the_folder_name_and_the_layout_and_leaves_the_path_to_the_status_bar_r1_1`, `grace::toolbar::tests::the_project::draws_the_name_and_the_chip` | ☑ |
 | TB-02 | The name is cut in the middle, keeping its end | `grace::toolbar::tests::the_project::cuts_a_long_name_in_the_middle_its_start_gives_way_its_last_12_characters_stay_r1_2`, `grace::toolbar::tests::the_project::lets_the_chip_go_whole_before_the_name_is_cut_r1_2` | ☑ |
 | TB-03 | A cut name explains itself | `grace::toolbar::tests::the_project::explains_a_cut_name_in_a_tooltip_and_says_nothing_while_it_fits_r1_3` | ☑ |
-| TB-04 | The name shows whole at the default size (e2e) | | ☐ |
-| TB-05 | A long path at the minimum width (e2e) | | ☐ |
+| TB-04 | The name shows whole at the default size (e2e) | `grace::window::tests::the_name_shows_whole_at_the_default_size` (headless: plan, Redesigns) | ☑ |
+| TB-05 | A long path at the minimum width (e2e) | `grace::window::tests::a_long_path_at_the_minimum_width` (headless: plan, Redesigns); the path's tooltip TB-07, the words TB-08 | ☑ |
 | TB-06 | The status bar shows the path while a project is open | `grace::status_bar::tests::shows_the_path_while_a_project_is_open_and_none_on_the_home_screen` | ☑ |
 | TB-07 | A cut path explains itself | `grace::status_bar::tests::explains_a_cut_path_in_a_tooltip_and_says_nothing_while_it_fits` | ☑ |
 | TB-08 | Env and Threads below 1280 px | `grace::env_picker::tests::below_1280_px_the_word_env_goes_from_sight_and_says_itself_in_a_tooltip`, `grace::threads_box::tests::below_1280_px_the_word_threads_goes_from_sight_and_says_itself_in_a_tooltip` | ☑ |
@@ -961,7 +961,7 @@ Phase P2 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-cursor-01 | cursors match what a control does | | ☐ |
+| E-cursor-01 | cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
 | E-cursor-02 | the busy cursor while running | | ☐ |
 | E-cursor-03 | the drag cursor wins over the busy cursor | | ☐ |
 
@@ -1074,7 +1074,7 @@ Phase P2 · 14 tests
 | E-home-03 | The last project opens at start without the home screen | `grace-e2e/tests/home.rs::the_last_project_opens_at_start_without_the_home_screen` | ☑ |
 | E-home-04 | A missing last project shows the home screen | `grace-e2e/tests/home.rs::a_missing_last_project_shows_the_home_screen` | ☑ |
 | E-home-05 | A dry-run error still opens the project | `grace-e2e/tests/home.rs::a_dry_run_error_still_opens_the_project` | ☑ |
-| E-home-06 | The home screen is on the ground in light and in dark | | ☐ |
+| E-home-06 | The home screen is on the ground in light and in dark | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (the home screen's ground, light and dark) | ☑ |
 | E-home-07 | Reopening a folder from the list | `grace-e2e/tests/home.rs::reopening_a_folder_from_the_list` | ☑ |
 | E-home-08 | The folder dialog starts next to the newest existing folder | `grace-e2e/tests/home.rs::the_folder_dialog_starts_next_to_the_newest_existing_folder` | ☑ |
 | E-home-09 | Removing a row | `grace-e2e/tests/home.rs::removing_a_row` | ☑ |
@@ -1126,10 +1126,10 @@ Phase P2 · 11 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-open-01 | Open a project and see its tests | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` | ☑ |
-| E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | | ☐ |
-| E-open-03 | A narrow window keeps every toolbar button on screen, with its name | | ☐ |
-| E-open-04 | A long project path stays readable at the minimum width | | ☐ |
-| E-open-05 | The Env and Threads boxes show their longest likely values whole | | ☐ |
+| E-open-02 | A feature opens on a click on its name, and as a run in it starts (#224) | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`, `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` (a run opens its feature) | ☑ |
+| E-open-03 | A narrow window keeps every toolbar button on screen, with its name | `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (the floor on Windows only: Xvfb has no window manager to hold the minimum) | ☑ |
+| E-open-04 | A long project path stays readable at the minimum width | `grace::window::tests::a_long_path_at_the_minimum_width`, `grace::window::tests::the_name_shows_whole_at_the_default_size` (headless: plan, Redesigns); the words and tooltips: TB-07, TB-08 | ☑ |
+| E-open-05 | The Env and Threads boxes show their longest likely values whole | `grace::env_picker::tests::the_env_and_threads_boxes_show_their_longest_likely_values_whole` (headless: plan, Redesigns) | ☑ |
 | E-open-06 | Maven layout with classpath resources | `grace-e2e/tests/open.rs::maven_layout_with_classpath_resources` | ☑ |
 | E-open-07 | Syntax error is reported, not hidden | `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` | ☑ |
 | E-open-08 | Nothing to run | `grace-e2e/tests/run.rs::nothing_to_run` | ☑ |
@@ -1197,7 +1197,7 @@ Phase P2 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-scrollbar-01 | scroll areas get thin themed scrollbars | | ☐ |
+| E-scrollbar-01 | scroll areas get thin themed scrollbars | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown` | ☑ |
 
 ### e2e/startup.spec.ts
 
@@ -1205,9 +1205,9 @@ Phase P2 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-startup-01 | the window opens painted in the app's theme | | ☐ |
-| E-startup-02 | the page starts with a static startup screen | | ☐ |
-| E-startup-03 | a reload shows the app once | | ☐ |
+| E-startup-01 | the window opens painted in the app's theme | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` | ☑ |
+| E-startup-02 | the page starts with a static startup screen | GPUI Grace has no page and no startup screen: its first frame is its own, in the theme (plan, Redesigns) | n/a |
+| E-startup-03 | a reload shows the app once | GPUI Grace has no page to reload (plan, Redesigns) | n/a |
 
 ### e2e/tags.spec.ts
 
@@ -1283,13 +1283,13 @@ Phase P2 · 9 tests
 |---|---|---|---|
 | E-virtual-01 | Only the rows in view are drawn | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (300 features, generated) | ☑ |
 | E-virtual-02 | A moved-to row scrolls into view | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End, in place of 40 Down presses) | ☑ |
-| E-virtual-03 | Focus survives scrolling away | | ☐ |
+| E-virtual-03 | Focus survives scrolling away | `grace::tree::tests::focus_survives_scrolling_away` (headless: plan, Redesigns) | ☑ |
 | E-virtual-04 | A new tree keeps the rows in view still | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` (headless: plan, Redesigns) | ☑ |
 | E-virtual-05 | The filter bar keeps one line with 54 tags | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
 | E-virtual-06 | A filter change scrolls to the selected row | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
-| E-virtual-07 | A click shows neither the focus ring nor a tooltip | | ☐ |
-| E-virtual-08 | A click on an HTTP call shows no focus ring | | ☐ |
-| E-virtual-09 | The keyboard shows the focus ring and a cut label's tooltip | | ☐ |
+| E-virtual-07 | A click shows neither the focus ring nor a tooltip | `grace::tree::tests::a_click_makes_the_row_focused`, `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` (a click shows no tooltip) | ☑ |
+| E-virtual-08 | A click on an HTTP call shows no focus ring | Waits for the HTTP tab, phase P3 | ☐ |
+| E-virtual-09 | The keyboard shows the focus ring and a cut label's tooltip | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus`, `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
 
 ### e2e/watch.spec.ts
 

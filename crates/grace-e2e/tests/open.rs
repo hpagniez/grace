@@ -114,6 +114,35 @@ fn maven_layout_with_classpath_resources() {
     .unwrap();
 }
 
+/// #208, #223: running one test of a Maven project runs it, and its result shows in the tree, the top bar and Details.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn running_one_test_of_a_maven_project_shows_its_result() {
+    let dir = project("maven").unwrap();
+    let app = open(&dir);
+    app.wait_for("the Maven test", WAIT, |t| named(t, "1 test · Not run yet").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Expand users.feature").unwrap();
+    let name = "config, classpath data and classpath call";
+    let tree = app.wait_for("the scenario", WAIT, |t| row(t, name).is_some()).unwrap();
+    app.press(row(&tree, name).unwrap()).unwrap();
+    app.press_named(Role::Button, &format!("Run {name}")).unwrap();
+    let tree = app
+        .wait_for("its result", RUN, |t| {
+            named(t, "Finished").is_some()
+                && named(t, "1 / 1").is_some()
+                && named(t, "1 passed").is_some()
+                && row(t, name).is_some_and(|r| r.name.contains("passed"))
+        })
+        .unwrap();
+    let details = tree.find(&Role::Group, "Details").unwrap();
+    assert!(
+        details.all().iter().any(|n| n.name == "Passed"),
+        "Details shows it passed: {}",
+        details.dump()
+    );
+}
+
 /// WS-03, E-open-07
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
@@ -184,4 +213,127 @@ fn the_last_project_folder_was_deleted() {
     app.answer_folder(None).unwrap();
     app.press_named(Role::Button, "Open folder…").unwrap();
     assert_eq!(first_dialog(&app), None);
+}
+
+/// The toolbar's buttons, in their order (`TOOLBAR_BUTTONS`; Watch comes with phase P4).
+const TOOLBAR: [&str; 8] = [
+    "Home",
+    "Properties…",
+    "Refresh",
+    "Open…",
+    "Report",
+    "Re-run failed",
+    "Cancel",
+    "Run all",
+];
+
+/// Where Grace's view is: its root, named Grace inside the window (the window itself has no place through AT-SPI).
+fn view(tree: &Node) -> Option<grace_e2e::Rect> {
+    tree.all()
+        .into_iter()
+        .find(|n| n.name == "Grace" && n.role != Role::Window)
+        .and_then(|n| n.rect)
+        .filter(|r| r.width > 0)
+}
+
+/// Sizes the window and waits until the tree shows it at that width, give or take Windows' frame, and `ok`.
+fn window_width(app: &App, width: i32, ok: impl Fn(&Node) -> bool) -> Node {
+    app.set_window_rect(0, 0, width, 700).unwrap();
+    app.wait_for(&format!("the window {width} px wide"), WAIT, |t| {
+        view(t).is_some_and(|r| (r.width - width).abs() <= 40) && ok(t)
+    })
+    .unwrap()
+}
+
+/// How wide the window can be: Windows holds a window to its screen, 1024 px on CI, and Xvfb's screen is wide. From
+/// 780 px, so the size seen after asking for more is the new one.
+fn widest(app: &App) -> i32 {
+    window_width(app, 780, |_| true);
+    app.set_window_rect(0, 0, 4000, 700).unwrap();
+    let tree = app
+        .wait_for("the window wider", WAIT, |t| view(t).is_some_and(|r| r.width > 820))
+        .unwrap();
+    view(&tree).unwrap().width + 40
+}
+
+fn button_width(tree: &Node, name: &str) -> Option<i32> {
+    tree.find(&Role::Button, name).and_then(|b| b.rect).map(|r| r.width)
+}
+
+/// Every toolbar button is named and inside the window (`expectToolbarFits`).
+fn toolbar_fits(tree: &Node) {
+    let window = view(tree).expect("the view's place");
+    for name in TOOLBAR {
+        let b = tree
+            .find(&Role::Button, name)
+            .unwrap_or_else(|| panic!("{name}: {}", tree.dump()));
+        let r = b.rect.unwrap_or_else(|| panic!("{name} has no place"));
+        assert!(
+            r.x >= window.x && r.x + r.width <= window.x + window.width,
+            "{name} at {r:?} inside the window {window:?}"
+        );
+    }
+}
+
+/// E-open-03: below 1280 px four buttons are their icon, with the name spoken; at the floor every button
+/// is still in the window.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name() {
+    let dir = project("clean").unwrap();
+    let app = open(&dir);
+    app.wait_for("the tests found", WAIT, |t| row(t, "tests").is_some())
+        .unwrap();
+    let widest = widest(&app);
+    for width in [780, 1200, 1279] {
+        if width > widest {
+            eprintln!("{width} px is wider than the screen lets the window be ({widest} px): not checked");
+            continue;
+        }
+        let tree = window_width(&app, width, |t| button_width(t, "Open…").is_some_and(|w| w < 40));
+        toolbar_fits(&tree);
+        for name in ["Properties…", "Open…", "Report", "Cancel"] {
+            let w = button_width(&tree, name).unwrap();
+            assert!(w < 40, "{name} is its icon at {width}: {w} px");
+        }
+        let name = tree.find(&Role::Text, "clean").and_then(|n| n.rect);
+        assert!(
+            name.is_some_and(|r| r.width > 25),
+            "the folder's name at {width}: {}",
+            tree.dump()
+        );
+    }
+    for width in [1281, 1500] {
+        if width > widest {
+            eprintln!("{width} px is wider than the screen lets the window be ({widest} px): not checked");
+            continue;
+        }
+        let tree = window_width(&app, width, |t| button_width(t, "Open…").is_some_and(|w| w > 60));
+        toolbar_fits(&tree);
+    }
+    // the floor: only a window manager holds the minimum width, and Xvfb has none
+    if cfg!(windows) {
+        app.set_window_rect(0, 0, 1, 700).unwrap();
+        let tree = app
+            .wait_for("the window at its minimum", WAIT, |t| {
+                view(t).is_some_and(|r| r.width >= 720 && r.width < 780)
+            })
+            .unwrap();
+        toolbar_fits(&tree);
+    }
+}
+
+/// LV-02: while the first discovery runs, the tree says it is finding the tests; then the tests show.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn finding_tests_for_the_first_time() {
+    let app = open(&project("clean").unwrap());
+    app.wait_for("Finding tests…", WAIT, |t| {
+        named(t, "Finding tests…").is_some() && row(t, "tests").is_none()
+    })
+    .unwrap();
+    app.wait_for("the tests", WAIT, |t| {
+        row(t, "basic.feature").is_some() && named(t, "Finding tests…").is_none()
+    })
+    .unwrap();
 }

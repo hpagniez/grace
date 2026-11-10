@@ -12,7 +12,7 @@ use gpui::{
     Window, deferred, div, prelude::FluentBuilder as _, px,
 };
 use gpui_base::ElementExt as _;
-use gpui_component::input::{Escape, Input, InputEvent, InputState, MoveDown, MoveUp};
+use gpui_component::input::{Escape, InputEvent, InputState, MoveDown, MoveUp};
 use grace_core::model::env::{EnvView, valid_env_name};
 use grace_core::state::AppState;
 
@@ -355,7 +355,7 @@ impl Render for EnvPicker {
         let tip = narrow.then(|| SharedString::from(LABEL));
         let boxed = tooltip("tip-env", tip).side(Side::Left).child(
             div().debug_selector(|| "env-input".into()).w(px(WIDTH)).child(
-                Input::new(&input)
+                crate::elements::input(&input)
                     .role(Role::EditableComboBox)
                     .aria_label(LABEL)
                     .h(px(METRICS.control_height))

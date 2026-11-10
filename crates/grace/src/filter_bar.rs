@@ -7,6 +7,7 @@
 //! line (`IntersectionObserver`), GPUI hands the strip its children's places after each layout, and the bar keeps the
 //! tags whose chip is below the first line (`on_children_prepainted`). It costs a comparison per frame drawn and
 //! nothing while idle, when no frame is drawn. The fold chip `+N` opens a panel of every tag over the tree.
+use crate::elements::Off as _;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,9 +18,9 @@ use gpui::{
     ParentElement as _, Pixels, Point, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, deferred, div, prelude::FluentBuilder as _, px,
 };
+use gpui_component::RoleOverride;
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
-use gpui_component::{Disableable as _, RoleOverride};
 use grace_core::model::node::TestNode;
 use grace_core::model::tags::{FilterState, chip_tags, cycle_tag, filter_on, matching_leaves};
 use grace_core::rows::leaves;
@@ -273,7 +274,7 @@ impl FilterBar {
                 .text_color(Theme::color(fg))
                 .when(state == ChipState::Exclude, |b| b.line_through())
                 .track_focus(f)
-                .disabled(locked)
+                .off(locked)
                 .map(|b| {
                     if folded {
                         b.role(RoleOverride::Presentational).tab_stop(false)
@@ -434,7 +435,7 @@ impl Render for FilterBar {
             };
             div().debug_selector(|| "tag-clear".into()).flex_none().child(
                 button("tag-clear", CLEAR, ButtonKind::Ghost, ButtonSize::Small)
-                    .disabled(locked)
+                    .off(locked)
                     .on_click(move |_, _, cx| me.update(cx, |bar, cx| bar.set_filter(cleared.clone(), cx))),
             )
         });
@@ -464,9 +465,10 @@ impl Render for FilterBar {
             .h(px(CHIP_HEIGHT))
             .child(
                 Checkbox::new("hide-non-matching")
+                    .cursor_pointer()
                     .label(HIDE_NON_MATCHING)
                     .checked(filter.hide_non_matching)
-                    .disabled(locked)
+                    .off(locked)
                     .text_size(px(METRICS.text_xs.size))
                     .whitespace_nowrap()
                     .on_click(move |checked, _, cx| {

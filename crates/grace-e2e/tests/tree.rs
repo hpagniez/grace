@@ -204,3 +204,40 @@ fn only_the_rows_in_view_are_drawn() {
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// VL-11, VL-22: Tab leaves the tree in one step, past no chevron, label or run button; the run button says its
+/// shortcut in its tooltip and a press of it runs its row.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn the_rows_buttons_are_out_of_the_tab_order_but_still_click() {
+    let app = open_clean();
+    let basic = row(&app.tree().unwrap(), "basic.feature").unwrap().clone();
+    app.press(&basic).unwrap();
+    let tree = app
+        .wait_for("passing hello", WAIT, |t| row(t, "passing hello").is_some())
+        .unwrap();
+    app.key(Key::Tab).unwrap();
+    let left = app
+        .wait_for("the focus out of the tree", WAIT, |t| {
+            focused(t).is_none() && t.all().iter().any(|n| n.states.focused)
+        })
+        .unwrap();
+    let on = left.all().into_iter().find(|n| n.states.focused).unwrap().clone();
+    assert!(
+        !on.name.starts_with("Expand ") && !on.name.starts_with("Collapse ") && !on.name.starts_with("Run "),
+        "Tab went to {:?} {:?}",
+        on.role,
+        on.name
+    );
+
+    let run = tree.find(&Role::Button, "Run passing hello").unwrap().clone();
+    app.hover(&run).unwrap();
+    app.wait_for_node(Role::Tooltip, "Run passing hello (Ctrl+Enter)")
+        .unwrap();
+    app.press(&run).unwrap();
+    app.wait_for("the run of passing hello", Duration::from_secs(60), |t| {
+        t.all().iter().any(|n| n.name == "Finished")
+            && row(t, "passing hello").is_some_and(|r| r.name.contains("passed"))
+    })
+    .unwrap();
+}

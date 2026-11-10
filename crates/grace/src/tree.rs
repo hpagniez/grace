@@ -8,6 +8,8 @@
 //!
 //! The debug button, the breakpoint dot (phase P4), "Open in VS Code" from a row's menu (P3) and the sub-folder
 //! buttons of an empty project (P4) come with their phases (P2 plan, Redesigns).
+use crate::elements::Off as _;
+use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -17,7 +19,6 @@ use gpui::{
     Render, ScrollStrategy, SharedString, StatefulInteractiveElement as _, Styled, Subscription,
     UniformListScrollHandle, Window, div, point, prelude::FluentBuilder as _, px, uniform_list,
 };
-use gpui_component::Disableable as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use grace_core::model::flaky::FLAKY_TITLE;
 use grace_core::model::node::{NodeKind, Status};
@@ -485,6 +486,7 @@ impl Render for Tree {
             .aria_label("Tests")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key))
+            .relative()
             .flex()
             .flex_col()
             .flex_1()
@@ -503,6 +505,7 @@ impl Render for Tree {
                 .flex_1()
                 .min_h_0(),
             )
+            .vertical_scrollbar(&self.scroll)
             .into_any_element()
     }
 }
@@ -583,14 +586,28 @@ impl Tree {
             .flex()
             .flex_1()
             .min_w_0()
+            .overflow_hidden()
             .items_center()
             .gap_2()
             .text_size(px(METRICS.text_sm.size))
-            .child(cut(part("label", &key), label.clone()).side(Side::Over))
+            .child(
+                cut(part("label", &key), label.clone())
+                    .whole(match &title {
+                        Some(title) => format!("{label} · {title}"),
+                        None => label.clone(),
+                    })
+                    .side(Side::Over)
+                    .keyboard(ring),
+            )
             .when_some(title, |d, title| {
+                // the title gives way first, then the file name, which the person navigates by
                 d.child(
                     div()
-                        .flex_none()
+                        .min_w_0()
+                        .flex_shrink(1000.)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
                         .text_size(px(METRICS.text_xs.size))
                         .text_color(Theme::color(t.muted))
                         .child(title),
@@ -646,7 +663,7 @@ impl Tree {
                                 .size(px(14.))
                                 .text_color(Theme::color(if selected { t.passed } else { t.muted })),
                         )
-                        .disabled(busy(state))
+                        .off(busy(state))
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             me.update(cx, |tree, cx| tree.clicked(&run_key, window, cx));
@@ -658,9 +675,13 @@ impl Tree {
 
         let me = cx.entity();
         let click_key = key.clone();
-        div()
+        let row = div()
             .id(part("row", &key))
-            .debug_selector(|| "tree-row".into())
+            .debug_selector({
+                let key = key.clone();
+                move || format!("tree-row:{key}")
+            })
+            .cursor_pointer()
             .role(Role::TreeItem)
             .aria_label(row_name(&label, status, flaky.as_deref(), &node.tags))
             .aria_level(r.level)
@@ -671,8 +692,8 @@ impl Tree {
             .aria_keyshortcuts(SHORTCUTS)
             .when(is_focus_row, |d| d.aria_active_descendant())
             .h(px(ROW_HEIGHT))
-            .ml(px(8. + (r.level - 1) as f32 * INDENT))
-            .mr(px(8.))
+            .flex_1()
+            .min_w_0()
             .pr_1()
             .flex()
             .items_center()
@@ -705,7 +726,16 @@ impl Tree {
             .child(name)
             .children(tags)
             .children(flaky_badge)
-            .children(run)
+            .children(run);
+        // A list lays its rows out alone, as wide as their content: the wrapper takes the list's width, so a long
+        // label is cut, with its tooltip, rather than drawn past the window.
+        div()
+            .w_full()
+            .h(px(ROW_HEIGHT))
+            .flex()
+            .pl(px(8. + (r.level - 1) as f32 * INDENT))
+            .pr(px(8.))
+            .child(row)
             .into_any_element()
     }
 }

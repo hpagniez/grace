@@ -1,6 +1,8 @@
 //! `ImportStep.tsx`: the Properties dialog's import step (spec `2026-11-04-env-var-properties.md` R5). Where the file's
 //! keys go, as which kind and under which names, and what that adds, replaces and skips. It shows names and reasons,
 //! never a value. The plan is `grace_core::import_plan`'s.
+use crate::elements::Off as _;
+use gpui_component::scroll::ScrollableElement as _;
 use std::rc::Rc;
 
 use gpui::accesskit::Role;
@@ -9,10 +11,10 @@ use gpui::{
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div,
     prelude::FluentBuilder as _, px,
 };
+use gpui_component::IndexPath;
 use gpui_component::checkbox::Checkbox;
-use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::input::{InputEvent, InputState};
 use gpui_component::select::{Select, SelectEvent, SelectState};
-use gpui_component::{Disableable as _, IndexPath};
 use grace_core::import_plan::{EMPTY, ImportPlan, PlanRow, import_plan};
 use grace_core::model::env::{ImportEntry, MAX_ENVS, MAX_ROWS, valid_prefix};
 use grace_core::properties_draft::Draft;
@@ -194,7 +196,7 @@ impl Render for ImportStep {
                 d.child(
                     div().flex().items_center().gap_2().child(PREFIX).child(
                         div().w(px(160.)).debug_selector(|| "import-prefix".into()).child(
-                            Input::new(&self.prefix)
+                            crate::elements::input(&self.prefix)
                                 .aria_label(PREFIX)
                                 .h(px(METRICS.control_height)),
                         ),
@@ -227,7 +229,7 @@ impl Render for ImportStep {
                                 .role(Role::List)
                                 .aria_label("Skipped keys")
                                 .max_h(px(160.))
-                                .overflow_y_scroll()
+                                .overflow_y_scrollbar()
                                 .text_size(px(METRICS.text_xs.size))
                                 .text_color(Theme::color(t.muted))
                                 .children(listed.into_iter().enumerate().map(|(i, s)| {
@@ -263,7 +265,7 @@ impl Render for ImportStep {
                     .child(
                         div().debug_selector(|| "import-confirm".into()).child(
                             button("import-confirm", "Import", ButtonKind::Primary, ButtonSize::Medium)
-                                .disabled(blocked)
+                                .off(blocked)
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     cx.emit(Imported::Rows {
                                         target: this.target.clone(),

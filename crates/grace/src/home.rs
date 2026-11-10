@@ -1,12 +1,13 @@
 //! `Home.tsx`: the start screen (home screen spec R12), on the ground in both themes: no project is open, so there is
 //! no sheet. The notice shows above the column.
+use crate::elements::Off as _;
 use gpui::accesskit::Role;
 use gpui::{
     AnyElement, App, Entity, FocusHandle, ImageSource, InteractiveElement as _, IntoElement, ParentElement, Resource,
     SharedString, StatefulInteractiveElement as _, Styled, Window, div, img, prelude::FluentBuilder as _, px,
 };
-use gpui_component::Disableable as _;
 use gpui_component::button::ButtonVariants as _;
+use gpui_component::scroll::ScrollableElement as _;
 use grace_core::model::events::RecentEntry;
 use grace_core::state::AppState;
 
@@ -134,7 +135,7 @@ pub fn render(
                 .id("home-scroll")
                 .flex_1()
                 .min_h_0()
-                .overflow_y_scroll()
+                .overflow_y_scrollbar()
                 .px_4()
                 .py_12()
                 .child(column),
@@ -219,7 +220,7 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
         .py_2()
         .justify_start()
         .rounded_none()
-        .disabled(!entry.exists)
+        .off(!entry.exists)
         .accessibility_label(row_name(entry))
         .on_click(move |_, _, cx| {
             let root = root.clone();

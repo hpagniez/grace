@@ -229,26 +229,22 @@ impl Render for Tips {
                     .text_size(px(m.text_xs.size))
                     .line_height(px(m.text_xs.line_height))
                     .text_color(Theme::color(t.ink))
-                    .child(
-                        div()
-                            .id("grace-tooltip-text")
-                            .on_prepaint(move |bounds, _, _| drawn.set(Some(bounds)))
-                            .on_hover(move |hovered, window, cx| {
-                                // leaving the tooltip for anything but its target closes it
-                                if !*hovered && !target.contains(&window.mouse_position()) {
-                                    let _ = leave.update(cx, |tips, cx| tips.hide(cx));
-                                }
-                            })
-                            // A click on it closes it rather than reaching what lies under it; one over its target
-                            // lies on it, so a click within the target's box is the target's.
-                            .on_mouse_down(MouseButton::Left, move |event, _, cx| {
-                                let _ = me.update(cx, |tips, cx| tips.hide(cx));
-                                if !(over && target.contains(&event.position)) {
-                                    cx.stop_propagation();
-                                }
-                            })
-                            .child(open.text),
-                    ),
+                    .on_prepaint(move |bounds, _, _| drawn.set(Some(bounds)))
+                    .on_hover(move |hovered, window, cx| {
+                        // leaving the tooltip for anything but its target closes it
+                        if !*hovered && !target.contains(&window.mouse_position()) {
+                            let _ = leave.update(cx, |tips, cx| tips.hide(cx));
+                        }
+                    })
+                    // A click on it closes it rather than reaching what lies under it; one over its target lies on
+                    // it, so a click within the target's box is the target's.
+                    .on_mouse_down(MouseButton::Left, move |event, _, cx| {
+                        let _ = me.update(cx, |tips, cx| tips.hide(cx));
+                        if !(over && target.contains(&event.position)) {
+                            cx.stop_propagation();
+                        }
+                    })
+                    .child(div().id("grace-tooltip-text").child(open.text)),
             ),
         )
         .with_priority(PRIORITY)
@@ -278,6 +274,8 @@ pub struct Tip {
     text: Option<SharedString>,
     side: Side,
     target: Target,
+    /// Whether the target holds the keyboard focus, for one that takes no focus of its own (`Tip::keyboard`).
+    keyboard: Option<bool>,
 }
 
 /// A tooltip saying `text` for a target. No text (a disabled control with no reason to give) means no tooltip.
@@ -288,6 +286,7 @@ pub fn tooltip(id: impl Into<ElementId>, text: impl Into<Option<SharedString>>) 
         text: text.into(),
         side: Side::Below,
         target: Target::Element(div().into_any_element()),
+        keyboard: None,
     }
 }
 
@@ -301,6 +300,7 @@ pub fn cut(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Tip {
         text: Some(text.clone()),
         side: Side::Below,
         target: Target::Cut(text),
+        keyboard: None,
     }
 }
 
@@ -314,6 +314,7 @@ pub fn cut_middle(id: impl Into<ElementId>, head: impl Into<SharedString>, tail:
         text: Some(format!("{head}{tail}").into()),
         side: Side::Below,
         target: Target::Middle(head, tail),
+        keyboard: None,
     }
 }
 
@@ -331,6 +332,20 @@ fn measure(text: SharedString, cut: Rc<Cell<bool>>) -> impl Fn(Bounds<Pixels>, &
 impl Tip {
     pub fn side(mut self, side: Side) -> Self {
         self.side = side;
+        self
+    }
+
+    /// What the tooltip of a cut line says in place of the line: more than it, such as a feature's file name and
+    /// its title (`Tree.tsx`'s `full`).
+    pub fn whole(mut self, text: impl Into<SharedString>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    /// Shows the tooltip as keyboard focus does, while `on` holds: for the active row of a list that is one tab stop,
+    /// where the list holds the focus and the row only stands for it (VL-21).
+    pub fn keyboard(mut self, on: bool) -> Self {
+        self.keyboard = Some(on);
         self
     }
 
@@ -377,8 +392,11 @@ impl RenderOnce for Tip {
         };
 
         // Keyboard focus shows it once; the next frame after the focus goes closes it.
-        if let (Some(focus), Some(tips)) = (&focus, tips_of(window, cx)) {
-            let focused = focus.contains_focused(window, cx) && window.last_input_was_keyboard();
+        let focused = match &focus {
+            Some(focus) => Some(focus.contains_focused(window, cx) && window.last_input_was_keyboard()),
+            None => self.keyboard,
+        };
+        if let (Some(focused), Some(tips)) = (focused, tips_of(window, cx)) {
             let was = tips.read(cx).focused.as_ref() == Some(&trigger);
             if focused != was
                 && let Some(open) = open().or_else(|| {
@@ -474,14 +492,49 @@ mod tests {
 
     struct View {
         tips: Option<Entity<Tips>>,
+        /// Whether the keyboard stands on the `pinned` target.
+        pinned: bool,
+        /// Clicks that reached the window's root.
+        clicks: Rc<Cell<u32>>,
     }
 
     impl Render for View {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let tips = self.tips.get_or_insert_with(|| install(window, cx)).clone();
             let at = |y: f32| div().absolute().left(px(0.)).top(px(y));
+            let beside = |x: f32, y: f32| div().absolute().left(px(x)).top(px(y));
+            let clicks = self.clicks.clone();
             div()
+                .id("root")
                 .size_full()
+                .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                .child(
+                    beside(300., 0.).child(
+                        tooltip("left", Some(SharedString::from("Left")))
+                            .side(Side::Left)
+                            .child(div().w(px(100.)).h(px(30.))),
+                    ),
+                )
+                .child(
+                    beside(500., 0.).child(
+                        tooltip("right", Some(SharedString::from("Right")))
+                            .side(Side::Right)
+                            .child(div().w(px(100.)).h(px(30.))),
+                    ),
+                )
+                .child(beside(300., 100.).child(tooltip("none", None).child(div().w(px(100.)).h(px(30.)))))
+                .child(
+                    beside(300., 200.).child(
+                        tooltip("pinned", Some(SharedString::from("Pinned")))
+                            .keyboard(self.pinned)
+                            .child(div().w(px(100.)).h(px(30.))),
+                    ),
+                )
+                .child(
+                    beside(300., 300.)
+                        .w(px(60.))
+                        .child(cut("over", "A long line that is cut over its row").side(Side::Over)),
+                )
                 .child(
                     at(0.).child(
                         tooltip("refresh", Some(SharedString::from("Refresh the tree")))
@@ -513,7 +566,11 @@ mod tests {
         cx.update(|cx| {
             crate::init(cx);
         });
-        let window = cx.add_window(|_, _| View { tips: None });
+        let window = cx.add_window(|_, _| View {
+            tips: None,
+            pinned: false,
+            clicks: Rc::default(),
+        });
         let view = window.root(cx).unwrap();
         let vcx = VisualTestContext::from_window(window.into(), cx);
         vcx.simulate_resize(size(px(800.), px(600.)));
@@ -652,5 +709,107 @@ mod tests {
         );
         rest_on(&mut cx, 5., 410.);
         assert_eq!(shown(&view, &mut cx), None);
+    }
+
+    /// The open tooltip's box, its 1 px border included.
+    fn drawn(view: &Entity<View>, cx: &mut VisualTestContext) -> Bounds<Pixels> {
+        cx.update(|_, cx| view.read(cx).tips.as_ref().unwrap().read(cx).drawn.get())
+            .expect("a tooltip drawn")
+            .dilate(px(1.))
+    }
+
+    fn clicks(view: &Entity<View>, cx: &mut VisualTestContext) -> u32 {
+        cx.update(|_, cx| view.read(cx).clicks.get())
+    }
+
+    #[gpui::test]
+    fn keeps_open_while_the_pointer_moves_from_the_target_onto_it(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        let tip = drawn(&view, &mut cx);
+        assert!(tip.top() >= px(30.), "below its target: {tip:?}");
+        cx.simulate_mouse_move(point(px(50.), px(29.)), None, Modifiers::none());
+        cx.simulate_mouse_move(tip.center(), None, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Refresh the tree"));
+        cx.simulate_mouse_move(point(px(700.), px(500.)), None, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None, "leaving it for elsewhere closes it");
+    }
+
+    #[gpui::test]
+    fn a_click_on_it_closes_it_and_reaches_nothing_under_it(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 50., 15.);
+        let tip = drawn(&view, &mut cx);
+        cx.simulate_click(tip.center(), Modifiers::none());
+        assert_eq!(shown(&view, &mut cx), None);
+        assert_eq!(clicks(&view, &mut cx), 0);
+    }
+
+    #[gpui::test]
+    fn a_click_on_an_over_tooltip_within_its_target_reaches_the_target(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 330., 310.);
+        assert_eq!(
+            shown(&view, &mut cx).as_deref(),
+            Some("A long line that is cut over its row")
+        );
+        let tip = drawn(&view, &mut cx);
+        assert_eq!(tip.origin, point(px(300.), px(300.)), "on the target's own top-left");
+        cx.simulate_click(point(px(330.), px(310.)), Modifiers::none());
+        assert_eq!(shown(&view, &mut cx), None);
+        assert_eq!(clicks(&view, &mut cx), 1, "the target's click");
+        rest_on(&mut cx, 330., 310.);
+        let tip = drawn(&view, &mut cx);
+        cx.simulate_click(point(tip.right() - px(5.), tip.center().y), Modifiers::none());
+        assert_eq!(clicks(&view, &mut cx), 1, "beyond the target's box it only closes");
+    }
+
+    #[gpui::test]
+    fn goes_beside_its_target_on_the_side_asked_and_below_by_default(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 350., 15.);
+        let left = drawn(&view, &mut cx);
+        assert_eq!(left.right(), px(300. - GAP));
+        assert!(left.top() < px(30.) && left.bottom() > px(0.), "on its row: {left:?}");
+        rest_on(&mut cx, 550., 15.);
+        let right = drawn(&view, &mut cx);
+        assert_eq!(right.left(), px(600. + GAP));
+        rest_on(&mut cx, 50., 15.);
+        assert_eq!(drawn(&view, &mut cx).top(), px(30. + GAP));
+    }
+
+    #[gpui::test]
+    fn opens_nothing_without_a_text(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        rest_on(&mut cx, 350., 115.);
+        assert_eq!(shown(&view, &mut cx), None);
+    }
+
+    fn pin(view: &Entity<View>, on: bool, cx: &mut VisualTestContext) {
+        view.update(cx, |v, cx| {
+            v.pinned = on;
+            cx.notify();
+        });
+        cx.run_until_parked();
+    }
+
+    /// A row the keyboard stands on (`Tip::keyboard`): its tooltip shows at once while it does, and Escape closes it
+    /// for as long as it does.
+    #[gpui::test]
+    fn shows_at_once_while_the_keyboard_stands_on_it(cx: &mut TestAppContext) {
+        let (view, mut cx) = open(cx);
+        pin(&view, true, &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+        pin(&view, false, &mut cx);
+        assert_eq!(shown(&view, &mut cx), None);
+        pin(&view, true, &mut cx);
+        assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+        cx.simulate_keystrokes("escape");
+        assert_eq!(shown(&view, &mut cx), None);
+        view.update(&mut cx, |_, cx| cx.notify());
+        cx.run_until_parked();
+        assert_eq!(shown(&view, &mut cx), None, "not back while the keyboard stays");
     }
 }

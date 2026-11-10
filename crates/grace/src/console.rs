@@ -6,6 +6,7 @@
 //! (R4.1). GPUI draws only the lines in view (`gpui::list`, which measures wrapped lines), so painting a match is
 //! drawing its line's few runs again: the cost is the view's, not the console's. The list follows the bottom while it
 //! is at the bottom, as the scroller's `pinned` did (`FollowMode::Tail`).
+use gpui_component::scroll::ScrollableElement as _;
 use std::cell::Cell;
 use std::ops::Range;
 use std::rc::Rc;
@@ -18,7 +19,7 @@ use gpui::{
     Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Window,
     canvas, div, list, prelude::FluentBuilder as _, px,
 };
-use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::input::{InputEvent, InputState};
 use grace_core::banner::{BannerState, banner_state, tests_text};
 use grace_core::console_find::{Match, error_lines, find_matches, is_error_line, start_index, step_index};
 use grace_core::state::{AppState, Panel};
@@ -379,7 +380,7 @@ impl Console {
             })
             .child(
                 div().w(px(192.)).child(
-                    Input::new(&self.field)
+                    crate::elements::input(&self.field)
                         .aria_label(FIND_IN_CONSOLE)
                         .h(px(METRICS.control_height_small)),
                 ),
@@ -651,7 +652,8 @@ impl Render for Console {
                 canvas(move |b, _, _| view.set(b), |_, _, _, _| {})
                     .absolute()
                     .size_full(),
-            );
+            )
+            .vertical_scrollbar(&self.list);
         div()
             .relative()
             .flex()
