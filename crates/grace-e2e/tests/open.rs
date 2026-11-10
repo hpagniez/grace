@@ -61,6 +61,11 @@ fn open_a_project_and_see_its_tests() {
             row(t, "tests").is_some() && features.iter().all(|f| row(t, f).is_some())
         })
         .unwrap();
+    // the toolbar, the main area and the status bar are landmarks, as `<header>`, `<main>` and `<footer>` were
+    if cfg!(not(windows)) {
+        let landmarks = tree.all().into_iter().filter(|n| n.role == Role::Landmark).count();
+        assert_eq!(landmarks, 3, "{}", tree.dump());
+    }
     // folders and feature files only, until a feature opens (#224 R1.1)
     assert_eq!(
         rows(&tree),

@@ -334,6 +334,9 @@ fn project_view(
                         }))
                         .child(
                             div()
+                                .id("main")
+                                // `<main>`: the main landmark
+                                .role(Role::Main)
                                 .debug_selector(|| "main".into())
                                 .flex()
                                 .flex_1()
@@ -507,6 +510,89 @@ mod tests {
         assert!(sheet.bottom() <= status.top());
         assert_eq!(status.bottom(), px(700.));
         assert!(vcx.debug_bounds("home").is_none());
+    }
+
+    /// The whole window drawn on `state`, 1200 × 700.
+    fn whole_window(cx: &mut TestAppContext, state: grace_core::state::AppState) -> gpui::VisualTestContext {
+        let (h, _) = crate::testing::open(cx, 1200., state, |_, _, _| div().into_any_element());
+        let grace = h.grace.clone();
+        let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
+        let vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.simulate_resize(size(px(1200.), px(700.)));
+        vcx.run_until_parked();
+        vcx
+    }
+
+    /// `Home.test.tsx` "home sits on the ground, with no sheet" and "the app root is ground and ink": with no project,
+    /// the window draws home alone, with no toolbar and no sheet.
+    #[gpui::test]
+    fn home_is_drawn_alone_with_no_toolbar_and_no_sheet(cx: &mut TestAppContext) {
+        let mut state = grace_core::state::AppState::new();
+        state.loaded = true;
+        state.recent = Some(vec![]);
+        let mut vcx = whole_window(cx, state);
+        assert!(vcx.debug_bounds("home").is_some());
+        assert!(vcx.debug_bounds("sheet").is_none());
+        assert!(vcx.debug_bounds("toolbar").is_none());
+        assert!(
+            vcx.debug_bounds("status-bar").is_some(),
+            "the status bar is on every view"
+        );
+    }
+
+    /// `Home.test.tsx` "the project view sits on the sheet under the toolbar": the notice, the main area and the
+    /// bottom panel are on the sheet; the toolbar is not.
+    #[gpui::test]
+    fn the_notice_the_main_area_and_the_panel_are_on_the_sheet(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let mut state = crate::testing::project("D:\\api", Layout::Maven, 2);
+        state.notice = Some(grace_core::state::NoticeView {
+            text: "Nothing to run".into(),
+            success: false,
+            build: false,
+        });
+        let mut vcx = whole_window(cx, state);
+        let sheet = vcx.debug_bounds("sheet").unwrap();
+        for part in ["notice", "main", "bottom-panel"] {
+            let b = vcx.debug_bounds(part).unwrap_or_else(|| panic!("{part}"));
+            assert!(
+                sheet.contains(&b.origin) && b.bottom() <= sheet.bottom(),
+                "{part} {b:?} on the sheet {sheet:?}"
+            );
+        }
+        assert!(vcx.debug_bounds("toolbar").unwrap().bottom() <= sheet.top());
+    }
+
+    /// `Toolbar.test.tsx` "keeps its items in order" and "the Env and Threads boxes are the controls' height": Home,
+    /// the project, Env, Threads, Properties…, Refresh, Open…, Report, Re-run failed, Cancel, Run all, left to right.
+    #[gpui::test]
+    fn the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let mut vcx = whole_window(cx, crate::testing::project("D:\\api", Layout::Maven, 2));
+        let order = [
+            "home-button",
+            "project",
+            "env-input",
+            "threads-input",
+            "properties-button",
+            "refresh-button",
+            "open-button",
+            "report-button",
+            "rerun-failed-button",
+            "cancel-button",
+            "run-all-button",
+        ];
+        let xs: Vec<_> = order
+            .iter()
+            .map(|id| vcx.debug_bounds(id).unwrap_or_else(|| panic!("{id}")).left())
+            .collect();
+        for (pair, x) in order.windows(2).zip(xs.windows(2)) {
+            assert!(x[0] < x[1], "{} before {}: {:?}", pair[0], pair[1], x);
+        }
+        for id in ["env-input", "threads-input"] {
+            let h = vcx.debug_bounds(id).unwrap().size.height;
+            assert_eq!(h, px(crate::theme::METRICS.control_height), "{id}");
+        }
     }
 
     /// The whole window on a project whose folder sits deep, more than 150 characters in (`open.spec.ts`).
