@@ -1405,12 +1405,12 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` (the order, narrow, Home and Refresh, project and action tests so far; Env, Threads and Properties with P2 PR 4, Watch and the step debugger with P4) | ☐ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | view `Tree` (`grace::ui`), headless | ☐ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 73 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 15 wait for P3, the VS Code menu, and P4, the debugger, Build and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
-| `src/renderer/VirtualList.test.tsx` | 28 | view `VirtualList` (`grace::ui`), headless | ☐ |
+| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 2 wait for P3's lists (the data-driven view, the HTTP tab) | ☑ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |

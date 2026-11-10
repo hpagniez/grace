@@ -49,6 +49,8 @@ P1's rules hold ([P1 plan](2026-11-09-gpui-p1-core.md#porting-rules)): same fixt
 | `app` | `Grace` holds its `AppState` in an `Rc`: a view takes a clone of the `Rc` to draw, and an event batch copies the state only while a view still holds the old one, which none does between frames | Each redraw would otherwise copy the whole state, the 10,000 console lines and the tree included | Every view test; `grace::app::tests` |
 | `tooltip` | `cut_middle` cuts a line's start and keeps its end whole: the head is an ellipsized block beside the tail, the tooltip only while the head is cut. GPUI's own `TruncateMiddle` is not used | `Cut.tsx`'s `Middle` keeps an exact end (the name's last 12 characters, the path's project folder); `TruncateMiddle` balances both ends | `toolbar::tests::the_project`, `status_bar::tests` |
 | `tooltip` | A press on a tooltip closes it; Electron Grace closed it on the click that the press starts. A tooltip whose target moved is checked once per frame against where its target was laid out, not through scroll listeners on the boxes that hold it | GPUI has no `popover` element and no scroll events of a box: the tooltip is one deferred element of the window, and a frame is when GPUI knows where every target went. Closing on the press needs no tracking of the click across the press and release | `tooltip::tests` (the clicks, the scrolls, a target no longer drawn); the click on an `over` tooltip still reaches its target |
+| `tree` | A click on a row's chevron or run button gives the focus to the tree, so no control in a row ever holds it and a key after the click is the tree's; Electron Grace left a key on a focused button to the button | One tab stop (VL-11): the buttons are out of the tab order, and the tree's keys work from the row the click made the focus row | `tree::tests::a_click_makes_the_row_focused`, `closing_a_feature_with_its_chevron_takes_the_focus_to_it` |
+| `tree` | The tree draws a test's flaky mark, its feature's count and the mark's tooltip in P2, ahead of the proof they lead to (P3) | `grace-core` already sends the marks with the tree; the rows read them for their names | `tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`, `grace_core::state::tests::reduce`'s two flaky tests |
 | `progress` | The segments ease to their width on a spring (GPUI's `with_spring`), not a 300 ms CSS transition; the hold Chromium needed beside a starting spinner is gone | A spring keeps its speed when a new result moves its end, so a fast run never restarts the ease; GPUI starts every animation in the frame it is asked for | `progress::tests::the_bar_r14_1` (LV-06 by its spring, the 2 px gaps) |
 | `progress` | The stripe and the turning icon run only while they show, and the clock ticks once a second only during a run that is not paused | ADR 0030: nothing animates or ticks while idle; `setInterval` and CSS animations ran the same way | `progress::tests::the_clock` |
 | `progress` | The bar has no `aria-busy`: while it waits it has no values, as Electron's did, which a screen reader reads as busy | GPUI 0.3.11 writes no busy state to AccessKit | `run_all_with_live_progress` (no value at `0 / 9`) |
@@ -225,6 +227,169 @@ The Vitest component files of P2, test for test. A test of the DOM, CSS or Solid
 | describe: leaves the target alone by default | `n/a`: no ids; a target has a description only where its view sets one |
 | describe: keeps an id the target already points at | `n/a`: no ids |
 | describe: gives two tooltips two ids | `n/a`: no ids |
+
+#### `VirtualList.test.tsx` (28) in `grace::tree::tests`
+
+The tree is GPUI's `uniform_list`, so the list's tests are the tree's. "later" names the phase whose view uses the list that way.
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. VirtualList: draws only the rows in view, plus the margin | ported | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (of 300 rows only 5 to 99 are in the tree). The 35, `data-rows` and the 24000 px height are `drawnRange` and DOM: Redesigns "uniform_list". |
+| 2. draws the rows at the bottom after a scroll, and keeps the focus row | ported | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End draws the last row, drops the first) and `grace::tree::tests::focus_survives_scrolling_away` (focus row kept while off screen). `style.top` is DOM. |
+| 3. keeps focus on its row when the list jumps back to the top | ported | `grace::tree::tests::focus_survives_scrolling_away`: the focus stays on the tree and its row while the row is off screen (one handle, Redesigns "one tab stop"). Scrolling back is not driven (weak). |
+| 4. keeps focus on its row when the list jumps onto rows below it | ported | Same test (weak, as 3). |
+| 5. keeps focus on its row through 100 px steps both ways | ported | Same test (weak, as 3). |
+| 6. has one tab stop: the selected row, else the first | ported | `grace::tree::tests::the_focus_row_is_the_selected_one_else_the_first`; one tab stop: `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` |
+| 7. moves with Down, Up, Home, End, Page Down and Page Up, selecting as it goes | ported | `grace::tree::tests::home_end_and_pages` (End, Page Up, Page Down, Home: selected and in view); `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (Down, Up, Home, End); tops: `grace_core::rows::tests::scroll_to_show::scrolls_the_least_to_bring_a_row_into_view`, `grace_core::rows::tests::page_rows::counts_whole_rows_in_view_at_least_1`. |
+| 8. does nothing at the ends, and keeps the page still | ported | `grace::tree::tests::the_keys_do_nothing_at_the_ends` (the list keeps still). `preventDefault` is DOM |
+| 9. with selectOnMove false, moves the focus without selecting, and selects with Enter or a click | later | P3: only `Examples.tsx` (the data-driven view, DD-*) sets `selectOnMove={false}`; the tree always selects as it moves. |
+| 10. selects with Enter and Space | ported | `grace::tree::tests::enter_and_space_select_the_focus_row_and_open_nothing` |
+| 11. brings a scrolled-away focus row back before Enter selects it (R4.2) | ported | `grace::tree::tests::a_scrolled_away_focus_row_comes_back_before_enter_or_right` |
+| 12. leaves a key on a control inside a row to that control | ported | A row's buttons never keep the focus: a click on one gives it to the tree (`Tree::clicked`), so a key after it is the tree's (Redesigns, `tree`); `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` |
+| 13. passes other keys to onKey, and stops what it handled | n/a | `onKey` is the Solid component's prop. The tree's own keys are `Tree::row_key` (Right, Left, Ctrl+Enter), proved by `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` and `ctrl_enter_runs_the_focused_row`. GPUI has no `defaultPrevented`; a handled key stops propagation. |
+| 14. brings a scrolled-away focus row back before moving | ported | `grace::tree::tests::focus_survives_scrolling_away` (Down after the wheel: the next row, in view); offsets: `grace_core::rows::tests::scroll_to_show::scrolls_the_least_to_bring_a_row_into_view`. |
+| 15. takes focus to the row clicked, even through a button in it | ported | `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` (a click on the chevron makes its row the focus row and acts once). The Run button goes through the same `Tree::clicked`. |
+| 16. selects a row clicked on itself, as a screen reader's activate does, not through a click inside it | ported | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (a press on the row selects it); `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` (a click on a scenario row selects it). A click anywhere on the row selects, so the "not through a click inside it" half goes: Redesigns "one clickable line". |
+| 17. keeps a press on a row from taking focus, so its click arrives | ported | `grace::tree::tests::a_click_makes_the_row_focused` (one tab stop, no ring after a click, the ring once a key moves). `mousedown` default and `focusVisible` are DOM. |
+| 18. keeps the rows in view still when rows are added above | ported | `grace_core::rows::tests::anchored_scroll_top::keeps_the_first_row_in_view_still_when_rows_are_added_above`; `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it`. |
+| 19. moves focus to the nearest row above when the focus row leaves | ported | `grace_core::rows::tests::survivor::is_the_nearest_row_before_the_key_that_is_still_there`, `survivor::falls_back_to_the_first_row_then_to_none`; `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above`. |
+| 20. falls back to the selected row when an unfocused active row leaves | ported | `grace::tree::tests::an_active_row_that_leaves_falls_back_to_the_selected_one` |
+| 21. falls back to the nearest row above when an unfocused active row leaves with the selected one | ported | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` (the other `Tree::build` branch: selected not kept) and the `survivor` tests above. |
+| 22. draws rows after the list shrinks below the scroll position | ported | `grace::tree::tests::rows_show_after_the_list_shrinks_below_the_scroll` |
+| 23. reveals a row by key | later | P3: `reveal(key)` is the HTTP tab's (`HttpCalls.tsx`, VL-13, VL-19, VL-25); the tree reveals its selected row (VL-20, row 24). The scroll rule itself is `grace_core::rows::tests::scroll_to_show`. |
+| 24. reveals the selected row after keeping the rows in view still, when revealSelectedOn changes | ported | `grace::tree::tests::only_a_new_filter_scrolls_to_the_selected_row`; `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row`; `grace_core::rows::tests::anchored_scroll_top` |
+| 25. moves to a row by key from the handle, as an arrow key does | ported | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (Right goes to the first child, Left to the parent, each focused and selected, through `Tree::move_to_key`). The handle is the Solid API. |
+| 26. tells a row when it has keyboard focus | ported | `grace::tree::tests::a_click_makes_the_row_focused` (the ring only after a key); `grace::tree::tests::the_focus_ring_starts_at_the_rows_indent`. |
+| 27. keeps a drawn row's element through a scroll, and updates its attributes | n/a | DOM node identity: `uniform_list` builds the rows afresh each frame (Redesigns "uniform_list"). The selected state updating is read in `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`. |
+| 28. shared: is made once per drawn row for its attributes and content, not again as the focus moves | n/a | Solid memo scope (`shared`). `Tree::row` works out the status and the chip once per drawn row per frame; the cost is the bench's (VL-26 to VL-29, PR 6). |
+
+#### `Tree.test.tsx` (92: 86 tests and two `it.each` of 3)
+
+##### main screen
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. shows a failed scenario's status on its feature | ported | `grace-e2e/tests/run.rs::run_all_with_live_progress` (a scenario failed, its feature "failed"); `grace_core::model::status::tests::derive_status::failed_wins_over_passed_and_running`, `derive_status::not_run_when_any_child_is_not_run_and_none_failed_or_running`; `grace_core::state::tests::reduce::run_started_sets_selection_to_pending_keeps_others_clears_console_sets_total` (pending); the tags in the row's name: `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags`. `data-*` is DOM. |
+| 2. runs a row from its run button | ported | `grace-e2e/tests/run.rs::run_one_outline_row` (presses "Run add 1 and 2", then "Run add 2 and 3"). |
+| 3. shows each row's status by shape, named for a screen reader (R4.4) | ported | `grace::elements::tests::marks_each_status_as_electron_grace_does`, `grace::elements::tests::tells_statuses_apart_by_shape_or_name`; `grace-e2e/tests/elements.rs::names_each_status_mark` (PU-08); the rows' own statuses in `grace-e2e/tests/run.rs::run_all_with_live_progress`. |
+| 4. swaps the chevron when a folder opens and closes, and icons folders and features | ported | `grace::tree::tests::a_folder_and_a_feature_have_their_icon_and_a_test_none`; the chevron's names and state `grace-e2e/tests/tree.rs::the_chevron_opens_and_closes_a_feature`; no chevron on a test `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (fixed here: an invisible one was read as "Expand") |
+| 5. marks the selected row with its background and the accent bar, rings focus inside the row | by eye | The ring `grace::tree::tests::the_focus_ring_starts_at_the_rows_indent`, the selected state `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one`; the fill and the accent bar in PR 6d's look check |
+| 6. shows the run button muted, green when its row is hovered, focused or selected | ported | `grace::tree::tests::the_run_button_is_green_on_a_hovered_focused_or_selected_row` (fixed here: green on hover and on the focus row too); the colour itself in PR 6d's look check |
+| 7. label tooltip: shows a cut label whole in a tooltip, not as a title | ported | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus`; the pointer path `grace::tooltip::tests::shows_cut_text_whole_only_when_it_is_cut`. `title` and `truncate` are DOM and CSS. |
+| 8. label tooltip: shows nothing for a label that fits (R9.4) | ported | The same two tests ("b.feature is whole" gives no tooltip; a fitting line gives none on hover). |
+| 9. label tooltip: keeps a row's tooltips on its row: the mark's right, the label's over it, the run's left | ported | `grace::tree::tests::a_rows_tooltips_stay_on_its_row` |
+| 10. gives tags the 20 px tag chip, so they clear the rows above and below | ported | `grace::ui::tests::a_tag_chip_is_20_px_high_inside_a_tree_row` |
+| 11. gives every run button an accessible name | ported | Pressed by name in `grace-e2e/tests/run.rs::run_one_outline_row`, `grace-e2e/tests/tags.rs::a_feature_run_is_filtered` ("Run basic.feature"), `grace-e2e/tests/tags.rs::run_all_runs_only_matching_tests`. |
+| 12. labels a feature with its file name, then its title | ported | `grace_core::rows::tests::a_label_is_a_features_file_name_and_an_unnamed_scenarios_line`; `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` (tooltip "file · title"); "Run basic.feature" in `grace-e2e/tests/tags.rs::a_feature_run_is_filtered`. Order of the two texts is by construction (weak). Redesigns "title beside the file name". |
+| 13. selects a node by clicking its label | ported | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (row selected); `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` (a click selects a scenario); Details' place `grace::details::tests::a_test::heads_it_with_its_name_a_tinted_badge_and_the_meta_line`. A click anywhere: Redesigns "one clickable line". |
+| 14. disables run buttons while a run is active and enables Cancel | ported | `grace::tree::tests::the_run_buttons_run_nothing_during_a_run_or_while_busy`; `grace::toolbar::tests::the_actions::keeps_run_all_cancel_open_and_report_as_before` |
+| 15. shows discovery as busy: actions off, Cancel on, Finding tests… | ported | `grace::tree::tests::the_run_buttons_run_nothing_during_a_run_or_while_busy`; `grace::progress::tests::after_a_run_r14_2::shows_finding_tests_with_the_turning_icon_while_the_runner_discovers` |
+| 16. keeps the stripe until the first result, then reports progress | ported | `grace::progress::tests::the_bar_r14_1::the_stripe_stays_until_the_first_result_and_a_cancel_stops_it`; `grace-e2e/tests/run.rs::run_all_with_live_progress` (no value at "0 / 9", value 9 at the end). |
+| 17. drops the stripe when a run is cancelled before any result | ported | The same `the_stripe_stays_until_the_first_result_and_a_cancel_stops_it` (ends on a cancel). |
+| 18. fills smoothly and keeps the stripe still under reduced motion | ported | `grace::progress::tests::the_bar_r14_1::the_passed_part_fills_during_a_big_run`, `the_bar_r14_1::reduced_motion_keeps_the_stripe_still`, `the_bar_r14_1::is_6_px_with_2_px_gaps_between_passed_failed_and_cancelled` (three segments). `transition-[width]` and `animate-slide` are CSS: Redesigns `progress` (spring) and `a11y` (reduced motion). |
+| 19. draws the stripe over the last run's results | ported | `grace::progress::tests::the_bar_r14_1::the_stripe_hides_the_last_runs_segments_and_they_show_again_after` (LV-04, #263). Paint order of DOM children is NA. |
+| 20. labels an unnamed scenario by its line | ported | `grace_core::rows::tests::a_label_is_a_features_file_name_and_an_unnamed_scenarios_line` ("Scenario at line N"); the row, its Run button and Details' heading all take `label_of` and `node_name`. |
+| 21. disables Run all without a tree or without leaves, and says why | ported | `grace::toolbar::tests::the_actions::run_all_is_disabled_with_nothing_to_run` (WS-10); `grace-e2e/tests/open.rs::finding_tests_for_the_first_time` ("Finding tests…" in the tree); `grace::progress::tests::after_a_run_r14_2::says_which_build_tool_lists_the_libraries_then_finding_tests` (the tree uses `progress::finding_text`); `grace-e2e/tests/run.rs::nothing_to_run` ("No feature files found"); the layout chip `grace::toolbar::tests::the_project::shows_the_folder_name_and_the_layout_and_leaves_the_path_to_the_status_bar_r1_1`; the error `grace-e2e/tests/open.rs::syntax_error_is_reported_not_hidden` with `grace::ui::tests::an_error_is_an_alert_tinted_failed`. The hint sentence and the spinner class are not asserted (weak). |
+| 22. offers the folders below an empty project | later | P4: sub-folders (`openSubfolder`); Redesigns "phases". |
+| 23. shows steps once they arrive, with their log on demand | ported | `grace::details::tests::a_test::says_steps_come_when_the_feature_finishes_with_the_spinner_while_a_run_is_on`, `a_test::shows_each_step_with_a_mark_named_by_its_status`, `a_test::toggles_a_steps_log_with_its_button`; `grace-e2e/tests/details.rs::failure_details` (a real run's steps and a log). |
+| 24. shows progress, outcome, elapsed and the notice | ported | `grace::progress::tests::after_a_run_r14_2::shows_done_of_total_and_each_count_behind_its_mark_and_word`, `after_a_run_r14_2::names_the_outcome_with_its_icon`, `after_a_run_r14_2::shows_the_elapsed_time_on_two_digits_each`, `grace::progress::tests::the_clock::runs_only_during_a_run_and_shows_the_summarys_time_after`; Report on after a run `grace::toolbar::tests::the_actions::keeps_run_all_cancel_open_and_report_as_before`; the notice `grace_core::state::tests::reduce::notice_sets_the_notice_a_warning_unless_main_says_it_reports_a_success`, `grace-e2e/tests/tags.rs::a_tag_removed_before_a_run_does_not_widen_it` ("Nothing to run"). |
+| 25. offers Build in a notice that asks for it, disabled while busy | later | P4: Build (there is no Build button yet; state already carries `NoticeView.build`). |
+
+##### flaky marks
+
+Phase: the feature map puts "Flaky marks and proof" (`FlakyProof.tsx`, FL-*, `flaky.spec.ts`) in P3. `crates/grace/src/tree.rs` already draws the badge, count and tooltip, and `grace_core::rows` already builds the chip words, so rows 26, 27, 30 can be tested now; see the note after the table.
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 26. flaky marks: marks flaky tests and counts them above | ported | `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; `grace_core::rows::tests::the_flaky_chip_counts_the_flaky_tests_under_a_row` (the tree draws the marks ahead of P3's proof) |
+| 27. shows the flaky explanation in a tooltip, left of the mark | ported | `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left` |
+| 28. names the mark for a screen reader | later | P3 (E-flaky-*): the name `FLAKY_TITLE` (role Image) is read through the accessibility tree, which needs flaky data from real runs; headless windows build no tree. |
+| 29. counts a flaky test the tag filter hides | ported | `grace_core::rows::tests::the_flaky_chip_counts_the_flaky_tests_under_a_row`: `flaky_chip` takes no filter and counts every leaf of the node, hidden ones too (by construction). |
+| 30. keeps the mark of a dimmed test | ported | `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left` |
+| 31. clears the marks for a new project | ported | `grace_core::state::tests::reduce::project_event_for_another_folder_clears_the_flaky_marks` |
+| 32. drops the mark of a key that now holds another test, keeps the rest | ported | `grace_core::state::tests::reduce::project_event_drops_the_flaky_mark_of_a_key_that_now_names_another_test` |
+
+##### virtual tree
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 33. folders open, features closed: starts with folders open and features closed | ported | `grace::tree::tests::a_project_opens_with_its_features_closed`; `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (TO-01); `grace_core::rows::tests::a_feature_starts_closed_and_every_other_row_open_and_a_turn_flips_it`. |
+| 34. selects and opens a closed feature when its name is clicked | ported | `grace-e2e/tests/tree.rs::features_start_closed_and_a_click_opens_one` (TO-05). Redesigns "one clickable line". |
+| 35. keeps an open feature open when its name is clicked again | ported | The same test, its second press (TO-06). |
+| 36. still closes a feature with its chevron | ported | `grace-e2e/tests/tree.rs::the_chevron_opens_and_closes_a_feature` (TO-07). |
+| 37. opens no feature with the keys that select; Right opens it, its outline open too | ported | `grace::tree::tests::enter_and_space_select_the_focus_row_and_open_nothing`, `an_outline_opens_with_its_feature` |
+| 38. keeps what was opened and closed through a refresh; a new feature starts closed | ported | `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed`; `grace_core::rows::tests::a_feature_starts_closed_and_every_other_row_open_and_a_turn_flips_it`. |
+| 39. starts another project with its features closed again | ported | `grace::tree::tests::another_project_starts_closed_again`. |
+| 40. a run opens features: opens the feature as a run of the feature starts | ported | `grace::tree::tests::a_run_of_one_feature_opens_it_as_it_starts`. |
+| 41. ... as a debug run of the feature starts | later | P4: debug runs. `Tree::follow_run` reads no debug flag, so it is row 40's path once they exist. |
+| 42. ... as History's Re-run of a run of one of its tests starts | ported | `grace_core::rows::tests::feature_of::reads_the_feature_of_a_feature_scenario_example_row_or_outline_key` (a scenario selection gives its feature), which `Tree::follow_run` feeds as row 40 does. The History tab is P3; the rule is the tree's. |
+| 43. opens nothing as Run all or a rerun of the failed tests starts | ported | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` ("the root opens nothing"). |
+| 44. opens a feature when one of its tests fails, and none where they pass | ported | The same test (features with failures open; the one without stays closed). |
+| 45. never reopens a feature closed during the run, where it opened on a failure | ported | The same test (TO-12: a failure after the close leaves it closed). |
+| 46. ... where it was open before the run | ported | `grace::tree::tests::a_feature_the_person_closed_during_a_run_stays_closed` |
+| 47. ... where its name was clicked during the run | ported | `grace::tree::tests::a_feature_the_person_closed_during_a_run_stays_closed` |
+| 48. opens nothing for a failure of an earlier run | ported | The second run of `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` (a new run id reads its own failures); `grace_core::state::tests::reduce::lists_the_tests_that_fail_in_the_run_once_each_in_order_224_r3_3`. |
+| 49. opens the feature only, not a folder or an outline that was closed | ported | `grace::tree::tests::a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed`, `grace::tree::tests::a_failure_leaves_a_closed_outline_closed` (TO-14); the outline's "failed" status `grace_core::model::status::tests::derive_status::failed_wins_over_passed_and_running`. |
+| 50. leaves open what a run opened, after it | ported | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` (TO-15). |
+| 51. rebuilds no rows for statuses that open nothing | ported | `grace::tree::tests::statuses_do_not_build_the_rows_again`. Redesigns "path rows". |
+| 52. drawing: draws the first 25 rows of a project of 30 tests | ported | `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (every row of a small project, VL-02). No jsdom here. |
+| 53. shows the same rows, order and indents as before, and only matches under Hide non-matching | ported | `grace_core::rows::tests::tree_rows::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings`, `tree_rows::leaves_out_non_matching_rows_under_hide_non_matching_and_counts_only_the_shown_siblings`; `grace::tree::tests::hide_non_matching_leaves_the_matching_rows`; indents `grace::tree::tests::the_focus_ring_starts_at_the_rows_indent`; `grace-e2e/tests/tags.rs::hide_non_matching_hides_the_other_rows`. |
+| 54. keeps the scroll position and the drawn rows when a run updates 500 statuses | ported | `grace::tree::tests::statuses_do_not_build_the_rows_again` (no rebuild, so no anchoring and no scroll move); `grace-e2e/tests/run.rs::run_all_with_live_progress`. "Not one row drawn again" is DOM identity. |
+| 55. keys: is one tab stop: the first row, with nothing selected | ported | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click`, `the_keys_move_through_the_rows`; the first row is the focus row from a fresh focus: `grace::tree::tests::focus_survives_scrolling_away` (nine Downs reach row 9). |
+| 56. moves and selects with Down, and the details pane follows | ported | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows`; `grace::tree::tests::home_end_and_pages` (selection follows); Details follows the selection `grace::details::tests::a_test::heads_it_with_its_name_a_tinted_badge_and_the_meta_line`. |
+| 57. Right and Left: opens a closed feature with Right, focus staying on it | ported | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows`. |
+| 58. ... moves to the first scenario of an open feature with Right, and selects it | ported | The same test (focused and selected "passing hello"). |
+| 59. ... closes an open feature with Left, focus staying on it | ported | The same test (Left closes; the focus is not moved by `toggle`). |
+| 60. ... moves from a scenario to its feature with Left, and selects it | ported | The same test. |
+| 61. ... does nothing with Left on a closed top-level folder | ported | `grace::tree::tests::the_keys_do_nothing_at_the_ends` |
+| 62. moves to the last row with End, a screen up with Page Up, and the first with Home | ported | `grace::tree::tests::home_end_and_pages`; `grace_core::rows::tests::page_rows::counts_whole_rows_in_view_at_least_1`; `grace_core::rows::tests::scroll_to_show::scrolls_the_least_to_bring_a_row_into_view` (row 0 gives scroll top 0 with its pad). |
+| 63. brings a scrolled-away focused row back before Right opens it (R4.2) | ported | `grace::tree::tests::a_scrolled_away_focus_row_comes_back_before_enter_or_right` |
+| 64. runs the focused row with Ctrl+Enter, and not during a run | ported | `grace::tree::tests::ctrl_enter_runs_the_focus_row_only_when_its_run_button_would`; `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` |
+| 65. debugs the focused row with Ctrl+Shift+Enter; Ctrl+Enter alone still runs it | later | P4: the debugger. The "Ctrl+Enter alone runs" half is `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row`. |
+| 66. runs nothing with Ctrl+Enter on a row the filter mutes: it has no run button | ported | `grace::tree::tests::ctrl_enter_runs_the_focus_row_only_when_its_run_button_would` |
+| 67. keeps the row's buttons out of the tab order, and they still click | ported | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` (VL-11). |
+| 68. makes a clicked row the focused one, so the next key moves from it | ported | `grace::tree::tests::a_click_makes_the_row_focused`. |
+| 69. focus and scrolling: takes focus to a folder closed by its chevron, keeping the selection | ported | `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` (VL-16). |
+| 70. moves focus to the nearest shown row above when Hide non-matching hides it | ported | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` (VL-17: the same `Tree::build` branch; here the filter is the cause), `grace_core::rows::tests::survivor::is_the_nearest_row_before_the_key_that_is_still_there`, `grace::tree::tests::hide_non_matching_leaves_the_matching_rows`. |
+| 71. keeps focus in the tree when a refresh removes the focused row | ported | The same tests plus `grace::tree::tests::a_refresh_keeps_what_was_opened_and_closed_and_a_new_feature_starts_closed` (a refresh goes through `Tree::build`). The focus stays on the tree by design: Redesigns "one tab stop". |
+| 72. scrolls to the selected row after a filter change takes rows away above the view | ported | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` (VL-20; rows come back above the selection instead of leaving); `grace_core::rows::tests::anchored_scroll_top::keeps_the_first_row_in_view_still_when_rows_are_added_above`. |
+| 73. scrolls to a test paused in a closed feature, once its rows are open (#224 R3.7) | later | P4: the pause needs the debugger. The same path for a reveal is `grace::tree::tests::a_reveal_opens_the_rows_above_the_selected_test`. |
+| 74. does not scroll to the selected row for a new tree and the same filter | ported | `grace::tree::tests::only_a_new_filter_scrolls_to_the_selected_row` |
+| 75. shows a cut label whole when Down moves to its row, and closes it on the next Down | ported | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` (VL-21: Down, Down, Up). `data-side` is DOM. |
+| 76. shows a cut label whole when Left or Right moves to its row | ported | The same test: Left and Right go through `Tree::move_to_key` and `move_to`, which set the keyboard ring the tooltip follows (weak: Down and Up only are driven). |
+| 77. names the run shortcut on every row and on the run button's tooltip | ported | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` (tooltip "Run passing hello (Ctrl+Enter)"); `tree::SHORTCUTS` on each row, which AT-SPI does not pass on (parity VL-22). The Shift variant is P4. |
+| 78. screen readers: gives rows their level, place and open state, in a tree named Tests | ported | `grace_core::rows::tests::tree_rows::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings` (level, position, set size, VL-23); the tree named "Tests" is waited for in every `grace-e2e/tests/tree.rs` test; `grace-e2e/tests/open.rs::open_a_project_and_see_its_tests` (expanded state). On Linux the pinned AccessKit adapter drops level and expanded (AGENTS.md). |
+| 79. names a row by its label, status, flaky chip and tags | ported | `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags`; `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"). |
+| 80. the walks behind a row: works out a changed row's status once per update, and does not count its flaky tests again | n/a | Counts calls of a mocked Solid memo. `Tree::row` works out one row's status and chip once per drawn frame; the cost is measured by the bench (VL-27, VL-28, PR 6). |
+| 81. ... walks only the new rows when a feature opens (#224 R4.3) | n/a | The same: memo call counts. Redesigns "path rows" (rows built again only when the tree, filter or a turn changes) is `grace::tree::tests::statuses_do_not_build_the_rows_again`. |
+| 82. ... works out no status when the selection or the focus moves | n/a | The same: memo call counts. The `leaves` calls it also counts are the HTTP tab's (P3). |
+
+##### tree: step debugger (R5, R7)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 83. a Debug button before Run, disabled during a run | later | P4: the debugger; Redesigns "phases". |
+| 84. marks the feature and the scenario holding a breakpoint | later | P4: the debugger (breakpoints); Redesigns "phases". |
+| 85. shows the pause mark on the paused test and selects it | later | P4: the debugger. The selection half is core's `grace_core::state::tests::the_step_debugger::the_first_pause_shows_the_variables_tab_and_selects_the_paused_test_later_ones_keep_the_tab`; `tree.rs` already draws the Paused mark. |
+
+##### tree: open in VS Code (open-in-editor-from-tree R1, R2)
+
+All six: LATER, P3. The feature map lists "Open in VS Code, from details and the tree" (#68, #222, `grace-core::editor`, context menu, OE-*, OT-*, `editor.spec.ts`) in P3; Redesigns "phases" says the row's menu comes with it.
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 86. asks for the menu at the pointer, for a test at its line, and keeps the selection | later | P3 (OT-*). |
+| 87. asks from a row's run button and from the focused row itself, as the menu key does | later | P3 (OT-*). |
+| 88. opens a feature at line 1, and asks nothing for a folder or the list's padding | later | P3 (OT-*). |
+| 89. opens a failed test at its failed step during a run, even in a called feature | later | P3 (OT-*). |
+| 90. asks from an open tooltip over a row | later | P3 (OT-*). |
+| 91. opens a failed test without a place at its own line | later | P3 (OT-*). |
+
+##### tree: reveal a test from Details (#229 R4.3)
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 92. reveal opens a closed feature | ported | `grace::tree::tests::a_reveal_opens_the_rows_above_the_selected_test` (the selected test is a row, its feature opens, the other stays closed). The "Next test with this error" button is P3 (failures grouped, #229, GF-*). |
 
 #### The small files
 
