@@ -229,7 +229,7 @@ impl Render for GraceWindow {
                 .map(|b| b.into_any_element())
                 .collect();
                 let toolbar = crate::toolbar::render(&grace, &state, boxes, window, cx).into_any_element();
-                project_view(self, toolbar, shown, cx).into_any_element()
+                project_view(self, toolbar, shown, window, cx).into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -288,6 +288,7 @@ fn project_view(
     window: &GraceWindow,
     toolbar: gpui::AnyElement,
     shown: Option<gpui::AnyElement>,
+    gpui_window: &Window,
     cx: &App,
 ) -> impl IntoElement {
     let (progress, filter_bar, tree, panel, details) = (
@@ -348,12 +349,48 @@ fn project_view(
                                 .flex()
                                 .flex_1()
                                 .min_h(px(grace_core::panel_height::MAIN_MIN))
-                                .child(div().flex().flex_col().w_1_2().min_h_0().children(tree))
-                                .child(div().flex().flex_col().w_1_2().min_h_0().children(details)),
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .w_1_2()
+                                        .min_h_0()
+                                        .children(tree.map(|v| cached(v, gpui_window))),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .w_1_2()
+                                        .min_h_0()
+                                        .children(details.map(|v| cached(v, gpui_window))),
+                                ),
                         )
                         .children(panel),
                 ),
         )
+}
+
+/// A pane's view, drawn again only when it is notified: a running test's mark and the console's cursor ask for
+/// frames during a run, and an uncached pane would build itself on every one of them (#320). The pane fills the
+/// room its parent gives it.
+///
+/// While an assistive technology is connected the pane is not cached: the pinned GPUI builds the accessibility tree
+/// anew on every frame and leaves a reused view's nodes out, so a cached pane would vanish from a screen reader.
+/// GPUI draws every view again when one connects or leaves, so the switch takes effect at once.
+pub fn cached<V: Render>(view: Entity<V>, window: &Window) -> gpui::AnyElement {
+    if window.is_a11y_active() {
+        return view.into_any_element();
+    }
+    view.cached(
+        gpui::StyleRefinement::default()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_h_0()
+            .min_w_0(),
+    )
+    .into_any_element()
 }
 
 /// Where the window opens: the saved bounds placed on the screens there are now, maximized when saved so; else
