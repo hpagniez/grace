@@ -108,6 +108,7 @@ fn near(actual: Area, want: Area) {
     }
 }
 
+#[cfg(windows)]
 fn is_near(actual: Area, want: Area) -> bool {
     [
         (actual.x, want.x),
@@ -124,6 +125,32 @@ fn place(app: &App, r: Area) {
         .unwrap();
 }
 
+/// How far the bounds Grace saves can sit from the rectangle the driver gave the window. Windows moves a window by
+/// its outer frame, and GPUI's bounds leave the frame out; Xvfb has no frame.
+const FRAME: f64 = if cfg!(windows) { 40. } else { 1. };
+
+fn within_frame(actual: Area, want: Area) -> bool {
+    [
+        (actual.x, want.x),
+        (actual.y, want.y),
+        (actual.width, want.width),
+        (actual.height, want.height),
+    ]
+    .iter()
+    .all(|(a, w)| (a - w).abs() <= FRAME)
+}
+
+/// Places the window at `want` and waits for Grace to save the move (WB-03); returns the bounds it saved.
+fn placed(app: &App, want: Area) -> Area {
+    place(app, want);
+    app.wait_until("the move saved", Duration::from_secs(10), || {
+        app.saved_window()
+            .is_some_and(|s| within_frame(s.bounds, want) && !s.maximized)
+    })
+    .unwrap();
+    app.saved_window().unwrap().bounds
+}
+
 fn saved(window: Area, maximized: bool) -> serde_json::Value {
     json!({ "x": window.x, "y": window.y, "width": window.width, "height": window.height, "maximized": maximized })
 }
@@ -133,12 +160,7 @@ fn saved(window: Area, maximized: bool) -> serde_json::Value {
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn the_window_comes_back_where_it_was() {
     let app = launch(fresh_data_dir().unwrap());
-    let want = inside(app.work_area().unwrap());
-    place(&app, want);
-    app.wait_until("the move saved", Duration::from_secs(10), || {
-        app.saved_window().is_some_and(|s| is_near(s.bounds, want))
-    })
-    .unwrap();
+    let want = placed(&app, inside(app.work_area().unwrap()));
     let app = app.relaunch(MAIN).unwrap();
     app.wait_for("the window", Duration::from_secs(15), grace_inside)
         .unwrap();
@@ -153,12 +175,7 @@ fn the_window_comes_back_where_it_was() {
 fn a_move_by_the_person_is_saved_before_the_app_closes() {
     let (_, wa) = first_start();
     let app = launch(fresh_data_dir().unwrap());
-    place(&app, inside(wa));
-    app.wait_until("the move saved", Duration::from_secs(10), || {
-        app.saved_window()
-            .is_some_and(|s| is_near(s.bounds, inside(wa)) && !s.maximized)
-    })
-    .unwrap();
+    placed(&app, inside(wa));
 }
 
 /// E-window-05, WB-06: settings.json is a folder, so the save on close fails; the window still closes.
@@ -276,7 +293,7 @@ fn a_maximized_window_comes_back_maximized() {
     use grace_e2e::Show;
     let (_, wa) = first_start();
     let app = launch(fresh_data_dir().unwrap());
-    place(&app, inside(wa));
+    let normal = placed(&app, inside(wa));
     app.show_window(Show::Maximized).unwrap();
     app.wait_until("maximized saved", Duration::from_secs(10), || {
         app.saved_window().is_some_and(|s| s.maximized)
@@ -291,7 +308,7 @@ fn a_maximized_window_comes_back_maximized() {
         .wait_until("restored to its bounds", Duration::from_secs(10), || {
             again
                 .saved_window()
-                .is_some_and(|s| !s.maximized && is_near(s.bounds, inside(wa)))
+                .is_some_and(|s| !s.maximized && is_near(s.bounds, normal))
         })
         .unwrap();
 }
@@ -304,7 +321,7 @@ fn a_window_closed_while_minimized_opens_normal() {
     use grace_e2e::Show;
     let (_, wa) = first_start();
     let app = launch(fresh_data_dir().unwrap());
-    place(&app, inside(wa));
+    let normal = placed(&app, inside(wa));
     app.show_window(Show::Maximized).unwrap();
     app.show_window(Show::Minimized).unwrap();
     let mut app = app;
@@ -315,7 +332,7 @@ fn a_window_closed_while_minimized_opens_normal() {
         .unwrap();
     let s = closed(again);
     assert!(!s.maximized);
-    near(s.bounds, inside(wa));
+    near(s.bounds, normal);
 }
 
 /// E-window-12, WB-13
