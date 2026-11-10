@@ -86,7 +86,7 @@ impl GraceWindow {
         cx.observe(&grace, |_, _, cx| cx.notify()).detach();
         let data_dir = grace.read(cx).data_dir().to_path_buf();
         cx.observe_window_bounds(window, move |this: &mut Self, window, cx| {
-            let state = window_state(window);
+            let state = window_state(window, cx);
             let dir = data_dir.clone();
             this.save = Some(cx.spawn(async move |_, cx| {
                 cx.background_executor().timer(SAVE_AFTER).await;
@@ -136,11 +136,14 @@ impl GraceWindow {
     }
 }
 
-/// The window's normal bounds and whether it is maximized, as `main.ts` saved them: a minimized window is saved
-/// normal, so it opens normal (WB-05).
-pub fn window_state(window: &Window) -> WindowState {
+/// The window's bounds and whether it is maximized, as `main.ts` saved them: the bounds it has now, so a snapped
+/// window (Win+Left) opens where it was snapped (WB-18); its normal bounds while it is maximized or minimized, so it
+/// opens normal (WB-05). Windows keeps a snapped window's normal bounds as the ones from before the snap.
+pub fn window_state(window: &Window, cx: &App) -> WindowState {
     let maximized = window.is_maximized();
-    let b = window.window_bounds().get_bounds();
+    let normal = window.window_bounds().get_bounds();
+    let screens: Vec<Bounds<gpui::Pixels>> = cx.displays().iter().map(|d| d.bounds()).collect();
+    let b = saved_bounds(maximized, normal, window.bounds(), &screens);
     WindowState {
         x: f64::from(f32::from(b.origin.x)),
         y: f64::from(f32::from(b.origin.y)),
@@ -148,6 +151,18 @@ pub fn window_state(window: &Window) -> WindowState {
         height: f64::from(f32::from(b.size.height)),
         maximized,
     }
+}
+
+/// `getBounds()` or `getNormalBounds()`, as `main.ts` chose: the bounds the window has now unless it is maximized,
+/// or minimized, which Windows tells by moving it off every screen.
+fn saved_bounds(
+    maximized: bool,
+    normal: Bounds<gpui::Pixels>,
+    now: Bounds<gpui::Pixels>,
+    screens: &[Bounds<gpui::Pixels>],
+) -> Bounds<gpui::Pixels> {
+    let shown = screens.iter().any(|s| s.intersects(&now));
+    if maximized || !shown { normal } else { now }
 }
 
 /// Saves the bounds; a failed save is logged and never stops anything, as `main.ts` did (WB-06).
@@ -448,7 +463,7 @@ pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHand
         let closing = grace.clone();
         let dir = data_dir.clone();
         window.on_window_should_close(cx, move |window, cx| {
-            save_bounds(&dir, &window_state(window));
+            save_bounds(&dir, &window_state(window, cx));
             let dispose = closing.read(cx).dispose(cx);
             cx.spawn(async move |cx| {
                 dispose.await;
@@ -468,6 +483,27 @@ pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHand
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+
+    /// WB-18 (#318): a snapped window is saved where it is snapped, as `main.ts`'s `getBounds()` did; a maximized
+    /// or minimized one keeps its normal bounds (WB-05).
+    #[test]
+    fn a_snapped_window_saves_where_it_is_and_a_maximized_or_minimized_one_its_normal_bounds() {
+        let r = |x: f32, y: f32, w: f32, h: f32| Bounds::new(point(px(x), px(y)), size(px(w), px(h)));
+        let screens = [r(0., 0., 1920., 1040.), r(1920., 0., 1920., 1040.)];
+        let normal = r(200., 150., 1200., 800.);
+        let snapped = r(1920., 0., 960., 1040.);
+        assert_eq!(saved_bounds(false, normal, snapped, &screens), snapped);
+        assert_eq!(saved_bounds(false, normal, normal, &screens), normal);
+        assert_eq!(saved_bounds(true, normal, r(0., 0., 1920., 1040.), &screens), normal);
+        // Windows moves a minimized window to (-32000, -32000), off every screen
+        assert_eq!(
+            saved_bounds(false, normal, r(-32000., -32000., 160., 28.), &screens),
+            normal
+        );
+        // partly off a screen still counts as shown (WB-17)
+        let partly = r(1700., 900., 1200., 800.);
+        assert_eq!(saved_bounds(false, normal, partly, &screens), partly);
+    }
 
     #[gpui::test]
     fn opens_an_empty_grace_window_in_the_theme(cx: &mut TestAppContext) {
