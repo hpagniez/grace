@@ -1,10 +1,12 @@
 // Moves GPUI Grace to the newest GPUI set, Rust toolchain and Cargo.lock (ADR 0032): the pins in Cargo.toml and
 // rust-toolchain.toml, the patched gpui-pre-windows rebuilt from the new release with every patch of patches/series
 // (patches/README.md), then `cargo update`. Prints what moved as Markdown. With --pr (cargo-updates.yml), it also
-// commits on a new branch, opens the draft PR and starts test.yml on it. When a patch no longer applies, the GPUI set
-// stays, an issue says why, and the toolchain and the lock still move.
+// commits on a new branch, opens the PR and starts checks, test and perf on it. With --merge, it waits for those runs
+// and merges the PR when all three pass (ADR 0033). When a patch no longer applies, the GPUI set stays, an issue says
+// why, and the toolchain and the lock still move.
 //
 //   node scripts/bump-cargo.mjs [--pr]
+//   node scripts/bump-cargo.mjs --merge <pr> <sha>
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -51,6 +53,11 @@ const PINS = [
   ["kit", /^(gpui-base = "=)([^"]+)/m],
   ["kit", /^(gpui-kit-assets = "=)([^"]+)/m],
 ];
+
+/** The issue every bump PR is part of: keeping the set current (ADR 0032). */
+const ISSUE = 328;
+/** The runs a bump PR merges on, started on its commit by hand: a PR opened with the workflow's token starts none. */
+export const GATES = ["checks.yml", "test.yml", "perf.yml"];
 
 export class PatchError extends Error {}
 
@@ -507,7 +514,7 @@ export function summary(r, { issue = null, keep = [], branch } = {}) {
     );
   if (r.fuzz.length)
     patches.push(
-      `Applied with fuzz, so check these hunks by hand:\n${list(r.fuzz.map((f) => `\`${f}\``))}`,
+      `Applied with fuzz, next to lines upstream changed; \`test\` checks what each patch does (\`gpui-idle\` the idle patch, the Windows e2e the focus patch):\n${list(r.fuzz.map((f) => `\`${f}\``))}`,
     );
   if (r.patchError)
     patches.push(
@@ -540,12 +547,11 @@ export function summary(r, { issue = null, keep = [], branch } = {}) {
   const ref = branch ?? "<branch>";
   parts.push(
     [
-      "### Before merging",
+      "### Merging",
       "",
-      `- [ ] \`test\`, started on this branch by \`cargo-updates\`, is green: clippy, \`cargo test\`, \`patches/check.sh\`, and GPUI Grace's e2e on Linux and Windows. Again by hand: \`gh workflow run test.yml --ref ${ref}\`.`,
-      "- [ ] Its `gpui-idle` job shows no wake-ups while minimised: the idle patch still works on the new GPUI.",
-      "- [ ] On a new GPUI: the known AccessKit holes on Linux (migration guide R8.4) are still the only ones.",
-      "- [ ] Marked ready for review, so that `checks` runs.",
+      `This PR merges itself once \`checks\`, \`test\` and \`perf\`, which \`cargo-updates\` starts on its commit, all pass (ADR 0033). \`test\` runs clippy, \`cargo test\`, \`patches/check.sh\`, GPUI Grace's e2e on Linux and Windows, and \`gpui-idle\`, which fails when GPUI Grace wakes more than 5 times a second while minimised. A failed run leaves the PR open with a comment, and \`cargo-updates\` fails. To run them again: \`gh workflow run test.yml --ref ${ref}\`, then merge by hand.`,
+      "",
+      `Part of #${ISSUE}.`,
     ].join("\n"),
   );
   if (keep.length)
@@ -588,11 +594,12 @@ export function patchIssue(error, run = execRun) {
 }
 
 /**
- * Commits the bump on `feature/bump-cargo-<date>`, opens its draft PR into develop, starts test.yml on it, and closes
- * older bump drafts that hold only the bot's commits. Returns the PR's number, or null when the day's branch already
- * has one.
+ * Commits the bump on `feature/bump-cargo-<date>`, opens its PR into develop, starts the runs of GATES on it, and closes
+ * older bump PRs that hold only the bot's commits. Returns the PR's number and commit, or null when the day's branch
+ * already has a PR.
  * @param {Awaited<ReturnType<typeof bump>>} r
  * @param {{ date: string, run?: typeof execRun }} o
+ * @returns {{ number: number, sha: string } | null}
  */
 export function openPr(r, { date, run = execRun }) {
   const gh = (...args) => JSON.parse(run("gh", args));
@@ -620,6 +627,7 @@ export function openPr(r, { date, run = execRun }) {
     ]);
     run("git", ["push", "origin", branch]);
   }
+  const sha = run("git", ["ls-remote", "origin", `refs/heads/${branch}`]).split(/\s/)[0];
   const open = gh(
     "pr",
     "list",
@@ -630,41 +638,26 @@ export function openPr(r, { date, run = execRun }) {
     "--limit",
     "100",
     "--json",
-    "number,headRefName,isDraft",
+    "number,headRefName",
   );
   const close = [];
   const keep = [];
   for (const pr of open) {
     if (!pr.headRefName.startsWith(branchFor("")) || pr.headRefName >= branch) continue;
-    const commits = pr.isDraft
-      ? gh("pr", "view", String(pr.number), "--json", "commits").commits
-      : [];
-    const botOnly =
-      pr.isDraft && commits.every((c) => c.authors.every((a) => a.email === BOT_EMAIL));
+    const { commits } = gh("pr", "view", String(pr.number), "--json", "commits");
+    const botOnly = commits.every((c) => c.authors.every((a) => a.email === BOT_EMAIL));
     (botOnly ? close : keep).push(pr.number);
   }
   const body = summary(r, { issue, keep, branch });
   const url = run(
     "gh",
-    [
-      "pr",
-      "create",
-      "--draft",
-      "--base",
-      "develop",
-      "--head",
-      branch,
-      "--title",
-      title,
-      "--body-file",
-      "-",
-    ],
+    ["pr", "create", "--base", "develop", "--head", branch, "--title", title, "--body-file", "-"],
     body,
   ).trim();
   console.log(`opened ${url}`);
   const number = Number(url.split("/").pop());
   // a PR opened with GITHUB_TOKEN starts no pull_request workflow, but a dispatch does
-  run("gh", ["workflow", "run", "test.yml", "--ref", branch]);
+  for (const workflow of GATES) run("gh", ["workflow", "run", workflow, "--ref", branch]);
   for (const n of close)
     run("gh", [
       "pr",
@@ -674,13 +667,99 @@ export function openPr(r, { date, run = execRun }) {
       `Superseded by #${number}`,
       "--delete-branch",
     ]);
-  return number;
+  return { number, sha };
+}
+
+/**
+ * Waits for the runs of GATES started on `sha` by hand, and merges PR `pr` with a merge commit once all pass, with a
+ * comment that links them: the newest run of each counts, so a run started again by hand replaces a cancelled one. A failed run, or none done
+ * within `timeout`, leaves the PR open with a comment and throws (ADR 0033).
+ * @param {number} pr
+ * @param {string} sha
+ * @param {{ run?: typeof execRun, wait?: (ms: number) => Promise<void>, now?: () => number, interval?: number, timeout?: number }} o
+ */
+export async function mergeWhenGreen(
+  pr,
+  sha,
+  {
+    run = execRun,
+    wait = (ms) => new Promise((done) => setTimeout(done, ms)),
+    now = Date.now,
+    interval = 60_000,
+    timeout = 110 * 60_000,
+  } = {},
+) {
+  const end = now() + timeout;
+  const stop = (why) => {
+    run("gh", ["pr", "comment", String(pr), "--body-file", "-"], `Not merged: ${why}`);
+    throw new Error(`#${pr} not merged: ${why}`);
+  };
+  let runs;
+  for (;;) {
+    runs = GATES.map((workflow) => {
+      const latest = run("gh", [
+        "api",
+        `repos/{owner}/{repo}/actions/workflows/${workflow}/runs?event=workflow_dispatch&head_sha=${sha}&per_page=1`,
+        "--jq",
+        ".workflow_runs[0] // {} | {status, conclusion, url: .html_url}",
+      ]);
+      return { workflow, ...JSON.parse(latest) };
+    });
+    const failed = runs.filter((r) => r.status === "completed" && r.conclusion !== "success");
+    if (failed.length)
+      stop(
+        failed.map((r) => `\`${r.workflow}\` ended ${r.conclusion} (${r.url})`).join(", ") +
+          ". Fix it on this branch, or run it again with `gh workflow run <workflow> --ref <branch>`, then merge by hand.",
+      );
+    if (runs.every((r) => r.status === "completed")) break;
+    if (now() >= end) {
+      const pending = runs.filter((r) => r.status !== "completed").map((r) => `\`${r.workflow}\``);
+      stop(
+        `${pending.join(", ")} had not finished on ${sha} after ${timeout / 60_000} minutes. Merge by hand once it passes.`,
+      );
+    }
+    await wait(interval);
+  }
+  // the runs are not on the PR's checks tab: link them, perf's table included (its run's summary)
+  run(
+    "gh",
+    ["pr", "comment", String(pr), "--body-file", "-"],
+    `Passed on ${sha}: ${runs.map((r) => `[\`${r.workflow}\`](${r.url})`).join(", ")}. \`perf\`'s table is in its run's summary.`,
+  );
+  try {
+    // --match-head-commit refuses the merge if a push landed after these runs
+    run("gh", [
+      "pr",
+      "merge",
+      String(pr),
+      "--merge",
+      "--delete-branch",
+      "--match-head-commit",
+      sha,
+    ]);
+  } catch (err) {
+    stop(
+      `the merge failed: ${String(err.stderr || err.message)
+        .trim()
+        .replace(/\.$/, "")}. Merge by hand.`,
+    );
+  }
+  console.log(`merged #${pr}`);
 }
 
 async function main() {
-  const flag = process.argv[2];
+  const [flag, ...args] = process.argv.slice(2);
+  if (
+    flag === "--merge" &&
+    args.length === 2 &&
+    /^\d+$/.test(args[0]) &&
+    /^[0-9a-f]{40}$/.test(args[1])
+  )
+    return mergeWhenGreen(Number(args[0]), args[1]);
   if (flag && flag !== "--pr") {
-    console.error("usage: node scripts/bump-cargo.mjs [--pr]");
+    console.error(
+      "usage: node scripts/bump-cargo.mjs [--pr]\n       node scripts/bump-cargo.mjs --merge <pr> <sha>",
+    );
     process.exit(2);
   }
   const r = await bump();
@@ -697,7 +776,8 @@ async function main() {
   console.log(summary(r));
   if (!flag) return;
   const pr = openPr(r, { date: new Date().toISOString().slice(0, 10) });
-  if (process.env.GITHUB_OUTPUT && pr) appendFileSync(process.env.GITHUB_OUTPUT, `pr=${pr}\n`);
+  if (process.env.GITHUB_OUTPUT && pr)
+    appendFileSync(process.env.GITHUB_OUTPUT, `pr=${pr.number}\nsha=${pr.sha}\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

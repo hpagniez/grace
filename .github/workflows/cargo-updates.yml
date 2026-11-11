@@ -1,7 +1,7 @@
-# Weekly draft PR that moves GPUI Grace to the newest gpui-pre, GPUI Kit and Rust, and Cargo.lock to the newest
-# releases its requirements allow, with the Windows patches rebased (ADR 0032, scripts/bump-cargo.mjs). It then starts
-# test.yml on the branch, so the new releases are built and tested with the patches on Linux and Windows. A patch that
-# no longer applies gets an issue, and the rest still moves.
+# Weekly PR that moves GPUI Grace to the newest gpui-pre, GPUI Kit and Rust, and Cargo.lock to the newest releases its
+# requirements allow, with the Windows patches rebased (ADR 0032, scripts/bump-cargo.mjs). It then starts checks,
+# test.yml and perf on the branch, so the new releases are built and tested with the patches on Linux and Windows, and
+# merges the PR once all three pass (ADR 0033). A patch that no longer applies gets an issue, and the rest still moves.
 name: cargo-updates
 
 on:
@@ -27,13 +27,42 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      # starts test.yml on the bump branch: a PR opened with GITHUB_TOKEN starts no workflow, a dispatch does
+      # starts checks, test and perf on the bump branch: a PR opened with GITHUB_TOKEN starts no workflow, a dispatch does
       actions: write
+    outputs:
+      pr: ${{ steps.bump.outputs.pr }}
+      sha: ${{ steps.bump.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: node scripts/bump-cargo.mjs --pr
+      - id: bump
+        run: node scripts/bump-cargo.mjs --pr
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # waits for the runs bump started and merges the PR once all pass; a failed run leaves it open with a comment
+  merge:
+    needs: bump
+    if: ${{ needs.bump.outputs.pr != '' }}
+    runs-on: ubuntu-latest
+    # test.yml's Windows e2e and perf take about an hour; the script gives up after 110 minutes
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: node scripts/bump-cargo.mjs --merge "$PR" "$SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ needs.bump.outputs.pr }}
+          SHA: ${{ needs.bump.outputs.sha }}
