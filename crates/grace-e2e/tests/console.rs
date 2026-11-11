@@ -57,6 +57,75 @@ fn run_all(app: &App) {
     .unwrap();
 }
 
+/// The colour of the window's pixel at `(x, y)`, as `rrggbb`; `None` where there is no pixel reader.
+#[cfg(target_os = "linux")]
+fn pixel(x: i32, y: i32) -> Option<String> {
+    use std::process::Command;
+    let id = Command::new("xdotool")
+        .args(["search", "--onlyvisible", "--name", "^Grace$"])
+        .output()
+        .ok()?;
+    let id = String::from_utf8_lossy(&id.stdout).lines().next()?.to_string();
+    let out = Command::new("import")
+        .args(["-window", &id, "-crop", &format!("1x1+{x}+{y}"), "txt:-"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stdout).to_lowercase();
+    // `srgb(248,246,241)`: the `#` form has 16 bits a channel
+    let at = text.rfind("srgb(")?;
+    let rgb: Vec<u8> = text[at + 5..]
+        .split(')')
+        .next()?
+        .split(',')
+        .map(|c| c.trim().parse().ok())
+        .collect::<Option<_>>()?;
+    Some(rgb.iter().map(|c| format!("{c:02x}")).collect())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn pixel(_: i32, _: i32) -> Option<String> {
+    None
+}
+
+/// E-console-02, CB-12: the console's ground is the sunken colour in both themes, read off the window's pixels in
+/// its left padding, beside its lines; a platform with no pixel reader checks only that the console is there.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn the_console_is_on_the_sunken_colour_in_both_themes() {
+    for (theme, sunken) in [("light", "f8f6f1"), ("dark", "0b0d11")] {
+        let dir = project("clean").unwrap();
+        let app = App::launch_with_settings(
+            &json!({ "lastProject": dir.to_string_lossy(), "appearance": { "theme": theme } }),
+            &[],
+        )
+        .unwrap();
+        let tree = app
+            .wait_for("the console", WAIT, |t| {
+                starting(t, "tests ").is_some()
+                    && t.all()
+                        .into_iter()
+                        .any(|n| n.name == "Console" && n.rect.is_some_and(|r| r.height > 40))
+            })
+            .unwrap();
+        let console = tree
+            .all()
+            .into_iter()
+            .filter(|n| n.name == "Console")
+            .filter_map(|n| n.rect)
+            .max_by_key(|r| r.height)
+            .unwrap();
+        // in the 12 px left padding (`px-3`), half way down, clear of the text and the rounded bottom corners
+        let (x, y) = (console.x + 6, console.y + console.height / 2);
+        if pixel(x, y).is_some() {
+            app.wait_until(&format!("the console #{sunken} in {theme}"), WAIT, || {
+                pixel(x, y).as_deref() == Some(sunken)
+            })
+            .unwrap();
+        }
+        app.close().unwrap();
+    }
+}
+
 /// E-console-01, CB-11
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]

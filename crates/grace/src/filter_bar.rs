@@ -495,19 +495,23 @@ impl Render for FilterBar {
             .items_center()
             .h(px(CHIP_HEIGHT))
             .child(
-                crate::elements::checkbox("hide-non-matching")
-                    .label(HIDE_NON_MATCHING)
-                    .checked(filter.hide_non_matching)
-                    .off(locked)
-                    .text_size(px(METRICS.text_xs.size))
-                    .whitespace_nowrap()
-                    .on_click(move |checked, _, cx| {
-                        let next = FilterState {
-                            hide_non_matching: *checked,
-                            ..hide.clone()
-                        };
-                        me.update(cx, |bar, cx| bar.set_filter(next, cx));
-                    }),
+                crate::elements::checkbox(
+                    "hide-non-matching",
+                    HIDE_NON_MATCHING,
+                    filter.hide_non_matching,
+                    locked,
+                    window,
+                    cx,
+                )
+                .text_size(px(METRICS.text_xs.size))
+                .whitespace_nowrap()
+                .on_change(move |state, _, _, cx| {
+                    let next = FilterState {
+                        hide_non_matching: crate::elements::on(state),
+                        ..hide.clone()
+                    };
+                    me.update(cx, |bar, cx| bar.set_filter(next, cx));
+                }),
             );
 
         let me = cx.entity();

@@ -175,7 +175,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 | UP-12 | The Windows folder dialog shows the siblings (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): opens in the parent folder with the siblings listed, modal | ☑ |
 | UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`, `grace::tree::tests::a_rows_run_button_shows_the_hand`; by hand in the P2 exit check and [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): the hand on buttons, labels and a row's Run button, not-allowed on a control turned off, the text cursor in the boxes | ☑ |
-| UP-14 | The busy cursor while running | | ☐ |
+| UP-14 | The busy cursor while running | No busy cursor in GPUI Grace: GPUI has none, and adding one to the Windows patch is more stack to carry; the progress bar, the status bar and the running marks show the run ([P2 plan, Redesigns](../plans/2026-11-09-gpui-p2-main-screen.md#redesigns)) | n/a |
 | UP-15 | Scroll areas get thin themed scrollbars | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown` (the tree, details, console and lists; History and HTTP with phase P3) | ☑ |
 | UP-16 | Scrollbars look right and are easy to use (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): the tree in dark, thin thumb, hover and drag | ☑ |
 | UP-17 | The window opens painted in the app's theme | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` (the ground in each theme); the window shows once its first frame is drawn (#90) | ☑ |
@@ -960,7 +960,7 @@ Phase P2 · 2 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-console-01 | open, run and run again | `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
-| E-console-02 | the console is on the sunken colour in both themes | | ☐ |
+| E-console-02 | the console is on the sunken colour in both themes | `grace-e2e/tests/console.rs::the_console_is_on_the_sunken_colour_in_both_themes` (`#f8f6f1` light, `#0b0d11` dark, read off the window's pixels on Linux) | ☑ |
 
 ### e2e/cursor.spec.ts
 
@@ -969,8 +969,8 @@ Phase P2 · 3 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-cursor-01 | cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`, `grace::tree::tests::a_rows_run_button_shows_the_hand`; by hand in the P2 exit check and [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): the hand on buttons, labels and a row's Run button, not-allowed on a control turned off, the text cursor in the boxes | ☑ |
-| E-cursor-02 | the busy cursor while running | | ☐ |
-| E-cursor-03 | the drag cursor wins over the busy cursor | | ☐ |
+| E-cursor-02 | the busy cursor while running | No busy cursor in GPUI Grace: GPUI has none, and adding one to the Windows patch is more stack to carry; the progress bar, the status bar and the running marks show the run ([P2 plan, Redesigns](../plans/2026-11-09-gpui-p2-main-screen.md#redesigns)) | n/a |
+| E-cursor-03 | the drag cursor wins over the busy cursor | No busy cursor to win over (UP-14); the splitter keeps its own resize cursor, `bottom_panel`'s `CursorStyle::ResizeUpDown` | n/a |
 
 ### e2e/debug.spec.ts
 

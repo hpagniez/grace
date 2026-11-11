@@ -25,7 +25,7 @@ use grace_core::properties_draft::{Draft, Row};
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, button, icon_button, icon_text_button};
+use crate::elements::{ButtonKind, ButtonSize, button, icon_button, icon_text_button, on};
 use crate::theme::{METRICS, Theme};
 use crate::tooltip::{Side, cut, tooltip};
 use crate::ui::{FieldKind, field_message, field_message_marked};
@@ -407,7 +407,7 @@ impl PropertiesView {
             .into_any_element()
     }
 
-    fn render_row(&self, row: &Row, error: Option<&String>, cx: &mut Context<Self>) -> AnyElement {
+    fn render_row(&self, row: &Row, error: Option<&String>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let id = row.id;
         let Some(f) = self.fields.get(&id) else {
             return div().into_any_element();
@@ -483,21 +483,38 @@ impl PropertiesView {
             .child(value)
             .child(
                 div().debug_selector(move || format!("prop-envvar-{id}")).child(
-                    crate::elements::checkbox(SharedString::from(format!("prop-envvar-{id}")))
-                        .label("Env variable")
-                        .checked(row.env_var)
-                        .text_size(px(METRICS.text_sm.size))
-                        .on_click(cx.listener(move |this, on: &bool, _, cx| this.set_env_var(id, *on, cx))),
+                    crate::elements::checkbox(
+                        SharedString::from(format!("prop-envvar-{id}")),
+                        "Env variable",
+                        row.env_var,
+                        false,
+                        window,
+                        cx,
+                    )
+                    .gap(px(4.))
+                    .text_size(px(METRICS.text_sm.size))
+                    .on_change({
+                        let me = cx.entity();
+                        move |state, _, _, cx| me.update(cx, |this, cx| this.set_env_var(id, on(state), cx))
+                    }),
                 ),
             )
             .child(
                 div().debug_selector(move || format!("prop-secret-{id}")).child(
-                    crate::elements::checkbox(SharedString::from(format!("prop-secret-{id}")))
-                        .label("Secret")
-                        .checked(row.secret)
-                        .off(!self.available && !row.secret)
-                        .text_size(px(METRICS.text_sm.size))
-                        .on_click(cx.listener(move |this, on: &bool, window, cx| this.set_secret(id, *on, window, cx))),
+                    crate::elements::checkbox(
+                        SharedString::from(format!("prop-secret-{id}")),
+                        "Secret",
+                        row.secret,
+                        !self.available && !row.secret,
+                        window,
+                        cx,
+                    )
+                    .gap(px(4.))
+                    .text_size(px(METRICS.text_sm.size))
+                    .on_change({
+                        let me = cx.entity();
+                        move |state, _, window, cx| me.update(cx, |this, cx| this.set_secret(id, on(state), window, cx))
+                    }),
                 ),
             )
             .child(
@@ -592,7 +609,10 @@ impl Render for PropertiesView {
         let main: AnyElement = match &self.import {
             Some(step) => step.clone().into_any_element(),
             None => {
-                let items: Vec<AnyElement> = rows.iter().map(|r| self.render_row(r, errors.get(&r.id), cx)).collect();
+                let items: Vec<AnyElement> = rows
+                    .iter()
+                    .map(|r| self.render_row(r, errors.get(&r.id), window, cx))
+                    .collect();
                 let import_focus = self.import_focus.clone();
                 let available = self.available;
                 let on_import = cx.listener(|this, _, window, cx| this.pick_file(window, cx));

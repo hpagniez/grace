@@ -189,8 +189,8 @@ mod filter_bar {
     }
 
     /// `chipBase` and the browser's checkbox: a chip is its 1 px border, `px-1.5`, its mark and `gap-1`, and its text
-    /// in `text-2xs` medium; Hide non-matching is a 12 px box, 6 px, and its text in `text-xs`. GPUI Kit's button
-    /// and checkbox set them in their own 14 px text, with a 16 px box 8 px from it.
+    /// in `text-2xs` medium; Hide non-matching is the browser's 13 px box, 6 px, and its text in `text-xs`. GPUI
+    /// Kit's button and checkbox set them in their own 14 px text, with a 16 px box 8 px from it.
     #[gpui::test]
     fn the_chips_and_the_checkbox_are_as_wide_as_their_text_at_electron_graces_sizes(cx: &mut TestAppContext) {
         use gpui::FontWeight;
@@ -222,7 +222,7 @@ mod filter_bar {
         near(
             "hide",
             at(&mut cx, "hide-non-matching").unwrap().size.width,
-            12. + 6. + hide,
+            crate::elements::CHECKBOX + 6. + hide,
         );
     }
 
