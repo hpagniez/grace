@@ -22,11 +22,14 @@ async-channel = "=2.5.0"
 # The threads box hands the runner its value as JSON, as `threads.ts` checked it
 serde_json = "1.0.154"
 
-# The Shell's folder dialog with a starting folder (`seams`, #82) and the system's reduced motion (`a11y`): the
-# `windows` GPUI already uses, with more features.
+# The Shell's folder dialog with a starting folder (`seams`, #82), the system's reduced motion (`a11y`) and the title
+# bar in Grace's theme (`theme`, #337): the `windows` GPUI already uses, with more features, and GPUI's
+# `raw-window-handle` for the window's handle.
 [target.'cfg(windows)'.dependencies]
+raw-window-handle = "=0.6.2"
 windows = { version = "=0.62.2", features = [
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
   "Win32_System_Com",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_Shell",
