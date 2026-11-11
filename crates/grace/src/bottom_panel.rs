@@ -471,7 +471,9 @@ impl Render for BottomPanel {
                     .flex_col()
                     .flex_1()
                     .min_h_0()
-                    .when(state.panel == Panel::Console, |d| d.child(self.console.clone())),
+                    .when(state.panel == Panel::Console, |d| {
+                        d.child(crate::window::cached(self.console.clone(), window))
+                    }),
             )
     }
 }

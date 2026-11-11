@@ -75,6 +75,20 @@ impl ChipState {
         }
     }
 
+    /// The mark beside the tag, so a state shows by shape and not only by colour (R7.3): a check, a minus, none.
+    pub fn mark(self) -> Option<Icon> {
+        match self {
+            Self::Off => None,
+            Self::Include => Some(Icon::Check),
+            Self::Exclude => Some(Icon::Minus),
+        }
+    }
+
+    /// An excluded tag is struck through, beside its minus.
+    pub fn struck(self) -> bool {
+        self == Self::Exclude
+    }
+
     /// Colour and strike-through are invisible to screen readers: the state goes in the name (`SPOKEN`).
     pub fn spoken(self) -> &'static str {
         match self {
@@ -244,11 +258,7 @@ impl FilterBar {
             ChipState::Include => (t.accent, t.accent, t.on_accent, None),
             ChipState::Exclude => (t.control, t.surface, t.ink, None),
         };
-        let mark = match state {
-            ChipState::Off => None,
-            ChipState::Include => Some(Icon::Check),
-            ChipState::Exclude => Some(Icon::Minus),
-        };
+        let mark = state.mark();
         let next = cycle_tag(filter.clone(), tag);
         let me = cx.entity();
         let name = chip_name(tag, state);
@@ -272,7 +282,7 @@ impl FilterBar {
                 .text_size(px(METRICS.text_2xs.size))
                 .font_weight(gpui::FontWeight::MEDIUM)
                 .text_color(Theme::color(fg))
-                .when(state == ChipState::Exclude, |b| b.line_through())
+                .when(state.struck(), |b| b.line_through())
                 .track_focus(f)
                 .off(locked)
                 .map(|b| {

@@ -14,10 +14,10 @@ use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
-    Animation, AnimationExt as _, App, AppContext as _, Bounds, Context, Entity, FocusHandle, FollowMode,
-    HighlightStyle, InteractiveElement as _, IntoElement, KeyBinding, ListAlignment, ListState, ParentElement as _,
-    Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Window,
-    canvas, div, list, prelude::FluentBuilder as _, px,
+    App, AppContext as _, Bounds, Context, Entity, FocusHandle, FollowMode, HighlightStyle, InteractiveElement as _,
+    IntoElement, KeyBinding, ListAlignment, ListState, ParentElement as _, Pixels, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Window, canvas, div, list,
+    prelude::FluentBuilder as _, px,
 };
 use gpui_component::input::{InputEvent, InputState};
 use grace_core::banner::{BannerState, banner_state, tests_text};
@@ -577,11 +577,13 @@ pub fn banner(state: &AppState, cx: &App) -> impl IntoElement {
                 .w(px(7.))
                 .h(px(12.))
                 .bg(Theme::color(t.ink));
+            // shown half a second, hidden half a second: two frames a second, not 60
             let cursor = if moving {
-                cursor
-                    .with_animation("blink", Animation::new(Duration::from_millis(1000)).repeat(), |c, d| {
-                        c.opacity(if d < 0.5 { 1. } else { 0. })
-                    })
+                let (phase, ask) = crate::spin::stepped(2, Duration::from_secs(1));
+                div()
+                    .relative()
+                    .child(cursor.opacity(if phase < 0.5 { 1. } else { 0. }))
+                    .child(ask)
                     .into_any_element()
             } else {
                 cursor.into_any_element()
@@ -654,6 +656,7 @@ impl Render for Console {
             .vertical_scrollbar(&self.list);
         div()
             .relative()
+            .size_full()
             .flex()
             .flex_col()
             .flex_1()

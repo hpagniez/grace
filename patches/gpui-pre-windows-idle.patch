@@ -13,18 +13,18 @@ index 4dd0c38..e00720b 100644
              return;
          }
 diff --git a/src/platform.rs b/src/platform.rs
-index 72731ec..e28666c 100644
+index 4cf4b6b..03c39e7 100644
 --- a/src/platform.rs
 +++ b/src/platform.rs
-@@ -436,6 +436,7 @@ impl WindowsPlatform {
+@@ -422,6 +422,7 @@ impl WindowsPlatform {
              // Not joined: the thread can be sending this thread a message. It exits after its
              // next vsync, and drops its reference to the devices then.
              stop.store(true, Ordering::Release);
 +            VSYNC_GATE.open();
          }
-         if let Some(text_system) = &self.direct_write_text_system {
-             text_system.release_gpu();
-@@ -464,6 +465,20 @@ impl WindowsPlatform {
+         self.inner.state.directx_devices.borrow_mut().take();
+     }
+@@ -443,6 +444,20 @@ impl WindowsPlatform {
              .spawn(move || {
                  let vsync_provider = VSyncProvider::new();
                  loop {
@@ -45,7 +45,7 @@ index 72731ec..e28666c 100644
                      let signal_source = vsync_provider.wait_for_vsync();
                      let signal_at = PlatformFrameSignal::capture(scheduler::Instant::now);
                      if stop.load(Ordering::Acquire) {
-@@ -487,15 +502,17 @@ impl WindowsPlatform {
+@@ -465,15 +480,17 @@ impl WindowsPlatform {
                      };
                      for hwnd in all_windows.read().iter() {
                          unsafe {
@@ -71,7 +71,7 @@ index 72731ec..e28666c 100644
                              }
                              RedrawWindow(Some(hwnd.as_raw()), None, None, RDW_INVALIDATE)
                                  .ok()
-@@ -775,6 +792,8 @@ impl Platform for WindowsPlatform {
+@@ -753,6 +770,8 @@ impl Platform for WindowsPlatform {
              handle: handle.into(),
              frame_signal: window.state.frame_signal.clone(),
          });
@@ -80,7 +80,7 @@ index 72731ec..e28666c 100644
  
          Ok(Box::new(window))
      }
-@@ -1477,6 +1496,7 @@ impl Drop for WindowsPlatform {
+@@ -1455,6 +1474,7 @@ impl Drop for WindowsPlatform {
      fn drop(&mut self) {
          if let Some(stop) = self.vsync_stop.borrow_mut().take() {
              stop.store(true, Ordering::Release);

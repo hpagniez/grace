@@ -578,6 +578,7 @@ mod tests {
     use super::*;
     use gpui::prelude::FluentBuilder as _;
     use gpui::{Modifiers, ScrollHandle, TestAppContext, VisualTestContext, size};
+    use std::path::{Path, PathBuf};
 
     struct View {
         tips: Option<Entity<Tips>>,
@@ -1181,5 +1182,42 @@ mod tests {
         pin(&view, true, &mut cx);
         cx.simulate_mouse_move(point(px(700.), px(400.)), None, Modifiers::none());
         assert_eq!(shown(&view, &mut cx).as_deref(), Some("Pinned"));
+    }
+    /// PU-22: as Electron Grace has no `title` attribute, GPUI Grace has no tooltip of GPUI's or GPUI Kit's own: each
+    /// goes through this module, which shows it after the pause or at once on keyboard focus and closes it on Escape.
+    #[test]
+    fn tooltips_come_only_from_this_module() {
+        fn walk(dir: &Path) -> Vec<PathBuf> {
+            let mut out = Vec::new();
+            for e in std::fs::read_dir(dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    out.extend(walk(&p));
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+            out
+        }
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut offenders = Vec::new();
+        let files = walk(&src);
+        for file in &files {
+            if file.file_name().is_some_and(|n| n == "tooltip.rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(file).unwrap();
+            for (i, line) in text.lines().enumerate() {
+                let code = line.split("//").next().unwrap();
+                if [".tooltip(", "hoverable_tooltip(", "Tooltip::new("]
+                    .iter()
+                    .any(|p| code.contains(p))
+                {
+                    offenders.push(format!("{}:{}: {}", file.display(), i + 1, line.trim()));
+                }
+            }
+        }
+        assert!(files.len() > 3, "scans the app's files");
+        assert_eq!(offenders, Vec::<String>::new());
     }
 }

@@ -3,10 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{
-    AppContext as _, Entity, IntoElement as _, ParentElement as _, Styled as _, TestAppContext, VisualTestContext, div,
-    px,
-};
+use gpui::{Entity, TestAppContext, VisualTestContext, div, px};
 use grace_core::model::events::AppEvent;
 use grace_core::model::node::Layout;
 use grace_core::state::{CONSOLE_LIMIT, Panel};

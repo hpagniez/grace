@@ -212,22 +212,24 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 [Spec](../specs/2026-10-27-bundled-dependency-updates.md) · [#84](https://github.com/hpagniez/grace/issues/84) · phase P0 · 14 scenarios
 
+The vendor pipeline is tooling and stays in Node ([guide](2026-11-08-gpui-migration.md#goals-non-goals-anti-goals), non-goal). It serves both apps: GPUI Grace's tests, e2e and package take the same pins from `scripts/vendor.json`.
+
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| BD-01 | Nothing new, nothing opened | | ☐ |
-| BD-02 | A new Karate release opens a draft PR | | ☐ |
-| BD-03 | A new JRE opens its own PR | | ☐ |
-| BD-04 | Marking the PR ready runs full CI | | ☐ |
-| BD-05 | A handled version is not opened again | | ☐ |
-| BD-06 | A pushed branch without a PR gets its PR | | ☐ |
-| BD-07 | A newer version supersedes a bot-only draft | | ☐ |
-| BD-08 | An older bump PR with a person's work stays open | | ☐ |
-| BD-09 | Versions that are never picked (unit) | | ☐ |
-| BD-10 | Numbers compare as numbers (unit) | | ☐ |
-| BD-11 | Missing data fails and changes nothing (unit) | | ☐ |
-| BD-12 | npm run vendor follows a changed pin (by hand) | | ☐ |
-| BD-13 | The bump script reproduces today's pins (by hand) | | ☐ |
-| BD-14 | First real run after merge (by hand) | | ☐ |
+| BD-01 | Nothing new, nothing opened | `scripts/bump-vendor.test.ts` pickKarate "keeps 2.1.4 when v2.1.4 is the newest", pickJre "keeps the pin when Adoptium's latest is the pinned build", bump "leaves an up-to-date JRE alone" | ☑ |
+| BD-02 | A new Karate release opens a draft PR | `scripts/bump-vendor.test.ts` bump "bumps Karate and its LICENSE, and nothing else"; `scripts/bump-pr.test.ts` openBumpPr "commits, pushes, opens the draft and supersedes the older bot-only draft", titleFor, runCommandStatus, prBody "lists what a Karate reviewer must check" | ☑ |
+| BD-03 | A new JRE opens its own PR | `scripts/bump-vendor.test.ts` pickJre "picks a newer build with Adoptium's link and checksum"; `scripts/bump-pr.test.ts` prBody "links the Adoptium release for a JRE bump" | ☑ |
+| BD-04 | Marking the PR ready runs full CI | `test.yml`'s `rust` job keys its `vendor` cache on `scripts/vendor.json` and fetches the new pins with `scripts/fetch-vendor.mjs`, so a bump PR runs `grace-core`'s real-Java tests and GPUI Grace's Linux e2e on them; Windows e2e on a run by hand. Electron Grace's e2e on a bump PR follows ADR 0017 (by hand or into `main`) | ☑ |
+| BD-05 | A handled version is not opened again | `scripts/bump-pr.test.ts` openBumpPr "stops when the version's branch already has a PR" (`--state all`: open or closed) | ☑ |
+| BD-06 | A pushed branch without a PR gets its PR | `scripts/bump-pr.test.ts` openBumpPr "opens the missing PR of a branch already pushed, without committing" | ☑ |
+| BD-07 | A newer version supersedes a bot-only draft | `scripts/bump-pr.test.ts` supersedePlan "closes only older bot-only drafts of the same dependency", openBumpPr "commits, pushes, opens the draft and supersedes the older bot-only draft" | ☑ |
+| BD-08 | An older bump PR with a person's work stays open | `scripts/bump-pr.test.ts` supersedePlan "closes only older bot-only drafts of the same dependency", prBody "says unknown, check by hand, and names kept PRs" | ☑ |
+| BD-09 | Versions that are never picked (unit) | `scripts/bump-vendor.test.ts` pickKarate "keeps 2.1.4 when …" (the newest, an older one, a new major, a pre-release, a draft, a release candidate tag) | ☑ |
+| BD-10 | Numbers compare as numbers (unit) | `scripts/bump-vendor.test.ts` compareVersions "compares part by part as numbers", pickKarate "picks the highest by number, not by text" | ☑ |
+| BD-11 | Missing data fails and changes nothing (unit) | `scripts/bump-vendor.test.ts` pickKarate "fails when the jar asset is missing", "fails when the jar has no sha256 digest", pickJre "fails without a checksum", bump "fails and changes nothing when the releases API answers 500" | ☑ |
+| BD-12 | npm run vendor follows a changed pin (by hand) | [Check record](../checks/2026-10-27-bundled-dependency-updates.md), by hand 1; `scripts/fetch-vendor.test.ts` verifySha256. GPUI Grace's package takes the same `vendor/`: `scripts/package-gpui.test.ts` layout "refuses without the vendored files, and says how to get them" | ☑ |
+| BD-13 | The bump script reproduces today's pins (by hand) | [Check record](../checks/2026-10-27-bundled-dependency-updates.md), by hand 2 | ☑ |
+| BD-14 | First real run after merge (by hand) | [Check record](../checks/2026-10-27-bundled-dependency-updates.md), Still needs a person 2: passed on 2026-10-28 (PR #35). The workflow has not changed since; its bump PRs now also run the `rust` job (BD-04) | ☑ |
 
 ### CB · Console banner
 
@@ -317,16 +319,18 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 [Spec](../specs/2026-10-28-faster-ci.md) · [#95](https://github.com/hpagniez/grace/issues/95) · phase P0 · 8 scenarios
 
+GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migration.md#r6-tests)): Cargo's `target/` and registry cached, Linux for every PR, Windows e2e for PRs into `main` and runs by hand. The Electron jobs stay until the cut-over.
+
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| FC-01 | a ready PR runs four jobs | | ☐ |
-| FC-02 | a draft PR runs unit tests only | | ☐ |
-| FC-03 | every test runs exactly once | | ☐ |
-| FC-04 | the e2e shards cover the suite | | ☐ |
-| FC-05 | npm test still runs everything locally | | ☐ |
-| FC-06 | no assertion changes | | ☐ |
-| FC-07 | merge-when-green and the e2e steps | | ☐ |
-| FC-08 | the time goal | | ☐ |
+| FC-01 | a ready PR runs four jobs | `test.yml`'s `rust` job, one VM per OS (`ubuntu-latest`, `windows-latest`), beside the four Electron jobs. Its step named `e2e` runs on Linux on every PR, and on Windows on a PR into `main` or a run by hand (guide R6.5, ADR 0017) | ☑ |
+| FC-02 | a draft PR runs unit tests only | GPUI Grace's job has no e2e step to skip on a draft: the `rust` job runs clippy, `cargo test` and the Linux e2e on every PR, drafts included (guide R6.5) | n/a |
+| FC-03 | every test runs exactly once | `cargo test --workspace --locked` runs every test of the workspace in one step per OS: nothing is split, so no test runs twice or not at all | ☑ |
+| FC-04 | the e2e shards cover the suite | `sh scripts/e2e-gpui.sh` runs every `crates/grace-e2e` test in one step per OS: no shards | ☑ |
+| FC-05 | npm test still runs everything locally | `cargo test --workspace` runs the same tests on a PC as in CI; nothing is left out by a variable | ☑ |
+| FC-06 | no assertion changes | Was about one PR's split of `runner.test.ts`; `grace-core`'s runner tests port test for test (R3.4) under the P1 rows of `src/main/runner.*.test.ts` | n/a |
+| FC-07 | merge-when-green and the e2e steps | `merge-when-green.yml` takes every step named `e2e` in the run, the `rust` job's on both OSes included: a back-merge waits for GPUI Grace's e2e too. The jq cases: [check record](../checks/2026-10-28-faster-ci.md) | ☑ |
+| FC-08 | the time goal | The time goal of the faster-CI PR (#45), met in its [check record](../checks/2026-10-28-faster-ci.md). The `rust` job runs beside the Electron jobs, on its own VMs, with its `target/` cached | n/a |
 
 ### LV · Loading always visible
 
@@ -352,37 +356,37 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 |---|---|---|---|
 | PU-01 | Every token pair meets WCAG 2.2 AA in both themes (unit) | `crates/grace::theme::tests::keeps_text_at_4_5_to_1_on_every_background`, `…keeps_each_status_readable_on_surface_its_tint_and_a_selected_row`, `…keeps_the_filled_buttons_text_readable`, `…keeps_control_borders_and_the_focus_ring_at_3_to_1`, `…paints_console_matches_readably_the_current_one_stronger` | ☑ |
 | PU-02 | The dark theme changes colours only (unit) | By construction: `grace::theme::Theme` is one shared `Metrics` and one `Tokens` per theme, so no size can differ; `crates/grace::theme::tests::matches_the_dark_tokens_of_index_css`, `…matches_the_sizes_of_index_css` | ☑ |
-| PU-03 | The structure and the primary button do not change with the theme | | ☐ |
+| PU-03 | The structure and the primary button do not change with the theme | `grace::theme::tests::matches_the_sizes_of_index_css` (the sheet's 8 px inset, 16 px corners and 1 px side, one set of sizes for both themes, PU-02), `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar`; Run all is the toolbar's one primary button (`grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`), filled with the passed green and its text readable in each theme (`grace::theme::tests::fills_the_primary_button_with_the_passed_green`, `…keeps_the_filled_buttons_text_readable`, the tokens equal to `src/index.css`'s) | ☑ |
 | PU-04 | No raw palette class or dark: variant is left (unit) | `crates/grace::theme::tests::colours_come_only_from_the_theme` (no colour literal outside `theme.rs`; GPUI has no `dark:` variant) | ☑ |
-| PU-05 | Main and the startup screen use the CSS ground colours (unit) | | ☐ |
-| PU-06 | The window follows the Windows theme | | ☐ |
-| PU-07 | Grace draws its own typefaces offline | | ☐ |
+| PU-05 | Main and the startup screen use the CSS ground colours (unit) | `grace::theme::tests::matches_the_light_tokens_of_index_css`, `…matches_the_dark_tokens_of_index_css` (the ground in each theme); GPUI Grace has no main process and no startup screen of its own: its first frame is the window on the ground (`grace::window::tests::opens_an_empty_grace_window_in_the_theme`, E-startup-02) | ☑ |
+| PU-06 | The window follows the Windows theme | Light: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` (the ground's pixels; Xvfb has no dark preference), `grace::theme::tests::picks_the_theme_from_the_system_unless_pinned`. Dark, with Windows itself in dark mode: for a person, with UP-18's theme switch | ☐ |
+| PU-07 | Grace draws its own typefaces offline | `grace::assets::tests::embeds_ibm_plex`, `…the_theme_asks_for_the_families_it_embeds` (the window in IBM Plex Sans, the console and the details' code in IBM Plex Mono), `grace::assets::tests::serves_every_icon` (the icons are in the exe); neither `grace` nor `grace-core` has an HTTP client until the updater (P5), so nothing leaves the app for a font or an icon | ☑ |
 | PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name`; through the tree, `crates/grace-e2e/tests/elements.rs::names_each_status_mark` | ☑ |
-| PU-09 | A cancelled run marks its interrupted tests | | ☐ |
-| PU-10 | Tag chip states differ by shape, not only colour (unit) | | ☐ |
-| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | | ☐ |
-| PU-12 | Reduced motion stops every animation | | ☐ |
-| PU-13 | The logo is the Home button | | ☐ |
-| PU-14 | The startup screen shows the logo in the active theme (by hand) | | ☐ |
-| PU-15 | Choosing Dark overrides a light Windows | | ☐ |
-| PU-16 | Follow Windows is the default | | ☐ |
+| PU-09 | A cancelled run marks its interrupted tests | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" named interrupted, the progress line's "Cancelled"), `grace::elements::tests::marks_each_status_as_electron_grace_does` (Interrupted: circle-slash), `grace::progress::tests::after_a_run_r14_2::names_the_outcome_with_its_icon` | ☑ |
+| PU-10 | Tag chip states differ by shape, not only colour (unit) | `grace::filter_bar::tests::words::a_chips_state_shows_in_its_shape_and_its_name_not_only_its_colour` | ☑ |
+| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | Waits for the HTTP tab, phase P3 | ☐ |
+| PU-12 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (the whole window during a run: nothing asks for a frame); each one: `grace::elements::tests::turns_only_while_running_and_never_with_reduced_motion`, `grace::progress::tests::the_bar_r14_1::reduced_motion_keeps_the_stripe_still`, `grace::console::tests::banner::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; GPUI's `with_animation` and springs draw at rest with it set | ☑ |
+| PU-13 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `…home_goes_home_and_is_off_while_busy`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
+| PU-14 | The startup screen shows the logo in the active theme (by hand) | GPUI Grace has no startup screen (E-startup-02): its first frame is the window in the theme (UP-17, UP-18). The title bar's half waits for a person, with Windows in light mode and Appearance on Dark: GPUI sets the title bar from Windows' theme, not the app's | ☐ |
+| PU-15 | Choosing Dark overrides a light Windows | `grace-e2e/tests/appearance.rs::choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart`, `…a_saved_dark_is_in_force_at_start` (under Xvfb's light preference the ground turns #151821 at once, and a saved Dark is in force at the next start) | ☑ |
+| PU-16 | Follow Windows is the default | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` | ☑ |
 | PU-17 | A malformed appearance setting reads as Follow Windows (unit) | `grace_core::settings` tests `appearance` | ☑ |
-| PU-18 | Main rejects an unknown theme (unit) | | ☐ |
+| PU-18 | Main rejects an unknown theme (unit) | Nothing to refuse: no IPC, and a theme is an enum (plan, Redesigns; E-appearance-06) | ☑ |
 | PU-19 | A tooltip shows on keyboard focus and closes with Escape | `crates/grace::tooltip::tests::shows_at_once_on_keyboard_focus_and_once_per_focus`, `…closes_on_escape_and_on_a_press_of_its_target`, `…does_not_show_on_a_focus_from_the_mouse`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` | ☑ |
 | PU-20 | A tooltip shows after a pause on hover, also on a disabled button | `crates/grace::tooltip::tests::shows_after_the_pause_not_before`, `…does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after`, `…shows_one_at_a_time`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` | ☑ |
 | PU-21 | Escape in a dialog closes the tooltip first | `crates/grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` (the tooltip takes Escape before any other handler) | ☑ |
-| PU-22 | No native title attribute is left (unit) | | ☐ |
-| PU-23 | Every control shows the focus ring | | ☐ |
-| PU-24 | Targets are at least 24 by 24 | | ☐ |
-| PU-25 | Existing keyboard paths still work | | ☐ |
-| PU-26 | First run shows the first-run home screen | | ☐ |
-| PU-27 | A missing recent folder says so in words | | ☐ |
-| PU-28 | A project with no feature files shows an empty state | | ☐ |
-| PU-29 | Before any run the progress line says so | | ☐ |
+| PU-22 | No native title attribute is left (unit) | `grace::tooltip::tests::tooltips_come_only_from_this_module` (no tooltip of GPUI's or GPUI Kit's own anywhere else) | ☑ |
+| PU-23 | Every control shows the focus ring | Not yet. GPUI Kit's controls draw Kit's own ring (3 px, half the focus colour, flush with the control); the bottom panel's tabs and its splitter draw none, nor does the tree when Tab reaches it after a click. Next PR | ☐ |
+| PU-24 | Targets are at least 24 by 24 | The tree's run buttons (`ROW_HEIGHT`), the tabs (32 px) and the recent list's remove buttons (`grace::home::tests::removes_a_row_with_a_24_px_icon_button_r10_3`) are; a tag chip takes the click on 22 px of its 24 (its 1 px frame does not). Next PR | ☐ |
+| PU-25 | Existing keyboard paths still work | The e2e suite, ported to the driver (the E-* rows), passes in `test.yml`: on Linux on every PR that changes code, on Windows on every PR into `main` and every run by hand | ☑ |
+| PU-26 | First run shows the first-run home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen`, `grace::home::tests::a_first_start_shows_the_home_screen_without_a_list`, `…the_mascot_is_decorative`; Open folder… is the home screen's one primary button | ☑ |
+| PU-27 | A missing recent folder says so in words | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled`, `…a_missing_folder_shows_its_reason_on_home` | ☑ |
+| PU-28 | A project with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` ("No feature files found" and where Grace looks, both in the tree) | ☑ |
+| PU-29 | Before any run the progress line says so | `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`; through the tree, `grace-e2e/tests/details.rs::failure_details` ("9 tests · Not run yet") | ☑ |
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
-| PU-31 | Empty history and HTTP tabs | | ☐ |
-| PU-32 | Dialogs keep their order and keyboard behaviour | | ☐ |
-| PU-33 | Before and after screenshots exist (by hand) | | ☐ |
+| PU-31 | Empty history and HTTP tabs | Waits for the History and HTTP tabs, phase P3 | ☐ |
+| PU-32 | Dialogs keep their order and keyboard behaviour | Waits for Clear history, phase P3 | ☐ |
+| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
 
 ### VL · Big projects: virtual lists and keyboard navigation
 
@@ -424,33 +428,35 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 [Spec](../specs/2026-10-31-light-and-fast.md) · [#147](https://github.com/hpagniez/grace/issues/147) [#148](https://github.com/hpagniez/grace/issues/148) · phase P0 · 25 scenarios
 
+`bench/`, `perf` and `check-pr` are tooling and stay in Node ([guide](2026-11-08-gpui-migration.md#goals-non-goals-anti-goals), non-goal). The bench measures a GPUI build without Playwright ([R7](2026-11-08-gpui-migration.md#r7-performance)); what it cannot measure there yet is #334.
+
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| LF-01 | The bench measures the packaged app | | ☐ |
-| LF-02 | The bench compares two builds in turns | | ☐ |
-| LF-03 | The bench measures a release zip it did not build | | ☐ |
-| LF-04 | The bench waits for a quiet machine | | ☐ |
-| LF-05 | A worse number does not fail the bench | | ☐ |
-| LF-06 | A bench that cannot measure fails | | ☐ |
-| LF-07 | Smoothness is measured idle and during a run | | ☐ |
-| LF-08 | Idle CPU is measured shown and minimised | | ☐ |
-| LF-09 | Numbers on a PR | | ☐ |
-| LF-10 | A merge waits for the numbers | | ☐ |
-| LF-11 | A worse number never blocks the merge | | ☐ |
-| LF-12 | A perf run that could not measure holds the merge | | ☐ |
-| LF-13 | A docs-only PR | | ☐ |
-| LF-14 | A PR from a fork | | ☐ |
-| LF-15 | Raising a limit without a decision record | | ☐ |
-| LF-16 | Lowering a limit | | ☐ |
-| LF-17 | A release with no performance section | | ☐ |
-| LF-18 | A release with no bench JSON | | ☐ |
-| LF-19 | A release result typed over a miss | | ☐ |
-| LF-20 | A measure the previous release cannot give | | ☐ |
-| LF-21 | A release miss with no decision | | ☐ |
-| LF-22 | A release miss with a no-go | | ☐ |
-| LF-23 | A release miss, analysed and accepted | | ☐ |
-| LF-24 | A release that passes | | ☐ |
-| LF-25 | Feature PRs skip the release gate | | ☐ |
+| LF-01 | The bench measures the packaged app | Partly: `npm run bench:gpui` writes the JSON and the table for a GPUI build's size, start, idle and wake-ups ([P0 record](../checks/2026-11-09-gpui-p0-windows.md), [P2 record](../checks/2026-11-10-gpui-p2-exit.md)). The tree, run and smooth measures: #334 | ☐ |
+| LF-02 | The bench compares two builds in turns | `bench/stats.test.ts` order "runs one warm-up per build, then the rounds in turns: a, b, b, a, a, b"; [P2 record](../checks/2026-11-10-gpui-p2-exit.md): Electron Grace against GPUI Grace in turns, the table with A, B and the change | ☑ |
+| LF-03 | The bench measures a release zip it did not build | [P2 record](../checks/2026-11-10-gpui-p2-exit.md): `--b-zip` on GPUI Grace's release zip. GPUI Grace has no CDP: the bench reads its probes (`bench/gpui.test.ts` parseProbe) and its processes | ☑ |
+| LF-04 | The bench waits for a quiet machine | `bench/system.test.ts` waitForQuiet; the same rounds for both apps (`bench/bench.mjs`) | ☑ |
+| LF-05 | A worse number does not fail the bench | `bench/judge.test.ts` judge "calls a move beyond the noise worse or better, and one within it a pass"; the bench exits 0 on a worse number whatever the build | ☑ |
+| LF-06 | A bench that cannot measure fails | `startGpui` rejects when GPUI Grace cannot start, dies first or draws nothing in 60 s (`bench/gpui.mjs`), with no test yet: #334 | ☐ |
+| LF-07 | Smoothness is measured idle and during a run | Not yet on GPUI Grace: the frame probe and the driven actions of R7.2, #334. Meanwhile the UI thread's stalls are measured from outside ([P2 record](../checks/2026-11-10-gpui-p2-exit.md), VL-26 to VL-29) | ☐ |
+| LF-08 | Idle CPU is measured shown and minimised | `idle.cpu.shown` and `idle.cpu.minimised` of `npm run bench:gpui` ([P0 record](../checks/2026-11-09-gpui-p0-windows.md), [P2 record](../checks/2026-11-10-gpui-p2-exit.md)) | ☑ |
+| LF-09 | Numbers on a PR | `perf` measures Electron Grace until it builds GPUI Grace's tree (guide, Cost: CI; P6), after #334 | ☐ |
+| LF-10 | A merge waits for the numbers | Unchanged tooling (guide, non-goal): `merge-when-green.yml` waits for `perf` on the head, whichever build the bench measures | ☑ |
+| LF-11 | A worse number never blocks the merge | Unchanged tooling: `merge-when-green.yml` reads `perf`'s conclusion, never its numbers | ☑ |
+| LF-12 | A perf run that could not measure holds the merge | Unchanged tooling: `merge-when-green.yml` needs `perf` to finish with success | ☑ |
+| LF-13 | A docs-only PR | Unchanged tooling: `perf.yml`'s `paths-ignore` (`docs/**`, `**/*.md`) | ☑ |
+| LF-14 | A PR from a fork | Unchanged tooling: `perf.yml` writes the job summary and comments only from a branch of this repo | ☑ |
+| LF-15 | Raising a limit without a decision record | `scripts/check-pr.test.ts` limitRaiseError "names a raised limit that adds no decision record"; check-pr CLI "fails a PR that raises a limit without a decision record" | ☑ |
+| LF-16 | Lowering a limit | `scripts/check-pr.test.ts` limitRaiseError "accepts a lowered limit" | ☑ |
+| LF-17 | A release with no performance section | `scripts/check-pr.test.ts` performanceError "rejects a record with no Performance section"; check-pr CLI "fails a release into main whose check record has no Performance section" | ☑ |
+| LF-18 | A release with no bench JSON | `scripts/check-pr.test.ts` performanceError "rejects a record with no bench JSON beside it" | ☑ |
+| LF-19 | A release result typed over a miss | `scripts/check-pr.test.ts` performanceError "rejects Result: pass over a JSON that misses, and names the measure" | ☑ |
+| LF-20 | A measure the previous release cannot give | `bench/judge.test.ts` judge "judges on the limit alone when build a has no value"; `bench/report.test.ts` markdown "writes n/a for a measure with no number" | ☑ |
+| LF-21 | A release miss with no decision | `scripts/check-pr.test.ts` performanceError "rejects Result: miss with no Decision: go" | ☑ |
+| LF-22 | A release miss with a no-go | `scripts/check-pr.test.ts` performanceError "rejects Decision: no-go" | ☑ |
+| LF-23 | A release miss, analysed and accepted | `scripts/check-pr.test.ts` performanceError "accepts Result: miss with an analysis and Decision: go" | ☑ |
+| LF-24 | A release that passes | `scripts/check-pr.test.ts` performanceError "accepts Result: pass over a JSON that passes" | ☑ |
+| LF-25 | Feature PRs skip the release gate | `scripts/check-pr.test.ts` performanceError "skips a feature PR into develop" | ☑ |
 
 ### JM · Java memory
 
@@ -458,12 +464,12 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| JM-01 | Every Java Grace starts gets the memory flags | `karate::command::tests::build_args::builds_the_exact_command_line`, `…passes_the_count_on_runs_and_t_1_on_dry_runs`, `…adds_the_debug_listener_and_its_socket_to_a_debug_run_only`; real Java: `…build_args_through_java::java_stops_at_the_first_out_of_memory_error_with_the_line_out_of_memory_finds`. The build tool's Java ports with Maven in P4
-| JM-02 | A run that runs out of memory says so | `runner::tests::runs::says_so_when_java_runs_out_of_memory_and_the_next_run_does_not` (real Java); the notice on screen with P2
-| JM-03 | A dry run that runs out of memory says so | `runner::tests::discovery::a_dry_run_that_ran_out_of_heap_says_so_one_that_only_names_the_error_does_not`; the notice on screen with P2
-| JM-04 | Another out-of-memory error gets no notice | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (Metaspace and native-thread lines)
-| JM-05 | A test's output that names the error is not Java running out of memory | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (a response body and a test name that name the error)
-| JM-06 | The bench shows a run takes less memory | | ☐ |
+| JM-01 | Every Java Grace starts gets the memory flags | `karate::command::tests::build_args::builds_the_exact_command_line`, `…passes_the_count_on_runs_and_t_1_on_dry_runs`, `…adds_the_debug_listener_and_its_socket_to_a_debug_run_only`; real Java: `…build_args_through_java::java_stops_at_the_first_out_of_memory_error_with_the_line_out_of_memory_finds`. The build tool's Java ports with Maven in P4 | ☑ |
+| JM-02 | A run that runs out of memory says so | `runner::tests::runs::says_so_when_java_runs_out_of_memory_and_the_next_run_does_not` (real Java); on screen: `grace_core::state::tests::notice_sets_the_notice_a_warning_unless_main_says_it_reports_a_success`, `grace::window::tests::the_notice_the_main_area_and_the_panel_are_on_the_sheet` | ☑ |
+| JM-03 | A dry run that runs out of memory says so | `runner::tests::discovery::a_dry_run_that_ran_out_of_heap_says_so_one_that_only_names_the_error_does_not`; on screen: `grace_core::state::tests::notice_sets_the_notice_a_warning_unless_main_says_it_reports_a_success`, `grace::window::tests::the_notice_the_main_area_and_the_panel_are_on_the_sheet` | ☑ |
+| JM-04 | Another out-of-memory error gets no notice | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (Metaspace and native-thread lines) | ☑ |
+| JM-05 | A test's output that names the error is not Java running out of memory | `karate::command::tests::out_of_memory::finds_javas_out_of_memory_line_among_the_others` (a response body and a test name that name the error) | ☑ |
+| JM-06 | The bench shows a run takes less memory | The same command line as JJ-04. GPUI Grace's run keeps Java's peak within the limits Electron Grace's flags set: 247 MB on 10,000 tests (Electron Grace 252, limit 281.3) and 238 on 2,000 (Electron Grace 189, limit 249.9; Java's peak varies by about 75 MB from round to round, [JIT record](../checks/2026-11-02-java-jit.md)) ([P2 record](../checks/2026-11-10-gpui-p2-exit.md), measured from outside). From the bench itself: #334 | ☑ |
 
 ### EN · Ship only the en-US locale
 
@@ -482,10 +488,10 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| JJ-01 | The dry run compiles with C1 only | `karate::command::tests::build_args::builds_the_exact_command_line` (the dry run's `-XX:TieredStopAtLevel=1`)
-| JJ-02 | A run keeps C2 on fewer threads | `karate::command::tests::build_args::builds_the_exact_command_line` (the run's `-XX:CICompilerCount=2`)
-| JJ-03 | Heavy JavaScript runs no slower | | ☐ |
-| JJ-04 | The bench shows Java works less | | ☐ |
+| JJ-01 | The dry run compiles with C1 only | `karate::command::tests::build_args::builds_the_exact_command_line` (the dry run's `-XX:TieredStopAtLevel=1`) | ☑ |
+| JJ-02 | A run keeps C2 on fewer threads | `karate::command::tests::build_args::builds_the_exact_command_line` (the run's `-XX:CICompilerCount=2`) | ☑ |
+| JJ-03 | Heavy JavaScript runs no slower | Java gets the same flags (JJ-01, JJ-02), and the [research](../research/2026-11-02-java-jit/README.md) ran the heavy JavaScript on Java itself, not through an app: it holds for GPUI Grace unchanged | ☑ |
+| JJ-04 | The bench shows Java works less | The flags' gain was measured on Java, which GPUI Grace starts with the same command line. GPUI Grace's run gives Java the same CPU as Electron Grace's: 30,406 against 32,250 ms on 10,000 tests, 10,141 against 10,578 on 2,000 ([P2 record](../checks/2026-11-10-gpui-p2-exit.md), measured from outside). From the bench itself: #334 | ☑ |
 
 ### PL · Project libraries
 
@@ -1101,23 +1107,23 @@ Phase P0 · 17 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-look-01 | The window follows Windows in ${scheme} mode | | ☐ |
-| E-look-02 | Grace draws its own typefaces without any network request | | ☐ |
-| E-look-03 | Each status has its own mark and name | | ☐ |
-| E-look-04 | A cancelled run marks its interrupted test | | ☐ |
-| E-look-05 | Reduced motion stops every animation | | ☐ |
-| E-look-06 | The logo is the Home button | | ☐ |
-| E-look-07 | A tooltip shows on keyboard focus and closes with Escape | | ☐ |
-| E-look-08 | A tooltip shows after a pause on hover, also on a disabled button | | ☐ |
-| E-look-09 | A row's tooltip leaves the next row's run button to the pointer | | ☐ |
-| E-look-10 | Escape in a dialog closes a shown tooltip first, then the dialog | | ☐ |
-| E-look-11 | Every control shows the focus ring in ${scheme} mode | | ☐ |
-| E-look-12 | Targets are at least 24 by 24 | | ☐ |
-| E-look-13 | A first start shows the first-run home screen | | ☐ |
-| E-look-14 | A missing recent folder says so in words | | ☐ |
-| E-look-15 | A folder with no feature files shows an empty state | | ☐ |
-| E-look-16 | Before any run the progress line, the details and the tabs say so | | ☐ |
-| E-look-17 | Clear history keeps its button order and closes on Escape | | ☐ |
+| E-look-01 | The window follows Windows in ${scheme} mode | As PU-06: light by `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`; dark with Windows itself in dark mode, for a person | ☐ |
+| E-look-02 | Grace draws its own typefaces without any network request | As PU-07: `grace::assets::tests::the_theme_asks_for_the_families_it_embeds`, `…embeds_ibm_plex`, `…serves_every_icon` | ☑ |
+| E-look-03 | Each status has its own mark and name | `grace-e2e/tests/elements.rs::names_each_status_mark`, `grace::elements::tests::marks_each_status_as_electron_grace_does` (PU-08) | ☑ |
+| E-look-04 | A cancelled run marks its interrupted test | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` (PU-09) | ☑ |
+| E-look-05 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (PU-12) | ☑ |
+| E-look-06 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` (PU-13) | ☑ |
+| E-look-07 | A tooltip shows on keyboard focus and closes with Escape | `grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` (PU-19) | ☑ |
+| E-look-08 | A tooltip shows after a pause on hover, also on a disabled button | `grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` (PU-20) | ☑ |
+| E-look-09 | A row's tooltip leaves the next row's run button to the pointer | `grace::tree::tests::a_rows_tooltips_stay_on_its_row` (the run button's tooltip to its left, the mark's to its right, the label's over it: none covers the next row) | ☑ |
+| E-look-10 | Escape in a dialog closes a shown tooltip first, then the dialog | `grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` (PU-21) | ☑ |
+| E-look-11 | Every control shows the focus ring in ${scheme} mode | Not yet, as PU-23. Next PR | ☐ |
+| E-look-12 | Targets are at least 24 by 24 | Not yet, as PU-24: a tag chip takes the click on 22 px. Next PR | ☐ |
+| E-look-13 | A first start shows the first-run home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` (PU-26) | ☑ |
+| E-look-14 | A missing recent folder says so in words | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled` (PU-27) | ☑ |
+| E-look-15 | A folder with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` (PU-28) | ☑ |
+| E-look-16 | Before any run the progress line, the details and the tabs say so | The progress line and the details: `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`, `grace-e2e/tests/details.rs::failure_details` (PU-29, PU-30); the History and HTTP tabs with phase P3 | ☐ |
+| E-look-17 | Clear history keeps its button order and closes on Escape | Waits for Clear history, phase P3 | ☐ |
 
 ### e2e/open.spec.ts
 

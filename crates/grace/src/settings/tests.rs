@@ -5,10 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use gpui::{
-    AppContext as _, Bounds, IntoElement as _, Modifiers, ParentElement as _, Pixels, Styled as _, TestAppContext,
-    VisualTestContext, div,
-};
+use gpui::{AppContext as _, Bounds, Modifiers, Pixels, TestAppContext, VisualTestContext, div};
 use grace_core::model::node::Layout;
 use grace_core::settings::load_appearance;
 

@@ -1,7 +1,9 @@
 //! Grace's window (`main.ts`'s `createWindow` and `App.tsx`'s frame): the ground, in the theme, from the first frame
 //! (#90); the accessibility root and the live region that announces a run's start and end (guide R8.1); its bounds
 //! saved and placed on the screens there are (window bounds spec); and the home screen or the project view.
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::accesskit::{Live, Role};
@@ -43,6 +45,8 @@ pub struct GraceWindow {
     painted: bool,
     /// The pending save of the window's bounds; a newer move replaces it.
     save: Option<Task<()>>,
+    /// Where the window's bounds are saved from (`window_state`), shared with the save on close.
+    pub frame: Rc<Frame>,
     /// The progress section, which keeps the run's clock.
     progress: Option<Entity<crate::progress::Progress>>,
     /// The tree, which keeps the rows a person opened and closed.
@@ -69,6 +73,7 @@ impl GraceWindow {
             open_focus: cx.focus_handle(),
             painted: false,
             save: None,
+            frame: Rc::default(),
             progress: None,
             tree: None,
             filter_bar: None,
@@ -85,8 +90,11 @@ impl GraceWindow {
     pub fn with_grace(grace: Entity<Grace>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         cx.observe(&grace, |_, _, cx| cx.notify()).detach();
         let data_dir = grace.read(cx).data_dir().to_path_buf();
+        let frame = Rc::new(Frame::default());
+        // learnt at once: a window snapped before it first moves is saved in the right frame too
+        window_state(window, &frame, cx);
         cx.observe_window_bounds(window, move |this: &mut Self, window, cx| {
-            let state = window_state(window);
+            let state = window_state(window, &this.frame, cx);
             let dir = data_dir.clone();
             this.save = Some(cx.spawn(async move |_, cx| {
                 cx.background_executor().timer(SAVE_AFTER).await;
@@ -95,6 +103,7 @@ impl GraceWindow {
         })
         .detach();
         let mut me = Self::new(cx);
+        me.frame = frame;
         me.progress = Some(cx.new(|cx| crate::progress::Progress::new(grace.clone(), cx)));
         me.tree = Some(cx.new(|cx| crate::tree::Tree::new(grace.clone(), cx)));
         me.filter_bar = Some(cx.new(|cx| crate::filter_bar::FilterBar::new(grace.clone(), cx)));
@@ -136,11 +145,23 @@ impl GraceWindow {
     }
 }
 
-/// The window's normal bounds and whether it is maximized, as `main.ts` saved them: a minimized window is saved
-/// normal, so it opens normal (WB-05).
-pub fn window_state(window: &Window) -> WindowState {
+/// How far where GPUI says the window is now (`Window::bounds`) sits from the frame of its normal bounds
+/// (`Window::window_bounds`), the frame it reopens in: on Windows the second puts the client area a fixed height
+/// below the window's top edge, half its frame, so it sits 12 px above the first with a title bar. Learnt while the
+/// window is neither snapped, maximized nor minimized, when both hold the same rectangle (#318).
+#[derive(Default)]
+pub struct Frame(Cell<Option<gpui::Point<gpui::Pixels>>>);
+
+/// The window's bounds and whether it is maximized, as `main.ts` saved them: the bounds it has now, so a snapped
+/// window (Win+Left) opens where it was snapped (WB-18); its normal bounds while it is maximized or minimized, so it
+/// opens normal (WB-05). Windows keeps a snapped window's normal bounds as the ones from before the snap.
+pub fn window_state(window: &Window, frame: &Frame, cx: &App) -> WindowState {
     let maximized = window.is_maximized();
-    let b = window.window_bounds().get_bounds();
+    let normal = window.window_bounds().get_bounds();
+    let screens: Vec<Bounds<gpui::Pixels>> = cx.displays().iter().map(|d| d.bounds()).collect();
+    let mut offset = frame.0.get();
+    let b = saved_bounds(maximized, normal, window.bounds(), &screens, &mut offset);
+    frame.0.set(offset);
     WindowState {
         x: f64::from(f32::from(b.origin.x)),
         y: f64::from(f32::from(b.origin.y)),
@@ -148,6 +169,28 @@ pub fn window_state(window: &Window) -> WindowState {
         height: f64::from(f32::from(b.size.height)),
         maximized,
     }
+}
+
+/// `getBounds()` or `getNormalBounds()`, as `main.ts` chose, in the frame of `normal`: the normal bounds while the
+/// window is maximized, minimized (Windows moves it off every screen) or as big as they are, so not snapped; else
+/// where it is now, moved into that frame by `offset`, which a window not snapped sets.
+fn saved_bounds(
+    maximized: bool,
+    normal: Bounds<gpui::Pixels>,
+    now: Bounds<gpui::Pixels>,
+    screens: &[Bounds<gpui::Pixels>],
+    offset: &mut Option<gpui::Point<gpui::Pixels>>,
+) -> Bounds<gpui::Pixels> {
+    let shown = screens.iter().any(|s| s.intersects(&now));
+    if maximized || !shown {
+        return normal;
+    }
+    let close = |a: gpui::Pixels, b: gpui::Pixels| (f32::from(a) - f32::from(b)).abs() < 1.;
+    if close(now.size.width, normal.size.width) && close(now.size.height, normal.size.height) {
+        *offset = Some(now.origin - normal.origin);
+        return normal;
+    }
+    Bounds::new(now.origin - offset.unwrap_or_default(), now.size)
 }
 
 /// Saves the bounds; a failed save is logged and never stops anything, as `main.ts` did (WB-06).
@@ -229,7 +272,7 @@ impl Render for GraceWindow {
                 .map(|b| b.into_any_element())
                 .collect();
                 let toolbar = crate::toolbar::render(&grace, &state, boxes, window, cx).into_any_element();
-                project_view(self, toolbar, shown, cx).into_any_element()
+                project_view(self, toolbar, shown, window, cx).into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -288,6 +331,7 @@ fn project_view(
     window: &GraceWindow,
     toolbar: gpui::AnyElement,
     shown: Option<gpui::AnyElement>,
+    gpui_window: &Window,
     cx: &App,
 ) -> impl IntoElement {
     let (progress, filter_bar, tree, panel, details) = (
@@ -348,12 +392,48 @@ fn project_view(
                                 .flex()
                                 .flex_1()
                                 .min_h(px(grace_core::panel_height::MAIN_MIN))
-                                .child(div().flex().flex_col().w_1_2().min_h_0().children(tree))
-                                .child(div().flex().flex_col().w_1_2().min_h_0().children(details)),
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .w_1_2()
+                                        .min_h_0()
+                                        .children(tree.map(|v| cached(v, gpui_window))),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .w_1_2()
+                                        .min_h_0()
+                                        .children(details.map(|v| cached(v, gpui_window))),
+                                ),
                         )
                         .children(panel),
                 ),
         )
+}
+
+/// A pane's view, drawn again only when it is notified: a running test's mark and the console's cursor ask for
+/// frames during a run, and an uncached pane would build itself on every one of them (#320). The pane fills the
+/// room its parent gives it.
+///
+/// While an assistive technology is connected the pane is not cached: the pinned GPUI builds the accessibility tree
+/// anew on every frame and leaves a reused view's nodes out, so a cached pane would vanish from a screen reader.
+/// GPUI draws every view again when one connects or leaves, so the switch takes effect at once.
+pub fn cached<V: Render>(view: Entity<V>, window: &Window) -> gpui::AnyElement {
+    if window.is_a11y_active() {
+        return view.into_any_element();
+    }
+    view.cached(
+        gpui::StyleRefinement::default()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_h_0()
+            .min_w_0(),
+    )
+    .into_any_element()
 }
 
 /// Where the window opens: the saved bounds placed on the screens there are now, maximized when saved so; else
@@ -454,8 +534,10 @@ pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHand
         }
         let closing = grace.clone();
         let dir = data_dir.clone();
+        let view = cx.new(|cx| GraceWindow::with_grace(grace, window, cx));
+        let frame = view.read(cx).frame.clone();
         window.on_window_should_close(cx, move |window, cx| {
-            save_bounds(&dir, &window_state(window));
+            save_bounds(&dir, &window_state(window, &frame, cx));
             let dispose = closing.read(cx).dispose(cx);
             cx.spawn(async move |cx| {
                 dispose.await;
@@ -464,7 +546,6 @@ pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHand
             .detach();
             false
         });
-        let view = cx.new(|cx| GraceWindow::with_grace(grace, window, cx));
         view.read(cx).focus.clone().focus(window, cx);
         cx.new(|cx| Root::new(view, window, cx))
     })
@@ -475,6 +556,45 @@ pub fn open(grace: Entity<Grace>, data_dir: PathBuf, cx: &mut App) -> WindowHand
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+
+    /// WB-18 (#318): a snapped window is saved where it is snapped, as `main.ts`'s `getBounds()` did, in the frame
+    /// it reopens in; a maximized or minimized one keeps its normal bounds (WB-05).
+    #[test]
+    fn a_snapped_window_saves_where_it_is_and_a_maximized_or_minimized_one_its_normal_bounds() {
+        let r = |x: f32, y: f32, w: f32, h: f32| Bounds::new(point(px(x), px(y)), size(px(w), px(h)));
+        let screens = [r(0., 0., 1920., 1040.), r(1920., 0., 1920., 1040.)];
+        let mut offset = None;
+        // not snapped: GPUI says the window is 12 px lower than its normal bounds' frame, as on Windows
+        let normal = r(200., 150., 1200., 800.);
+        assert_eq!(
+            saved_bounds(false, normal, r(200., 162., 1200., 800.), &screens, &mut offset),
+            normal
+        );
+        assert_eq!(offset, Some(point(px(0.), px(12.))));
+        // snapped to the left half of the second screen: Windows keeps the normal bounds from before the snap
+        let snapped = r(1920., 12., 960., 1028.);
+        assert_eq!(
+            saved_bounds(false, normal, snapped, &screens, &mut offset),
+            r(1920., 0., 960., 1028.)
+        );
+        assert_eq!(
+            saved_bounds(true, normal, r(0., 0., 1920., 1040.), &screens, &mut offset),
+            normal
+        );
+        // Windows moves a minimized window to (-32000, -32000), off every screen
+        assert_eq!(
+            saved_bounds(false, normal, r(-32000., -32000., 160., 28.), &screens, &mut offset),
+            normal
+        );
+        // partly off a screen still counts as shown (WB-17)
+        let partly = r(1700., 900., 1200., 800.);
+        assert_eq!(
+            saved_bounds(false, partly, r(1700., 912., 1200., 800.), &screens, &mut offset),
+            partly
+        );
+        // snapped before the offset is known: where GPUI says
+        assert_eq!(saved_bounds(false, normal, snapped, &screens, &mut None), snapped);
+    }
 
     #[gpui::test]
     fn opens_an_empty_grace_window_in_the_theme(cx: &mut TestAppContext) {
@@ -544,6 +664,40 @@ mod tests {
         vcx
     }
 
+    /// PU-12, E-look-05: with reduced motion nothing in the window moves during a run. The running marks, the
+    /// progress line's turning icon, the details' spinner and the console's cursor ask for no next step, and GPUI
+    /// draws the stripe and the bar's springs at rest (its `AnimationExt` reads the same setting). Turned off, the same
+    /// window turns its marks again at once.
+    #[gpui::test]
+    fn reduced_motion_stops_every_animation_during_a_run(cx: &mut TestAppContext) {
+        use grace_core::model::node::{Layout, Status};
+        let mut state = crate::testing::project("D:\\api", Layout::Maven, 2);
+        // finding tests: the stripe, the turning icon and the console's cursor; a test running, open and selected
+        state.busy = true;
+        state.statuses.insert("f:a.feature".into(), Status::Running);
+        state.statuses.insert("s:a.feature#0".into(), Status::Running);
+        state.selected = Some("s:a.feature#0".into());
+        let mut vcx = whole_window(cx, state);
+        assert!(vcx.debug_bounds("progress-stripe").is_some(), "the run is on");
+        // the window follows the system's setting, which is on where Windows shows no animations (CI's runners)
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn");
+
+        // the window drawn again with reduced motion asks for nothing; the clock stays, so the window's place is not
+        // saved
+        vcx.update(|_, cx| {
+            crate::spin::forget_asked(cx);
+            crate::a11y::set_reduce_motion(true, cx);
+        });
+        vcx.run_until_parked();
+        assert_eq!(vcx.update(|_, cx| crate::spin::asked(cx)), 0);
+
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn again");
+    }
+
     /// `Home.test.tsx` "home sits on the ground, with no sheet" and "the app root is ground and ink": with no project,
     /// the window draws home alone, with no toolbar and no sheet.
     #[gpui::test]
@@ -582,6 +736,32 @@ mod tests {
             );
         }
         assert!(vcx.debug_bounds("toolbar").unwrap().bottom() <= sheet.top());
+    }
+
+    /// #320: the tree, the details and the console are cached views, laid out from their own root, as a window with
+    /// no screen reader draws them (`cached`): each fills its room, and the tree draws its rows.
+    #[gpui::test]
+    fn the_cached_panes_fill_their_room(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let mut vcx = whole_window(cx, crate::testing::project("D:\\api", Layout::Maven, 2));
+        let main = vcx.debug_bounds("main").unwrap();
+        for pane in ["tree", "details"] {
+            let b = vcx.debug_bounds(pane).unwrap_or_else(|| panic!("{pane}"));
+            assert_eq!(
+                b.size.height, main.size.height,
+                "{pane} {b:?} fills the main area {main:?}"
+            );
+        }
+        assert!(
+            vcx.debug_bounds("tree-row:f:a.feature").is_some(),
+            "the tree draws its rows"
+        );
+        let panel = vcx.debug_bounds("bottom-panel").unwrap();
+        let console = vcx.debug_bounds("console").unwrap();
+        assert!(
+            console.bottom() >= panel.bottom() - px(1.) && console.size.height > px(48.),
+            "the console {console:?} fills the panel {panel:?}"
+        );
     }
 
     /// `Toolbar.test.tsx` "keeps its items in order" and "the Env and Threads boxes are the controls' height": Home,

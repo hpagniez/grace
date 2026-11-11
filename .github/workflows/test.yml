@@ -1,4 +1,4 @@
-# Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017), and GPUI Grace's Rust tests on Windows and Linux (ADR 0031). Each job runs on its own VM, so the suites' Java leak
+# Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017), and GPUI Grace's Rust tests on Windows and Linux (ADR 0031), its minimised idle on runs by hand (ADR 0032). Each job runs on its own VM, so the suites' Java leak
 # checks never see each other's processes. Unit tests run on every PR; e2e only on PRs into main once ready for
 # review, and on manual runs. A release/* or hotfix/* merge back into develop runs nothing: its PR into main did.
 name: test
@@ -92,7 +92,7 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: rust-${{ runner.os }}-
-      # the patched GPUI crate is crates.io's plus the idle patch, and nothing else (patches/README.md)
+      # the patched GPUI crate is crates.io's plus the patches of patches/series, and nothing else (patches/README.md)
       - if: ${{ runner.os == 'Linux' }}
         run: sh patches/check.sh
       # grace-core's tests run the real Java and Karate (guide R6.1): the bundled JRE and jar on Windows, the runner's
@@ -118,6 +118,57 @@ jobs:
       - name: e2e
         if: ${{ runner.os == 'Linux' || github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
         run: sh scripts/e2e-gpui.sh
+
+  # GPUI Grace's minimised idle on Windows (ADR 0030, ADR 0032): the release build through the bench, which fails the
+  # job when Grace's own threads wake more than 5 times a second while minimised, as they do without the idle patch.
+  # Only on runs by hand, which cargo-updates starts on every bump. The reference machine's numbers still need a person.
+  gpui-idle:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # the unpacked JRE and jar only; fetch-vendor.mjs re-verifies the jar
+          path: |
+            vendor
+            !vendor/.download
+          key: vendor-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-release-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: rust-release-${{ runner.os }}-
+      # the bench drives no Electron
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - run: npm run vendor
+      - run: npm run bench:gpui
+      - if: ${{ always() }}
+        run: if [ -f bench-out/bench.md ]; then cat bench-out/bench.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: minimised wake-ups
+        run: |
+          node -e '
+            const w = require("./bench-out/bench.json").medians.b["idle.wakeups.minimised"];
+            console.log(`idle.wakeups.minimised: ${w} a second`);
+            if (w == null || w > 5) {
+              console.log(`::error::GPUI Grace woke ${w} times a second while minimised, over 5: is the idle patch (patches/series) still working?`);
+              process.exit(1);
+            }'
 
   e2e:
     if: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
