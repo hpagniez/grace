@@ -23,7 +23,7 @@ use grace_core::state::{AppState, Panel};
 use crate::app::Grace;
 use crate::assets::Icon;
 use crate::console::{Console, FIND};
-use crate::elements::icon;
+use crate::elements::{icon, ring as ring_on, ring_shown};
 use crate::theme::Theme;
 use crate::tooltip::tooltip;
 
@@ -198,12 +198,13 @@ impl BottomPanel {
 
     /// The splitter; `shown` is the height this frame draws, which its value says at once (the last layout's would
     /// lag a frame behind a key).
-    fn splitter_view(&self, shown: f32, cx: &mut Context<Self>) -> impl IntoElement {
+    fn splitter_view(&self, shown: f32, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         let max = self.sizes().1;
         let this = cx.entity();
         let pressed = self.drag.is_some();
-        div()
+        let ring = ring_shown(&self.splitter, window);
+        let line = div()
             .id("splitter")
             .debug_selector(|| "splitter".into())
             .role(Role::Splitter)
@@ -262,7 +263,8 @@ impl BottomPanel {
                             .opacity(if pressed { 1. } else { 0. })
                             .group_hover("splitter", |s| s.opacity(1.)),
                     ),
-            )
+            );
+        ring_on(line, ring, window, cx)
     }
 
     fn tab_view(
@@ -271,9 +273,11 @@ impl BottomPanel {
         k: usize,
         from: Option<TabId>,
         state: &AppState,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
+        let ring = ring_shown(&self.tabs[k], window);
         let (panel, glyph, label) = tab_look(id);
         let active = state.panel == panel;
         let count = tab_count(id, state);
@@ -374,6 +378,7 @@ impl BottomPanel {
                     .text_color(Theme::color(t.muted))
                     .child(n.to_string())
             }))
+            .map(|d| ring_on(d, ring, window, cx))
     }
 }
 
@@ -400,7 +405,7 @@ impl Render for BottomPanel {
             .order
             .into_iter()
             .enumerate()
-            .map(|(k, id)| self.tab_view(id, k, from, &state, cx).into_any_element())
+            .map(|(k, id)| self.tab_view(id, k, from, &state, window, cx).into_any_element())
             .collect();
         let console = self.console.clone();
         let find = tooltip("tip-find", Some(SharedString::from("Find (Ctrl+F)"))).focusable(move |f| {
@@ -443,7 +448,7 @@ impl Render for BottomPanel {
                     .absolute()
                     .size_full(),
             )
-            .child(self.splitter_view(h.round(), cx))
+            .child(self.splitter_view(h.round(), window, cx))
             .child(
                 div()
                     .flex()
