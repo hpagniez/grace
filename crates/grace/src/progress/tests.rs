@@ -305,6 +305,55 @@ mod the_bar_r14_1 {
         assert!(last > bar * 0.3, "{last} of {bar} px for 39 % passed");
     }
 
+    /// #320: the springs move by the time between the view's frames and say whether they still move, so the bar
+    /// asks for a next frame only then; a first frame, and every frame with reduced motion, draws the ends.
+    #[test]
+    fn the_springs_move_by_the_time_between_frames_until_they_rest() {
+        let ms = Duration::from_millis;
+        let t0 = Instant::now();
+        let mut bar = Bar::default();
+        assert!(!bar.step([10., 0., 0.], t0, false), "a first frame draws the ends");
+        assert_eq!(bar.springs[0].position, 10.);
+        assert!(bar.step([20., 5., 0.], t0, false), "new ends: the segments move");
+        bar.step([20., 5., 0.], t0 + ms(100), false);
+        let (passed, failed) = (bar.springs[0].position, bar.springs[1].position);
+        assert!(passed > 10. && passed < 20., "{passed}");
+        assert!(failed > 0. && failed < 5., "{failed}");
+        let speed = bar.springs[0].velocity;
+        bar.step([30., 5., 0.], t0 + ms(100), false);
+        assert_eq!(bar.springs[0].velocity, speed, "a new end keeps the speed");
+        assert!(!bar.step([30., 5., 0.], t0 + ms(2_100), false), "at rest");
+        assert_eq!(bar.springs[0].position, 30.);
+        assert!(!bar.step([50., 0., 0.], t0 + ms(2_150), true), "reduced motion");
+        assert_eq!(bar.springs[0].position, 50.);
+    }
+
+    /// #320: a moving bar asks for its frame at the next step of the marks' clock, and a bar at rest for none.
+    #[gpui::test]
+    fn a_moving_bar_asks_for_its_next_step_and_a_resting_one_for_none(cx: &mut TestAppContext) {
+        let mut s = loaded(4);
+        started(&mut s, 4);
+        let (h, _, mut cx) = view(cx, s);
+        h.update(&mut cx, |s| {
+            for passed in [true, true, false, true] {
+                result(s, passed);
+            }
+            finished(s, RunOutcome::Finished);
+        });
+        assert_eq!(cx.update(|_, cx| crate::spin::asked(cx)), 1, "the bar moves");
+        for _ in 0..40 {
+            cx.executor().advance_clock(crate::spin::TURN / crate::spin::STEPS);
+            cx.run_until_parked();
+        }
+        assert_eq!(cx.update(|_, cx| crate::spin::asked(cx)), 0, "at rest, no frame asked");
+        let bar = cx.debug_bounds("progress-bar").unwrap();
+        let passed = cx.debug_bounds("progress-segment-0").unwrap();
+        assert!(
+            (f32::from(passed.size.width) - f32::from(bar.size.width) * 0.75).abs() < 4.,
+            "{passed:?} is three quarters of {bar:?}"
+        );
+    }
+
     #[test]
     fn widths_are_each_counts_share_of_the_total() {
         let mut s = loaded(4);
