@@ -179,6 +179,22 @@ mod tests {
         }
     }
 
+    /// PU-07, E-look-02: the families the theme asks for, `SANS` for the window and `MONO` for the console and the
+    /// details' code, are the ones embedded, so GPUI draws Grace's own faces and falls back to none it would fetch.
+    /// A font file names its family in UTF-16 for Windows and in plain bytes for the Mac.
+    #[test]
+    fn the_theme_asks_for_the_families_it_embeds() {
+        let names = |font: &[u8], family: &str| {
+            let utf16: Vec<u8> = family.encode_utf16().flat_map(u16::to_be_bytes).collect();
+            let has = |needle: &[u8]| font.windows(needle.len()).any(|w| w == needle);
+            has(&utf16) || has(family.as_bytes())
+        };
+        assert!(names(FONTS[0], crate::theme::SANS));
+        assert!(names(FONTS[1], crate::theme::MONO));
+        assert!(names(FONTS[2], crate::theme::MONO));
+        assert!(!names(FONTS[0], crate::theme::MONO));
+    }
+
     /// Electron Grace's icons are the `lucide` imports under `src/renderer`: until the cut-over GPUI Grace has
     /// exactly those (guide R9), so a new one there fails here.
     #[test]

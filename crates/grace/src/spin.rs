@@ -42,6 +42,18 @@ pub fn until_next_step(elapsed: Duration, steps: u32, period: Duration) -> Durat
 struct Asked(HashSet<EntityId>);
 impl Global for Asked {}
 
+/// How many views have a frame asked for at their next step: none while nothing turns.
+#[cfg(test)]
+pub fn asked(cx: &App) -> usize {
+    cx.try_global::<Asked>().map_or(0, |a| a.0.len())
+}
+
+/// Forgets the steps asked so far, so a test sees only those the next frames ask for.
+#[cfg(test)]
+pub fn forget_asked(cx: &mut App) {
+    cx.default_global::<Asked>().0.clear();
+}
+
 /// Asks for the current view's frame at the next step of `steps` a `period`, once per view.
 fn ask_next_step(steps: u32, period: Duration, window: &mut Window, cx: &mut App) {
     let view = window.current_view();
