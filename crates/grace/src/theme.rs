@@ -647,6 +647,26 @@ mod tests {
         });
     }
 
+    /// PU-23: the focus ring is GPUI Kit's, the focus colour at half strength (`FOCUS_RING_OPACITY` in
+    /// gpui-component's `styled.rs`) over what is under it, which GPUI blends channel by channel as stored (over
+    /// white the light ring reads 138, 139, 144 under Xvfb). It keeps 3 to 1 on every ground a control sits on.
+    #[test]
+    fn kits_half_strength_focus_ring_keeps_3_to_1() {
+        let half = |fg: u32, bg: u32| -> u32 {
+            [16, 8, 0]
+                .iter()
+                .map(|&s| (((fg >> s) & 0xff) + ((bg >> s) & 0xff)).div_ceil(2) << s)
+                .sum()
+        };
+        each_theme(|theme, t| {
+            for bg in ["ground", "surface", "raised", "sunken"] {
+                let bg = token(t, bg);
+                let r = contrast(half(t.focus, bg), bg);
+                assert!(r >= 3., "{theme}: the ring on {bg:06x} is {r:.2}");
+            }
+        });
+    }
+
     #[test]
     fn picks_the_theme_from_the_system_unless_pinned() {
         assert!(wants_dark(WindowAppearance::Dark, None));
