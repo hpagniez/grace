@@ -679,6 +679,9 @@ mod tests {
         state.selected = Some("s:a.feature#0".into());
         let mut vcx = whole_window(cx, state);
         assert!(vcx.debug_bounds("progress-stripe").is_some(), "the run is on");
+        // the window follows the system's setting, which is on where Windows shows no animations (CI's runners)
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
         assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn");
 
         // the window drawn again with reduced motion asks for nothing; the clock stays, so the window's place is not
