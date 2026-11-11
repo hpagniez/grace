@@ -347,7 +347,7 @@ impl Console {
         let small = |id: &'static str, glyph: Icon, label: &'static str, tip: &'static str, down: Option<bool>| {
             let this = this.clone();
             tooltip(format!("tip-{id}"), Some(SharedString::from(tip))).focusable(move |f| {
-                crate::elements::icon_button(id, glyph, label, true)
+                crate::elements::icon_button(id, glyph, 14., label, true)
                     .track_focus(f)
                     .on_click(move |_, window, cx| {
                         this.update(cx, |c, cx| match down {
@@ -422,7 +422,7 @@ impl Console {
         let step = |id: &'static str, glyph: Icon, label: &'static str, tip: &'static str, down: bool| {
             let this = this.clone();
             tooltip(format!("tip-{id}"), Some(SharedString::from(tip))).focusable(move |f| {
-                crate::elements::icon_button(id, glyph, label, true)
+                crate::elements::icon_button(id, glyph, 14., label, true)
                     .track_focus(f)
                     .on_click(move |_, _, cx| this.update(cx, |c, cx| c.step_error(down, cx)))
             })

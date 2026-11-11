@@ -13,7 +13,7 @@ use grace_core::state::AppState;
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, button, icon, icon_button};
+use crate::elements::{ButtonKind, ButtonSize, icon, icon_button, icon_text_button};
 use crate::theme::{METRICS, Theme};
 use crate::tooltip::{Side, cut, tooltip};
 
@@ -64,10 +64,15 @@ pub fn render(
     let t = Theme::global(cx).tokens;
     let entries = state.recent.clone().unwrap_or_default();
     let g = grace.clone();
-    let open_button = button("open-button", OPEN, ButtonKind::Primary, ButtonSize::Medium)
-        .icon(Icon::FolderOpen)
-        .track_focus(open)
-        .on_click(move |_, _, cx| g.update(cx, |g, cx| g.open_project(cx)));
+    let open_button = icon_text_button(
+        "open-button",
+        Icon::FolderOpen,
+        OPEN,
+        ButtonKind::Primary,
+        ButtonSize::Medium,
+    )
+    .track_focus(open)
+    .on_click(move |_, _, cx| g.update(cx, |g, cx| g.open_project(cx)));
     let column = div()
         .id("home-column")
         .debug_selector(|| "home-column".into())
@@ -227,6 +232,7 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
             g.update(cx, |g, cx| g.open_recent(root, cx));
         })
         .child(
+            // the body's `text-sm`: GPUI Kit's button would set it in its own 14 px
             div()
                 .flex()
                 .items_center()
@@ -234,6 +240,7 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
                 .min_w_0()
                 .flex_1()
                 .text_left()
+                .text_size(px(METRICS.text_sm.size))
                 .child(icon(Icon::Folder, 16., muted))
                 .child(
                     div().flex().flex_col().min_w_0().flex_1().child(title).child(
@@ -251,7 +258,7 @@ fn recent_row(grace: &Entity<Grace>, i: usize, entry: &RecentEntry, open: &Focus
     let root = entry.path.clone();
     let open = open.clone();
     let remove = tooltip(("tip-remove", i), Some(REMOVE.into())).focusable(move |f| {
-        icon_button(("recent-remove", i), Icon::X, REMOVE, true)
+        icon_button(("recent-remove", i), Icon::X, 16., REMOVE, true)
             .track_focus(f)
             .on_click(move |_, window, cx| {
                 let root = root.clone();

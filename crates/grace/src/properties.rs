@@ -19,14 +19,13 @@ use gpui::{
 };
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::checkbox::Checkbox;
 use gpui_component::input::{InputEvent, InputState};
 use grace_core::model::env::{EnvView, ImportEntry, SecretState};
 use grace_core::properties_draft::{Draft, Row};
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, button, icon_button};
+use crate::elements::{ButtonKind, ButtonSize, button, icon_button, icon_text_button};
 use crate::theme::{METRICS, Theme};
 use crate::tooltip::{Side, cut, tooltip};
 use crate::ui::{FieldKind, field_message, field_message_marked};
@@ -367,12 +366,14 @@ impl PropertiesView {
                 .role(Role::Tab)
                 .accessibility_label(spoken)
                 .child(
+                    // `text-sm`: GPUI Kit's button would set it in its own 14 px
                     div()
                         .flex()
                         .flex_1()
                         .min_w_0()
                         .items_center()
                         .gap_1()
+                        .text_size(px(METRICS.text_sm.size))
                         .when(selected, |d| d.font_weight(gpui::FontWeight::MEDIUM))
                         .child(
                             div()
@@ -482,7 +483,7 @@ impl PropertiesView {
             .child(value)
             .child(
                 div().debug_selector(move || format!("prop-envvar-{id}")).child(
-                    Checkbox::new(SharedString::from(format!("prop-envvar-{id}")))
+                    crate::elements::checkbox(SharedString::from(format!("prop-envvar-{id}")))
                         .label("Env variable")
                         .checked(row.env_var)
                         .text_size(px(METRICS.text_sm.size))
@@ -491,7 +492,7 @@ impl PropertiesView {
             )
             .child(
                 div().debug_selector(move || format!("prop-secret-{id}")).child(
-                    Checkbox::new(SharedString::from(format!("prop-secret-{id}")))
+                    crate::elements::checkbox(SharedString::from(format!("prop-secret-{id}")))
                         .label("Secret")
                         .checked(row.secret)
                         .off(!self.available && !row.secret)
@@ -510,6 +511,7 @@ impl PropertiesView {
                         icon_button(
                             SharedString::from(format!("prop-delete-{id}")),
                             Icon::Trash2,
+                            16.,
                             delete,
                             true,
                         )
@@ -614,20 +616,25 @@ impl Render for PropertiesView {
                             .gap_2()
                             .child(
                                 div().debug_selector(|| "add-property".into()).child(
-                                    button("add-property", "Add property", ButtonKind::Plain, ButtonSize::Medium)
-                                        .icon(Icon::Plus)
-                                        .on_click(cx.listener(|this, _, window, cx| this.add_row(window, cx))),
+                                    icon_text_button(
+                                        "add-property",
+                                        Icon::Plus,
+                                        "Add property",
+                                        ButtonKind::Plain,
+                                        ButtonSize::Medium,
+                                    )
+                                    .on_click(cx.listener(|this, _, window, cx| this.add_row(window, cx))),
                                 ),
                             )
                             .child(
                                 div().debug_selector(|| "import-file".into()).child(
-                                    button(
+                                    icon_text_button(
                                         "import-file",
+                                        Icon::FileUp,
                                         "Import from file…",
                                         ButtonKind::Plain,
                                         ButtonSize::Medium,
                                     )
-                                    .icon(Icon::FileUp)
                                     .track_focus(&import_focus)
                                     .off(!available)
                                     .on_click(on_import),

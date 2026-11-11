@@ -12,7 +12,6 @@ use gpui::{
     prelude::FluentBuilder as _, px,
 };
 use gpui_component::IndexPath;
-use gpui_component::checkbox::Checkbox;
 use gpui_component::input::{InputEvent, InputState};
 use gpui_component::select::{Select, SelectEvent, SelectState};
 use grace_core::import_plan::{EMPTY, ImportPlan, PlanRow, import_plan};
@@ -183,7 +182,7 @@ impl Render for ImportStep {
                 ),
             )
             .child(
-                Checkbox::new("import-envvar")
+                crate::elements::checkbox("import-envvar")
                     .label(KIND)
                     .checked(self.env_var)
                     .text_size(px(METRICS.text_sm.size))

@@ -581,9 +581,9 @@ impl Tree {
             .h(px(ROW_HEIGHT))
             .px_0()
             .accessibility_label(format!("{} {label}", if open { "Collapse" } else { "Expand" }))
-            .icon(
-                gpui_component::Icon::new(if open { Icon::ChevronDown } else { Icon::ChevronRight })
-                    .size(px(14.))
+            // a child, not GPUI Kit's `icon`, which would draw it at 16 px
+            .child(
+                crate::elements::glyph(if open { Icon::ChevronDown } else { Icon::ChevronRight }, 14.)
                     .text_color(Theme::color(t.muted)),
             )
             .on_click(move |_, window, cx| {
@@ -685,15 +685,13 @@ impl Tree {
                 .side(Side::Left)
                 .child(
                     run_button(part("run", &key), &label)
-                        .icon(
-                            gpui_component::Icon::new(Icon::Play)
-                                .size(px(14.))
-                                .text_color(Theme::color(if run_is_green(selected, hovered, ring) {
-                                    t.passed
-                                } else {
-                                    t.muted
-                                })),
-                        )
+                        .child(crate::elements::glyph(Icon::Play, 14.).text_color(Theme::color(
+                            if run_is_green(selected, hovered, ring) {
+                                t.passed
+                            } else {
+                                t.muted
+                            },
+                        )))
                         .off(busy(state))
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();

@@ -409,7 +409,7 @@ impl Render for BottomPanel {
             .collect();
         let console = self.console.clone();
         let find = tooltip("tip-find", Some(SharedString::from("Find (Ctrl+F)"))).focusable(move |f| {
-            crate::elements::icon_button("find-button", Icon::Search, FIND, true)
+            crate::elements::icon_button("find-button", Icon::Search, 14., FIND, true)
                 .track_focus(f)
                 .on_click(move |_, window, cx| console.update(cx, |c, cx| c.open_bar(window, cx)))
         });
