@@ -1,7 +1,8 @@
 //! `e2e/appearance.spec.ts`, through the accessibility tree: Settings › Appearance, the theme in force at start, a
 //! change applied at once and kept after a restart, and Escape going back. On Linux the ground's colour is read off
-//! the window's pixels, on Windows the title bar's dark mode, which follows Grace's theme rather than Windows' (PU-14,
-//! #337); the dialog test and main's refusal of an unknown theme are the plan's Redesigns.
+//! the window's pixels, on Windows the title bar's dark mode and the colour the screen shows there, which follow
+//! Grace's theme rather than Windows' (PU-14, #337); the dialog test and main's refusal of an unknown theme are the
+//! plan's Redesigns.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::time::Duration;
 
@@ -89,15 +90,105 @@ fn wait_ground(app: &App, rgb: &str) {
         .unwrap();
 }
 
-/// Waits for the title bar to be dark or light, where the platform says which (Windows); elsewhere skips the check.
-/// An error is a window not there yet, after a restart: the wait goes on.
+/// Whether a colour `0xrrggbb` is dark: its luma under half.
+fn is_dark(rgb: u32) -> bool {
+    let (r, g, b) = ((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+    2 * r + 5 * g + b < 8 * 128
+}
+
+/// The title bar as (asked dark, drawn dark): its dark mode attribute, and the colour the screen shows in it.
+fn title_bar(app: &App) -> Option<(bool, bool)> {
+    Some((app.dark_title_bar().ok()??, is_dark(app.title_bar_colour().ok()??)))
+}
+
+/// Waits for the title bar to be asked and drawn dark or light, where the platform says which (Windows); elsewhere
+/// skips the check. An error is a window not there yet, after a restart: the wait goes on.
 fn wait_title_bar(app: &App, dark: bool) {
     if let Ok(None) = app.dark_title_bar() {
         return;
     }
     let what = if dark { "a dark title bar" } else { "a light title bar" };
-    app.wait_until(what, WAIT, || app.dark_title_bar().ok().flatten() == Some(dark))
-        .unwrap();
+    app.wait_until(what, WAIT, || title_bar(app) == Some((dark, dark)))
+        .unwrap_or_else(|e| {
+            panic!(
+                "{e}: asked dark {:?}, drawn {:?}; {}",
+                app.dark_title_bar(),
+                app.title_bar_colour(),
+                app.title_bar_report()
+            )
+        });
+}
+
+/// Windows' own theme, switched as Settings › Personalisation › Colours › Choose your mode does: the registry values
+/// for apps and for Windows, then the broadcast Windows sends. Put back when dropped. Only on CI's runner: a test never
+/// changes the theme of a person's machine.
+#[cfg(windows)]
+struct WindowsTheme {
+    was: [bool; 2],
+}
+
+#[cfg(windows)]
+const PERSONALIZE: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+
+#[cfg(windows)]
+const MODES: [&str; 2] = ["AppsUseLightTheme", "SystemUsesLightTheme"];
+
+#[cfg(windows)]
+impl WindowsTheme {
+    /// Whether apps or Windows are dark: a value of 0, where a missing value is light.
+    fn dark(name: &str) -> bool {
+        let out = std::process::Command::new("reg")
+            .args(["query", PERSONALIZE, "/v", name])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).contains("0x0")
+    }
+
+    fn is_dark() -> bool {
+        Self::dark(MODES[0])
+    }
+
+    fn set(dark: [bool; 2]) {
+        use windows::Win32::Foundation::{LPARAM, WPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
+        };
+        use windows::core::w;
+        for (name, dark) in MODES.iter().zip(dark) {
+            let value = if dark { "0" } else { "1" };
+            let added = std::process::Command::new("reg")
+                .args(["add", PERSONALIZE, "/v", name, "/t", "REG_DWORD", "/d", value, "/f"])
+                .status()
+                .unwrap();
+            assert!(added.success(), "reg add {name}");
+        }
+        // SAFETY: the string is static, and the call waits at most 5 s for each window
+        unsafe {
+            SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                WPARAM(0),
+                LPARAM(w!("ImmersiveColorSet").as_ptr() as isize),
+                SMTO_ABORTIFHUNG,
+                5000,
+                None,
+            );
+        }
+    }
+
+    /// Switches both to the other mode of the apps'.
+    fn switch() -> Self {
+        let was = MODES.map(Self::dark);
+        Self::set([!was[0]; 2]);
+        WindowsTheme { was }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for WindowsTheme {
+    fn drop(&mut self) {
+        Self::set(self.was);
+    }
 }
 
 fn no_project() -> App {
@@ -190,6 +281,70 @@ fn choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart()
     wait_title_bar(&again, false);
     let tree = open_appearance(&again);
     assert_eq!(checked(&tree), [false, true, false]);
+}
+
+/// PU-14 with Windows' own theme switched while Grace is open: GPUI sets the title bar from Windows' new theme, and
+/// Grace's own must win, as Electron Grace's does; then Follow Windows takes the new theme, which shows the switch
+/// reached GPUI. Only on CI's Windows runner, where the test may switch the machine's theme.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_switch_of_windows_theme_leaves_graces_on_the_title_bar() {
+    #[cfg(windows)]
+    if std::env::var("CI").as_deref() == Ok("true") {
+        windows_switches_under_grace();
+    }
+}
+
+#[cfg(windows)]
+fn windows_switches_under_grace() {
+    // Grace on the theme Windows is switched away from
+    let to_dark = !WindowsTheme::is_dark();
+    let grace_dark = !to_dark;
+    let theme = if grace_dark { "dark" } else { "light" };
+    let app = App::launch_with_settings(&json!({ "appearance": { "theme": theme } }), &[]).unwrap();
+    app.wait_for("the home screen", WAIT, |t| {
+        t.all().into_iter().any(|n| n.name.starts_with("Open folder"))
+    })
+    .unwrap();
+    wait_title_bar(&app, grace_dark);
+
+    let switched = std::time::Instant::now();
+    let _theme = WindowsTheme::switch();
+    // what the title bar was asked and drew over 4 s, each change once
+    let seen = std::cell::RefCell::new(Vec::<(u128, Option<bool>, Option<u32>)>::new());
+    let _ = app.wait_until("4 s after the switch", Duration::from_secs(5), || {
+        let now = (
+            app.dark_title_bar().ok().flatten(),
+            app.title_bar_colour().ok().flatten(),
+        );
+        let mut seen = seen.borrow_mut();
+        if seen.last().map(|&(_, a, c)| (a, c)) != Some(now) {
+            seen.push((switched.elapsed().as_millis(), now.0, now.1));
+        }
+        switched.elapsed() >= Duration::from_secs(4)
+    });
+    let seen = seen.into_inner();
+    let report = seen
+        .iter()
+        .map(|(ms, a, c)| {
+            let drawn = c.map_or("unread".into(), |c| format!("#{c:06x}"));
+            format!("{ms} ms: asked dark {a:?}, drawn {drawn}")
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    let (_, asked, drawn) = *seen.last().unwrap();
+    if (asked, drawn.map(is_dark)) != (Some(grace_dark), Some(grace_dark)) {
+        panic!(
+            "Windows switched to {}: {report}; then {:?}, {}",
+            if to_dark { "dark" } else { "light" },
+            app.title_bar_colour(),
+            app.title_bar_report()
+        );
+    }
+    // the switch reached GPUI: Follow Windows takes Windows' new theme
+    open_appearance(&app);
+    choose(&app, "Follow Windows");
+    wait_title_bar(&app, to_dark);
 }
 
 #[test]

@@ -467,7 +467,7 @@ pub fn bounds(saved: Option<WindowState>, cx: &App) -> WindowBounds {
             )
         })
     });
-    let first = || Bounds::centered(e2e_display(cx), size(px(FIRST_SIZE.0), px(FIRST_SIZE.1)), cx);
+    let first = || first_bounds(cx);
     match (placed, saved.is_some_and(|s| s.maximized)) {
         (Some(b), true) => WindowBounds::Maximized(b),
         (Some(b), false) => WindowBounds::Windowed(b),
@@ -475,6 +475,41 @@ pub fn bounds(saved: Option<WindowState>, cx: &App) -> WindowBounds {
         (None, true) => WindowBounds::Maximized(first()),
         (None, false) => WindowBounds::Windowed(first()),
     }
+}
+
+/// A first start's bounds: `FIRST_SIZE`, centred on the main screen (or the e2e screen), smaller where the whole
+/// window would not fit the work area. GPUI takes them as the client area and puts the frame half above and half below
+/// it, so the frame comes off the room first; else a screen under about 840 px high, CI's 1024×768 or a 1366×768
+/// laptop, has the title bar above its top edge (#346). Electron's `BrowserWindow` fits its window the same way.
+fn first_bounds(cx: &App) -> Bounds<gpui::Pixels> {
+    let id = e2e_display(cx);
+    let first = size(px(FIRST_SIZE.0), px(FIRST_SIZE.1));
+    let room = id
+        .and_then(|id| cx.find_display(id))
+        .or_else(|| cx.primary_display())
+        .map(|d| d.visible_bounds().size - frame_size());
+    Bounds::centered(id, room.map_or(first, |room| first.min(&room)), cx)
+}
+
+/// What the system's frame adds to a window's client area, in logical pixels: the title bar and the borders, as Windows
+/// works them out for GPUI's window styles at 100 %.
+#[cfg(windows)]
+fn frame_size() -> gpui::Size<gpui::Pixels> {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::HiDpi::AdjustWindowRectExForDpi;
+    use windows::Win32::UI::WindowsAndMessaging::{WS_EX_APPWINDOW, WS_OVERLAPPEDWINDOW};
+    let mut rect = RECT::default();
+    // SAFETY: the call writes to the one RECT it is given, which lives across it
+    match unsafe { AdjustWindowRectExForDpi(&mut rect, WS_OVERLAPPEDWINDOW, false, WS_EX_APPWINDOW, 96) } {
+        Ok(()) => size(px((rect.right - rect.left) as f32), px((rect.bottom - rect.top) as f32)),
+        Err(_) => size(px(0.), px(0.)),
+    }
+}
+
+/// Elsewhere the window manager's frame lies outside GPUI's bounds.
+#[cfg(not(windows))]
+fn frame_size() -> gpui::Size<gpui::Pixels> {
+    size(px(0.), px(0.))
 }
 
 /// The screen a window with these bounds opens on: the one that holds their middle, or else the main one (or the

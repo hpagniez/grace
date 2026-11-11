@@ -84,9 +84,11 @@ fn open_features(app: &App, features: &[&str]) {
     }
 }
 
-/// Grace on a fixture project, its tests found.
+/// Grace on a fixture project, its tests found. The bottom panel at its smallest, 96 px, leaves the tree room for every
+/// row of the clean project with its features open, on CI's 1024×768 screen too: the tree draws only the rows in view.
 fn open(dir: &Path, found: &str) -> App {
-    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    let app =
+        App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 96 }), &[]).unwrap();
     app.wait_for("the tests found", WAIT, |t| label(t, found).is_some())
         .unwrap();
     app

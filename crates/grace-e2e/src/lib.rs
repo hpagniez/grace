@@ -229,6 +229,17 @@ pub trait Driver {
     fn dark_title_bar(&self) -> Result<Option<bool>> {
         Ok(None)
     }
+    /// The colour the screen shows in the middle of the window's title bar, as `0xrrggbb`, where Grace's window has
+    /// one of the system's: on Windows. It tells what DWM drew, where `dark_title_bar` tells what it was asked. An
+    /// error where the screen cannot be read there: off the screen, under another window.
+    fn title_bar_colour(&self) -> Result<Option<u32>> {
+        Ok(None)
+    }
+    /// For a failed title bar check: where the window and the screen are, whether the window is in front, and what
+    /// the title bar and the client area show.
+    fn title_bar_report(&self) -> String {
+        String::new()
+    }
 }
 
 /// How the window shows, for `Driver::show_window`.
@@ -455,6 +466,16 @@ impl App {
     /// See `Driver::dark_title_bar`.
     pub fn dark_title_bar(&self) -> Result<Option<bool>> {
         self.driver.dark_title_bar()
+    }
+
+    /// See `Driver::title_bar_colour`.
+    pub fn title_bar_colour(&self) -> Result<Option<u32>> {
+        self.driver.title_bar_colour()
+    }
+
+    /// See `Driver::title_bar_report`.
+    pub fn title_bar_report(&self) -> String {
+        self.driver.title_bar_report()
     }
 
     /// The main screen's work area, as the `e2e` build records it at start (`grace::e2e::record_screen`).
