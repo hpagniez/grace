@@ -619,6 +619,9 @@ impl Render for Console {
             .flex_1()
             .min_h_0()
             .bg(Theme::color(t.sunken))
+            // the sheet's bottom corners, inside its edge: GPUI clips a child to its parent's box, not to its
+            // rounded corners, where the browser clips the console to the sheet's (`overflow-clip`)
+            .rounded_b(px(METRICS.sheet_radius - METRICS.sheet_side))
             .px_3()
             .py_2()
             .font_family(crate::theme::MONO)

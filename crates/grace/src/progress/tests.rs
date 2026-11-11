@@ -242,6 +242,38 @@ mod the_bar_r14_1 {
         assert_eq!(seg[2].left() - seg[1].right(), px(2.));
     }
 
+    /// The fill ends with the track: a full bar draws only its non-empty segments, the first from the track's left
+    /// end and the last to its right end, where the rounded ends are (#321).
+    #[gpui::test]
+    fn a_full_bar_fills_the_track_from_end_to_end(cx: &mut TestAppContext) {
+        let mut s = loaded(4);
+        started(&mut s, 4);
+        for passed in [true, true, true, false] {
+            result(&mut s, passed);
+        }
+        finished(&mut s, RunOutcome::Finished);
+        let (_, _, mut cx) = view(cx, s);
+        cx.executor().advance_clock(Duration::from_secs(2));
+        cx.run_until_parked();
+        let bar = cx.debug_bounds("progress-bar").unwrap();
+        let passed = cx.debug_bounds("progress-segment-0").unwrap();
+        let failed = cx.debug_bounds("progress-segment-1").unwrap();
+        assert!(
+            cx.debug_bounds("progress-segment-2").is_none(),
+            "no empty cancelled segment"
+        );
+        assert_eq!(passed.left(), bar.left());
+        assert_eq!(failed.left() - passed.right(), px(2.));
+        assert!(
+            (f32::from(failed.right() - bar.right())).abs() < 0.5,
+            "{failed:?} ends at {bar:?}"
+        );
+        assert!(
+            passed.size.width > failed.size.width * 2.5,
+            "{passed:?} is about three times {failed:?}"
+        );
+    }
+
     /// #144: on a big run the passed part grows with each update, every 100 ms, though each one moves its target.
     #[gpui::test]
     fn the_passed_part_fills_during_a_big_run(cx: &mut TestAppContext) {

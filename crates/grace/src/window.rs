@@ -364,7 +364,11 @@ fn project_view(
                 .mb(px(m.sheet_inset))
                 .overflow_hidden()
                 .rounded(px(m.sheet_radius))
+                // `sheet`: `border-t` and, `--sheet-side` wide, `border-x` and `border-b`
                 .border_t_1()
+                .border_l(px(m.sheet_side))
+                .border_r(px(m.sheet_side))
+                .border_b(px(m.sheet_side))
                 .border_color(Theme::color(t.line))
                 .bg(Theme::color(t.surface))
                 .children(progress)
