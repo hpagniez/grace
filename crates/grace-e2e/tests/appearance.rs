@@ -90,8 +90,9 @@ fn wait_ground(app: &App, rgb: &str) {
 }
 
 /// Waits for the title bar to be dark or light, where the platform says which (Windows); elsewhere skips the check.
+/// An error is a window not there yet, after a restart: the wait goes on.
 fn wait_title_bar(app: &App, dark: bool) {
-    if app.dark_title_bar().unwrap().is_none() {
+    if let Ok(None) = app.dark_title_bar() {
         return;
     }
     let what = if dark { "a dark title bar" } else { "a light title bar" };
