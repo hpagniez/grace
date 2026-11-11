@@ -11,7 +11,7 @@ The copy is the crate as published on crates.io, without `.cargo_vcs_info.json`,
 
 ## Upgrade
 
-The patches follow the newest `gpui-pre` ([ADR 0032](../docs/decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md)). Every Tuesday `cargo-updates` runs `npm run cargo:bump`, which does it all, and opens a draft PR with `test` running on it: the Windows e2e for the focus patch, `gpui-idle` for the idle patch. By hand, `npm run cargo:bump` makes the same change in the working tree:
+The patches follow the newest `gpui-pre` ([ADR 0032](../docs/decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md)). Every Tuesday `cargo-updates` runs `npm run cargo:bump`, which does it all, and opens a PR with `test` running on it: the Windows e2e for the focus patch, `gpui-idle` for the idle patch. The PR merges itself once `checks`, `test` and `perf` pass ([ADR 0033](../docs/decisions/0033-merge-the-weekly-cargo-bump-prs-on-green.md)). By hand, `npm run cargo:bump` makes the same change in the working tree:
 
 1. It takes the newest GPUI Kit and the `gpui-pre` that Kit pins, and moves the pins in the workspace's `Cargo.toml`.
 2. It downloads that `gpui-pre-windows` from `https://static.crates.io/crates/gpui-pre-windows/gpui-pre-windows-<version>.crate`, checks it against the crates.io index's checksum, drops the four files above, and applies each patch of `series` in order.

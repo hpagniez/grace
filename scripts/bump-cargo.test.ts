@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  GATES,
   PATCHED,
   PatchError,
   ROOT,
@@ -12,7 +13,9 @@ import {
   indexPath,
   isNewer,
   lockPackages,
+  mergeWhenGreen,
   newest,
+  openPr,
   parseCargoUpdate,
   parseRustStable,
   parseSeries,
@@ -267,6 +270,8 @@ describe("summary", () => {
     expect(body).toContain("https://github.com/rust-lang/rust/releases/tag/1.99.1");
     expect(body).toContain("1 updated, 1 added, 1 removed");
     expect(body).toContain("gh workflow run test.yml --ref feature/bump-cargo-2026-11-17");
+    expect(body).toContain("This PR merges itself once `checks`, `test` and `perf`");
+    expect(body).toContain("Part of #328.");
   });
 
   it("says when only the lock moves, and why the GPUI set stays", () => {
@@ -362,5 +367,138 @@ describe.skipIf(process.platform === "win32")("rebase", () => {
     await expect(
       rebase({ version: "1.0.1", sha256: "0".repeat(64) }, { root, fetch }),
     ).rejects.toThrow(/does not match/);
+  });
+});
+
+/** A fake `run` that answers gh and git as GitHub would, and records every call. */
+function fakeGh(answer: (cmd: string, args: string[]) => string | undefined) {
+  const calls: { cmd: string; args: string[]; input?: string }[] = [];
+  const run = (cmd: string, args: string[], input?: string) => {
+    calls.push({ cmd, args, input });
+    return answer(cmd, args) ?? "";
+  };
+  return { run, calls };
+}
+
+const SHA = "0123456789abcdef0123456789abcdef01234567";
+
+describe("openPr", () => {
+  it("opens the PR ready, starts checks, test and perf on it, and closes older bot-only bumps", () => {
+    const { run, calls } = fakeGh((cmd, args) => {
+      if (cmd === "git" && args[0] === "ls-remote")
+        return args[1] === "--heads" ? "" : `${SHA}\trefs/heads/feature/bump-cargo-2026-11-17\n`;
+      if (cmd !== "gh") return undefined;
+      if (args[0] === "pr" && args[1] === "list" && args.includes("--head")) return "[]";
+      if (args[0] === "pr" && args[1] === "list")
+        return JSON.stringify([
+          { number: 330, headRefName: "feature/bump-cargo-2026-11-10" },
+          { number: 331, headRefName: "feature/bump-cargo-2026-11-03" },
+          { number: 340, headRefName: "feature/gpui-title-bar-theme" },
+        ]);
+      if (args[0] === "pr" && args[1] === "view") {
+        const human = args[2] === "331";
+        return JSON.stringify({
+          commits: [
+            { authors: [{ email: "41898282+github-actions[bot]@users.noreply.github.com" }] },
+            ...(human ? [{ authors: [{ email: "someone@example.com" }] }] : []),
+          ],
+        });
+      }
+      if (args[0] === "pr" && args[1] === "create")
+        return "https://github.com/hpagniez/grace/pull/350\n";
+      return undefined;
+    });
+    expect(openPr(result(), { date: "2026-11-17", run })).toEqual({ number: 350, sha: SHA });
+    const gh = calls.filter((c) => c.cmd === "gh").map((c) => c.args.join(" "));
+    const create = gh.find((a) => a.startsWith("pr create"));
+    expect(create).not.toContain("--draft");
+    expect(calls.find((c) => c.args[0] === "pr" && c.args[1] === "create")?.input).toContain(
+      "#331 is still open",
+    );
+    expect(gh.filter((a) => a.startsWith("workflow run"))).toEqual(
+      GATES.map((w) => `workflow run ${w} --ref feature/bump-cargo-2026-11-17`),
+    );
+    expect(gh.filter((a) => a.startsWith("pr close"))).toEqual([
+      "pr close 330 --comment Superseded by #350 --delete-branch",
+    ]);
+  });
+});
+
+describe("mergeWhenGreen", () => {
+  /** gh answering with each gate's newest run, as `states(poll)` gives them. */
+  function gates(states: (poll: number) => Record<string, object>) {
+    let poll = -1;
+    return fakeGh((cmd, args) => {
+      if (cmd !== "gh" || args[0] !== "api") return undefined;
+      const workflow = GATES.find((w) => args[1].includes(`/workflows/${w}/`))!;
+      if (workflow === GATES[0]) poll++;
+      expect(args[1]).toContain(`event=workflow_dispatch&head_sha=${SHA}`);
+      return JSON.stringify(
+        states(poll)[workflow] ?? { status: null, conclusion: null, url: null },
+      );
+    });
+  }
+  const done = (conclusion: string) => ({ status: "completed", conclusion, url: "https://run" });
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, wait: async (ms: number) => void (t += ms) };
+  };
+
+  it("waits for all three runs, then merges with a merge commit on the same commit", async () => {
+    const { run, calls } = gates((poll) =>
+      poll === 0
+        ? { "checks.yml": done("success"), "test.yml": { status: "in_progress" } }
+        : Object.fromEntries(GATES.map((w) => [w, done("success")])),
+    );
+    await mergeWhenGreen(350, SHA, { run, ...clock() });
+    const last = calls.at(-1)!;
+    expect(last.args).toEqual([
+      "pr",
+      "merge",
+      "350",
+      "--merge",
+      "--delete-branch",
+      "--match-head-commit",
+      SHA,
+    ]);
+    expect(calls.filter((c) => c.args[0] === "api").length).toBe(GATES.length * 2);
+    const comment = calls.at(-2)!;
+    expect(comment.args.slice(0, 3)).toEqual(["pr", "comment", "350"]);
+    expect(comment.input).toContain(`Passed on ${SHA}: [\`checks.yml\`](https://run)`);
+  });
+
+  it("leaves the PR open with a comment when a run fails", async () => {
+    const { run, calls } = gates(() => ({
+      "checks.yml": done("success"),
+      "test.yml": done("failure"),
+      "perf.yml": { status: "in_progress" },
+    }));
+    await expect(mergeWhenGreen(350, SHA, { run, ...clock() })).rejects.toThrow("not merged");
+    expect(calls.some((c) => c.args[1] === "merge")).toBe(false);
+    const comment = calls.find((c) => c.args[1] === "comment");
+    expect(comment?.input).toContain("`test.yml` ended failure (https://run)");
+  });
+
+  it("comments when GitHub refuses the merge", async () => {
+    const green = gates(() => Object.fromEntries(GATES.map((w) => [w, done("success")])));
+    const calls = green.calls;
+    const run = (cmd: string, args: string[], input?: string) => {
+      if (args[1] === "merge") throw new Error('Required status check "checks" is expected.\n');
+      return green.run(cmd, args, input);
+    };
+    await expect(mergeWhenGreen(350, SHA, { run, ...clock() })).rejects.toThrow("not merged");
+    expect(calls.at(-1)!.input).toContain(
+      'the merge failed: Required status check "checks" is expected. Merge by hand.',
+    );
+  });
+
+  it("gives up after its timeout, and says which runs had not finished", async () => {
+    const { run, calls } = gates(() => ({ "checks.yml": done("success") }));
+    await expect(
+      mergeWhenGreen(350, SHA, { run, ...clock(), interval: 60_000, timeout: 5 * 60_000 }),
+    ).rejects.toThrow("not merged");
+    const comment = calls.find((c) => c.args[1] === "comment");
+    expect(comment?.input).toContain("`test.yml`, `perf.yml` had not finished");
+    expect(calls.some((c) => c.args[1] === "merge")).toBe(false);
   });
 });

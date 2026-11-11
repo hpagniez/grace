@@ -1,4 +1,5 @@
-# Fast checks on Linux for every PR (ADR 0007). Windows tests are in test.yml.
+# Fast checks on Linux for every PR (ADR 0007). Windows tests are in test.yml. By hand on a branch, as if it were a PR
+# into develop: cargo-updates starts it on its bump PR, which GITHUB_TOKEN opened and so started no workflow (ADR 0033).
 name: checks
 
 on:
@@ -6,12 +7,13 @@ on:
     branches: [develop, main]
     # ready_for_review: a bump PR opened by vendor-updates starts CI only when a person marks it ready
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -47,7 +49,7 @@ jobs:
       - run: node scripts/check-pr.mjs
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
         env:
-          HEAD_REF: ${{ github.head_ref }}
-          BASE_REF: ${{ github.base_ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          BASE_REF: ${{ github.base_ref || 'develop' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/develop' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
