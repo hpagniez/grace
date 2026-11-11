@@ -273,6 +273,73 @@ pub fn checkbox(id: impl Into<ElementId>) -> gpui_component::checkbox::Checkbox 
         .cursor_pointer()
 }
 
+/// A radio button's circle, as a browser draws `<input type="radio">`.
+pub const RADIO: f32 = 13.;
+/// The dot in a checked radio button: the circle inside its 1 px edge, less a fifth of it each side, to a whole
+/// pixel so that it sits in the middle.
+pub const RADIO_DOT: f32 = 7.;
+
+/// A radio button with its label, as `Settings.tsx`'s `choice` draws `<input type="radio" class="accent-accent">`:
+/// a 24 px row, the circle 8 px from its text and the hand over all of it. Off, the circle has a 1 px edge in the
+/// control colour; on, the edge and a dot in the middle are in the accent colour, and the keyboard's ring is round
+/// the circle (`:focus-visible`). GPUI Kit's own radio fills its circle in the primary colour and puts a check mark
+/// in it, so the role, the state, the focus and the click come from gpui-base's unstyled radio, which leaves the
+/// drawing to the app (plan, Redesigns). `id` names the debug selectors too: `{id}`, `{id}-circle`, `{id}-dot` and
+/// `{id}-label`.
+pub fn radio(
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    checked: bool,
+    window: &mut gpui::Window,
+    cx: &mut App,
+) -> gpui_base::Radio {
+    let t = Theme::global(cx).tokens;
+    let id: SharedString = id.into();
+    let label: SharedString = label.into();
+    let focus = window
+        .use_keyed_state(ElementId::from(id.clone()), cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone();
+    let circle_id = id.clone();
+    let circle = div()
+        .debug_selector(move || format!("{circle_id}-circle"))
+        .size(px(RADIO))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_full()
+        .border_1()
+        .border_color(Theme::color(if checked { t.accent } else { t.control }))
+        .bg(Theme::color(t.surface))
+        .when(checked, |c| {
+            let dot_id = id.clone();
+            c.child(
+                div()
+                    .debug_selector(move || format!("{dot_id}-dot"))
+                    .size(px(RADIO_DOT))
+                    .rounded_full()
+                    .bg(Theme::color(t.accent)),
+            )
+        });
+    let circle = ring(circle, ring_shown(&focus, window), window, cx);
+    let row_id = id.clone();
+    let label_id = id.clone();
+    gpui_base::Radio::new(ElementId::from(id))
+        .debug_selector(move || row_id.to_string())
+        .checked(checked)
+        .track_focus(&focus)
+        .accessibility_label(label.clone())
+        .h(px(24.))
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .text_size(px(crate::theme::METRICS.text_sm.size))
+        .cursor_pointer()
+        .child(circle)
+        .child(div().debug_selector(move || format!("{label_id}-label")).child(label))
+}
+
 /// A button's state, with the cursor that says it (`buttons.ts`): the hand while it can be pressed, the
 /// not-allowed sign while it cannot. GPUI Kit's own `disabled` leaves the arrow.
 pub trait Off: gpui_component::Disableable + Styled + Sized {

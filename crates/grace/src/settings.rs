@@ -6,11 +6,10 @@ use gpui::{
     App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, actions, div, prelude::FluentBuilder as _, px,
 };
-use gpui_component::radio::{Radio, RadioGroup};
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, button, icon_text_button};
+use crate::elements::{ButtonKind, ButtonSize, button, icon_text_button, radio};
 use crate::theme::{Appearance, METRICS, SavedAppearance, Theme};
 
 pub const TITLE: &str = "Settings";
@@ -185,7 +184,7 @@ impl SettingsPage {
             }))
     }
 
-    fn appearance(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn appearance(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let grace = self.grace.clone();
         let current = saved(cx);
         let index = THEMES.iter().position(|(theme, _)| *theme == current);
@@ -224,35 +223,24 @@ impl SettingsPage {
                             .font_weight(FontWeight::MEDIUM)
                             .child(THEME),
                     )
-                    .child(
-                        RadioGroup::vertical("theme")
-                            .mt_1()
-                            .gap_0()
-                            .selected_index(index)
-                            .children(THEMES.map(|(theme, label)| {
-                                Radio::new(label)
-                                    .label(label)
-                                    .debug_selector(move || format!("theme-{}", theme.as_str()))
-                                    .h(px(24.))
-                                    .items_center()
-                                    .text_size(px(METRICS.text_sm.size))
-                            }))
-                            .on_click(move |i, window, cx| {
-                                if let Some((theme, _)) = THEMES.get(*i) {
-                                    choose(&grace, *theme, window, cx);
-                                }
-                            }),
-                    ),
+                    .child(gpui_base::RadioGroup::new("theme").mt_1().flex().flex_col().children(
+                        THEMES.iter().enumerate().map(|(i, &(theme, label))| {
+                            let grace = grace.clone();
+                            radio(format!("theme-{}", theme.as_str()), label, index == Some(i), window, cx)
+                                .set_position(i + 1, THEMES.len())
+                                .on_change(move |_, _, window, cx| choose(&grace, theme, window, cx))
+                        }),
+                    )),
             )
     }
 }
 
 impl Render for SettingsPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         let m = METRICS;
         let section = match self.section {
-            Section::Appearance => self.appearance(cx).into_any_element(),
+            Section::Appearance => self.appearance(window, cx).into_any_element(),
         };
         let shown = self
             .grace

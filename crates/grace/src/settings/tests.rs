@@ -123,6 +123,30 @@ mod appearance_r8 {
         assert!(tops.iter().all(|b| group.contains(&b.center())));
     }
 
+    /// #321: the checked radio is a ring with a dot, as a browser draws it, not GPUI Kit's filled circle with a
+    /// check mark: a 13 px circle 8 px from its text, a 7 px dot in its middle, and no dot in the others.
+    #[gpui::test]
+    fn the_checked_radio_is_a_ring_with_a_dot_as_in_a_browser(cx: &mut TestAppContext) {
+        use crate::elements::{RADIO, RADIO_DOT};
+        let mut p = setup(cx, data_dir("ring-dot"), Appearance::Light);
+        for t in ["system", "light", "dark"] {
+            let circle = at(&mut p.cx, &format!("theme-{t}-circle"));
+            assert_eq!(circle.size, gpui::size(gpui::px(RADIO), gpui::px(RADIO)), "{t}");
+            let row = at(&mut p.cx, &format!("theme-{t}"));
+            assert_eq!(circle.center().y, row.center().y, "{t}: on the middle of its row");
+            let text = at(&mut p.cx, &format!("theme-{t}-label"));
+            assert_eq!(text.left() - circle.right(), gpui::px(8.), "{t}: 8 px from its text");
+        }
+        assert!(p.cx.debug_bounds("theme-system-dot").is_none());
+        assert!(p.cx.debug_bounds("theme-dark-dot").is_none());
+        let dot = at(&mut p.cx, "theme-light-dot");
+        assert_eq!(dot.size, gpui::size(gpui::px(RADIO_DOT), gpui::px(RADIO_DOT)));
+        assert_eq!(dot.center(), at(&mut p.cx, "theme-light-circle").center());
+        click(&mut p.cx, "theme-dark");
+        assert!(p.cx.debug_bounds("theme-light-dot").is_none());
+        assert!(p.cx.debug_bounds("theme-dark-dot").is_some());
+    }
+
     #[gpui::test]
     fn choosing_a_theme_applies_it_at_once_and_saves_it(cx: &mut TestAppContext) {
         let dir = data_dir("choose");
