@@ -333,19 +333,11 @@ pub fn set_appearance(appearance: Appearance, window: &mut Window, cx: &mut App)
 /// Windows' theme changes, and has no call for the app to set it: Grace sets the same DWM attribute on its own window.
 /// After a change of Windows' theme, GPUI sets the attribute first and runs the window's appearance observers in a
 /// task after it, so `follow_system`'s observer sets Grace's back.
-///
-/// DWM draws a changed attribute only when the window's frame is next drawn: a window already on screen kept its old
-/// title bar until it was resized or activated, and after a switch of Windows' theme it kept the one Windows' switch
-/// drew. So Grace then asks for the frame again (`SWP_FRAMECHANGED`), in a task of its own: the frame's messages reach
-/// GPUI's window procedure at once, which must not happen while this update holds the app.
 #[cfg(windows)]
-fn title_bar(window: &Window, dark: bool, cx: &App) {
+fn title_bar(window: &Window, dark: bool) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
-    };
     use windows::core::BOOL;
     let Ok(handle) = HasWindowHandle::window_handle(window) else {
         return;
@@ -353,33 +345,16 @@ fn title_bar(window: &Window, dark: bool, cx: &App) {
     let RawWindowHandle::Win32(handle) = handle.as_raw() else {
         return;
     };
-    let hwnd = handle.hwnd.get();
     let dark = BOOL::from(dark);
     // SAFETY: the handle is this live window's; the call reads one BOOL from the pointer, which lives across it.
     let _ = unsafe {
         DwmSetWindowAttribute(
-            HWND(hwnd as *mut core::ffi::c_void),
+            HWND(handle.hwnd.get() as *mut core::ffi::c_void),
             DWMWA_USE_IMMERSIVE_DARK_MODE,
             &dark as *const BOOL as *const core::ffi::c_void,
             std::mem::size_of::<BOOL>() as u32,
         )
     };
-    cx.foreground_executor()
-        .spawn(async move {
-            // SAFETY: a window that has closed since is a handle Windows refuses, with an error that is dropped
-            let _ = unsafe {
-                SetWindowPos(
-                    HWND(hwnd as *mut core::ffi::c_void),
-                    None,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOZORDER,
-                )
-            };
-        })
-        .detach();
 }
 
 /// A floating panel's shadow (`--shadow-float`): the tag panel's, the environment's suggestions'.
@@ -417,7 +392,7 @@ pub fn cursor_blink(reduced: bool) -> gpui_component::input::CursorBlink {
 pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
     #[cfg(windows)]
     if let Some(window) = window.as_deref() {
-        title_bar(window, dark, cx);
+        title_bar(window, dark);
     }
     let reduced = cx.reduce_motion();
     let theme = Theme::new(dark);
