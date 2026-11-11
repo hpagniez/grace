@@ -328,6 +328,35 @@ pub fn set_appearance(appearance: Appearance, window: &mut Window, cx: &mut App)
     apply(current(window, cx), Some(window), cx);
 }
 
+/// Draws the window's title bar dark or light with Grace's theme, as Electron Grace's title bar follows
+/// `nativeTheme.themeSource` (PU-14, #337). GPUI sets it from Windows' theme when it opens the window and again when
+/// Windows' theme changes, and has no call for the app to set it: Grace sets the same DWM attribute on its own window.
+/// After a change of Windows' theme, GPUI sets the attribute first and runs the window's appearance observers in a
+/// task after it, so `follow_system`'s observer sets Grace's back.
+#[cfg(windows)]
+fn title_bar(window: &Window, dark: bool) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
+    use windows::core::BOOL;
+    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+        return;
+    };
+    let RawWindowHandle::Win32(handle) = handle.as_raw() else {
+        return;
+    };
+    let dark = BOOL::from(dark);
+    // SAFETY: the handle is this live window's; the call reads one BOOL from the pointer, which lives across it.
+    let _ = unsafe {
+        DwmSetWindowAttribute(
+            HWND(handle.hwnd.get() as *mut core::ffi::c_void),
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &dark as *const BOOL as *const core::ffi::c_void,
+            std::mem::size_of::<BOOL>() as u32,
+        )
+    };
+}
+
 /// A floating panel's shadow (`--shadow-float`): the tag panel's, the environment's suggestions'.
 pub fn float_shadow(cx: &App) -> Vec<gpui::BoxShadow> {
     let theme = Theme::global(cx);
@@ -358,8 +387,13 @@ pub fn cursor_blink(reduced: bool) -> gpui_component::input::CursorBlink {
     }
 }
 
-/// Sets Grace's theme, and maps its tokens onto GPUI Kit's, so GPUI Kit's controls draw in Grace's colours.
+/// Sets Grace's theme, and maps its tokens onto GPUI Kit's, so GPUI Kit's controls draw in Grace's colours. With a
+/// window, its title bar takes the theme too.
 pub fn apply(dark: bool, window: Option<&mut Window>, cx: &mut App) {
+    #[cfg(windows)]
+    if let Some(window) = window.as_deref() {
+        title_bar(window, dark);
+    }
     let reduced = cx.reduce_motion();
     let theme = Theme::new(dark);
     cx.set_global(theme);

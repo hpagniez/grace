@@ -224,6 +224,11 @@ pub trait Driver {
     fn show_window(&self, _show: Show) -> Result<()> {
         Err("no window manager to maximize or minimize the window".into())
     }
+    /// Whether the window's title bar is drawn dark, where Grace sets it: on Windows, its DWM attribute
+    /// `DWMWA_USE_IMMERSIVE_DARK_MODE` (PU-14, #337). `None` elsewhere: Xvfb has no title bar.
+    fn dark_title_bar(&self) -> Result<Option<bool>> {
+        Ok(None)
+    }
 }
 
 /// How the window shows, for `Driver::show_window`.
@@ -445,6 +450,11 @@ impl App {
     /// See `Driver::show_window`.
     pub fn show_window(&self, show: Show) -> Result<()> {
         self.driver.show_window(show)
+    }
+
+    /// See `Driver::dark_title_bar`.
+    pub fn dark_title_bar(&self) -> Result<Option<bool>> {
+        self.driver.dark_title_bar()
     }
 
     /// The main screen's work area, as the `e2e` build records it at start (`grace::e2e::record_screen`).

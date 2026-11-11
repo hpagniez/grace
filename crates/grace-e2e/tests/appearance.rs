@@ -1,6 +1,7 @@
 //! `e2e/appearance.spec.ts`, through the accessibility tree: Settings › Appearance, the theme in force at start, a
 //! change applied at once and kept after a restart, and Escape going back. On Linux the ground's colour is read off
-//! the window's pixels; the dialog test and main's refusal of an unknown theme are the plan's Redesigns.
+//! the window's pixels, on Windows the title bar's dark mode, which follows Grace's theme rather than Windows' (PU-14,
+//! #337); the dialog test and main's refusal of an unknown theme are the plan's Redesigns.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::time::Duration;
 
@@ -88,6 +89,17 @@ fn wait_ground(app: &App, rgb: &str) {
         .unwrap();
 }
 
+/// Waits for the title bar to be dark or light, where the platform says which (Windows); elsewhere skips the check.
+/// An error is a window not there yet, after a restart: the wait goes on.
+fn wait_title_bar(app: &App, dark: bool) {
+    if let Ok(None) = app.dark_title_bar() {
+        return;
+    }
+    let what = if dark { "a dark title bar" } else { "a light title bar" };
+    app.wait_until(what, WAIT, || app.dark_title_bar().ok().flatten() == Some(dark))
+        .unwrap();
+}
+
 fn no_project() -> App {
     let app = App::launch_with_settings(&json!({}), &[]).unwrap();
     app.wait_for("the home screen", WAIT, |t| {
@@ -130,6 +142,7 @@ fn a_saved_dark_is_in_force_at_start() {
     })
     .unwrap();
     wait_ground(&app, DARK_GROUND);
+    wait_title_bar(&app, true);
     let tree = open_appearance(&app);
     assert_eq!(checked(&tree), [false, false, true]);
 }
@@ -150,6 +163,7 @@ fn choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart()
     open_appearance(&app);
     choose(&app, "Dark");
     wait_ground(&app, DARK_GROUND);
+    wait_title_bar(&app, true);
     app.wait_for("Dark checked", WAIT, |t| checked(t) == [false, false, true])
         .unwrap();
     app.wait_until("Dark saved", WAIT, || {
@@ -159,6 +173,7 @@ fn choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart()
 
     choose(&app, "Light");
     wait_ground(&app, LIGHT_GROUND);
+    wait_title_bar(&app, false);
     app.wait_until("Light saved", WAIT, || {
         app.settings()["appearance"] == json!({ "theme": "light" })
     })
@@ -172,6 +187,7 @@ fn choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart()
 
     let again = app.relaunch(&[]).unwrap();
     wait_ground(&again, LIGHT_GROUND);
+    wait_title_bar(&again, false);
     let tree = open_appearance(&again);
     assert_eq!(checked(&tree), [false, true, false]);
 }
