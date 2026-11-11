@@ -188,6 +188,44 @@ mod filter_bar {
         assert_eq!(at(&mut cx, "filter-bar").unwrap().size.height, px(BAR_HEIGHT));
     }
 
+    /// `chipBase` and the browser's checkbox: a chip is its 1 px border, `px-1.5`, its mark and `gap-1`, and its text
+    /// in `text-2xs` medium; Hide non-matching is a 12 px box, 6 px, and its text in `text-xs`. GPUI Kit's button
+    /// and checkbox set them in their own 14 px text, with a 16 px box 8 px from it.
+    #[gpui::test]
+    fn the_chips_and_the_checkbox_are_as_wide_as_their_text_at_electron_graces_sizes(cx: &mut TestAppContext) {
+        use gpui::FontWeight;
+        let (_h, mut cx, _bar) = setup(cx, 1200., clean(smoke_not_wip(false)));
+        let m = crate::theme::METRICS;
+        let width = |cx: &mut VisualTestContext, text: &str, size: f32, weight: FontWeight| {
+            cx.update(|window, _| testing::text_width(window, text, size, weight))
+        };
+        let near = |what: &str, got: Pixels, want: f32| {
+            assert!(
+                (f32::from(got) - want).abs() < 1.,
+                "{what}: {got:?} wide, {want} wanted"
+            );
+        };
+        let slow = width(&mut cx, "@slow", m.text_2xs.size, FontWeight::MEDIUM);
+        near(
+            "@slow",
+            at(&mut cx, "tag-chip-slow").unwrap().size.width,
+            2. * 7. + slow,
+        );
+        // included: the check mark, 14 px, then 4 px
+        let smoke = width(&mut cx, "@smoke", m.text_2xs.size, FontWeight::MEDIUM);
+        near(
+            "@smoke",
+            at(&mut cx, "tag-chip-smoke").unwrap().size.width,
+            2. * 7. + 14. + 4. + smoke,
+        );
+        let hide = width(&mut cx, HIDE_NON_MATCHING, m.text_xs.size, FontWeight::NORMAL);
+        near(
+            "hide",
+            at(&mut cx, "hide-non-matching").unwrap().size.width,
+            12. + 6. + hide,
+        );
+    }
+
     #[gpui::test]
     fn a_chip_click_asks_the_runner_for_the_next_state_and_waits_for_its_answer(cx: &mut TestAppContext) {
         let (h, mut cx, _) = setup(cx, 1200., clean(no_filter()));

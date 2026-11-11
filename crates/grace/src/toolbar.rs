@@ -18,7 +18,7 @@ use grace_core::state::AppState;
 
 use crate::app::Grace;
 use crate::assets::{Icon, LOGO_PATH};
-use crate::elements::{ButtonKind, ButtonSize, button};
+use crate::elements::{ButtonKind, ButtonSize, icon_text_button};
 use crate::theme::{METRICS, Theme};
 use crate::tooltip::{cut_middle, tooltip};
 
@@ -141,7 +141,7 @@ pub fn render(
     });
     let g = grace.clone();
     let refresh = tooltip("tip-refresh", Some(REFRESH.into())).focusable(move |f| {
-        crate::elements::icon_button("refresh-button", Icon::RefreshCw, REFRESH, false)
+        crate::elements::icon_button("refresh-button", Icon::RefreshCw, 16., REFRESH, false)
             .track_focus(f)
             .off(!a.refresh)
             .on_click(move |_, _, cx| g.update(cx, |g, cx| g.refresh(cx)))
@@ -243,10 +243,15 @@ pub fn render(
     );
     let g = grace.clone();
     let run_all = div().debug_selector(|| "run-all-button".into()).child(
-        button("run-all-button", RUN_ALL, ButtonKind::Primary, ButtonSize::Medium)
-            .icon(Icon::Play)
-            .off(!a.run_all)
-            .on_click(move |_, _, cx| g.update(cx, |g, cx| g.run_all(cx))),
+        icon_text_button(
+            "run-all-button",
+            Icon::Play,
+            RUN_ALL,
+            ButtonKind::Primary,
+            ButtonSize::Medium,
+        )
+        .off(!a.run_all)
+        .on_click(move |_, _, cx| g.update(cx, |g, cx| g.run_all(cx))),
     );
 
     div()
@@ -323,7 +328,7 @@ fn labelled(
             let side = METRICS.control_height;
             Button::new(id)
                 .outline()
-                .icon(icon)
+                .child(crate::elements::glyph(icon, 16.))
                 .h(px(side))
                 .rounded(px(METRICS.radius))
                 .accessibility_label(label)
@@ -335,7 +340,7 @@ fn labelled(
                     }
                 })
         } else {
-            button(id, label, ButtonKind::Plain, ButtonSize::Medium).icon(icon)
+            icon_text_button(id, icon, label, ButtonKind::Plain, ButtonSize::Medium)
         };
         b.track_focus(f)
             .off(!enabled)

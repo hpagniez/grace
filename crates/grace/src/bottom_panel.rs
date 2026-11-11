@@ -24,7 +24,7 @@ use crate::app::Grace;
 use crate::assets::Icon;
 use crate::console::{Console, FIND};
 use crate::elements::{icon, ring as ring_on, ring_shown};
-use crate::theme::Theme;
+use crate::theme::{METRICS, Theme};
 use crate::tooltip::tooltip;
 
 pub const TABS: &str = "Console, run history and HTTP calls";
@@ -294,12 +294,14 @@ impl BottomPanel {
             .track_focus(&self.tabs[k])
             .flex()
             .items_center()
+            // `tabBase`: `h-8 gap-1.5 border-b-2 px-3 text-sm`, and `font-medium` on the open one
             .gap_1p5()
             .h(px(32.))
-            .px_2()
+            .px_3()
             .border_b_2()
             .border_color(if active { Theme::color(t.accent) } else { Theme::clear() })
-            .text_sm()
+            .text_size(px(METRICS.text_sm.size))
+            .when(active, |d| d.font_weight(gpui::FontWeight::MEDIUM))
             .text_color(Theme::color(if active { t.ink } else { t.muted }))
             .cursor_pointer()
             .hover(|s| s.text_color(Theme::color(t.ink)))
@@ -369,12 +371,22 @@ impl BottomPanel {
             })
             .child(icon(glyph, 14., Theme::color(if active { t.ink } else { t.muted })))
             .child(label)
+            // `countPill`: `h-4 min-w-5 rounded-full bg-selected px-1.5 text-2xs font-medium text-muted tabular-nums`
             .children(count.map(|n| {
                 div()
+                    .debug_selector(move || format!("tab-count-{}", id.name()))
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .h(px(16.))
+                    .min_w(px(20.))
                     .px_1p5()
                     .rounded_full()
-                    .bg(Theme::color(t.control))
-                    .text_xs()
+                    .bg(Theme::color(t.selected))
+                    .text_size(px(METRICS.text_2xs.size))
+                    .line_height(px(16.))
+                    .font_weight(gpui::FontWeight::MEDIUM)
                     .text_color(Theme::color(t.muted))
                     .child(n.to_string())
             }))
@@ -409,7 +421,7 @@ impl Render for BottomPanel {
             .collect();
         let console = self.console.clone();
         let find = tooltip("tip-find", Some(SharedString::from("Find (Ctrl+F)"))).focusable(move |f| {
-            crate::elements::icon_button("find-button", Icon::Search, FIND, true)
+            crate::elements::icon_button("find-button", Icon::Search, 14., FIND, true)
                 .track_focus(f)
                 .on_click(move |_, window, cx| console.update(cx, |c, cx| c.open_bar(window, cx)))
         });

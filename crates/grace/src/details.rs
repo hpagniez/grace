@@ -323,10 +323,15 @@ impl Details {
                     let this = this.clone();
                     let name = log_toggle_name(&step.text, open);
                     crate::a11y::aria(
-                        crate::elements::button(("step-toggle", i), "Log", ButtonKind::Ghost, ButtonSize::Small)
-                            .icon(if open { Icon::ChevronDown } else { Icon::ChevronRight })
-                            .accessibility_label(SharedString::from(name))
-                            .debug_selector(move || format!("step-toggle-{i}")),
+                        crate::elements::icon_text_button(
+                            ("step-toggle", i),
+                            if open { Icon::ChevronDown } else { Icon::ChevronRight },
+                            "Log",
+                            ButtonKind::Ghost,
+                            ButtonSize::Small,
+                        )
+                        .accessibility_label(SharedString::from(name))
+                        .debug_selector(move || format!("step-toggle-{i}")),
                         |a| a.aria_expanded(open),
                     )
                     .on_click(move |_, _, cx| this.update(cx, |d, cx| d.toggle_log(i, cx)))

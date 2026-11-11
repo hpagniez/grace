@@ -20,7 +20,6 @@ use gpui::{
 };
 use gpui_component::RoleOverride;
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-use gpui_component::checkbox::Checkbox;
 use grace_core::model::node::TestNode;
 use grace_core::model::tags::{FilterState, chip_tags, cycle_tag, filter_on, matching_leaves};
 use grace_core::rows::leaves;
@@ -55,6 +54,19 @@ impl Target for Button {
 }
 
 pub const CLEAR: &str = "Clear";
+/// A chip's mark and text, in `chipBase`'s `text-2xs` with `gap-1`: Grace's own child, since GPUI Kit's button sets
+/// its content in its own 14 px text with 8 px between, over the size given to the button.
+fn chip_text(mark: Option<impl IntoElement>, text: impl Into<SharedString>) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_1()
+        .text_size(px(METRICS.text_2xs.size))
+        .whitespace_nowrap()
+        .children(mark)
+        .child(text.into())
+}
+
 pub const HIDE_NON_MATCHING: &str = "Hide non-matching";
 pub const SHOW_ALL_TAGS: &str = "Show all tags";
 pub const ALL_TAGS: &str = "All tags";
@@ -288,8 +300,6 @@ impl FilterBar {
             Button::new(button_id)
                 .custom(variant)
                 .target()
-                .gap_1()
-                .text_size(px(METRICS.text_2xs.size))
                 .font_weight(gpui::FontWeight::MEDIUM)
                 .text_color(Theme::color(fg))
                 .when(state.struck(), |b| b.line_through())
@@ -302,8 +312,7 @@ impl FilterBar {
                         crate::a11y::aria(b.accessibility_label(name), |a| a.aria_description(state.hint()))
                     }
                 })
-                .children(mark.map(|m| icon(m, 14., Theme::color(fg))))
-                .child(label)
+                .child(chip_text(mark.map(|m| icon(m, 14., Theme::color(fg))), label))
                 .on_click(move |_, _, cx| me.update(cx, |bar, cx| bar.set_filter(next.clone(), cx)))
         });
         // the border, the fill and the hover on a frame under the button, which GPUI Kit's custom buttons colour
@@ -428,12 +437,11 @@ impl Render for FilterBar {
                         Button::new("tag-more")
                             .custom(variant)
                             .target()
-                            .text_size(px(METRICS.text_2xs.size))
                             .font_weight(gpui::FontWeight::MEDIUM)
                             .text_color(Theme::color(t.muted))
                             .accessibility_label(name)
                             .track_focus(f)
-                            .child(text)
+                            .child(chip_text(None::<gpui::Svg>, text))
                             .on_click(move |e, window, cx| me.update(cx, |bar, cx| bar.toggle_panel(e, window, cx)))
                             // the panel's chips follow the fold chip in the Tab order (R3.4)
                             .on_action(move |_: &FocusNext, window, cx| {
@@ -487,8 +495,7 @@ impl Render for FilterBar {
             .items_center()
             .h(px(CHIP_HEIGHT))
             .child(
-                Checkbox::new("hide-non-matching")
-                    .cursor_pointer()
+                crate::elements::checkbox("hide-non-matching")
                     .label(HIDE_NON_MATCHING)
                     .checked(filter.hide_non_matching)
                     .off(locked)

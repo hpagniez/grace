@@ -116,14 +116,12 @@ impl Render for Gallery {
                 div()
                     .flex()
                     .gap_2()
-                    .child(
-                        tooltip("tip-settings", Some("Settings".into())).focusable(|f| {
-                            icon_button("icon-medium", Icon::Settings, "Settings", false).track_focus(f)
-                        }),
-                    )
+                    .child(tooltip("tip-settings", Some("Settings".into())).focusable(|f| {
+                        icon_button("icon-medium", Icon::Settings, 16., "Settings", false).track_focus(f)
+                    }))
                     .child(
                         tooltip("tip-delete", Some("Delete".into()))
-                            .focusable(|f| icon_button("icon-small", Icon::Trash2, "Delete", true).track_focus(f)),
+                            .focusable(|f| icon_button("icon-small", Icon::Trash2, 16., "Delete", true).track_focus(f)),
                     ),
             )
             // PU-20: a disabled button shows its reason on hover; a line too long for its room shows whole

@@ -10,7 +10,7 @@ use gpui_component::radio::{Radio, RadioGroup};
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, button};
+use crate::elements::{ButtonKind, ButtonSize, button, icon_text_button};
 use crate::theme::{Appearance, METRICS, SavedAppearance, Theme};
 
 pub const TITLE: &str = "Settings";
@@ -117,9 +117,14 @@ impl SettingsPage {
             .px_3()
             .child(
                 div().debug_selector(|| "settings-back".into()).child(
-                    button("settings-back", BACK, ButtonKind::Ghost, ButtonSize::Medium)
-                        .icon(Icon::ArrowLeft)
-                        .on_click(move |_, window, cx| back(window, cx)),
+                    icon_text_button(
+                        "settings-back",
+                        Icon::ArrowLeft,
+                        BACK,
+                        ButtonKind::Ghost,
+                        ButtonSize::Medium,
+                    )
+                    .on_click(move |_, window, cx| back(window, cx)),
                 ),
             )
             .child(
@@ -288,7 +293,11 @@ impl Render for SettingsPage {
                     .mb(px(m.sheet_inset))
                     .overflow_hidden()
                     .rounded(px(m.sheet_radius))
+                    // `sheet`: `border-t` and, `--sheet-side` wide, `border-x` and `border-b`
                     .border_t_1()
+                    .border_l(px(m.sheet_side))
+                    .border_r(px(m.sheet_side))
+                    .border_b(px(m.sheet_side))
                     .border_color(Theme::color(t.line))
                     .bg(Theme::color(t.surface))
                     .children(notice.map(|n| div().px_3().py_2().child(n)))

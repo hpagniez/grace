@@ -68,16 +68,14 @@ pub fn render(
         })
         .child(
             div().debug_selector(|| "settings-button".into()).child(
-                crate::elements::button(
+                crate::elements::icon_text_button(
                     "settings-button",
+                    crate::assets::Icon::Settings,
                     SETTINGS,
                     crate::elements::ButtonKind::Ghost,
-                    crate::elements::ButtonSize::Small,
+                    // R10.3: no target under 24 px, the bar's own height
+                    crate::elements::ButtonSize::Bar,
                 )
-                .icon(crate::assets::Icon::Settings)
-                // R10.3: no target under 24 px, the bar's own height
-                .h(px(HEIGHT))
-                .px(px(6.))
                 .text_color(Theme::color(t.muted))
                 .on_click(settings),
             ),

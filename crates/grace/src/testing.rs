@@ -214,3 +214,24 @@ pub fn run(id: &str, passed: u32, failed: u32) -> HistoryEntry {
         debug: false,
     }
 }
+
+/// The width of `text` in Grace's sans font at `size` px and `weight`, as GPUI shapes it: what a label of that size
+/// takes in a row.
+pub fn text_width(window: &Window, text: &str, size: f32, weight: gpui::FontWeight) -> f32 {
+    let mut font = gpui::font(crate::theme::SANS);
+    font.weight = weight;
+    let run = gpui::TextRun {
+        len: text.len(),
+        font,
+        color: gpui::Hsla::default(),
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    f32::from(
+        window
+            .text_system()
+            .shape_line(text.to_owned().into(), gpui::px(size), &[run], None)
+            .width,
+    )
+}

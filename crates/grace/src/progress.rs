@@ -270,11 +270,24 @@ impl Render for Progress {
         }
         // the segments stay laid out under the stripe, holding the last run's widths, but are not drawn (LV-04)
         let colours = [t.passed, t.failed, t.cancelled];
-        for (i, (w, c)) in widths(&state).into_iter().zip(colours).enumerate() {
+        let ws = widths(&state);
+        // GPUI clips a child to the track's box, not to its rounded ends, where the browser's `overflow-hidden` rounds
+        // the fill too: the first segment rounds its own left end, and a full bar's last segment its right end. A full
+        // bar drops its empty segments with their gaps and lets the rest shrink to the track, so that end is the
+        // track's; the browser draws them past it and clips the 2 or 4 px off
+        let full = !waiting && ws.iter().sum::<f32>() >= 99.95;
+        let first = ws.iter().position(|w| *w > 0.);
+        let last = ws.iter().rposition(|w| *w > 0.);
+        for (i, (w, c)) in ws.into_iter().zip(colours).enumerate() {
+            if full && w <= 0. {
+                continue;
+            }
             let segment = div()
                 .debug_selector(move || format!("progress-segment-{i}"))
-                .flex_none()
+                .map(|d| if full { d.flex_shrink(1.) } else { d.flex_none() })
                 .h_full()
+                .when(Some(i) == first, |d| d.rounded_l_full())
+                .when(full && Some(i) == last, |d| d.rounded_r_full())
                 .when(!waiting, |d| d.bg(Theme::color(c)));
             // a spring keeps its place and speed when a new result moves its end, so a fast run fills smoothly (LV-06)
             bar = bar.child(
