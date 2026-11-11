@@ -17,6 +17,10 @@ pub mod instance;
 pub mod probe;
 pub mod progress;
 pub mod properties;
+/// The icon `build.rs` puts in `Grace.exe`, tested here: a build script has no tests of its own.
+#[cfg(test)]
+#[path = "../build/res.rs"]
+mod res;
 pub mod seams;
 pub mod settings;
 pub mod spin;

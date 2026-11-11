@@ -218,6 +218,100 @@ fn a_first_window_keeps_its_title_bar_on_the_screen() {
     .unwrap_or_else(|e| panic!("{e}: {:?}; {}", app.title_bar_colour(), app.title_bar_report()));
 }
 
+/// #321: Grace's icon in the title bar and on the taskbar, as Electron Grace's exe carries it. `Grace.exe` holds
+/// `assets/icon.ico` as icon 1, each image as the file has it, and the window has an icon: GPUI loads icon 1 of the exe
+/// for its window class and leaves the class without one when the exe has none.
+#[cfg(windows)]
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn the_exe_and_its_window_carry_graces_icon() {
+    use windows::Win32::UI::WindowsAndMessaging::{RT_GROUP_ICON, RT_ICON};
+
+    let ico = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/icon.ico")).unwrap();
+    let field = |at: usize| u32::from_le_bytes(ico[at..at + 4].try_into().unwrap()) as usize;
+    let exe = resources::Exe::open(&grace_e2e::grace_exe());
+    let group = exe.resource(1, RT_GROUP_ICON).expect("icon 1 in Grace.exe");
+    let count = usize::from(u16::from_le_bytes([ico[4], ico[5]]));
+    assert_eq!(group[..6], ico[..6], "the icon's header");
+    assert_eq!(group.len(), 6 + 14 * count, "one entry for each image of the file");
+    for i in 0..count {
+        let (entry, item) = (6 + 16 * i, &group[6 + 14 * i..6 + 14 * (i + 1)]);
+        assert_eq!(item[..12], ico[entry..entry + 12], "image {}'s size and colours", i + 1);
+        let id = u16::from_le_bytes([item[12], item[13]]);
+        let (size, offset) = (field(entry + 8), field(entry + 12));
+        let image = exe
+            .resource(id, RT_ICON)
+            .unwrap_or_else(|| panic!("image {} in Grace.exe", i + 1));
+        assert!(
+            image == ico[offset..offset + size],
+            "image {} as the file holds it",
+            i + 1
+        );
+    }
+    drop(exe);
+
+    let app = App::launch().unwrap();
+    app.wait_until("the window's icon", Duration::from_secs(15), || {
+        matches!(app.window_icon(), Ok(Some(true)))
+    })
+    .unwrap_or_else(|e| panic!("{e}: {:?}", app.window_icon()));
+}
+
+/// An exe's resources, read as Explorer and the window manager read them.
+#[cfg(windows)]
+mod resources {
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::Path;
+
+    use windows::Win32::Foundation::{FreeLibrary, HMODULE};
+    use windows::Win32::System::LibraryLoader::{
+        FindResourceW, LOAD_LIBRARY_AS_DATAFILE, LOAD_LIBRARY_AS_IMAGE_RESOURCE, LoadLibraryExW, LoadResource,
+        LockResource, SizeofResource,
+    };
+    use windows::core::PCWSTR;
+
+    /// An exe loaded for its resources only: none of its code runs.
+    pub struct Exe(HMODULE);
+
+    impl Exe {
+        pub fn open(path: &Path) -> Self {
+            let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
+            // SAFETY: a nul-terminated path that lives across the call
+            let module = unsafe {
+                LoadLibraryExW(
+                    PCWSTR(wide.as_ptr()),
+                    None,
+                    LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE,
+                )
+            }
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            Self(module)
+        }
+
+        /// The bytes of the resource of type `kind` numbered `id`, where the exe has one.
+        pub fn resource(&self, id: u16, kind: PCWSTR) -> Option<Vec<u8>> {
+            let name = PCWSTR(std::ptr::without_provenance(usize::from(id)));
+            // SAFETY: the module stays loaded while `self` lives, and the bytes are copied out of it before the return
+            unsafe {
+                let found = FindResourceW(Some(self.0), name, kind);
+                if found.is_invalid() {
+                    return None;
+                }
+                let size = SizeofResource(Some(self.0), found) as usize;
+                let data = LockResource(LoadResource(Some(self.0), found).ok()?) as *const u8;
+                (!data.is_null()).then(|| std::slice::from_raw_parts(data, size).to_vec())
+            }
+        }
+    }
+
+    impl Drop for Exe {
+        fn drop(&mut self) {
+            // SAFETY: the module this value loaded, freed once
+            let _ = unsafe { FreeLibrary(self.0) };
+        }
+    }
+}
+
 /// E-window-07, WB-09
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]

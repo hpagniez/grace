@@ -14,7 +14,9 @@ use windows::Win32::Graphics::Dwm::{
 use windows::Win32::Graphics::Gdi::{
     CLR_INVALID, GetDC, GetMonitorInfoW, GetPixel, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, ReleaseDC,
 };
-use windows::Win32::UI::WindowsAndMessaging::{GA_ROOT, GetAncestor, GetForegroundWindow, WindowFromPoint};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GA_ROOT, GCLP_HICON, GetAncestor, GetClassLongPtrW, GetForegroundWindow, WindowFromPoint,
+};
 use windows::core::BOOL;
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
@@ -363,6 +365,12 @@ impl Driver for UiaDriver {
             ));
         }
         screen_colour(at).map(Some)
+    }
+
+    fn window_icon(&self) -> Result<Option<bool>> {
+        let hwnd = self.hwnd()?;
+        // SAFETY: a plain call on the window's handle
+        Ok(Some(unsafe { GetClassLongPtrW(hwnd, GCLP_HICON) } != 0))
     }
 
     fn title_bar_report(&self) -> String {
