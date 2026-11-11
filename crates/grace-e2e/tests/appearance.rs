@@ -110,9 +110,10 @@ fn wait_title_bar(app: &App, dark: bool) {
     app.wait_until(what, WAIT, || title_bar(app) == Some((dark, dark)))
         .unwrap_or_else(|e| {
             panic!(
-                "{e}: asked dark {:?}, drawn #{:06x}",
+                "{e}: asked dark {:?}, drawn {:?}; {}",
                 app.dark_title_bar(),
-                app.title_bar_colour().ok().flatten().unwrap_or(0)
+                app.title_bar_colour(),
+                app.title_bar_report()
             )
         });
 }
@@ -282,8 +283,8 @@ fn choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart()
 }
 
 /// PU-14 with Windows' own theme switched while Grace is open: GPUI sets the title bar from Windows' new theme, and
-/// Grace's own must win, as Electron Grace's does. Only on CI's Windows runner, where the test may switch the machine's
-/// theme.
+/// Grace's own must win, as Electron Grace's does; then Follow Windows takes the new theme, which shows the switch
+/// reached GPUI. Only on CI's Windows runner, where the test may switch the machine's theme.
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn a_switch_of_windows_theme_leaves_graces_on_the_title_bar() {
@@ -324,16 +325,25 @@ fn windows_switches_under_grace() {
     let seen = seen.into_inner();
     let report = seen
         .iter()
-        .map(|(ms, a, c)| format!("{ms} ms: asked dark {a:?}, drawn #{:06x}", c.unwrap_or(0)))
+        .map(|(ms, a, c)| {
+            let drawn = c.map_or("unread".into(), |c| format!("#{c:06x}"));
+            format!("{ms} ms: asked dark {a:?}, drawn {drawn}")
+        })
         .collect::<Vec<_>>()
         .join("; ");
     let (_, asked, drawn) = *seen.last().unwrap();
-    assert_eq!(
-        (asked, drawn.map(is_dark)),
-        (Some(grace_dark), Some(grace_dark)),
-        "Windows switched to {}: {report}",
-        if to_dark { "dark" } else { "light" }
-    );
+    if (asked, drawn.map(is_dark)) != (Some(grace_dark), Some(grace_dark)) {
+        panic!(
+            "Windows switched to {}: {report}; then {:?}, {}",
+            if to_dark { "dark" } else { "light" },
+            app.title_bar_colour(),
+            app.title_bar_report()
+        );
+    }
+    // the switch reached GPUI: Follow Windows takes Windows' new theme
+    open_appearance(&app);
+    choose(&app, "Follow Windows");
+    wait_title_bar(&app, to_dark);
 }
 
 #[test]

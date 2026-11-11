@@ -7,6 +7,18 @@ use uiautomation::patterns::{
 };
 use uiautomation::types::{ControlType, ExpandCollapseState, Point, ToggleState, UIProperty};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
+use windows::Win32::Graphics::Dwm::{
+    DWMWA_EXTENDED_FRAME_BOUNDS, DWMWA_USE_IMMERSIVE_DARK_MODE, DwmGetWindowAttribute,
+};
+use windows::Win32::Graphics::Gdi::{
+    CLR_INVALID, GetDC, GetMonitorInfoW, GetPixel, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, ReleaseDC,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GA_ROOT, GetAncestor, GetForegroundWindow, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
+    SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos, WM_NCACTIVATE, WindowFromPoint,
+};
+use windows::core::BOOL;
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
 
@@ -324,10 +336,7 @@ impl Driver for UiaDriver {
     }
 
     fn dark_title_bar(&self) -> Result<Option<bool>> {
-        use windows::Win32::Foundation::HWND;
-        use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmGetWindowAttribute};
-        use windows::core::BOOL;
-        let hwnd: HWND = self.window()?.get_native_window_handle().map_err(err)?.into();
+        let hwnd = self.hwnd()?;
         let mut dark = BOOL(0);
         // SAFETY: the call writes one BOOL to the pointer it is given, which lives across the call.
         unsafe {
@@ -343,27 +352,145 @@ impl Driver for UiaDriver {
     }
 
     fn title_bar_colour(&self) -> Result<Option<u32>> {
-        use windows::Win32::Foundation::{HWND, RECT};
-        use windows::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC};
-        use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
-        let hwnd: HWND = self.window()?.get_native_window_handle().map_err(err)?.into();
-        let mut rect = RECT::default();
-        // SAFETY: the call writes one RECT to the pointer it is given, which lives across the call.
-        unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(err)?;
-        // the middle of the title bar, clear of the icon, the title and the buttons
-        let (x, y) = ((rect.left + rect.right) / 2, rect.top + 12);
-        // SAFETY: the screen's device context, released at once
-        let colour = unsafe {
-            let dc = GetDC(None);
-            let colour = GetPixel(dc, x, y);
-            ReleaseDC(None, dc);
-            colour.0
-        };
-        // COLORREF is 0x00bbggrr
-        Ok(Some(
-            ((colour & 0xff) << 16) | (colour & 0xff00) | ((colour >> 16) & 0xff),
-        ))
+        let hwnd = self.hwnd()?;
+        let (frame, at) = title_bar_point(hwnd)?;
+        // a point off the screen, or under another window, would read something else than the title bar
+        // SAFETY: plain calls on a point and the handle they return
+        let over = unsafe { GetAncestor(WindowFromPoint(at), GA_ROOT) };
+        if over != hwnd {
+            return Err(format!(
+                "the title bar at ({}, {}) is off the screen or under another window; {}",
+                at.x,
+                at.y,
+                frame_text(frame)
+            ));
+        }
+        screen_colour(at).map(Some)
     }
+
+    fn title_bar_report(&self) -> String {
+        let Ok(hwnd) = self.hwnd() else {
+            return "no window".into();
+        };
+        let Ok((frame, at)) = title_bar_point(hwnd) else {
+            return "no frame".into();
+        };
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: the call writes one MONITORINFO, its size set, to the pointer it is given
+        let _ = unsafe { GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mut info) };
+        let m = info.rcMonitor;
+        let colour = |p: POINT| match screen_colour(p) {
+            Ok(c) => format!("#{c:06x}"),
+            Err(e) => e,
+        };
+        // SAFETY: plain calls
+        let (foreground, over) = unsafe {
+            (
+                GetForegroundWindow() == hwnd,
+                GetAncestor(WindowFromPoint(at), GA_ROOT) == hwnd,
+            )
+        };
+        let client = POINT {
+            x: at.x,
+            y: frame.top + 80,
+        };
+        let mut report = format!(
+            "{}; screen {},{} to {},{}; foreground {foreground}; on top at the title bar {over}; title bar ({}, {}) {}; \
+             client ({}, {}) {}",
+            frame_text(frame),
+            m.left,
+            m.top,
+            m.right,
+            m.bottom,
+            at.x,
+            at.y,
+            colour(at),
+            client.x,
+            client.y,
+            colour(client),
+        );
+        // what the title bar shows once its frame is redrawn from outside, then once Windows draws it inactive and
+        // active again: which of them makes DWM draw a changed dark mode attribute
+        let settle = || std::thread::sleep(std::time::Duration::from_millis(500));
+        // SAFETY: the window's own handle; a closed window is refused with an error that is dropped
+        let _ = unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOZORDER,
+            )
+        };
+        settle();
+        report += &format!("; after a frame redraw {}", colour(at));
+        // SAFETY: as above; the messages ask the window to draw its frame inactive, then active
+        unsafe {
+            SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(0)), Some(LPARAM(0)));
+            SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(1)), Some(LPARAM(0)));
+        }
+        settle();
+        report += &format!("; after an inactive and active frame {}", colour(at));
+        report
+    }
+}
+
+impl UiaDriver {
+    fn hwnd(&self) -> Result<HWND> {
+        Ok(self.window()?.get_native_window_handle().map_err(err)?.into())
+    }
+}
+
+/// The window's visible frame (`DWMWA_EXTENDED_FRAME_BOUNDS`, without the invisible resize border), and where its
+/// title bar is read: the middle of its width, 8 px below its top edge, clear of the icon, the title and the buttons.
+fn title_bar_point(hwnd: HWND) -> Result<(RECT, POINT)> {
+    let mut frame = RECT::default();
+    // SAFETY: the call writes one RECT to the pointer it is given, which lives across the call
+    unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            &mut frame as *mut RECT as *mut core::ffi::c_void,
+            std::mem::size_of::<RECT>() as u32,
+        )
+    }
+    .map_err(err)?;
+    Ok((
+        frame,
+        POINT {
+            x: (frame.left + frame.right) / 2,
+            y: frame.top + 8,
+        },
+    ))
+}
+
+fn frame_text(frame: RECT) -> String {
+    format!(
+        "window frame {},{} to {},{}",
+        frame.left, frame.top, frame.right, frame.bottom
+    )
+}
+
+/// The colour the screen shows at a point, as `0xrrggbb`; an error where Windows cannot read it (`CLR_INVALID`,
+/// which would otherwise read as white).
+fn screen_colour(at: POINT) -> Result<u32> {
+    // SAFETY: the screen's device context, released at once
+    let colour = unsafe {
+        let dc = GetDC(None);
+        let colour = GetPixel(dc, at.x, at.y);
+        ReleaseDC(None, dc);
+        colour.0
+    };
+    if colour == CLR_INVALID {
+        return Err(format!("the screen cannot be read at ({}, {})", at.x, at.y));
+    }
+    // COLORREF is 0x00bbggrr
+    Ok(((colour & 0xff) << 16) | (colour & 0xff00) | ((colour >> 16) & 0xff))
 }
 
 /// UI Automation's control types to the driver's roles.
