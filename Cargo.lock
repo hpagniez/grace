@@ -2836,6 +2836,7 @@ dependencies = [
  "futures-lite",
  "serde_json",
  "uiautomation",
+ "windows 0.62.2",
  "x11rb",
 ]
 

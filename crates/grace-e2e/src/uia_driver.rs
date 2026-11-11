@@ -322,6 +322,25 @@ impl Driver for UiaDriver {
             .set_window_visual_state(state)
             .map_err(err)
     }
+
+    fn dark_title_bar(&self) -> Result<Option<bool>> {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmGetWindowAttribute};
+        use windows::core::BOOL;
+        let hwnd: HWND = self.window()?.get_native_window_handle().map_err(err)?.into();
+        let mut dark = BOOL(0);
+        // SAFETY: the call writes one BOOL to the pointer it is given, which lives across the call.
+        unsafe {
+            DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                &mut dark as *mut BOOL as *mut core::ffi::c_void,
+                std::mem::size_of::<BOOL>() as u32,
+            )
+        }
+        .map_err(err)?;
+        Ok(Some(dark.as_bool()))
+    }
 }
 
 /// UI Automation's control types to the driver's roles.
