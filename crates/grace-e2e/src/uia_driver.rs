@@ -341,6 +341,29 @@ impl Driver for UiaDriver {
         .map_err(err)?;
         Ok(Some(dark.as_bool()))
     }
+
+    fn title_bar_colour(&self) -> Result<Option<u32>> {
+        use windows::Win32::Foundation::{HWND, RECT};
+        use windows::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC};
+        use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+        let hwnd: HWND = self.window()?.get_native_window_handle().map_err(err)?.into();
+        let mut rect = RECT::default();
+        // SAFETY: the call writes one RECT to the pointer it is given, which lives across the call.
+        unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(err)?;
+        // the middle of the title bar, clear of the icon, the title and the buttons
+        let (x, y) = ((rect.left + rect.right) / 2, rect.top + 12);
+        // SAFETY: the screen's device context, released at once
+        let colour = unsafe {
+            let dc = GetDC(None);
+            let colour = GetPixel(dc, x, y);
+            ReleaseDC(None, dc);
+            colour.0
+        };
+        // COLORREF is 0x00bbggrr
+        Ok(Some(
+            ((colour & 0xff) << 16) | (colour & 0xff00) | ((colour >> 16) & 0xff),
+        ))
+    }
 }
 
 /// UI Automation's control types to the driver's roles.

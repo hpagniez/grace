@@ -229,6 +229,11 @@ pub trait Driver {
     fn dark_title_bar(&self) -> Result<Option<bool>> {
         Ok(None)
     }
+    /// The colour the screen shows in the middle of the window's title bar, as `0xrrggbb`, where Grace's window has
+    /// one of the system's: on Windows. It tells what DWM drew, where `dark_title_bar` tells what it was asked.
+    fn title_bar_colour(&self) -> Result<Option<u32>> {
+        Ok(None)
+    }
 }
 
 /// How the window shows, for `Driver::show_window`.
@@ -455,6 +460,11 @@ impl App {
     /// See `Driver::dark_title_bar`.
     pub fn dark_title_bar(&self) -> Result<Option<bool>> {
         self.driver.dark_title_bar()
+    }
+
+    /// See `Driver::title_bar_colour`.
+    pub fn title_bar_colour(&self) -> Result<Option<u32>> {
+        self.driver.title_bar_colour()
     }
 
     /// The main screen's work area, as the `e2e` build records it at start (`grace::e2e::record_screen`).
