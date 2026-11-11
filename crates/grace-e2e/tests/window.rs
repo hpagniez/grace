@@ -204,6 +204,20 @@ fn a_short_saved_window_is_held_at_the_minimum_height() {
     assert_eq!(s.bounds.height, 480.);
 }
 
+/// #346: a first start on a screen too small for 1200×800 (CI's 1024×768) keeps the whole window on it, the title bar
+/// too, as Electron's `BrowserWindow` does; GPUI took the shrunk size as the client area and put half the frame above
+/// the screen's top edge. The title bar reads only where the screen shows it.
+#[cfg(windows)]
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_first_window_keeps_its_title_bar_on_the_screen() {
+    let app = launch(fresh_data_dir().unwrap());
+    app.wait_until("the title bar on the screen", Duration::from_secs(15), || {
+        matches!(app.title_bar_colour(), Ok(Some(_)))
+    })
+    .unwrap_or_else(|e| panic!("{e}: {:?}; {}", app.title_bar_colour(), app.title_bar_report()));
+}
+
 /// E-window-07, WB-09
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
