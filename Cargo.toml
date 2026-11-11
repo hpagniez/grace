@@ -12,18 +12,20 @@ edition = "2024"
 license = "MIT"
 publish = false
 
-# One set, upgraded together between phases, the idle patch rebased each time (ADR 0031, guide R9.4).
+# One set, moved together to the newest releases, the patches rebased each time (ADR 0031, ADR 0032): scripts/bump-cargo.mjs
+# rewrites these pins.
 [workspace.dependencies]
-gpui = { package = "gpui-pre", version = "=0.3.11" }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
-gpui-component = "=0.9.0"
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12" }
+gpui-component = "=0.9.1"
 # GPUI Kit's unstyled layer: the tooltip role and the positioner (grace::tooltip). Already in the lock through GPUI Kit.
-gpui-base = "=0.9.0"
-gpui-kit-assets = "=0.9.0"
+gpui-base = "=0.9.1"
+gpui-kit-assets = "=0.9.1"
 grace-core = { path = "crates/grace-core" }
 
-# The Windows idle patch: the vsync thread sleeps while every window is minimised or hidden (ADR 0030, ADR 0031).
-# Dropped when an upstream release has the fix (zed#66221). patches/README.md says how to rebase it.
+# The Windows patches of patches/series: the idle patch (the vsync thread sleeps while every window is minimised or
+# hidden, ADR 0030, zed#66221) and the accessibility focus patch (#301). Each is dropped when an upstream release has
+# the fix. patches/README.md says how they are rebased.
 [patch.crates-io]
 gpui-pre-windows = { path = "patches/gpui-pre-windows" }
 

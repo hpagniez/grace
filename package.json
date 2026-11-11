@@ -24,6 +24,7 @@
     "screens:readme": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts readme.shots",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",
+    "cargo:bump": "node scripts/bump-cargo.mjs",
     "fixtures": "node scripts/capture-fixtures.mjs",
     "icon": "node scripts/make-icon.mjs"
   },

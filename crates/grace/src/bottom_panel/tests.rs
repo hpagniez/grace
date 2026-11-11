@@ -4,10 +4,7 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use gpui::{
-    AppContext as _, Entity, IntoElement as _, Modifiers, ParentElement as _, Point, Styled as _, TestAppContext,
-    VisualTestContext, div, px,
-};
+use gpui::{Entity, Modifiers, Point, TestAppContext, VisualTestContext, div, px};
 use grace_core::model::node::Layout;
 use grace_core::panel_height::{MAIN_MIN, PANEL_DEFAULT, PANEL_STEP};
 use grace_core::panel_tabs::TAB_IDS;

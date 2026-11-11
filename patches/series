@@ -1,0 +1,4 @@
+# The patches to gpui-pre-windows, in the order they apply (patches/README.md). check.sh and
+# scripts/bump-cargo.mjs read this list.
+gpui-pre-windows-idle.patch
+gpui-pre-windows-a11y-focus.patch
