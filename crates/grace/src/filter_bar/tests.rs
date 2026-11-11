@@ -2,7 +2,7 @@
 //! non-matching, the locks of a run, and the fold of the chips past the line with its panel. The tree's dimming and
 //! hiding are `grace::tree`'s and `grace_core::rows`' tests; what assistive technology reads is
 //! `grace-e2e/tests/tags.rs`'.
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -403,4 +403,32 @@ mod folding {
         let n = folded(&bar, &mut cx).len();
         assert_eq!(fold_name(n, 1), format!("{n} more tags, 1 on"));
     }
+}
+
+/// #320: the bar is drawn again when a run starts or ends, or the filter or the tree changes, never for a run's
+/// results, which change none of its chips.
+#[gpui::test]
+fn is_drawn_again_for_a_lock_or_a_new_filter_not_for_a_runs_results(cx: &mut TestAppContext) {
+    let (h, mut cx, bar) = setup(cx, 1200., clean(no_filter()));
+    let told = Rc::new(Cell::new(0));
+    let t = Rc::clone(&told);
+    let _watch = cx.update(|_, cx| cx.observe(&bar, move |_, _| t.set(t.get() + 1)));
+    h.update(&mut cx, |s| s.run.active = true);
+    assert_eq!(told.get(), 1, "a run's start locks the chips");
+    h.update(&mut cx, |s| {
+        s.run.done += 1;
+        s.run.passed += 1;
+    });
+    assert_eq!(told.get(), 1, "a result changes nothing the bar shows");
+    h.update(&mut cx, |s| {
+        s.run.active = false;
+        s.filter = smoke_not_wip(false);
+    });
+    assert_eq!(told.get(), 2);
+    assert!(at(&mut cx, "tag-clear").is_some(), "the new filter is drawn");
+    h.update(&mut cx, |s| {
+        s.tree = Some(testing::tree(1));
+        s.trees += 1;
+    });
+    assert_eq!(told.get(), 3, "a new tree");
 }

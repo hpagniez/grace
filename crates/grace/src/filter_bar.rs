@@ -183,22 +183,85 @@ pub struct FilterBar {
     chips: Rc<RefCell<HashMap<String, FocusHandle>>>,
     more: Rc<RefCell<Option<FocusHandle>>>,
     panel: Rc<RefCell<Vec<FocusHandle>>>,
+    /// The tags of the chips, for `seen`.
+    tags: Vec<String>,
+    /// What the bar was last drawn from.
+    seen: Option<Seen>,
     _observe: Subscription,
+}
+
+/// What the bar is drawn from, beside its own state: it is drawn again only when one of them changes, so a run's
+/// results, which change none, do not build its chips again (#320).
+#[derive(Clone, Debug, PartialEq)]
+struct Seen {
+    /// The tree, by the count of trees the runner sent (`AppState::trees`).
+    trees: u64,
+    project: bool,
+    filter: FilterState,
+    locked: bool,
+}
+
+impl Seen {
+    fn of(state: &AppState) -> Self {
+        Self {
+            trees: state.trees,
+            project: state.project.is_some(),
+            filter: state.filter.clone(),
+            locked: state.run.active || state.busy,
+        }
+    }
 }
 
 impl FilterBar {
     pub fn new(grace: Entity<Grace>, cx: &mut Context<Self>) -> Self {
-        let observe = cx.observe(&grace, |_, _, cx| cx.notify());
-        Self {
-            grace,
+        let observe = cx.observe(&grace, |bar: &mut Self, grace, cx| {
+            let state = grace.read(cx).state.clone();
+            if bar.follow(&state) {
+                cx.notify();
+            }
+        });
+        let mut bar = Self {
+            grace: grace.clone(),
             folded: Vec::new(),
             open: false,
             closed_at: None,
             chips: Rc::default(),
             more: Rc::default(),
             panel: Rc::default(),
+            tags: Vec::new(),
+            seen: None,
             _observe: observe,
+        };
+        let state = grace.read(cx).state.clone();
+        bar.follow(&state);
+        bar
+    }
+
+    /// Takes what the bar is drawn from, the tags again when the tree or the filter changed: true when one changed.
+    fn follow(&mut self, state: &AppState) -> bool {
+        let seen = Seen::of(state);
+        if self.seen.as_ref() == Some(&seen) {
+            return false;
         }
+        let same_tags = self
+            .seen
+            .as_ref()
+            .is_some_and(|was| (was.trees, was.project, &was.filter) == (seen.trees, seen.project, &seen.filter));
+        if !same_tags {
+            let tree = state.tree.as_ref().filter(|_| state.project.is_some());
+            self.tags = if tree.is_some() {
+                chip_tags(tree, &state.filter)
+            } else {
+                Vec::new()
+            };
+        }
+        self.seen = Some(seen);
+        true
+    }
+
+    /// Whether the bar shows: the project has tags, or the filter names some. Without, it is no height.
+    pub fn shows(&self) -> bool {
+        !self.tags.is_empty()
     }
 
     pub fn folded(&self) -> &[String] {
@@ -339,12 +402,10 @@ impl FilterBar {
 impl Render for FilterBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state: Rc<AppState> = self.grace.read(cx).state.clone();
+        // a view that draws the bar without telling it of the state, as a test's does, still draws the state's tags
+        self.follow(&state);
         let tree = state.tree.as_ref().filter(|_| state.project.is_some());
-        let tags = if tree.is_some() {
-            chip_tags(tree, &state.filter)
-        } else {
-            Vec::new()
-        };
+        let tags = self.tags.clone();
         if tags.is_empty() {
             self.chips.borrow_mut().clear();
             *self.more.borrow_mut() = None;
