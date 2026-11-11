@@ -204,7 +204,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WB-13 | A maximized window on a screen that is gone opens maximized on the main screen | `grace::window::tests::a_window_on_a_screen_that_is_gone_opens_on_the_main_screen` (the maximized case) | ☑ |
 | WB-14 | Placement on two screens (unit) | `grace-core::window::tests` (13 tests: two screens, edges, flush, shrink) | ☑ |
 | WB-15 | Two screens (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): bounds and maximized on screen 2 | ☑ |
-| WB-16 | The second screen is gone (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): passes with saved bounds where no screen is; unplugging a real screen is for a person | ☐ |
+| WB-16 | The second screen is gone (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): passes with saved bounds where no screen is. By hand on the owner's PC on 2026-11-11, the release build of `develop` at 029a401: with the screen Grace was on unplugged, Grace came back on another screen | ☑ |
 | WB-17 | Partly off the screen (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md) | ☑ |
 | WB-18 | A snapped window (by hand) | `grace::window::tests::a_snapped_window_saves_where_it_is_and_a_maximized_or_minimized_one_its_normal_bounds` (#318); [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): a Win+Left snap on the main screen and a Win+Right snap on the second reopen exactly where they were over 3 restarts, and a normal window does not drift | ☑ |
 
