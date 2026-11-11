@@ -174,7 +174,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | UP-10 | Open… with no last project | `grace-e2e/tests/open.rs::open_with_no_last_project` | ☑ |
 | UP-11 | The last project folder was deleted | `grace-e2e/tests/open.rs::the_last_project_folder_was_deleted` | ☑ |
 | UP-12 | The Windows folder dialog shows the siblings (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): opens in the parent folder with the siblings listed, modal | ☑ |
-| UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
+| UP-13 | Cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`, `grace::tree::tests::a_rows_run_button_shows_the_hand`; by hand in the P2 exit check and [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): the hand on buttons, labels and a row's Run button, not-allowed on a control turned off, the text cursor in the boxes | ☑ |
 | UP-14 | The busy cursor while running | | ☐ |
 | UP-15 | Scroll areas get thin themed scrollbars | `grace::theme::tests::scrollbars_are_thin_themed_and_always_shown` (the tree, details, console and lists; History and HTTP with phase P3) | ☑ |
 | UP-16 | Scrollbars look right and are easy to use (by hand) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): the tree in dark, thin thumb, hover and drag | ☑ |
@@ -206,7 +206,7 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | WB-15 | Two screens (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): bounds and maximized on screen 2 | ☑ |
 | WB-16 | The second screen is gone (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): passes with saved bounds where no screen is; unplugging a real screen is for a person | ☐ |
 | WB-17 | Partly off the screen (by hand) | #317; [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md) | ☑ |
-| WB-18 | A snapped window (by hand) | Fails in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): a Win+Left snap is not kept (#318) | ☐ |
+| WB-18 | A snapped window (by hand) | `grace::window::tests::a_snapped_window_saves_where_it_is_and_a_maximized_or_minimized_one_its_normal_bounds` (#318); [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): a Win+Left snap on the main screen and a Win+Right snap on the second reopen exactly where they were over 3 restarts, and a normal window does not drift | ☑ |
 
 ### BD · Bundled dependency updates
 
@@ -359,7 +359,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-03 | The structure and the primary button do not change with the theme | `grace::theme::tests::matches_the_sizes_of_index_css` (the sheet's 8 px inset, 16 px corners and 1 px side, one set of sizes for both themes, PU-02), `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar`; Run all is the toolbar's one primary button (`grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`), filled with the passed green and its text readable in each theme (`grace::theme::tests::fills_the_primary_button_with_the_passed_green`, `…keeps_the_filled_buttons_text_readable`, the tokens equal to `src/index.css`'s) | ☑ |
 | PU-04 | No raw palette class or dark: variant is left (unit) | `crates/grace::theme::tests::colours_come_only_from_the_theme` (no colour literal outside `theme.rs`; GPUI has no `dark:` variant) | ☑ |
 | PU-05 | Main and the startup screen use the CSS ground colours (unit) | `grace::theme::tests::matches_the_light_tokens_of_index_css`, `…matches_the_dark_tokens_of_index_css` (the ground in each theme); GPUI Grace has no main process and no startup screen of its own: its first frame is the window on the ground (`grace::window::tests::opens_an_empty_grace_window_in_the_theme`, E-startup-02) | ☑ |
-| PU-06 | The window follows the Windows theme | Light: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` (the ground's pixels; Xvfb has no dark preference), `grace::theme::tests::picks_the_theme_from_the_system_unless_pinned`. Dark, with Windows itself in dark mode: for a person, with UP-18's theme switch | ☐ |
+| PU-06 | The window follows the Windows theme | Light: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` (the ground's pixels; Xvfb has no dark preference), `grace::theme::tests::picks_the_theme_from_the_system_unless_pinned`. Dark: [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md), with Windows in dark mode and no Appearance saved: the ground is `#151821` and the title bar dark. Windows switched while Grace is open is UP-18's, for a person | ☑ |
 | PU-07 | Grace draws its own typefaces offline | `grace::assets::tests::embeds_ibm_plex`, `…the_theme_asks_for_the_families_it_embeds` (the window in IBM Plex Sans, the console and the details' code in IBM Plex Mono), `grace::assets::tests::serves_every_icon` (the icons are in the exe); neither `grace` nor `grace-core` has an HTTP client until the updater (P5), so nothing leaves the app for a font or an icon | ☑ |
 | PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name`; through the tree, `crates/grace-e2e/tests/elements.rs::names_each_status_mark` | ☑ |
 | PU-09 | A cancelled run marks its interrupted tests | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" named interrupted, the progress line's "Cancelled"), `grace::elements::tests::marks_each_status_as_electron_grace_does` (Interrupted: circle-slash), `grace::progress::tests::after_a_run_r14_2::names_the_outcome_with_its_icon` | ☑ |
@@ -367,7 +367,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | Waits for the HTTP tab, phase P3 | ☐ |
 | PU-12 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (the whole window during a run: nothing asks for a frame); each one: `grace::elements::tests::turns_only_while_running_and_never_with_reduced_motion`, `grace::progress::tests::the_bar_r14_1::reduced_motion_keeps_the_stripe_still`, `grace::console::tests::banner::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; GPUI's `with_animation` and springs draw at rest with it set | ☑ |
 | PU-13 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `…home_goes_home_and_is_off_while_busy`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
-| PU-14 | The startup screen shows the logo in the active theme (by hand) | GPUI Grace has no startup screen (E-startup-02): its first frame is the window in the theme (UP-17, UP-18). The title bar's half waits for a person, with Windows in light mode and Appearance on Dark: GPUI sets the title bar from Windows' theme, not the app's | ☐ |
+| PU-14 | The startup screen shows the logo in the active theme (by hand) | GPUI Grace has no startup screen (E-startup-02): its first frame is the window in the theme (UP-17, UP-18). But its title bar follows Windows' theme, not Grace's Appearance: in [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md), Grace on Light in a dark Windows has a light ground under a dark title bar, where Electron Grace's title bar follows Appearance (#337) | ☐ |
 | PU-15 | Choosing Dark overrides a light Windows | `grace-e2e/tests/appearance.rs::choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart`, `…a_saved_dark_is_in_force_at_start` (under Xvfb's light preference the ground turns #151821 at once, and a saved Dark is in force at the next start) | ☑ |
 | PU-16 | Follow Windows is the default | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` | ☑ |
 | PU-17 | A malformed appearance setting reads as Follow Windows (unit) | `grace_core::settings` tests `appearance` | ☑ |
@@ -422,7 +422,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
 | VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
 | VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
-| VL-29 | 2,000 tests are not slower (perf) | Misses in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): app CPU 6,875 ms against Electron's 4,625 ms during Run all (#320) | ☐ |
+| VL-29 | 2,000 tests are not slower (perf) | Misses in [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md) on one measure: with no UI Automation client, app CPU 5,438 ms against Electron's 4,156 ms during Run all (+31%, from +58% before #327); run time, Java's CPU and memory are as good or better (#320) | ☐ |
 
 ### LF · Light and fast: numbers on every PR, a benchmark before every release
 
@@ -967,7 +967,7 @@ Phase P2 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-cursor-01 | cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`; the cursor over each control by hand in PR 6's check (the test platform keeps the cursor to itself) | ☐ |
+| E-cursor-01 | cursors match what a control does | `grace::elements::tests::a_button_shows_the_hand_and_a_disabled_one_the_not_allowed_sign`, `grace::tree::tests::a_rows_run_button_shows_the_hand`; by hand in the P2 exit check and [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md): the hand on buttons, labels and a row's Run button, not-allowed on a control turned off, the text cursor in the boxes | ☑ |
 | E-cursor-02 | the busy cursor while running | | ☐ |
 | E-cursor-03 | the drag cursor wins over the busy cursor | | ☐ |
 
@@ -1107,7 +1107,7 @@ Phase P0 · 17 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-look-01 | The window follows Windows in ${scheme} mode | As PU-06: light by `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`; dark with Windows itself in dark mode, for a person | ☐ |
+| E-look-01 | The window follows Windows in ${scheme} mode | As PU-06: light by `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`; dark: [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md), with Windows in dark mode and no Appearance saved: the ground is `#151821` and the title bar dark. Windows switched while Grace is open is UP-18's, for a person | ☑ |
 | E-look-02 | Grace draws its own typefaces without any network request | As PU-07: `grace::assets::tests::the_theme_asks_for_the_families_it_embeds`, `…embeds_ibm_plex`, `…serves_every_icon` | ☑ |
 | E-look-03 | Each status has its own mark and name | `grace-e2e/tests/elements.rs::names_each_status_mark`, `grace::elements::tests::marks_each_status_as_electron_grace_does` (PU-08) | ☑ |
 | E-look-04 | A cancelled run marks its interrupted test | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` (PU-09) | ☑ |
