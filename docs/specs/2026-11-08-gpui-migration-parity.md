@@ -960,7 +960,7 @@ Phase P2 · 2 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-console-01 | open, run and run again | `grace-e2e/tests/console.rs::open_run_and_run_again` | ☑ |
-| E-console-02 | the console is on the sunken colour in both themes | | ☐ |
+| E-console-02 | the console is on the sunken colour in both themes | `grace-e2e/tests/console.rs::the_console_is_on_the_sunken_colour_in_both_themes` (`#f8f6f1` light, `#0b0d11` dark, read off the window's pixels on Linux) | ☑ |
 
 ### e2e/cursor.spec.ts
 
