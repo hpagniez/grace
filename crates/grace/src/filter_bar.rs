@@ -42,6 +42,18 @@ const RING: f32 = 4.;
 /// The bar: the line, its 6 px above and below, and the 1 px line under it.
 pub const BAR_HEIGHT: f32 = CHIP_HEIGHT + 12. + 1.;
 
+/// A chip's button over the whole of its frame, the frame's border included, so that it takes the click on all of
+/// the chip's 24 px (PU-24), its text 7 px in from the chip's edge: the 1 px border and `px-1.5`.
+trait Target {
+    fn target(self) -> Self;
+}
+
+impl Target for Button {
+    fn target(self) -> Self {
+        self.h(px(CHIP_HEIGHT)).m(px(-1.)).px(px(7.)).rounded(px(4.))
+    }
+}
+
 pub const CLEAR: &str = "Clear";
 pub const HIDE_NON_MATCHING: &str = "Hide non-matching";
 pub const SHOW_ALL_TAGS: &str = "Show all tags";
@@ -267,18 +279,16 @@ impl FilterBar {
         let variant = ButtonCustomVariant::new(cx)
             .color(Theme::clear())
             .foreground(Theme::color(fg))
-            .hover(hover.map_or(Theme::clear(), Theme::color))
-            .active(hover.map_or(Theme::clear(), Theme::color));
+            .hover(Theme::clear())
+            .active(Theme::clear());
         let button_id = id.clone();
         let tip_id = SharedString::from(format!("tip-{id}"));
         let target = tooltip(tip_id, tip).focusable(move |f| {
             focus(f);
             Button::new(button_id)
                 .custom(variant)
-                .h(px(CHIP_HEIGHT - 2.))
-                .px(px(5.))
+                .target()
                 .gap_1()
-                .rounded(px(3.))
                 .text_size(px(METRICS.text_2xs.size))
                 .font_weight(gpui::FontWeight::MEDIUM)
                 .text_color(Theme::color(fg))
@@ -296,7 +306,8 @@ impl FilterBar {
                 .child(label)
                 .on_click(move |_, _, cx| me.update(cx, |bar, cx| bar.set_filter(next.clone(), cx)))
         });
-        // the border and the fill on a frame around the button, which GPUI Kit's custom buttons colour themselves
+        // the border, the fill and the hover on a frame under the button, which GPUI Kit's custom buttons colour
+        // themselves
         div()
             .debug_selector(move || id.to_string())
             .flex()
@@ -306,6 +317,9 @@ impl FilterBar {
             .border_1()
             .border_color(Theme::color(border))
             .bg(Theme::color(bg))
+            .when_some(hover.filter(|_| !locked), |d, h| {
+                d.hover(move |s| s.bg(Theme::color(h)))
+            })
             .when(locked, |d| d.opacity(0.4))
             .when(folded, |d| d.invisible())
             .child(target)
@@ -397,8 +411,8 @@ impl Render for FilterBar {
             let variant = ButtonCustomVariant::new(cx)
                 .color(Theme::clear())
                 .foreground(Theme::color(t.muted))
-                .hover(Theme::color(t.hover))
-                .active(Theme::color(t.hover));
+                .hover(Theme::clear())
+                .active(Theme::clear());
             tooltip("tip-tag-more", Some(SHOW_ALL_TAGS.into())).focusable(move |f| {
                 *store.borrow_mut() = Some(f.clone());
                 div()
@@ -409,12 +423,11 @@ impl Render for FilterBar {
                     .border_1()
                     .border_color(Theme::color(t.line))
                     .bg(Theme::color(t.surface))
+                    .hover(|s| s.bg(Theme::color(t.hover)))
                     .child(crate::a11y::aria(
                         Button::new("tag-more")
                             .custom(variant)
-                            .h(px(CHIP_HEIGHT - 2.))
-                            .px(px(5.))
-                            .rounded(px(3.))
+                            .target()
                             .text_size(px(METRICS.text_2xs.size))
                             .font_weight(gpui::FontWeight::MEDIUM)
                             .text_color(Theme::color(t.muted))

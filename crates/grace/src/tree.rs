@@ -545,7 +545,7 @@ impl Tree {
         state: &AppState,
         focused: bool,
         focus_key: Option<&str>,
-        _: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let t = Theme::global(cx).tokens;
@@ -564,7 +564,8 @@ impl Tree {
         let selected = state.selected.as_deref() == Some(key.as_str());
         let matches = row_matches(node, &state.filter);
         let is_focus_row = focus_key == Some(key.as_str());
-        let ring = focused && is_focus_row && self.keyboard;
+        // from the arrow keys, or by Tab after a click on a row, as `:focus-visible` in Electron Grace (PU-23)
+        let ring = focused && is_focus_row && (self.keyboard || window.last_input_was_keyboard());
         let title = (node.kind == NodeKind::Feature && node.name != label).then(|| node.name.clone());
         let ink = if matches { t.ink } else { t.muted };
         let is_feature = node.kind == NodeKind::Feature;

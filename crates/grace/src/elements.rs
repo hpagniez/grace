@@ -197,6 +197,20 @@ pub trait Off: gpui_component::Disableable + Styled + Sized {
 impl Off for Button {}
 impl Off for gpui_component::checkbox::Checkbox {}
 
+/// Whether one of Grace's own focusable elements shows the focus ring now: it has the focus and the last input was a
+/// key, as a browser's `:focus-visible` (PU-23). GPUI Kit's controls show theirs after a click too.
+pub fn ring_shown(focus: &gpui::FocusHandle, window: &gpui::Window) -> bool {
+    focus.is_focused(window) && window.last_input_was_keyboard()
+}
+
+/// GPUI Kit's focus ring, the one its buttons and boxes draw, on one of Grace's own elements while `shown`: the
+/// panel's tabs and its splitter. Its colour is the theme's focus colour at half strength, 3 px outside the element
+/// (plan, Redesigns).
+pub fn ring<E: Styled + ParentElement>(el: E, shown: bool, window: &gpui::Window, cx: &App) -> E {
+    use gpui_component::ThemeStyled as _;
+    if shown { el.focus_ring_style(window, cx) } else { el }
+}
+
 /// A text box, with the text cursor over it, as a browser's `<input>` has. GPUI Kit gives it only inside an
 /// `InputGroup`.
 /// A one-line text box `height` px high (`ui.ts`'s `input`, 28 px; 24 px in the console's find bar). GPUI Kit's
