@@ -6,7 +6,7 @@
 //
 // One calibration launch, read through UI Automation, finds Run all in a 1400 x 900 window on the second screen; that
 // process is then killed. Each measured round starts a fresh process that no UIA client ever touches: it is placed the
-// same way, the tree is taken as shown once the dry run's Java has come and gone, Run all is clicked at the calibrated
+// same way, the tree is taken as shown once the dry run's Java is gone, Run all is clicked at the calibrated
 // place, and the app's and Java's CPU are sampled until the run's Java has exited. Prints the medians as JSON.
 import { execFile, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -60,6 +60,24 @@ async function javaCameAndWent(pid, timeoutMs) {
   throw new Error("Java never came and went");
 }
 
+/**
+ * Waits for the dry run that lists the tests to be over. On the 2,000-test project it lasts about 2 s, less than two of
+ * sample()'s PowerShell readings, so its Java may never be seen: wait until 10 s after the start, then for two readings
+ * in a row with no Java.
+ */
+async function dryRunOver({ pid, t0 }) {
+  await sleep(Math.max(0, t0 + 10000 - Date.now()));
+  const end = Date.now() + 120000;
+  let none = 0;
+  while (Date.now() < end) {
+    const { java } = await sample(pid);
+    none = java.privateMB > 0 ? 0 : none + 1;
+    if (none >= 2) return;
+    await sleep(500);
+  }
+  throw new Error("the dry run's Java never went");
+}
+
 // calibration, through UI Automation, in a process that is not measured
 const cal = start();
 let runAll;
@@ -80,7 +98,7 @@ const rounds = [];
 for (let i = 0; i < Number(roundsArg); i++) {
   const app = start();
   try {
-    await javaCameAndWent(app.pid, 120000); // the dry run that lists the tests
+    await dryRunOver(app); // the dry run that lists the tests
     await placeWindow(app.pid, { ...AT, ...SIZE });
     await sleep(3000);
     await p("front", app.pid);
