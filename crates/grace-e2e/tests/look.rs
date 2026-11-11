@@ -114,6 +114,23 @@ fn changed_sides(r: Rect, before: &[u32], after: &[u32]) -> [f32; 4] {
 /// which shows at once on keyboard focus, changes one side only. A ring is cut where the control meets the edge of
 /// its pane or the window (the splitter's ends), and goes round a box wider than the control's node (the thread
 /// count's buttons), so one or two sides may show none.
+/// A checkbox's box, at the left of its row and on its middle: the ring goes round the box, as a browser's
+/// `:focus-visible` goes round the `<input>` (`elements::checkbox`), where the node is the whole row with its label.
+const CHECKBOX: i32 = 13;
+
+/// Where a stop's ring is: a checkbox's round its box, any other control's round the control.
+fn ringed(stop: &Node, r: Rect) -> Rect {
+    if stop.role != Role::CheckBox {
+        return r;
+    }
+    Rect {
+        x: r.x,
+        y: r.y + (r.height - CHECKBOX) / 2,
+        width: CHECKBOX,
+        height: CHECKBOX,
+    }
+}
+
 fn shows_a_ring(sides: [f32; 4]) -> bool {
     let [top, right, bottom, left] = sides;
     sides.iter().filter(|s| **s >= 0.25).count() >= 3
@@ -210,7 +227,7 @@ fn every_control_shows_the_focus_ring(theme: &str) {
     let mut missing = Vec::new();
     for i in (1..=stops.len()).map(|k| k % stops.len()) {
         let stop = &stops[i];
-        let r = stop.rect.unwrap_or_else(|| panic!("{} has no place", key(stop)));
+        let r = ringed(stop, stop.rect.unwrap_or_else(|| panic!("{} has no place", key(stop))));
         let before = band(r).unwrap();
         app.key(Key::Tab).unwrap();
         app.wait_for(&format!("the focus on {}", key(stop)), WAIT, |t| {

@@ -203,23 +203,30 @@ fn screens_tree() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_filter_bar() {
-    let dir = project("tags").unwrap();
-    let app = open(&dir, false);
-    let tree = app.tree().unwrap();
-    let chip = tree
-        .all()
-        .into_iter()
-        .find(|n| n.role == Role::Button && n.name.ends_with(", not filtered"))
-        .unwrap()
-        .name
-        .clone();
-    app.press_named(Role::Button, &chip).unwrap();
-    app.wait_for("a chip included", WAIT, |t| {
-        t.all().into_iter().any(|n| n.name.ends_with(", included"))
-    })
-    .unwrap();
-    app.press_named(Role::CheckBox, "Hide non-matching").unwrap();
-    shot(&app, "filter-bar");
+    for dark in [false, true] {
+        let dir = project("tags").unwrap();
+        let app = open(&dir, dark);
+        let tree = app.tree().unwrap();
+        let chip = tree
+            .all()
+            .into_iter()
+            .find(|n| n.role == Role::Button && n.name.ends_with(", not filtered"))
+            .unwrap()
+            .name
+            .clone();
+        app.press_named(Role::Button, &chip).unwrap();
+        app.wait_for("a chip included", WAIT, |t| {
+            t.all().into_iter().any(|n| n.name.ends_with(", included"))
+        })
+        .unwrap();
+        app.press_named(Role::CheckBox, "Hide non-matching").unwrap();
+        app.wait_for("Hide non-matching checked", WAIT, |t| {
+            t.find(&Role::CheckBox, "Hide non-matching")
+                .is_some_and(|n| n.states.checked)
+        })
+        .unwrap();
+        shot(&app, if dark { "filter-bar-dark" } else { "filter-bar" });
+    }
 }
 
 #[test]

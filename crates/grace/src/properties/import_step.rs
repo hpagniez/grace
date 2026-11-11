@@ -134,7 +134,7 @@ impl ImportStep {
 }
 
 impl Render for ImportStep {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         let plan = self.plan(cx);
         let prefix_error = self.prefix_error(cx);
@@ -182,14 +182,18 @@ impl Render for ImportStep {
                 ),
             )
             .child(
-                crate::elements::checkbox("import-envvar")
-                    .label(KIND)
-                    .checked(self.env_var)
+                crate::elements::checkbox("import-envvar", KIND, self.env_var, false, window, cx)
+                    .gap(px(4.))
                     .text_size(px(METRICS.text_sm.size))
-                    .on_click(cx.listener(|this, on: &bool, _, cx| {
-                        this.env_var = *on;
-                        cx.notify();
-                    })),
+                    .on_change({
+                        let me = cx.entity();
+                        move |state, _, _, cx| {
+                            me.update(cx, |this, cx| {
+                                this.env_var = crate::elements::on(state);
+                                cx.notify();
+                            })
+                        }
+                    }),
             )
             .when(env_var, |d| {
                 d.child(

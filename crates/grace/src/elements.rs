@@ -261,16 +261,79 @@ pub fn icon_button(
         .accessibility_label(label)
 }
 
-/// A checkbox as a browser draws `<input type="checkbox">` beside its label (`accent-accent`): the box 12 px (13 in
-/// a browser) and 6 px from its text (`gap-1.5`), with the hand over it (`index.css`'s cursors). GPUI Kit's own box
-/// is 16 px, 8 px from its text, and sits its top 1/8 of its size down: a 12 px box is then centred on a 12 px label's
-/// line, where the 16 px one sits 2.5 px low.
-pub fn checkbox(id: impl Into<ElementId>) -> gpui_component::checkbox::Checkbox {
-    use gpui_component::Sizable as _;
-    gpui_component::checkbox::Checkbox::new(id)
-        .with_size(gpui_component::Size::XSmall)
+/// A checkbox's box, as a browser draws `<input type="checkbox">`.
+pub const CHECKBOX: f32 = 13.;
+/// The check mark in a checked box: the Lucide check over the box inside its 1 px edge.
+pub const CHECK: f32 = 11.;
+
+/// A checkbox with its label, as a browser draws `<input type="checkbox" class="accent-accent">` in a `<label>`:
+/// a 13 px box with 2 px corners, 6 px from its text (`gap-1.5`), and the hand over all of it. Off, the box has a
+/// 1 px edge in the control colour on the surface; on, it is filled with the accent colour, near black in the light
+/// theme, with a check mark in the colour on it. The keyboard's ring goes round the box (`:focus-visible`). A
+/// checkbox turned off (`off`) draws its box at half strength, takes no focus or click and shows the not-allowed
+/// sign; its label keeps its colour, as Electron Grace's labels do. GPUI Kit's own checkbox fills its box in the
+/// primary colour, green in both themes, so the role, the state, the focus and the click come from gpui-base's
+/// unstyled checkbox, which leaves the drawing to the app (plan, Redesigns). `id` names the debug selectors
+/// `{id}-box`, `{id}-mark` and `{id}-label`; the caller names the whole.
+pub fn checkbox(
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    checked: bool,
+    off: bool,
+    window: &mut gpui::Window,
+    cx: &mut App,
+) -> gpui_base::Checkbox {
+    let t = Theme::global(cx).tokens;
+    let id: SharedString = id.into();
+    let label: SharedString = label.into();
+    let focus = window
+        .use_keyed_state(ElementId::from(id.clone()), cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone();
+    let box_id = id.clone();
+    let square = div()
+        .debug_selector(move || format!("{box_id}-box"))
+        .size(px(CHECKBOX))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(2.))
+        .border_1()
+        .border_color(Theme::color(if checked { t.accent } else { t.control }))
+        .bg(Theme::color(if checked { t.accent } else { t.surface }))
+        .when(off, |b| b.opacity(0.5))
+        .when(checked, |b| {
+            let mark_id = id.clone();
+            b.child(
+                div()
+                    .debug_selector(move || format!("{mark_id}-mark"))
+                    .flex()
+                    .child(icon(Icon::Check, CHECK, Theme::color(t.on_accent))),
+            )
+        });
+    let square = ring(square, !off && ring_shown(&focus, window), window, cx);
+    let label_id = id.clone();
+    gpui_base::Checkbox::new(ElementId::from(id))
+        .checked(checked)
+        .disabled(off)
+        .track_focus(&focus)
+        .accessibility_label(label.clone())
+        .flex()
+        .items_center()
         .gap(px(6.))
-        .cursor_pointer()
+        .cursor(if off {
+            gpui::CursorStyle::OperationNotAllowed
+        } else {
+            gpui::CursorStyle::PointingHand
+        })
+        .child(square)
+        .child(div().debug_selector(move || format!("{label_id}-label")).child(label))
+}
+
+/// Whether a checkbox's change turned it on.
+pub fn on(state: gpui_base::CheckboxState) -> bool {
+    state == gpui_base::CheckboxState::Checked
 }
 
 /// A radio button's circle, as a browser draws `<input type="radio">`.
@@ -354,7 +417,6 @@ pub trait Off: gpui_component::Disableable + Styled + Sized {
 }
 
 impl Off for Button {}
-impl Off for gpui_component::checkbox::Checkbox {}
 
 /// Whether one of Grace's own focusable elements shows the focus ring now: it has the focus and the last input was a
 /// key, as a browser's `:focus-visible` (PU-23). GPUI Kit's controls show theirs after a click too.
@@ -483,6 +545,71 @@ mod tests {
         assert_eq!(size(&mut cx, "mark-14"), (14., 14.));
         assert_eq!(size(&mut cx, "mark-16"), (16., 16.));
         assert_eq!(crate::theme::METRICS.text_base.size, 14., "a dialog button's text");
+    }
+
+    /// #321: a checkbox is the browser's `accent-accent` box, not GPUI Kit's green one: a 13 px box on the middle of
+    /// its label and 6 px from it, a check mark only while checked, a click that asks for the other state, and one
+    /// turned off that asks for nothing.
+    #[gpui::test]
+    fn a_checkbox_is_the_browsers_box_with_its_mark_only_when_checked(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, VisualTestContext};
+        use std::{cell::RefCell, rc::Rc};
+        struct View {
+            asked: Rc<RefCell<Vec<(&'static str, bool)>>>,
+        }
+        impl gpui::Render for View {
+            fn render(&mut self, window: &mut gpui::Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+                let boxes = [
+                    ("plain", false, false),
+                    ("ticked", true, false),
+                    ("locked", false, true),
+                ];
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_start()
+                    .gap_4()
+                    .children(boxes.map(|(name, checked, off)| {
+                        let asked = self.asked.clone();
+                        div().debug_selector(move || name.into()).child(
+                            checkbox(name, "Hide non-matching", checked, off, window, cx)
+                                .text_size(px(crate::theme::METRICS.text_xs.size))
+                                .on_change(move |state, _, _, _| asked.borrow_mut().push((name, on(state)))),
+                        )
+                    }))
+            }
+        }
+        let asked = Rc::new(RefCell::new(Vec::new()));
+        cx.update(crate::init);
+        let window = cx.add_window({
+            let asked = asked.clone();
+            move |_, _| View { asked }
+        });
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        let at = |cx: &mut VisualTestContext, name: &str| {
+            cx.debug_bounds(Box::leak(name.to_owned().into_boxed_str()))
+                .unwrap_or_else(|| panic!("{name}"))
+        };
+        for name in ["plain", "ticked", "locked"] {
+            let square = at(&mut cx, &format!("{name}-box"));
+            assert_eq!(square.size, gpui::size(px(CHECKBOX), px(CHECKBOX)), "{name}");
+            let label = at(&mut cx, &format!("{name}-label"));
+            assert_eq!(label.left() - square.right(), px(6.), "{name}: 6 px from its text");
+            assert!(
+                (square.center().y - label.center().y).abs() < px(0.5),
+                "{name}: on the middle of its label"
+            );
+        }
+        assert!(cx.debug_bounds("plain-mark").is_none());
+        assert!(cx.debug_bounds("locked-mark").is_none());
+        assert_eq!(at(&mut cx, "ticked-mark").center(), at(&mut cx, "ticked-box").center());
+        for name in ["plain", "ticked", "locked"] {
+            let c = at(&mut cx, &format!("{name}-label")).center();
+            cx.simulate_click(c, Modifiers::default());
+            cx.run_until_parked();
+        }
+        assert_eq!(*asked.borrow(), [("plain", true), ("ticked", false)]);
     }
 
     /// `buttons.ts` and `StatusBar.tsx`: a button is its padding, its icon, the room after it and its text, each at
