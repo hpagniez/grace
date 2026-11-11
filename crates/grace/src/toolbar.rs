@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use grace_core::model::node::Layout;
-use grace_core::model::tags::matching_leaves;
+use grace_core::model::tags::any_matching_leaf;
 use grace_core::state::AppState;
 
 use crate::app::Grace;
@@ -78,10 +78,7 @@ pub fn actions(state: &AppState) -> Actions {
     let busy = state.run.active || state.busy;
     // the runner sends the newest run first
     let failed = state.history.first().map_or(0, |h| h.failed);
-    let can_run = state
-        .tree
-        .as_ref()
-        .is_some_and(|t| !matching_leaves(t, &state.filter).is_empty());
+    let can_run = state.tree.as_ref().is_some_and(|t| any_matching_leaf(t, &state.filter));
     Actions {
         home: !busy,
         refresh: !busy,

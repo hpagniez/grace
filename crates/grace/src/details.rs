@@ -113,24 +113,31 @@ pub struct Details {
     /// rows were made afresh.
     open_logs: HashSet<usize>,
     for_key: Option<String>,
+    /// It showed that nothing is selected: drawn again only once something is.
+    nothing: bool,
     _subscriptions: Vec<Subscription>,
 }
 
 impl Details {
     pub fn new(grace: Entity<Grace>, cx: &mut Context<Self>) -> Self {
         let subscriptions = vec![cx.observe(&grace, |this, _, cx| {
-            let selected = this.grace.read(cx).state.selected.clone();
-            if selected != this.for_key {
-                this.for_key = selected;
+            let state = this.grace.read(cx).state.clone();
+            if state.selected != this.for_key {
+                this.for_key = state.selected.clone();
                 this.open_logs.clear();
             }
-            cx.notify();
+            // #320: with nothing selected the pane says so whatever else changes, so a run's results do not draw it
+            let nothing = shown(&state) == Shown::Nothing;
+            if !std::mem::replace(&mut this.nothing, nothing) || !nothing {
+                cx.notify();
+            }
         })];
-        let for_key = grace.read(cx).state.selected.clone();
+        let state = grace.read(cx).state.clone();
         Self {
             grace,
             open_logs: HashSet::new(),
-            for_key,
+            for_key: state.selected.clone(),
+            nothing: shown(&state) == Shown::Nothing,
             _subscriptions: subscriptions,
         }
     }

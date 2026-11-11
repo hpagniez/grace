@@ -37,6 +37,12 @@ pub fn until_next_step(elapsed: Duration, steps: u32, period: Duration) -> Durat
     Duration::from_nanos(left as u64)
 }
 
+/// How long from now to the next step of the marks' clock, the one a run's frames keep to: the runner's events wait
+/// for it too, so a batch of results, the turning marks and the bar share their frames (#320).
+pub fn until_next_step_now() -> Duration {
+    until_next_step(epoch().elapsed(), STEPS, TURN)
+}
+
 /// The views that have a frame asked for at their next step.
 #[derive(Default)]
 struct Asked(HashSet<EntityId>);
@@ -82,6 +88,12 @@ pub fn stepped(steps: u32, period: Duration) -> (f32, impl IntoElement) {
     .absolute()
     .size_0();
     (phase, ask)
+}
+
+/// Asks for the current view's frame at the next step of the marks' clock: for something that moves otherwise than by
+/// turning, such as the progress bar's springs, so it moves in the frames the marks draw anyway.
+pub fn next_step() -> impl IntoElement {
+    stepped(STEPS, TURN).1
 }
 
 /// `mark` turning, a step at a time.

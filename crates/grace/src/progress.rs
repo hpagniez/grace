@@ -4,15 +4,16 @@
 //! track in place of the segments (LV-01 to LV-08).
 //!
 //! What moves, and when (ADR 0030): the stripe only while it shows, the spinner only while Grace works, the time
-//! once a second only during a run that is not paused, and the segments only for the 300 ms after a result. With the
-//! system's reduced motion nothing slides, turns or eases (`a11y::follow_reduced_motion`).
-use std::time::Duration;
+//! once a second only during a run that is not paused, and the segments only while a result moves their ends. The
+//! stripe, the spinner and the segments move a step of the marks' clock at a time (`spin`, #320). With the system's
+//! reduced motion nothing slides, turns or eases (`a11y::follow_reduced_motion`).
+use std::time::{Duration, Instant};
 
 use gpui::accesskit::Role;
 use gpui::{
-    Animation, AnimationExt as _, App, Context, Entity, InteractiveElement as _, IntoElement, ParentElement, Render,
-    SharedString, SpringAnimation, SpringConfig, StatefulInteractiveElement as _, Styled, Task, Window, div,
-    ease_in_out, prelude::FluentBuilder as _, px, relative,
+    App, Context, Entity, InteractiveElement as _, IntoElement, ParentElement, Render, SharedString, SpringConfig,
+    SpringState, StatefulInteractiveElement as _, Styled, Task, Window, div, ease_in_out, prelude::FluentBuilder as _,
+    px, relative,
 };
 use grace_core::model::events::RunOutcome;
 use grace_core::model::tags::{matching_leaves, no_filter};
@@ -165,9 +166,62 @@ fn now_ms() -> f64 {
         .map_or(0., |d| d.as_millis() as f64)
 }
 
-/// The progress section, its own view: it holds the run's clock.
+/// The slide of the stripe: its period, as `animate-slide`, and its steps, those of the marks' clock (#320).
+pub const SLIDE: Duration = Duration::from_millis(1400);
+pub const SLIDE_STEPS: u32 = 28;
+
+/// The bar's springs.
+const SPRING: SpringConfig = SpringConfig::new(170., 26., 1.);
+/// How near its end a segment rests, in percent of the track.
+const EPSILON: f32 = 0.05;
+
+/// The passed, failed and interrupted segments, each a spring that keeps its place and speed when a new result moves
+/// its end (LV-06).
+///
+/// Rust-native (#320): GPUI's `with_spring` asks for a frame 60 times a second while a segment moves, the whole run
+/// long on a big one; these springs move by the time since the view's last frame and ask for their next frame at the
+/// next step of the marks' clock (`spin::next_step`), so the bar moves in the frames the marks and the results draw.
+#[derive(Default)]
+struct Bar {
+    springs: [SpringState; 3],
+    targets: [f32; 3],
+    at: Option<Instant>,
+}
+
+impl Bar {
+    /// Moves each segment on by the time since the last step toward the end it had then, and takes the new ends: true
+    /// while a segment still moves. A first step, and every step with reduced motion, puts each segment at its end.
+    fn step(&mut self, to: [f32; 3], now: Instant, still: bool) -> bool {
+        let dt = self.at.map(|at| now.saturating_duration_since(at).as_secs_f32());
+        self.at = Some(now);
+        let mut moving = false;
+        for (i, end) in to.into_iter().enumerate() {
+            let s = match dt {
+                Some(dt) if !still => SPRING.step(self.springs[i], self.targets[i], dt),
+                _ => SpringState {
+                    position: end,
+                    velocity: 0.,
+                },
+            };
+            self.springs[i] = if SPRING.is_settled(s, end, EPSILON) {
+                SpringState {
+                    position: end,
+                    velocity: 0.,
+                }
+            } else {
+                moving = true;
+                s
+            };
+            self.targets[i] = end;
+        }
+        moving
+    }
+}
+
+/// The progress section, its own view: it holds the run's clock and the bar's springs.
 pub struct Progress {
     grace: Entity<Grace>,
+    bar: Bar,
     /// The run's time at the last tick.
     ticked: u64,
     /// The run the clock follows, and whether it is paused: a change restarts or stops the clock.
@@ -180,6 +234,7 @@ impl Progress {
         cx.observe(&grace, |this, _, cx| this.follow(cx)).detach();
         let mut me = Self {
             grace,
+            bar: Bar::default(),
             ticked: 0,
             clock_for: None,
             clock: None,
@@ -271,6 +326,7 @@ impl Render for Progress {
         // the segments stay laid out under the stripe, holding the last run's widths, but are not drawn (LV-04)
         let colours = [t.passed, t.failed, t.cancelled];
         let ws = widths(&state);
+        let moving = self.bar.step(ws, cx.background_executor().now(), still);
         // GPUI clips a child to the track's box, not to its rounded ends, where the browser's `overflow-hidden` rounds
         // the fill too: the first segment rounds its own left end, and a full bar's last segment its right end. A full
         // bar drops its empty segments with their gaps and lets the rest shrink to the track, so that end is the
@@ -290,15 +346,11 @@ impl Render for Progress {
                 .when(full && Some(i) == last, |d| d.rounded_r_full())
                 .when(!waiting, |d| d.bg(Theme::color(c)));
             // a spring keeps its place and speed when a new result moves its end, so a fast run fills smoothly (LV-06)
-            bar = bar.child(
-                segment.with_spring(
-                    ("progress-segment", i),
-                    SpringAnimation::new(SpringConfig::new(170., 26., 1.))
-                        .to(w)
-                        .with_epsilon(0.05),
-                    |d, w| d.w(relative(w.clamp(0., 100.) / 100.)),
-                ),
-            );
+            let w = self.bar.springs[i].position;
+            bar = bar.child(segment.w(relative(w.clamp(0., 100.) / 100.)));
+        }
+        if moving {
+            bar = bar.child(crate::spin::next_step());
         }
         if waiting {
             let stripe = div()
@@ -309,20 +361,15 @@ impl Render for Progress {
                 .w(relative(0.3))
                 .rounded_full()
                 .bg(Theme::color(t.running));
-            bar = bar.child(if still {
-                stripe.left_0().into_any_element()
+            bar = if still {
+                bar.child(stripe.left_0())
             } else {
-                // `slide`: from one stripe's width before the track to 340 % of it along
-                stripe
-                    .with_animation(
-                        "slide",
-                        Animation::new(Duration::from_millis(1400))
-                            .repeat()
-                            .with_easing(ease_in_out),
-                        |d, delta| d.left(relative(-0.3 + delta * 1.32)),
-                    )
-                    .into_any_element()
-            });
+                // `slide`: from one stripe's width before the track to 340 % of it along, in 1.4 s, a step of the
+                // marks' clock at a time (#320)
+                let (delta, ask) = crate::spin::stepped(SLIDE_STEPS, SLIDE);
+                bar.child(stripe.left(relative(-0.3 + ease_in_out(delta) * 1.32)))
+                    .child(ask)
+            };
         }
 
         let mono = |id: &'static str, text: String| {

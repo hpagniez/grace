@@ -373,7 +373,16 @@ fn project_view(
                 .bg(Theme::color(t.surface))
                 .children(progress)
                 .children(shown.map(|n| div().px_3().py_2().child(n)))
-                .children(filter_bar)
+                // its chips change only with the tree, the filter or a run's start and end (#320); the bar is one
+                // line high, or nothing without tags
+                .children(filter_bar.map(|v| {
+                    let h = if v.read(cx).shows() {
+                        crate::filter_bar::BAR_HEIGHT
+                    } else {
+                        0.
+                    };
+                    cached_as(v, gpui::StyleRefinement::default().flex_none().h(px(h)), gpui_window)
+                }))
                 .child(
                     // the main area and the bottom panel share what is left; the panel's limits are read from it
                     div()
@@ -426,18 +435,25 @@ fn project_view(
 /// anew on every frame and leaves a reused view's nodes out, so a cached pane would vanish from a screen reader.
 /// GPUI draws every view again when one connects or leaves, so the switch takes effect at once.
 pub fn cached<V: Render>(view: Entity<V>, window: &Window) -> gpui::AnyElement {
-    if window.is_a11y_active() {
-        return view.into_any_element();
-    }
-    view.cached(
+    cached_as(
+        view,
         gpui::StyleRefinement::default()
             .flex()
             .flex_col()
             .flex_1()
             .min_h_0()
             .min_w_0(),
+        window,
     )
-    .into_any_element()
+}
+
+/// As [`cached`], laid out at `style`, which must give the view its size: GPUI lays a cached view out from it, not
+/// from what it draws.
+pub fn cached_as<V: Render>(view: Entity<V>, style: gpui::StyleRefinement, window: &Window) -> gpui::AnyElement {
+    if window.is_a11y_active() {
+        return view.into_any_element();
+    }
+    view.cached(style).into_any_element()
 }
 
 /// Where the window opens: the saved bounds placed on the screens there are now, maximized when saved so; else
@@ -800,6 +816,49 @@ mod tests {
         assert!(
             console.bottom() >= panel.bottom() - px(1.) && console.size.height > px(48.),
             "the console {console:?} fills the panel {panel:?}"
+        );
+    }
+
+    /// #320: the filter bar is a cached view, one line high, and drawn again when the filter changes; without tags
+    /// it takes no room.
+    #[gpui::test]
+    fn the_cached_filter_bar_is_one_line_high_and_follows_the_filter(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let (h, _) = crate::testing::open(
+            cx,
+            1200.,
+            crate::testing::project("D:\\api", Layout::Maven, 2),
+            |_, _, _| div().into_any_element(),
+        );
+        let grace = h.grace.clone();
+        let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
+        let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+        vcx.simulate_resize(size(px(1200.), px(700.)));
+        vcx.run_until_parked();
+        let bar = vcx.debug_bounds("filter-bar").unwrap();
+        assert_eq!(bar.size.height, px(crate::filter_bar::BAR_HEIGHT));
+        assert!(vcx.debug_bounds("tag-chip-smoke").is_some());
+        assert!(vcx.debug_bounds("tag-clear").is_none());
+        h.grace.update(&mut vcx, |g, cx| {
+            g.state_mut().filter.include = vec!["smoke".into()];
+            cx.notify();
+        });
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("tag-clear").is_some(), "the bar drew the new filter");
+        h.grace.update(&mut vcx, |g, cx| {
+            let state = g.state_mut();
+            state.filter.include.clear();
+            state.tree = Some(crate::testing::tree(0));
+            state.trees += 1;
+            cx.notify();
+        });
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("filter-bar").is_none());
+        let progress = vcx.debug_bounds("progress-bar").unwrap();
+        let main = vcx.debug_bounds("main").unwrap();
+        assert!(
+            main.top() - progress.bottom() < px(40.),
+            "no room kept for a bar without tags: {progress:?} {main:?}"
         );
     }
 

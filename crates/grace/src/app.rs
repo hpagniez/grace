@@ -158,6 +158,10 @@ impl Grace {
                 if applied.is_err() {
                     break; // the window is gone
                 }
+                // Rust-native (#320): the next batch waits for the next step of the marks' clock, so a run's results,
+                // its turning marks and its bar share their frames, at most `spin::STEPS` a second however often Java
+                // prints; an event after a quiet spell is applied at once. Nothing waits once no event comes (ADR 0030).
+                cx.background_executor().timer(crate::spin::until_next_step_now()).await;
             }
         });
         let (_, order) = async_channel::bounded(1);
@@ -562,6 +566,29 @@ mod tests {
             assert_eq!(g.state.notice.as_ref().unwrap().text, "hi");
             assert_eq!(g.state.recent.as_ref().unwrap().len(), 1);
         });
+    }
+
+    /// #320: a batch that comes right after another waits for the next step of the marks' clock, so a run draws at
+    /// most `spin::STEPS` frames a second.
+    #[gpui::test]
+    fn holds_the_next_batch_until_the_next_step(cx: &mut TestAppContext) {
+        let (g, _, tx) = grace(cx);
+        let notice = |g: &Entity<Grace>, cx: &mut TestAppContext| {
+            g.read_with(cx, |g, _| g.state.notice.as_ref().map(|n| n.text.clone()))
+        };
+        tx.try_send(AppEvent::notice("one")).unwrap();
+        cx.run_until_parked();
+        assert_eq!(
+            notice(&g, cx).as_deref(),
+            Some("one"),
+            "an event after a quiet spell, at once"
+        );
+        tx.try_send(AppEvent::notice("two")).unwrap();
+        cx.run_until_parked();
+        assert_eq!(notice(&g, cx).as_deref(), Some("one"), "held");
+        cx.executor().advance_clock(crate::spin::TURN / crate::spin::STEPS);
+        cx.run_until_parked();
+        assert_eq!(notice(&g, cx).as_deref(), Some("two"), "at the next step");
     }
 
     #[gpui::test]

@@ -64,6 +64,16 @@ pub fn matching_leaves<'a>(n: &'a TestNode, f: &FilterState) -> Vec<&'a TestNode
     out
 }
 
+/// Whether any test under `n` matches: `!matching_leaves(n, f).is_empty()`, stopping at the first one, without listing
+/// them (#320: the toolbar asks at every frame).
+pub fn any_matching_leaf(n: &TestNode, f: &FilterState) -> bool {
+    if n.is_leaf() {
+        matches(&n.tags, f)
+    } else {
+        n.children.iter().any(|c| any_matching_leaf(c, f))
+    }
+}
+
 /// Sorted union of the filterable tags of every scenario and row. Sorted as JavaScript's `sort()` does, by UTF-16 unit.
 pub fn project_tags(tree: &TestNode) -> Vec<String> {
     fn walk<'a>(n: &'a TestNode, tags: &mut HashSet<&'a str>) {
@@ -282,6 +292,21 @@ mod tests {
         fn filter_on_is_true_with_an_include_or_an_exclude() {
             assert!(filter_on(&filter(&["a"], &[])));
             assert!(filter_on(&filter(&[], &["a"])));
+        }
+
+        #[test]
+        fn any_matching_leaf_says_whether_matching_leaves_has_one() {
+            for (include, exclude) in [
+                (&[][..], &[][..]),
+                (&["smoke"], &["wip"]),
+                (&["nothing"], &[]),
+                (&[], &["smoke", "slow", "wip"]),
+            ] {
+                let f = filter(include, exclude);
+                assert_eq!(any_matching_leaf(&tree(), &f), !matching_leaves(&tree(), &f).is_empty());
+            }
+            assert!(!any_matching_leaf(&tree(), &filter(&["nothing"], &[])));
+            assert!(any_matching_leaf(&scenario(1, "x", &[]), &no_filter()));
         }
 
         #[test]

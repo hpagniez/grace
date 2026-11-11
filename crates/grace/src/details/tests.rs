@@ -2,7 +2,7 @@
 //! Classes have no GPUI twin, so the look is checked through the tokens a part takes and where the parts are drawn;
 //! what a screen reader reads is `grace-e2e/tests/details.rs`'s. The steps before a run, breakpoints, Open in VS Code
 //! and the failure groups come with their phases.
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -386,4 +386,27 @@ mod long_text {
         let tip = hover(&h, &mut cx, "details-location").expect("a tooltip on the cut place");
         assert!(tip.ends_with("/x.feature:3"), "{tip}");
     }
+}
+
+/// #320: while nothing is selected the pane says so whatever a run changes, so a run's results do not draw it again;
+/// a selection does, and so do the results of the test it shows.
+#[gpui::test]
+fn with_nothing_selected_a_runs_results_do_not_draw_it_again(cx: &mut TestAppContext) {
+    let (h, mut cx, details) = setup(cx, 600., finished());
+    let told = Rc::new(Cell::new(0));
+    let t = Rc::clone(&told);
+    let _watch = cx.update(|_, cx| cx.observe(&details, move |_, _| t.set(t.get() + 1)));
+    h.update(&mut cx, |s| {
+        s.statuses.insert(WAIT.into(), Status::Running);
+    });
+    assert_eq!(told.get(), 0, "nothing selected, nothing to draw again");
+    select(&h, &mut cx, WAIT);
+    assert_eq!(told.get(), 1);
+    h.update(&mut cx, |s| {
+        s.statuses.insert(WAIT.into(), Status::Passed);
+    });
+    assert_eq!(told.get(), 2, "the shown test's result");
+    h.update(&mut cx, |s| s.selected = None);
+    assert_eq!(told.get(), 3, "back to nothing");
+    assert!(drawn(&mut cx, "empty-state"));
 }
