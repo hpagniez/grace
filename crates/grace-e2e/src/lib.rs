@@ -235,8 +235,8 @@ pub trait Driver {
     fn title_bar_colour(&self) -> Result<Option<u32>> {
         Ok(None)
     }
-    /// For a failed title bar check: where the window and the screen are, what the title bar and the client area
-    /// show, and what the title bar shows once its frame is drawn again from outside.
+    /// For a failed title bar check: where the window and the screen are, whether the window is in front, and what
+    /// the title bar and the client area show.
     fn title_bar_report(&self) -> String {
         String::new()
     }
