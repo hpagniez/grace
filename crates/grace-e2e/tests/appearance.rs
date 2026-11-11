@@ -1,7 +1,8 @@
 //! `e2e/appearance.spec.ts`, through the accessibility tree: Settings › Appearance, the theme in force at start, a
 //! change applied at once and kept after a restart, and Escape going back. On Linux the ground's colour is read off
-//! the window's pixels, on Windows the title bar's dark mode, which follows Grace's theme rather than Windows' (PU-14,
-//! #337); the dialog test and main's refusal of an unknown theme are the plan's Redesigns.
+//! the window's pixels, on Windows the title bar's dark mode and the colour the screen shows there, which follow
+//! Grace's theme rather than Windows' (PU-14, #337); the dialog test and main's refusal of an unknown theme are the
+//! plan's Redesigns.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::time::Duration;
 

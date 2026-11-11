@@ -7,17 +7,14 @@ use uiautomation::patterns::{
 };
 use uiautomation::types::{ControlType, ExpandCollapseState, Point, ToggleState, UIProperty};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
-use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Dwm::{
     DWMWA_EXTENDED_FRAME_BOUNDS, DWMWA_USE_IMMERSIVE_DARK_MODE, DwmGetWindowAttribute,
 };
 use windows::Win32::Graphics::Gdi::{
     CLR_INVALID, GetDC, GetMonitorInfoW, GetPixel, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, ReleaseDC,
 };
-use windows::Win32::UI::WindowsAndMessaging::{
-    GA_ROOT, GetAncestor, GetForegroundWindow, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
-    SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos, WM_NCACTIVATE, WindowFromPoint,
-};
+use windows::Win32::UI::WindowsAndMessaging::{GA_ROOT, GetAncestor, GetForegroundWindow, WindowFromPoint};
 use windows::core::BOOL;
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
@@ -397,7 +394,7 @@ impl Driver for UiaDriver {
             x: at.x,
             y: frame.top + 80,
         };
-        let mut report = format!(
+        format!(
             "{}; screen {},{} to {},{}; foreground {foreground}; on top at the title bar {over}; title bar ({}, {}) {}; \
              client ({}, {}) {}",
             frame_text(frame),
@@ -411,32 +408,7 @@ impl Driver for UiaDriver {
             client.x,
             client.y,
             colour(client),
-        );
-        // what the title bar shows once its frame is redrawn from outside, then once Windows draws it inactive and
-        // active again: which of them makes DWM draw a changed dark mode attribute
-        let settle = || std::thread::sleep(std::time::Duration::from_millis(500));
-        // SAFETY: the window's own handle; a closed window is refused with an error that is dropped
-        let _ = unsafe {
-            SetWindowPos(
-                hwnd,
-                None,
-                0,
-                0,
-                0,
-                0,
-                SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOZORDER,
-            )
-        };
-        settle();
-        report += &format!("; after a frame redraw {}", colour(at));
-        // SAFETY: as above; the messages ask the window to draw its frame inactive, then active
-        unsafe {
-            SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(0)), Some(LPARAM(0)));
-            SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(1)), Some(LPARAM(0)));
-        }
-        settle();
-        report += &format!("; after an inactive and active frame {}", colour(at));
-        report
+        )
     }
 }
 
