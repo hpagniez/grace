@@ -123,6 +123,21 @@ mod words {
         assert_eq!(ChipState::Exclude.hint(), "Excluded. Click to clear.");
     }
 
+    /// PU-10: the states differ by shape, not only by colour: "@smoke, included" has the check, "@wip, excluded"
+    /// the minus and a line through it, and a tag that is off neither.
+    #[test]
+    fn a_chips_state_shows_in_its_shape_and_its_name_not_only_its_colour() {
+        let f = smoke_not_wip(false);
+        let smoke = ChipState::of(&f, "smoke");
+        let wip = ChipState::of(&f, "wip");
+        let slow = ChipState::of(&f, "slow");
+        assert_eq!((smoke.mark(), smoke.struck()), (Some(Icon::Check), false));
+        assert_eq!((wip.mark(), wip.struck()), (Some(Icon::Minus), true));
+        assert_eq!((slow.mark(), slow.struck()), (None, false));
+        assert_eq!(chip_name("smoke", smoke), "@smoke, included");
+        assert_eq!(chip_name("wip", wip), "@wip, excluded");
+    }
+
     #[test]
     fn the_fold_chip_counts_the_folded_tags_and_those_that_are_on() {
         assert_eq!((fold_text(2, 0), fold_name(2, 0)), ("+2".into(), "2 more tags".into()));

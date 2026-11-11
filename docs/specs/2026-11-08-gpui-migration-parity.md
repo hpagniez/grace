@@ -356,37 +356,37 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 |---|---|---|---|
 | PU-01 | Every token pair meets WCAG 2.2 AA in both themes (unit) | `crates/grace::theme::tests::keeps_text_at_4_5_to_1_on_every_background`, `…keeps_each_status_readable_on_surface_its_tint_and_a_selected_row`, `…keeps_the_filled_buttons_text_readable`, `…keeps_control_borders_and_the_focus_ring_at_3_to_1`, `…paints_console_matches_readably_the_current_one_stronger` | ☑ |
 | PU-02 | The dark theme changes colours only (unit) | By construction: `grace::theme::Theme` is one shared `Metrics` and one `Tokens` per theme, so no size can differ; `crates/grace::theme::tests::matches_the_dark_tokens_of_index_css`, `…matches_the_sizes_of_index_css` | ☑ |
-| PU-03 | The structure and the primary button do not change with the theme | | ☐ |
+| PU-03 | The structure and the primary button do not change with the theme | `grace::theme::tests::matches_the_sizes_of_index_css` (the sheet's 8 px inset, 16 px corners and 1 px side, one set of sizes for both themes, PU-02), `grace::window::tests::the_project_view_sits_on_the_sheet_under_the_toolbar`; Run all is the toolbar's one primary button (`grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`), filled with the passed green and its text readable in each theme (`grace::theme::tests::fills_the_primary_button_with_the_passed_green`, `…keeps_the_filled_buttons_text_readable`, the tokens equal to `src/index.css`'s) | ☑ |
 | PU-04 | No raw palette class or dark: variant is left (unit) | `crates/grace::theme::tests::colours_come_only_from_the_theme` (no colour literal outside `theme.rs`; GPUI has no `dark:` variant) | ☑ |
-| PU-05 | Main and the startup screen use the CSS ground colours (unit) | | ☐ |
-| PU-06 | The window follows the Windows theme | | ☐ |
-| PU-07 | Grace draws its own typefaces offline | | ☐ |
+| PU-05 | Main and the startup screen use the CSS ground colours (unit) | `grace::theme::tests::matches_the_light_tokens_of_index_css`, `…matches_the_dark_tokens_of_index_css` (the ground in each theme); GPUI Grace has no main process and no startup screen of its own: its first frame is the window on the ground (`grace::window::tests::opens_an_empty_grace_window_in_the_theme`, E-startup-02) | ☑ |
+| PU-06 | The window follows the Windows theme | Light: `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` (the ground's pixels; Xvfb has no dark preference), `grace::theme::tests::picks_the_theme_from_the_system_unless_pinned`. Dark, with Windows itself in dark mode: for a person, with UP-18's theme switch | ☐ |
+| PU-07 | Grace draws its own typefaces offline | `grace::assets::tests::embeds_ibm_plex`, `…the_theme_asks_for_the_families_it_embeds` (the window in IBM Plex Sans, the console and the details' code in IBM Plex Mono), `grace::assets::tests::serves_every_icon` (the icons are in the exe); neither `grace` nor `grace-core` has an HTTP client until the updater (P5), so nothing leaves the app for a font or an icon | ☑ |
 | PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name`; through the tree, `crates/grace-e2e/tests/elements.rs::names_each_status_mark` | ☑ |
-| PU-09 | A cancelled run marks its interrupted tests | | ☐ |
-| PU-10 | Tag chip states differ by shape, not only colour (unit) | | ☐ |
-| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | | ☐ |
-| PU-12 | Reduced motion stops every animation | | ☐ |
-| PU-13 | The logo is the Home button | | ☐ |
-| PU-14 | The startup screen shows the logo in the active theme (by hand) | | ☐ |
-| PU-15 | Choosing Dark overrides a light Windows | | ☐ |
-| PU-16 | Follow Windows is the default | | ☐ |
+| PU-09 | A cancelled run marks its interrupted tests | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" named interrupted, the progress line's "Cancelled"), `grace::elements::tests::marks_each_status_as_electron_grace_does` (Interrupted: circle-slash), `grace::progress::tests::after_a_run_r14_2::names_the_outcome_with_its_icon` | ☑ |
+| PU-10 | Tag chip states differ by shape, not only colour (unit) | `grace::filter_bar::tests::words::a_chips_state_shows_in_its_shape_and_its_name_not_only_its_colour` | ☑ |
+| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | Waits for the HTTP tab, phase P3 | ☐ |
+| PU-12 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (the whole window during a run: nothing asks for a frame); each one: `grace::elements::tests::turns_only_while_running_and_never_with_reduced_motion`, `grace::progress::tests::the_bar_r14_1::reduced_motion_keeps_the_stripe_still`, `grace::console::tests::banner::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; GPUI's `with_animation` and springs draw at rest with it set | ☑ |
+| PU-13 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `…home_goes_home_and_is_off_while_busy`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
+| PU-14 | The startup screen shows the logo in the active theme (by hand) | GPUI Grace has no startup screen (E-startup-02): its first frame is the window in the theme (UP-17, UP-18). The title bar's half waits for a person, with Windows in light mode and Appearance on Dark: GPUI sets the title bar from Windows' theme, not the app's | ☐ |
+| PU-15 | Choosing Dark overrides a light Windows | `grace-e2e/tests/appearance.rs::choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart`, `…a_saved_dark_is_in_force_at_start` (under Xvfb's light preference the ground turns #151821 at once, and a saved Dark is in force at the next start) | ☑ |
+| PU-16 | Follow Windows is the default | `grace-e2e/tests/appearance.rs::follow_windows_is_the_default` | ☑ |
 | PU-17 | A malformed appearance setting reads as Follow Windows (unit) | `grace_core::settings` tests `appearance` | ☑ |
-| PU-18 | Main rejects an unknown theme (unit) | | ☐ |
+| PU-18 | Main rejects an unknown theme (unit) | Nothing to refuse: no IPC, and a theme is an enum (plan, Redesigns; E-appearance-06) | ☑ |
 | PU-19 | A tooltip shows on keyboard focus and closes with Escape | `crates/grace::tooltip::tests::shows_at_once_on_keyboard_focus_and_once_per_focus`, `…closes_on_escape_and_on_a_press_of_its_target`, `…does_not_show_on_a_focus_from_the_mouse`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` | ☑ |
 | PU-20 | A tooltip shows after a pause on hover, also on a disabled button | `crates/grace::tooltip::tests::shows_after_the_pause_not_before`, `…does_not_show_when_the_pointer_leaves_first_and_hides_when_it_leaves_after`, `…shows_one_at_a_time`; through the tree, `crates/grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` | ☑ |
 | PU-21 | Escape in a dialog closes the tooltip first | `crates/grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` (the tooltip takes Escape before any other handler) | ☑ |
-| PU-22 | No native title attribute is left (unit) | | ☐ |
-| PU-23 | Every control shows the focus ring | | ☐ |
-| PU-24 | Targets are at least 24 by 24 | | ☐ |
-| PU-25 | Existing keyboard paths still work | | ☐ |
-| PU-26 | First run shows the first-run home screen | | ☐ |
-| PU-27 | A missing recent folder says so in words | | ☐ |
-| PU-28 | A project with no feature files shows an empty state | | ☐ |
-| PU-29 | Before any run the progress line says so | | ☐ |
+| PU-22 | No native title attribute is left (unit) | `grace::tooltip::tests::tooltips_come_only_from_this_module` (no tooltip of GPUI's or GPUI Kit's own anywhere else) | ☑ |
+| PU-23 | Every control shows the focus ring | Not yet. GPUI Kit's controls draw Kit's own ring (3 px, half the focus colour, flush with the control); the bottom panel's tabs and its splitter draw none, nor does the tree when Tab reaches it after a click. Next PR | ☐ |
+| PU-24 | Targets are at least 24 by 24 | The tree's run buttons (`ROW_HEIGHT`), the tabs (32 px) and the recent list's remove buttons (`grace::home::tests::removes_a_row_with_a_24_px_icon_button_r10_3`) are; a tag chip takes the click on 22 px of its 24 (its 1 px frame does not). Next PR | ☐ |
+| PU-25 | Existing keyboard paths still work | The e2e suite, ported to the driver (the E-* rows), passes in `test.yml`: on Linux on every PR that changes code, on Windows on every PR into `main` and every run by hand | ☑ |
+| PU-26 | First run shows the first-run home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen`, `grace::home::tests::a_first_start_shows_the_home_screen_without_a_list`, `…the_mascot_is_decorative`; Open folder… is the home screen's one primary button | ☑ |
+| PU-27 | A missing recent folder says so in words | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled`, `…a_missing_folder_shows_its_reason_on_home` | ☑ |
+| PU-28 | A project with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` ("No feature files found" and where Grace looks, both in the tree) | ☑ |
+| PU-29 | Before any run the progress line says so | `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`; through the tree, `grace-e2e/tests/details.rs::failure_details` ("9 tests · Not run yet") | ☑ |
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
-| PU-31 | Empty history and HTTP tabs | | ☐ |
-| PU-32 | Dialogs keep their order and keyboard behaviour | | ☐ |
-| PU-33 | Before and after screenshots exist (by hand) | | ☐ |
+| PU-31 | Empty history and HTTP tabs | Waits for the History and HTTP tabs, phase P3 | ☐ |
+| PU-32 | Dialogs keep their order and keyboard behaviour | Waits for Clear history, phase P3 | ☐ |
+| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
 
 ### VL · Big projects: virtual lists and keyboard navigation
 
@@ -1107,23 +1107,23 @@ Phase P0 · 17 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-look-01 | The window follows Windows in ${scheme} mode | | ☐ |
-| E-look-02 | Grace draws its own typefaces without any network request | | ☐ |
-| E-look-03 | Each status has its own mark and name | | ☐ |
-| E-look-04 | A cancelled run marks its interrupted test | | ☐ |
-| E-look-05 | Reduced motion stops every animation | | ☐ |
-| E-look-06 | The logo is the Home button | | ☐ |
-| E-look-07 | A tooltip shows on keyboard focus and closes with Escape | | ☐ |
-| E-look-08 | A tooltip shows after a pause on hover, also on a disabled button | | ☐ |
-| E-look-09 | A row's tooltip leaves the next row's run button to the pointer | | ☐ |
-| E-look-10 | Escape in a dialog closes a shown tooltip first, then the dialog | | ☐ |
-| E-look-11 | Every control shows the focus ring in ${scheme} mode | | ☐ |
-| E-look-12 | Targets are at least 24 by 24 | | ☐ |
-| E-look-13 | A first start shows the first-run home screen | | ☐ |
-| E-look-14 | A missing recent folder says so in words | | ☐ |
-| E-look-15 | A folder with no feature files shows an empty state | | ☐ |
-| E-look-16 | Before any run the progress line, the details and the tabs say so | | ☐ |
-| E-look-17 | Clear history keeps its button order and closes on Escape | | ☐ |
+| E-look-01 | The window follows Windows in ${scheme} mode | As PU-06: light by `grace-e2e/tests/appearance.rs::follow_windows_is_the_default`; dark with Windows itself in dark mode, for a person | ☐ |
+| E-look-02 | Grace draws its own typefaces without any network request | As PU-07: `grace::assets::tests::the_theme_asks_for_the_families_it_embeds`, `…embeds_ibm_plex`, `…serves_every_icon` | ☑ |
+| E-look-03 | Each status has its own mark and name | `grace-e2e/tests/elements.rs::names_each_status_mark`, `grace::elements::tests::marks_each_status_as_electron_grace_does` (PU-08) | ☑ |
+| E-look-04 | A cancelled run marks its interrupted test | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` (PU-09) | ☑ |
+| E-look-05 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (PU-12) | ☑ |
+| E-look-06 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` (PU-13) | ☑ |
+| E-look-07 | A tooltip shows on keyboard focus and closes with Escape | `grace-e2e/tests/tooltips.rs::shows_on_keyboard_focus_and_closes_with_escape` (PU-19) | ☑ |
+| E-look-08 | A tooltip shows after a pause on hover, also on a disabled button | `grace-e2e/tests/tooltips.rs::shows_on_hover_also_over_a_disabled_button` (PU-20) | ☑ |
+| E-look-09 | A row's tooltip leaves the next row's run button to the pointer | `grace::tree::tests::a_rows_tooltips_stay_on_its_row` (the run button's tooltip to its left, the mark's to its right, the label's over it: none covers the next row) | ☑ |
+| E-look-10 | Escape in a dialog closes a shown tooltip first, then the dialog | `grace-e2e/tests/tooltips.rs::escape_in_a_dialog_closes_the_tooltip_first` (PU-21) | ☑ |
+| E-look-11 | Every control shows the focus ring in ${scheme} mode | Not yet, as PU-23. Next PR | ☐ |
+| E-look-12 | Targets are at least 24 by 24 | Not yet, as PU-24: a tag chip takes the click on 22 px. Next PR | ☐ |
+| E-look-13 | A first start shows the first-run home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` (PU-26) | ☑ |
+| E-look-14 | A missing recent folder says so in words | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled` (PU-27) | ☑ |
+| E-look-15 | A folder with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` (PU-28) | ☑ |
+| E-look-16 | Before any run the progress line, the details and the tabs say so | The progress line and the details: `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`, `grace-e2e/tests/details.rs::failure_details` (PU-29, PU-30); the History and HTTP tabs with phase P3 | ☐ |
+| E-look-17 | Clear history keeps its button order and closes on Escape | Waits for Clear history, phase P3 | ☐ |
 
 ### e2e/open.spec.ts
 

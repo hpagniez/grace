@@ -664,6 +664,40 @@ mod tests {
         vcx
     }
 
+    /// PU-12, E-look-05: with reduced motion nothing in the window moves during a run. The running marks, the
+    /// progress line's turning icon, the details' spinner and the console's cursor ask for no next step, and GPUI
+    /// draws the stripe and the bar's springs at rest (its `AnimationExt` reads the same setting). Turned off, the same
+    /// window turns its marks again at once.
+    #[gpui::test]
+    fn reduced_motion_stops_every_animation_during_a_run(cx: &mut TestAppContext) {
+        use grace_core::model::node::{Layout, Status};
+        let mut state = crate::testing::project("D:\\api", Layout::Maven, 2);
+        // finding tests: the stripe, the turning icon and the console's cursor; a test running, open and selected
+        state.busy = true;
+        state.statuses.insert("f:a.feature".into(), Status::Running);
+        state.statuses.insert("s:a.feature#0".into(), Status::Running);
+        state.selected = Some("s:a.feature#0".into());
+        let mut vcx = whole_window(cx, state);
+        assert!(vcx.debug_bounds("progress-stripe").is_some(), "the run is on");
+        // the window follows the system's setting, which is on where Windows shows no animations (CI's runners)
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn");
+
+        // the window drawn again with reduced motion asks for nothing; the clock stays, so the window's place is not
+        // saved
+        vcx.update(|_, cx| {
+            crate::spin::forget_asked(cx);
+            crate::a11y::set_reduce_motion(true, cx);
+        });
+        vcx.run_until_parked();
+        assert_eq!(vcx.update(|_, cx| crate::spin::asked(cx)), 0);
+
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn again");
+    }
+
     /// `Home.test.tsx` "home sits on the ground, with no sheet" and "the app root is ground and ink": with no project,
     /// the window draws home alone, with no toolbar and no sheet.
     #[gpui::test]

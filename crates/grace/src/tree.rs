@@ -38,6 +38,8 @@ use crate::tooltip::{Side, cut, tooltip};
 
 /// px, a row (VL-01).
 pub const ROW_HEIGHT: f32 = 24.;
+/// Under "No feature files found", where Grace looks.
+const EMPTY_HINT: &str = "Grace looks for .feature files under the project folder.";
 /// px before the first row and after the last.
 pub const PAD: f32 = 8.;
 /// px a level indents its rows.
@@ -483,10 +485,14 @@ impl Render for Tree {
                     Icon::FileSearch,
                     "No feature files found",
                     Some(
+                        // a label, so a screen reader reads the hint as it read Electron Grace's (PU-28)
                         div()
+                            .id("tree-empty-hint")
+                            .role(Role::Label)
+                            .aria_value(EMPTY_HINT)
                             .text_size(px(METRICS.text_xs.size))
                             .text_color(Theme::color(t.muted))
-                            .child("Grace looks for .feature files under the project folder.")
+                            .child(EMPTY_HINT)
                             .into_any_element(),
                     ),
                     cx,
