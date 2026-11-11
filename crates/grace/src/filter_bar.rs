@@ -43,14 +43,14 @@ const RING: f32 = 4.;
 pub const BAR_HEIGHT: f32 = CHIP_HEIGHT + 12. + 1.;
 
 /// A chip's button over the whole of its frame, the frame's border included, so that it takes the click on all of
-/// the chip's 24 px (PU-24), its text 6 px in from the chip's edge.
+/// the chip's 24 px (PU-24), its text 7 px in from the chip's edge: the 1 px border and `px-1.5`.
 trait Target {
     fn target(self) -> Self;
 }
 
 impl Target for Button {
     fn target(self) -> Self {
-        self.h(px(CHIP_HEIGHT)).m(px(-1.)).px(px(6.)).rounded(px(4.))
+        self.h(px(CHIP_HEIGHT)).m(px(-1.)).px(px(7.)).rounded(px(4.))
     }
 }
 
