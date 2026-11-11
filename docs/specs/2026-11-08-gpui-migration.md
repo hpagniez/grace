@@ -139,7 +139,7 @@ Three levels, each replacing one of today's:
 1. The Electron app keeps shipping from `develop` until the cut-over. Releases follow the usual git flow.
 2. A bug in Electron Grace is fixed there, and the fix lands in GPUI Grace too if the feature is already ported, with the same regression test.
 3. A new feature waits for the cut-over, unless the owner says otherwise. If one lands in Electron Grace anyway, the same PR adds its spec scenarios and tests to the parity list.
-4. The GPUI pins (`gpui-pre`, GPUI Kit, the toolchain) and `Cargo.lock` follow the newest releases, as one set, with the patches rebased and the minimised idle measured again ([ADR 0032](../decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md), the owner's rule of 2026-11-10; until then they moved only between phases). `cargo-updates` opens the bump PR every week; one that collides with a phase's open PRs merges after them.
+4. The GPUI pins (`gpui-pre`, GPUI Kit, the toolchain) and `Cargo.lock` follow the newest releases, as one set, with the patches rebased and the minimised idle measured again ([ADR 0032](../decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md), the owner's rule of 2026-11-10; until then they moved only between phases). `cargo-updates` opens the bump PR every week and merges it once all its tests pass ([ADR 0033](../decisions/0033-merge-the-weekly-cargo-bump-prs-on-green.md)); a phase PR that collides with it merges `develop` in afterwards.
 5. Phase PRs follow the repository's rules: a `feature/*` branch, Conventional Commits with scope `gpui` or the area, `Part of #N` the phase issue, draft while working.
 
 ### R10. Cut-over
