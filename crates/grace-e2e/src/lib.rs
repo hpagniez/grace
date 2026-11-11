@@ -240,6 +240,12 @@ pub trait Driver {
     fn title_bar_report(&self) -> String {
         String::new()
     }
+    /// Whether the window has an icon for its title bar and taskbar button, where the platform shows one: on Windows,
+    /// its class's icon, which GPUI loads from icon 1 of the exe and leaves empty when the exe has none (#321). `None`
+    /// elsewhere: Xvfb has no title bar.
+    fn window_icon(&self) -> Result<Option<bool>> {
+        Ok(None)
+    }
 }
 
 /// How the window shows, for `Driver::show_window`.
@@ -476,6 +482,11 @@ impl App {
     /// See `Driver::title_bar_report`.
     pub fn title_bar_report(&self) -> String {
         self.driver.title_bar_report()
+    }
+
+    /// See `Driver::window_icon`.
+    pub fn window_icon(&self) -> Result<Option<bool>> {
+        self.driver.window_icon()
     }
 
     /// The main screen's work area, as the `e2e` build records it at start (`grace::e2e::record_screen`).
