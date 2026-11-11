@@ -245,6 +245,12 @@ fn nothing_to_run() {
             |t| label(t, "0 tests · Not run yet").is_some() && label(t, "No feature files found").is_some(),
         )
         .unwrap();
+    // PU-28, E-look-15: and where Grace looks
+    assert!(
+        label(&tree, "Grace looks for .feature files under the project folder.").is_some(),
+        "{}",
+        tree.dump()
+    );
     assert!(tree.find(&Role::Button, "Run all").is_some(), "{}", tree.dump());
     // Run all is disabled: a press starts nothing
     let _ = app.press_named(Role::Button, "Run all");
