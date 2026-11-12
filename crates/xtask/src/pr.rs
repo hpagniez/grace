@@ -180,6 +180,14 @@ pub fn papers_errors(tier: Tier, body: &str, docs_only: bool, exists: &dyn Fn(&s
     errors
 }
 
+/// A project is built slice by slice, each in its own session on the model its plan names (WORKFLOW.md): the plan
+/// at `path` must hold a `## Slices` section.
+pub fn slices_error(path: &str, plan: &str) -> Option<String> {
+    (!plan.lines().any(|line| line.trim_end() == "## Slices")).then(|| {
+        format!("Plan: {path} has no \"## Slices\" section: a project's plan names its slices, one PR each, with the model that builds it (WORKFLOW.md)")
+    })
+}
+
 /// A PR body or a commit message says nothing of the agent but its attribution lines (AGENTS.md): no claude.ai
 /// session or project link, no `Claude-Session:` trailer, no "Requested by" line.
 pub fn trace_errors(texts: &[String]) -> Vec<String> {
@@ -430,6 +438,11 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
                 git(&["cat-file", "-t", &format!("{head}:{path}")]).is_some_and(|kind| kind.trim() == "blob")
             };
             errors.extend(papers_errors(tier, body, docs_only, &exists));
+            if let (Tier::Project, Some(path)) = (tier, body_line(body, "Plan:"))
+                && exists(path)
+            {
+                errors.extend(slices_error(path, &show(head, path).unwrap_or_default()));
+            }
         }
         None => {}
     }
@@ -780,6 +793,30 @@ mod tests {
             Vec::<String>::new()
         );
         assert_eq!(papers_errors(Tier::Project, body, false, &|_| true).len(), 1);
+    }
+
+    // a project's plan names its slices
+
+    #[test]
+    fn a_plan_with_its_slices() {
+        let plan = "# Plan\n\n## Slices\n\n| Slice | What | Model |\n|---|---|---|\n| 1 | HTTP | sonnet |\n";
+        assert_eq!(slices_error("docs/plans/a.md", plan), None);
+        assert_eq!(slices_error("docs/plans/a.md", &plan.replace('\n', "\r\n")), None);
+    }
+
+    #[test]
+    fn a_plan_without_its_slices() {
+        for plan in [
+            "# Plan\n\n### Task 1\n",
+            "# Plan\n\nThe ## Slices come later.\n",
+            "# Plan\n\n### Slices\n",
+        ] {
+            let error = slices_error("docs/plans/a.md", plan).unwrap();
+            assert!(
+                error.contains("Plan: docs/plans/a.md has no \"## Slices\" section"),
+                "{error}"
+            );
+        }
     }
 
     // agent traces
@@ -1377,5 +1414,31 @@ mod repository_tests {
         let errors = repo.check("develop", Some("Tier: small"));
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(errors[0].contains("says more about the agent"), "{errors:?}");
+    }
+
+    #[test]
+    fn a_project_pr_names_a_plan_with_slices() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/specs/a.md", "# Spec\n");
+        repo.write("docs/plans/a.md", "# Plan\n\n### Task 1\n");
+        repo.commit("docs: add the spec and the plan");
+        let body = "Tier: project\nPart of #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
+        let errors = repo.check("develop", Some(body));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("Plan: docs/plans/a.md has no \"## Slices\" section"),
+            "{errors:?}"
+        );
+        // a feature's plan needs none
+        assert_eq!(
+            repo.check("develop", Some(&body.replace("project", "feature"))),
+            Vec::<String>::new()
+        );
+        repo.write(
+            "docs/plans/a.md",
+            "# Plan\n\n## Slices\n\n| Slice | Model |\n|---|---|\n| 1 | sonnet |\n",
+        );
+        repo.commit("docs: name the slices");
+        assert_eq!(repo.check("develop", Some(body)), Vec::<String>::new());
     }
 }

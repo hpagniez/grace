@@ -10,8 +10,8 @@ Name the tier in your first message of a task; the owner can overrule it. When t
 |---|---|---|---|
 | When | A fix, a doc or config change, a dependency bump, a refactor that changes no behaviour; nothing hard to reverse | New behaviour a person using the product sees, or a change across several parts | Several PRs, a hard-to-reverse choice (dependency, architecture, file format), or work no one can check from one diff |
 | Design | Two or three lines in the PR body | A short design file the owner approves (`brainstorming`) | A full design, read by a reviewer agent, then approved by the owner; a decision record per hard-to-reverse choice |
-| Plan | None | A plan file (`writing-plans`) | A plan file per phase |
-| Build | In the session | In the session (`executing-plans`) | An agent per task where tasks are independent (`subagent-driven-development`), else in the session |
+| Plan | None | A plan file (`writing-plans`) | A plan file per phase, with its slices: one PR each, in order, each with its model |
+| Build | In the session | In the session (`executing-plans`) | A fresh session per slice, one at a time, on the slice's model, built as a Feature; the owner's approval of the plan starts them |
 | Review | Your own check | One fresh reviewer on the whole branch (`requesting-code-review`) | A reviewer per task, then one on the whole branch |
 | Issue | Only for a reported bug or unfinished work | One | One to track, one per phase |
 
