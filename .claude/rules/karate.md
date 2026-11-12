@@ -6,6 +6,8 @@ paths:
   - "listener/**"
   - "test/fixtures/**"
   - "scripts/capture-fixtures.mjs"
+  - "scripts/vendor.json"
+  - "scripts/bump-vendor.mjs"
 ---
 
 # Karate integration rules

@@ -346,6 +346,8 @@ mod tests {
             ("src/main/karate/http.ts", vec!["electron.md", "karate.md"]),
             (".github/workflows/checks.yml", vec!["ci.md"]),
             ("docs/features.md", vec!["docs.md"]),
+            // a Karate bump starts at the pin: the fixtures rule must load there
+            ("scripts/vendor.json", vec!["ci.md", "karate.md"]),
             ("README.md", vec![]),
         ] {
             let found = matching_rules(file, &read_index, &list_index, &rules);
@@ -355,5 +357,50 @@ mod tests {
                 .collect();
             assert_eq!(names, expected, "{file}");
         }
+    }
+
+    /// A rule reaches the agent who needs it: some rules file loaded with `file` holds `text`.
+    fn loads_with(file: &str, text: &str) -> bool {
+        let rules = list_index(".claude/rules/*.md");
+        matching_rules(file, &read_index, &list_index, &rules)
+            .iter()
+            .any(|rule| read_index(rule).unwrap().contains(text))
+    }
+
+    #[test]
+    fn rules_reach_the_files_they_bind() {
+        for (file, text) in [
+            // the script crate is Rust too, and a `crates/` PR
+            (
+                "crates/xtask/src/rules.rs",
+                "- Before pushing Rust: `cargo fmt --all --check`",
+            ),
+            (
+                "crates/xtask/src/rules.rs",
+                "- A PR that changes `crates/` gets a Windows run by hand",
+            ),
+            (
+                "crates/grace/src/app.rs",
+                "- Before pushing Rust: `cargo fmt --all --check`",
+            ),
+            // a dependency is added in a manifest, not in a doc
+            ("package.json", "A PR that adds a dependency states its size"),
+            ("Cargo.toml", "A PR that adds a dependency states its size"),
+            // a screenshot run on the owner's machine needs that file's rules
+            ("src/renderer/App.tsx", "(../../docs/process/owner-machine.md)"),
+            ("crates/grace/src/app.rs", "(../../docs/process/owner-machine.md)"),
+        ] {
+            assert!(loads_with(file, text), "{file} does not load: {text}");
+        }
+    }
+
+    /// What binds every code PR is named in a file loaded at the start, whatever the PR touches.
+    #[test]
+    fn agents_md_points_to_the_pr_rules() {
+        let agents = read_index("AGENTS.md").unwrap();
+        assert!(
+            agents.contains("Read it before marking a code PR ready"),
+            "AGENTS.md does not point to ci.md"
+        );
     }
 }

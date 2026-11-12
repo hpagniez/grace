@@ -30,7 +30,8 @@ Electron Grace, the app that ships until the GPUI cut-over (`.claude/rules/gpui.
 On a machine with more than one screen, every e2e window opens on a screen that is not the main one, out of the way of the person working: `launch()` in `e2e/helpers.ts` moves it there before it shows. Launch the app in a test only through `launch()`. Only `window.spec.ts` keeps its windows on the main screen (`primaryScreen`), since it tests where the app places them. The bench opens its windows on the first screen that is not the main one too, so run the release benchmark with the same screen layout as the `machine` in `bench/limits.json`.
 
 - End-to-end tests before a PR is ready: run those of the app the PR changes (`npm run e2e` for `src/`). Small: the spec files of the touched area. Feature and Project: the whole suite once, and paste its summary in the PR. CI runs no e2e on PRs into `develop`; PRs into `main` run it on CI once ready.
-- A PR that changes what the app shows carries before and after screenshots (a Small PR only when the look changes). They live on the never-merged branch `feature/pr-screenshots`, as `pr-<N>/<name>-before.png` and `-after.png`, linked by `https://raw.githubusercontent.com/hpagniez/grace/<sha>/...`. Take GPUI Grace's on Linux under Xvfb, or on [the owner's machine](../../AGENTS.md#graces-own) with his go.
+- A PR that changes what the app shows carries before and after screenshots (a Small PR only when the look changes). They live on the never-merged branch `feature/pr-screenshots`, as `pr-<N>/<name>-before.png` and `-after.png`, linked by `https://raw.githubusercontent.com/hpagniez/grace/<sha>/...`. Take GPUI Grace's on Linux under Xvfb, or on [the owner's machine](../../docs/process/owner-machine.md) with his go.
+- A PR that adds a dependency states its size.
 
 ## Solid 2 rules
 

@@ -33,3 +33,10 @@ Dependabot opens grouped update PRs into `develop` monthly, plus security PRs wh
 
 - To change an issue's `Spec:` line: `gh issue edit <N> --body-file -` replaces the whole body, so start from the current one (`gh issue view <N> --json body --jq .body`), change only that line, and pipe the full body back.
 - For a feature built over several PRs, move its card to `building` when its first building PR (not a spec-only PR) opens: `gh project item-add 2 --owner hpagniez --url <issue URL> --format json --jq .id` gives the item ID, then `gh project item-edit --id <item ID> --project-id PVT_kwHOAka2MM4BpJIV --field-id PVTSSF_lAHOAka2MM4BpJIVzhnmDmA --single-select-option-id 47fc9ee4`. Both calls need a token with the `project` scope (`gh auth refresh -h github.com -s project`) ([ADR 0014](../../docs/decisions/0014-backlog-in-github-issues-and-a-project.md)).
+
+## The script crate
+
+`crates/xtask` holds Grace's scripts ([AGENTS.md](../../AGENTS.md#graces-own)). It is Rust and it is under `crates/`, so two rules of GPUI Grace bind it too:
+
+- Before pushing Rust: `cargo fmt --all --check` after the last edit, clippy and `cargo test --workspace`, and `sh scripts/e2e-gpui.sh`.
+- A PR that changes `crates/` gets a Windows run by hand before it merges (`gh workflow run test.yml --ref <branch>`). `merge-when-green` does not wait for it, and a new dispatch cancels the one before: add the label only once the run is green.

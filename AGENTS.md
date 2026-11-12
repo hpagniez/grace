@@ -8,7 +8,7 @@ Grace is moving to Rust and GPUI ([ADR 0031](docs/decisions/0031-move-grace-to-r
 
 ## Rules by area
 
-Claude Code loads each rules file with the files it governs. Any other tool: read the one for the files you touch.
+Claude Code loads each rules file with the files it governs; any other tool reads the one for the files it touches.
 
 | File | Holds |
 |---|---|
@@ -16,8 +16,8 @@ Claude Code loads each rules file with the files it governs. Any other tool: rea
 | `.claude/rules/gpui.md` | GPUI rules, the port's rules, Rust commands and e2e |
 | `.claude/rules/karate.md` | How Grace drives Karate, for both apps |
 | `.claude/rules/both-apps.md` | The theme and icons, which change on both sides until the cut-over |
-| `.claude/rules/ci.md` | Workflows, merge checks, `perf`, limits, issue and board recipes |
-| `.claude/rules/docs.md` | Docs map, and the rules for specs, plans, issues and decision records |
+| `.claude/rules/ci.md` | Workflows, limits, issue and board recipes. Read it before marking a code PR ready: the checks to wait for, the `perf` comment, the project card |
+| `.claude/rules/docs.md` | Docs map; rules for specs, plans, issues and decision records |
 | [docs/process/release.md](docs/process/release.md) | Release and hotfix steps, the release benchmark: read it before any release work |
 | [docs/process/owner-machine.md](docs/process/owner-machine.md) | Read it before any run on the owner's machine: a measure, the bench, a by-hand check |
 
@@ -97,4 +97,4 @@ Release and hotfix branches: [docs/process/release.md](docs/process/release.md).
 
 - Scripts are Rust, in `crates/xtask`, run as `cargo xtask <command>`. The toolchain's version is `rust-toolchain.toml`; its place is `RUSTUP_HOME` and `CARGO_HOME`. The existing JavaScript and shell scripts are ported when touched; `bench/` stays JavaScript until the cut-over.
 - Subagent models: `haiku`, `sonnet` and `opus` are the smallest, the middle one and the largest. Never Fable. Never leave the model unset: an unset model inherits the main agent's.
-- Plugins: superpowers carries the process; ponytail keeps the change small and never drops a step; claude-mem is for recall only, never the to-do list or the place of a rule.
+- Plugins: superpowers carries the process; ponytail keeps the change small; claude-mem is for recall only, never the to-do list or a rule's home.
