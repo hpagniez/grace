@@ -319,6 +319,130 @@ pub fn tests_error(headers: &[String], changes: &[Change], added_rust_lines: &[S
     })
 }
 
+/// What a run knows of the PR. `body` is `None` outside a `pull_request` event, where there is none to read.
+pub struct Env {
+    pub head_ref: String,
+    pub base_ref: String,
+    pub base_sha: String,
+    pub head_sha: String,
+    pub body: Option<String>,
+}
+
+/// Every reason the PR does not follow the rules. `git` gives git's output for its arguments, `None` when it fails.
+pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String> {
+    let lines = |args: &[&str]| -> Vec<String> { git(args).unwrap_or_default().lines().map(String::from).collect() };
+    let show = |sha: &str, path: &str| git(&["show", &format!("{sha}:{path}")]);
+    let (head, base) = (env.head_sha.as_str(), env.base_sha.as_str());
+    let mut errors = Vec::new();
+
+    errors.extend(branch_error(&env.head_ref, &env.base_ref));
+    let records = lines(&["ls-tree", "--name-only", head, "docs/checks/"]);
+    errors.extend(public_docs_error(&env.head_ref, &env.base_ref, &records, &|path| {
+        show(head, path)
+    }));
+
+    // commits already on develop were checked in their own PR; a release PR into main carries them all
+    let Some(log) = git(&[
+        "log",
+        "--no-merges",
+        "--format=%B%x00",
+        head,
+        "--not",
+        base,
+        "origin/develop",
+    ]) else {
+        errors.push("could not list the PR's commits: is origin/develop fetched?".to_string());
+        return errors;
+    };
+    let messages: Vec<String> = log.split('\0').map(|message| message.trim().to_string()).collect();
+    let messages: Vec<String> = messages.into_iter().filter(|message| !message.is_empty()).collect();
+    let headers: Vec<String> = messages
+        .iter()
+        .map(|message| message.lines().next().unwrap_or_default().to_string())
+        .collect();
+    // Dependabot writes its own commit headers, often over 72 characters
+    if !env.head_ref.starts_with("dependabot/") {
+        for header in &headers {
+            errors.extend(commit_error(header).map(|error| format!("commit \"{header}\": {error}")));
+        }
+    }
+    errors.extend(trace_errors(&messages));
+
+    // a PR changes only what it added to where it left the base, not to the base's tip
+    let fork = git(&["merge-base", base, head]).unwrap_or_default().trim().to_string();
+    let added = lines(&["diff", "--name-only", "--no-renames", "--diff-filter=A", &fork, head]);
+    let changes: Vec<Change> = lines(&["diff", "--numstat", "--no-renames", &fork, head])
+        .iter()
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, '\t');
+            // a binary file counts no line: git prints "-" for it
+            let count = |field: Option<&str>| field.and_then(|field| field.parse::<usize>().ok()).unwrap_or(0);
+            let lines = count(fields.next()) + count(fields.next());
+            let path = fields.next()?.to_string();
+            Some(Change {
+                added: added.contains(&path),
+                path,
+                lines,
+            })
+        })
+        .collect();
+
+    if let Some(body) = &env.body {
+        errors.extend(trace_errors(std::slice::from_ref(body)));
+        errors.extend(script_language_error(&added, body));
+    }
+    if exempt(&env.head_ref) {
+        return errors;
+    }
+    let rust: Vec<String> = lines(&["diff", "-U0", "--no-renames", &fork, head, "--", "*.rs"])
+        .into_iter()
+        .filter(|line| line.starts_with('+') && !line.starts_with("+++"))
+        .collect();
+    errors.extend(tests_error(&headers, &changes, &rust));
+    let Some(body) = &env.body else {
+        return errors;
+    };
+    errors.extend(tier_error(&env.head_ref, body));
+    match tier(body) {
+        Some(Tier::Small) => {
+            let manifest = |change: &&Change| change.path == "package.json" || change.path.ends_with("Cargo.toml");
+            let mut new = Vec::new();
+            for change in changes.iter().filter(manifest) {
+                let before = dependencies(&change.path, &show(&fork, &change.path).unwrap_or_default());
+                let after = dependencies(&change.path, &show(head, &change.path).unwrap_or_default());
+                new.extend(after.into_iter().filter(|name| !before.contains(name)));
+            }
+            errors.extend(small_errors(&changes, &new));
+        }
+        Some(tier) => {
+            let docs_only = changes
+                .iter()
+                .all(|change| change.path.starts_with("docs/") || change.path.ends_with(".md"));
+            let exists = |path: &str| git(&["cat-file", "-e", &format!("{head}:{path}")]).is_some();
+            errors.extend(papers_errors(tier, body, docs_only, &exists));
+        }
+        None => {}
+    }
+    errors
+}
+
+/// Checks the PR the environment describes, prints each failure as a CI error, and gives the exit code.
+pub fn run() -> u8 {
+    let var = |name: &str| std::env::var(name).unwrap_or_default();
+    let env = Env {
+        head_ref: var("HEAD_REF"),
+        base_ref: var("BASE_REF"),
+        base_sha: var("BASE_SHA"),
+        head_sha: var("HEAD_SHA"),
+        body: (var("EVENT_NAME") == "pull_request").then(|| var("PR_BODY")),
+    };
+    let errors = errors(&env, &|args| crate::rules::git(crate::rules::root(), args));
+    for error in &errors {
+        println!("::error::{error}");
+    }
+    u8::from(!errors.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -833,5 +957,259 @@ screens = []
             tests_error(&strings(&["feat: x"]), &[change("docs/specs/a.md", 30)], &[]),
             None
         );
+    }
+}
+
+/// `errors` on real repositories, each made in a temporary folder and removed after its test.
+#[cfg(test)]
+mod repository_tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Repo {
+        dir: PathBuf,
+        base: String,
+    }
+
+    impl Repo {
+        /// A repository with one commit on `main`, which is also `origin/develop`, and a branch `head` cut from it.
+        fn new(head: &str) -> Repo {
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            let name = format!(
+                "grace-xtask-{}-{}",
+                std::process::id(),
+                COUNT.fetch_add(1, Ordering::Relaxed)
+            );
+            let dir = std::env::temp_dir().join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            let mut repo = Repo {
+                dir,
+                base: String::new(),
+            };
+            repo.git(&["init", "-q", "-b", "main"]);
+            repo.write(
+                "package.json",
+                "{\n  \"dependencies\": {\n    \"a\": \"1.0.0\"\n  }\n}\n",
+            );
+            repo.commit("chore: init");
+            repo.commit("Merge pull request #4 from x/y");
+            repo.git(&["update-ref", "refs/remotes/origin/develop", "HEAD"]);
+            repo.base = repo.git(&["rev-parse", "HEAD"]);
+            repo.git(&["switch", "-q", "-c", head]);
+            repo
+        }
+
+        /// Git in this repository, with none of the machine's identity or commit signing.
+        fn git(&self, args: &[&str]) -> String {
+            let settings = [
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgsign=false",
+            ];
+            let out = std::process::Command::new("git")
+                .arg("-C")
+                .arg(&self.dir)
+                .args(settings)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "git {args:?}: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        }
+
+        fn write(&self, path: &str, text: &str) {
+            let file = self.dir.join(path);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+
+        fn commit(&self, message: &str) {
+            self.git(&["add", "-A"]);
+            self.git(&["commit", "-q", "--allow-empty", "-m", message]);
+        }
+
+        /// The errors of a PR from this repository's branch into `base`, with `body`.
+        fn check(&self, base: &str, body: Option<&str>) -> Vec<String> {
+            let env = Env {
+                head_ref: self.git(&["branch", "--show-current"]),
+                base_ref: base.to_string(),
+                base_sha: self.base.clone(),
+                head_sha: self.git(&["rev-parse", "HEAD"]),
+                body: body.map(String::from),
+            };
+            errors(&env, &|args| crate::rules::git(&self.dir, args))
+        }
+    }
+
+    impl Drop for Repo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    #[test]
+    fn a_small_docs_pr_passes() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/a.md", "# A\n");
+        repo.commit("docs: note a");
+        assert_eq!(
+            repo.check("develop", Some("## Summary\n\nTier: small\n")),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn a_pr_without_a_tier_fails() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/a.md", "# A\n");
+        repo.commit("docs: note a");
+        let errors = repo.check("develop", Some("## Summary\n"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("has no \"Tier: small\""), "{errors:?}");
+    }
+
+    #[test]
+    fn a_dispatch_run_skips_the_body() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/a.md", "# A\n");
+        repo.commit("docs: note a");
+        assert_eq!(repo.check("develop", None), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_bad_header_is_reported_and_a_merge_commit_is_not() {
+        let repo = Repo::new("feature/x");
+        repo.commit("Bad header");
+        let errors = repo.check("develop", Some("Tier: small"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].starts_with("commit \"Bad header\": "), "{errors:?}");
+    }
+
+    #[test]
+    fn a_branch_that_may_not_target_main_fails() {
+        let repo = Repo::new("feature/x");
+        repo.commit("docs: note");
+        let errors = repo.check("main", Some("Tier: small"));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("feature/x may not target main")),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_release_into_main_without_its_record_fails() {
+        let repo = Repo::new("release/v1.0.0-rc.1");
+        repo.commit("build: bump version to 1.0.0-rc.1");
+        let errors = repo.check("main", Some(""));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("-1.0.0-rc.1-packaged.md"), "{errors:?}");
+        repo.write(
+            "docs/checks/2026-10-30-release-1.0.0-rc.1-packaged.md",
+            "# Check\n\n## Public docs\n\nFine.\n",
+        );
+        repo.commit("docs: record the 1.0.0-rc.1 packaged-app check");
+        assert_eq!(repo.check("main", Some("")), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_dependabot_pr_passes() {
+        let repo = Repo::new("dependabot/npm_and_yarn/develop/minor-and-patch-450526cfbb");
+        repo.write(
+            "package.json",
+            "{\n  \"dependencies\": {\n    \"a\": \"1.0.1\"\n  }\n}\n",
+        );
+        repo.commit("Bump the minor-and-patch group across 1 directory with 12 updates, far beyond 72 characters");
+        assert_eq!(
+            repo.check("develop", Some("Bumps the minor-and-patch group.")),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn a_small_pr_that_adds_a_dependency_fails() {
+        let repo = Repo::new("feature/x");
+        repo.write(
+            "package.json",
+            "{\n  \"dependencies\": {\n    \"a\": \"1.0.0\",\n    \"b\": \"2.0.0\"\n  }\n}\n",
+        );
+        repo.write(
+            "crates/x/Cargo.toml",
+            "[package]\nname = \"x\"\n\n[dependencies]\nserde_json = \"1\"\n",
+        );
+        repo.commit("build(deps): add b and serde_json");
+        let errors = repo.check("develop", Some("Tier: small"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("a Small PR adds a dependency (serde_json, b)"),
+            "{errors:?}"
+        );
+        // the same change is fine in a feature PR with its papers
+        repo.write("docs/specs/a.md", "# Spec\n");
+        repo.write("docs/plans/a.md", "# Plan\n");
+        repo.commit("docs: add the spec and the plan");
+        let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
+        assert_eq!(repo.check("develop", Some(body)), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_feature_names_files_that_exist_at_its_head() {
+        let repo = Repo::new("feature/x");
+        repo.write("src/a.ts", "export const a = 1;\n");
+        repo.write("src/a.test.ts", "it('a', () => {});\n");
+        repo.write("docs/specs/a.md", "# Spec\n");
+        repo.commit("feat: add a");
+        let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
+        let errors = repo.check("develop", Some(body));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("Plan: docs/plans/a.md is not a file of this PR's head"),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_rust_fix_needs_a_test_line() {
+        let repo = Repo::new("feature/x");
+        repo.write("crates/x/src/a.rs", "pub fn a() -> u8 {\n    2\n}\n");
+        repo.commit("fix: give a its value");
+        let errors = repo.check("develop", Some("Tier: small"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("a feat or fix commit changes src/ or crates/ and no test"),
+            "{errors:?}"
+        );
+        repo.write(
+            "crates/x/src/a.rs",
+            "pub fn a() -> u8 {\n    2\n}\n\n#[test]\nfn a_is_two() {\n    assert_eq!(a(), 2);\n}\n",
+        );
+        repo.commit("test: pin a");
+        assert_eq!(repo.check("develop", Some("Tier: small")), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_session_link_in_a_commit_is_refused() {
+        let repo = Repo::new("feature/x");
+        repo.git(&[
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "docs: note",
+            "-m",
+            "https://claude.ai/code/session_01",
+        ]);
+        let errors = repo.check("develop", Some("Tier: small"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("says more about the agent"), "{errors:?}");
     }
 }
