@@ -1,6 +1,6 @@
 # GPUI migration: parity checklist
 
-Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P2.
+Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Status: porting, phase P3 ([plan](../plans/2026-11-12-gpui-p3-panels.md)).
 
 This is the list the cut-over is checked against ([guide R3](2026-11-08-gpui-migration.md#r3-what-ported-means)): 594 spec scenarios, 194 end-to-end tests and 1,773 unit and component tests, taken from `develop` at `32a5ef6`, the commit of the go decision. A row is ported when the behaviour it names works in GPUI Grace and a test proves it: fill **Proof** with the test (`crates/…::test_name`, `e2e-uia/…`, a bench measure, or a dated check record for a by-hand check) and tick the box in the PR that ports it. A row that does not apply any more says why, in words, in **Proof**, with `n/a` in the last column; only the owner can accept an `n/a` on a user-facing row.
 
