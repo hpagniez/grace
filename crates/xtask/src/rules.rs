@@ -370,18 +370,18 @@ mod tests {
     #[test]
     fn rules_reach_the_files_they_bind() {
         for (file, text) in [
-            // the script crate is Rust too, and a `crates/` PR
+            // the script crate is Rust too, but not GPUI Grace: no Windows run by hand
             (
                 "crates/xtask/src/rules.rs",
-                "- Before pushing Rust: `cargo fmt --all --check`",
-            ),
-            (
-                "crates/xtask/src/rules.rs",
-                "- A PR that changes `crates/` gets a Windows run by hand",
+                "Before pushing it: `cargo fmt --all --check`",
             ),
             (
                 "crates/grace/src/app.rs",
                 "- Before pushing Rust: `cargo fmt --all --check`",
+            ),
+            (
+                "crates/grace/src/app.rs",
+                "- A PR whose `gpui` area is true (`cargo xtask scope origin/develop` says",
             ),
             // a dependency is added in a manifest, not in a doc
             ("package.json", "A PR that adds a dependency states its size"),
