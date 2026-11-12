@@ -880,6 +880,14 @@ mod tests {
                 .into_iter()
                 .find(|u| u.status == Status::Failed)
                 .unwrap();
+            // the error itself still starts with the place
+            assert!(
+                failed
+                    .error
+                    .as_deref()
+                    .unwrap()
+                    .starts_with("C:\\fixture\\tests\\basic.feature:20")
+            );
             assert_eq!(
                 slice_utf16(failed.error.as_deref().unwrap(), failed.reason_at.unwrap()),
                 "match failed: EQUALS\n  $ | not equal (STRING:STRING)\n  'hello'\n  'goodbye'\n"

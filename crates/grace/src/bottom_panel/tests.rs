@@ -121,6 +121,19 @@ mod tabs {
     }
 
     #[gpui::test]
+    fn an_unusable_saved_order_shows_the_default_and_stays_until_the_next_move(cx: &mut TestAppContext) {
+        let dir = data_dir("unusable-order");
+        let saved = r#"{"panelTabs":["history","history","http"]}"#;
+        std::fs::write(dir.join("settings.json"), saved).unwrap();
+        let (_h, mut cx, p) = setup(cx, dir.clone());
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert_eq!(std::fs::read_to_string(dir.join("settings.json")).unwrap(), saved);
+        focus_tab(&p, 0, &mut cx);
+        keys(&mut cx, "alt-right");
+        assert_eq!(load_tab_order(&dir), [TabId::History, TabId::Console, TabId::Http]);
+    }
+
+    #[gpui::test]
     fn a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved(cx: &mut TestAppContext) {
         let dir = data_dir("drag");
         let (h, mut cx, p) = setup(cx, dir.clone());
@@ -192,6 +205,98 @@ mod tabs {
         keys(&mut cx, "right ctrl-alt-right alt-shift-right alt-up");
         assert_eq!(order(&p, &mut cx), TAB_IDS);
         assert!(!dir.join("settings.json").exists());
+    }
+
+    /// Presses on one tab and drags to another, the button still down; returns where it stands.
+    fn drag(cx: &mut VisualTestContext, from: &'static str, to: &'static str) -> Point<gpui::Pixels> {
+        let a = centre(cx, from);
+        let b = centre(cx, to);
+        cx.simulate_mouse_down(a, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(a + gpui::point(px(-10.), px(0.)), MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(b, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        b
+    }
+
+    /// The side of `id` that shows the drop bar: `Some(true)` the right, `Some(false)` the left.
+    fn bar(p: &Entity<BottomPanel>, id: TabId, cx: &mut VisualTestContext) -> Option<bool> {
+        cx.update(|_, cx| {
+            let p = p.read(cx);
+            p.mark(id, p.from)
+        })
+    }
+
+    #[gpui::test]
+    fn a_drop_bar_shows_on_the_side_the_tab_will_land_and_not_over_the_dragged_tab(cx: &mut TestAppContext) {
+        let (_h, mut cx, p) = setup(cx, data_dir("bar-right"));
+        let at = drag(&mut cx, "tab-console", "tab-history");
+        assert_eq!(bar(&p, TabId::History, &mut cx), Some(true));
+        assert_eq!(bar(&p, TabId::Console, &mut cx), None);
+        // back over the dragged tab: no bar anywhere
+        let console = centre(&mut cx, "tab-console");
+        cx.simulate_mouse_move(console, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+        cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::none());
+    }
+
+    #[gpui::test]
+    fn dragging_a_tab_from_the_right_marks_the_left_side(cx: &mut TestAppContext) {
+        let (_h, mut cx, p) = setup(cx, data_dir("bar-left"));
+        drag(&mut cx, "tab-http", "tab-history");
+        assert_eq!(bar(&p, TabId::History, &mut cx), Some(false));
+    }
+
+    #[gpui::test]
+    fn a_drop_outside_the_tabs_changes_and_saves_nothing(cx: &mut TestAppContext) {
+        let dir = data_dir("drop-outside");
+        let (_h, mut cx, p) = setup(cx, dir.clone());
+        drag(&mut cx, "tab-console", "tab-history");
+        let outside = gpui::point(px(500.), px(100.));
+        cx.simulate_mouse_move(outside, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_up(outside, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        draw(&mut cx);
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+    }
+
+    #[gpui::test]
+    fn a_file_dragged_in_from_outside_shows_no_bar_and_moves_no_tab(cx: &mut TestAppContext) {
+        let dir = data_dir("outside-file");
+        let (_h, mut cx, p) = setup(cx, dir.clone());
+        let over = centre(&mut cx, "tab-history");
+        cx.simulate_event(gpui::FileDropEvent::Entered {
+            position: over,
+            paths: gpui::ExternalPaths(Default::default()),
+        });
+        cx.run_until_parked();
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+        cx.simulate_event(gpui::FileDropEvent::Submit { position: over });
+        cx.run_until_parked();
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+    }
+
+    #[gpui::test]
+    fn alt_right_stops_at_the_last_place_and_the_shown_tab_stays(cx: &mut TestAppContext) {
+        let dir = data_dir("last");
+        let (h, mut cx, p) = setup(cx, dir.clone());
+        let at = centre(&mut cx, "tab-http");
+        cx.simulate_click(at, Modifiers::none());
+        cx.run_until_parked();
+        focus_tab(&p, 0, &mut cx);
+        keys(&mut cx, "alt-right alt-right alt-right");
+        assert_eq!(order(&p, &mut cx), [TabId::History, TabId::Http, TabId::Console]);
+        assert_eq!(load_tab_order(&dir), [TabId::History, TabId::Http, TabId::Console]);
+        assert_eq!(cx.update(|_, cx| h.grace.read(cx).state.panel), Panel::Http);
     }
 
     #[gpui::test]

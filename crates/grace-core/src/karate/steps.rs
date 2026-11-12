@@ -162,7 +162,7 @@ mod tests {
             assert_eq!(step.status, "failed");
             assert!(
                 step.text
-                    .starts_with("Scenario execution failed: Config evaluation failed: karate-config.js"),
+                    .starts_with("Scenario execution failed: Config evaluation failed: karate-config.js - js failed:"),
                 "{}",
                 step.text
             );

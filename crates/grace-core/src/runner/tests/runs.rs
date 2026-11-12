@@ -309,3 +309,37 @@ fn a_cancel_just_before_java_starts_starts_none() {
     assert!(!project_dir(&t.data_dir, &fx.root).join("run-args.txt").exists());
     assert_eq!(java_command_lines(&fx.root), Vec::<String>::new());
 }
+
+/// The value after `-f` in Java's arguments.
+fn formats(s: &Started) -> &str {
+    let at = s.args.iter().position(|a| a == "-f").expect("-f");
+    &s.args[at + 1]
+}
+
+/// Export reports R1 (ER-01, ER-02): a project that asks for JUnit XML gets it in its runs, not in the dry run that
+/// lists the tests; one that does not ask gets Karate's usual two formats.
+#[test]
+fn a_project_that_asks_for_junit_xml_gets_it_in_runs_and_not_in_the_dry_run() {
+    for (pom, run) in [
+        (r#"{"output":{"junitXml":true}}"#, "html,karate:jsonl,junit:xml"),
+        (r#"{"output":{"junitXml":false}}"#, "html,karate:jsonl"),
+    ] {
+        let t = setup();
+        let starts = t.record_spawns();
+        let fx = fixture("clean");
+        fs::write(fx.join("karate-pom.json"), pom).unwrap();
+        t.runner.open(&fx.root).unwrap();
+        t.runner.run(&t.key("passing hello")).unwrap();
+        let starts = lock(&starts);
+        let dry: Vec<_> = starts.iter().filter(|s| s.dry).map(formats).collect();
+        assert!(
+            !dry.is_empty() && dry.iter().all(|f| *f == "html,karate:jsonl"),
+            "{pom}: {dry:?}"
+        );
+        assert_eq!(
+            starts.iter().filter(|s| !s.dry).map(formats).collect::<Vec<_>>(),
+            [run],
+            "{pom}"
+        );
+    }
+}
