@@ -10,7 +10,7 @@ updates:
       prefix: build
       include: scope
     groups:
-      # AGENTS.md: upgrade the Solid set together
+      # .claude/rules/electron.md: upgrade the Solid set together
       solid:
         patterns: ["solid-js", "@solidjs/*", "@tanstack/solid-router", "@kobalte/core"]
       electron-forge:

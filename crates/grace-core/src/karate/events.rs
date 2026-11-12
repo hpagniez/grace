@@ -87,7 +87,7 @@ impl KarateEvent {
         })
     }
 
-    /// `data.callDepth === 0`: the run's own features and scenarios, not the ones they call (AGENTS.md: filter
+    /// `data.callDepth === 0`: the run's own features and scenarios, not the ones they call (.claude/rules/karate.md: filter
     /// `callDepth == 0` for the test tree).
     pub fn at_depth_zero(&self) -> bool {
         self.data.get("callDepth").and_then(Value::as_f64) == Some(0.0)

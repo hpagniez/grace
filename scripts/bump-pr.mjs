@@ -61,7 +61,7 @@ export function prBody({ dep, from, to, keep, runCommand }) {
         "Karate:",
         `- Release notes: https://github.com/karatelabs/karate/releases/tag/v${to}`,
         `- Changes: https://github.com/karatelabs/karate/compare/v${from}...v${to}`,
-        `- \`RunCommand.java\`: ${status}. Check the flags in AGENTS.md (Karate integration rules) against it.`,
+        `- \`RunCommand.java\`: ${status}. Check the flags in .claude/rules/karate.md against it.`,
         `- Fixtures recorded again with Karate ${to} (second commit; time stamps, durations and ports always differ). \`src/main/karate/http.test.ts\` checks the HTTP calls (F11).`,
         "- Check that `RESERVED_KARATE_KEYS` in `src/shared/env.ts` still lists every system property Karate reads.",
       ].join("\n"),
