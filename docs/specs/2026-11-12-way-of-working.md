@@ -109,7 +109,7 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 - A task ends with its PR merged or closed, its branch deleted on the machine and on the remote, its worktree removed, and the default branch up to date on the machine.
 - Nothing is parked. A branch has a PR within a day, and a PR nobody has touched for 7 days is finished or closed with a note (its commits stay reachable from the closed PR).
 - Everything an agent makes outside the checkout goes under one scratch folder, `<temp>/agent-work/<repository>/<task>/`, and is removed when the task ends. No junction or symbolic link into the checkout, ever.
-- A leftover is something with no open PR behind it. `scripts/tidy.mjs` reports: a branch that is merged, whose remote is gone, or that has no open PR; a worktree whose branch has no open PR; a stash; untracked files while on the default branch; a link inside the checkout; a scratch folder whose task has no open PR; a PR idle for 7 days. Work in progress is not a leftover: the current branch with its open PR, its worktree and its untracked files are left alone, and so are release and hotfix branches with an open PR and PRs opened by a bot. It changes nothing and prints nothing when all is clean. A `SessionStart` hook in `.claude/settings.json` runs it, so leftovers show at the start of the next session, at no cost when there are none.
+- A leftover is something with no open PR behind it. The project's tidy check reports: a branch that is merged, whose remote is gone, or that has no open PR; a worktree whose branch has no open PR; a stash; untracked files while on the default branch; a link inside the checkout; a scratch folder whose task has no open PR; a PR idle for 7 days. Work in progress is not a leftover: the current branch with its open PR, its worktree and its untracked files are left alone, and so are release and hotfix branches with an open PR and PRs opened by a bot. It changes nothing and prints nothing when all is clean. It runs at the start of every session, so leftovers show the next day, at no cost when there are none.
 - What an agent may do with the report: delete on its own only what cannot lose work, that is a merged branch (`git branch -d`), a worktree with no changes whose branch is merged, an empty folder. Anything else (an unmerged branch, a stash, untracked files, a folder with content, an idle PR) it shows to the owner and asks.
 
 **The person's machine.** Ask before a run that opens windows, needs a quiet machine or installs something; say how long and what will show; one yes covers one run. Builds, unit tests and git need no ask.
@@ -128,7 +128,7 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 | Workflow table, SignPath, Dependabot and bump workflows | `.claude/rules/ci.md` | `.github/**`, `scripts/check-pr.mjs`, `scripts/bump-*.mjs`, `scripts/vendor.json` |
 | Release and hotfix steps, the release benchmark | `docs/process/release.md` | linked from `AGENTS.md` |
 | Stack, Solid 2 rules, UI conventions | `.claude/rules/electron.md` | `src/**`, `e2e/**`, `bench/**`, `*.config.*`, `package.json` |
-| GPUI rules | `.claude/rules/gpui.md` | `crates/**`, `patches/**`, `Cargo.*`, `rust-toolchain.toml`, `scripts/e2e-gpui.sh` |
+| GPUI rules | `.claude/rules/gpui.md` | `crates/grace/**`, `crates/grace-core/**`, `crates/grace-e2e/**`, `patches/**`, `Cargo.*`, `rust-toolchain.toml`, `scripts/e2e-gpui.sh` |
 | Rules that bind both apps until the cut-over (the theme tokens equal `src/index.css`, a new icon is added on both sides) | `.claude/rules/both-apps.md`, so they load whichever side is edited | `src/index.css`, `src/renderer/**`, `crates/grace/src/theme*`, `crates/grace/assets/**` |
 | Karate integration rules | `.claude/rules/karate.md` | `src/main/karate/**`, `src/main/runner*`, `crates/grace-core/**`, `listener/**`, `test/fixtures/**` |
 
@@ -172,32 +172,40 @@ Where they disagree, the order is: the project's rules, then `WORKFLOW.md`, then
 - The Subagents section's "always extra high" rule.
 - The "every PR links an issue" rule, for Small PRs only.
 
-### 5. Enforcement
+### 5. Scripts
 
-The owner's requirement (2026-11-12): whether the workflow was followed is checked by machines, not by trust. Every check below is a script: none costs licence usage. A rule that no script can check is listed at the end, so nobody takes it for enforced.
+The owner's requirements (2026-11-12): one convention for all scripting, in a safe technology; Rust first, then Python, then JavaScript, moving down only when the job cannot be done in the language above; where each toolchain is installed and which one a project uses are configurable; and the whole stays simple.
 
-**The PR says its tier.** The PR template shrinks from 107 lines to a summary, one `Tier: small|feature|project` line, the issue line, and `## Verification`. `scripts/check-pr.mjs` reads the PR body (passed by `checks.yml`, which also runs when the body is edited) and the diff:
+**General (`WORKFLOW.md`, a few lines).**
 
-| Check in `check-pr.mjs`, on every PR | Fails when |
+- A project has one script command and one home for its scripts. Its `AGENTS.md` names them in one line.
+- The order is Rust, then Python, then JavaScript. A project that sets no language uses the first of them it already builds with. A script goes one language down only when the one above cannot do the job (it must run inside another runtime, such as a browser driver), and the PR says why in one line. No new shell script: a CI step is a one-liner that calls the script command.
+- Three rules in any language: a program is started with an argument list, never through a shell; the standard library before a dependency; every script has tests.
+- Nothing hard-codes where a toolchain lives or which version runs. The version is the language's own pin file (`rust-toolchain.toml`, `.python-version`); the place is the toolchain's own variables (`RUSTUP_HOME` and `CARGO_HOME`; `UV_PYTHON_INSTALL_DIR`).
+
+**Grace.** Scripts are Rust: one crate, `crates/xtask`, run as `cargo xtask <command>` (an alias in `.cargo/config.toml`), with `#![forbid(unsafe_code)]`, the workspace's lints and no dependency. Each command is a module of pure functions with unit tests; `main` reads the arguments, calls them and sets the exit code. This work adds three commands and no more: `check-rules`, `check-pr`, `tidy`.
+
+**The existing scripts.** All 19 are in use: each is called by `package.json`, by a workflow, or imported by one that is (17 JavaScript files, 3,837 lines; 2 shell files, 49 lines). None is removed. They are ported when touched (the owner, 2026-11-12): a script is rewritten in Rust when it is next changed in substance. `scripts/check-pr.mjs` is ported in phase 2, which rewrites it anyway. `bench/` (2,485 lines) stays JavaScript: it drives Electron through Playwright and goes at the cut-over, with whatever JavaScript is left then. The one script outside every automatic path is `scripts/make-icon.mjs` (48 lines, `npm run icon`), kept because it is the only way to rebuild the icon.
+
+### 6. Enforcement
+
+The owner's requirement (2026-11-12): whether the workflow was followed is checked by machines, not by trust. Three mechanisms, all scripts or settings: none costs licence usage. What no script can check is listed at the end, so nobody takes it for enforced.
+
+**1. The required CI check.** The PR template shrinks from 107 lines to a summary, a `Tier: small|feature|project` line and the issue line. `checks`, the one workflow the ruleset requires, runs `cargo xtask check-rules` and `cargo xtask check-pr` (the port of `scripts/check-pr.mjs`, with its existing checks), which reads the PR body and the diff. A PR that fails cannot merge.
+
+| Check | Fails when |
 |---|---|
 | Tier | The body has no `Tier:` line. A bot branch (`dependabot/*`, `feature/bump-*`) counts as Small without one |
 | Small stays small | A Small PR adds a dependency (a new name in `package.json` or a `Cargo.toml`), adds a file under `docs/decisions/`, or changes more than 400 lines outside docs, lock files and fixtures: the message says to step up a tier |
 | Feature and Project have their papers | The body has no `Closes #N` or `Part of #N`, or no `Spec:` and `Plan:` lines naming files that exist at the PR's head |
 | Tests come with behaviour | A PR with a `feat` or `fix` commit changes code under `src/` or `crates/` and no test file |
-| Verification | A PR that changes code has an empty `## Verification` section (it holds the commands run and their summary lines) |
+| Script language | The PR adds a `.py`, `.mjs`, `.js`, `.sh` or `.ps1` file outside `src/`, `e2e/`, `test/` and `bench/`, and its body has no `Script-language:` line giving the reason |
 | Agent traces | A commit message or the body holds a claude.ai session or project link, a `Claude-Session:` trailer or a "Requested by" line |
-| Rules files | `WORKFLOW.md` or `AGENTS.md` is over its size limit, `WORKFLOW.md` names the project, or a glob in a `.claude/rules/*.md` `paths:` list matches no tracked file |
+| Rules files (`check-rules`) | `WORKFLOW.md` or `AGENTS.md` is over its size limit, `WORKFLOW.md` names the project, or a glob in a `.claude/rules/*.md` `paths:` list matches no tracked file |
 
-These run in `checks`, the one workflow the ruleset requires, so a PR that fails them cannot merge. The existing checks (commit headers, branch target, release records, raised limits) stay.
+**2. Refusals, as settings.** `.claude/settings.json` denies, with no script behind it, the commands that caused harm: making a junction or a symbolic link (`mklink`, `New-Item -ItemType Junction` or `SymbolicLink`, `ln -s`), and `git push --force`. The repository's ruleset already refuses a push to `main` or `develop` outside a PR.
 
-**Guardrails on the machine**, as hooks in `.claude/settings.json`, which load in local and cloud sessions alike:
-
-| Hook | Does |
-|---|---|
-| `SessionStart` | Runs `scripts/tidy.mjs`; its report, when there is one, is the first thing the session reads |
-| `PreToolUse` on shell commands | Refuses a command that makes a junction or symbolic link (`mklink`, `New-Item -ItemType Junction` or `SymbolicLink`, `ln -s`), and a `git commit` while on `main` or `develop` |
-
-**A weekly sweep on GitHub.** A new workflow, `housekeeping` (scheduled, Linux, GitHub-owned actions only), runs `scripts/tidy.mjs --remote`: branches with no open PR other than `main`, `develop` and `feature/pr-screenshots`, PRs idle for 7 days, issues still open whose closing PR merged. It keeps one issue, "Housekeeping", open with the list while there is one, and closes it when there is none.
+**3. The tidy report.** A `SessionStart` hook runs `cargo xtask tidy`. It reports leftovers on the machine and, when `gh` is there, on GitHub: branches with no open PR other than `main`, `develop` and `feature/pr-screenshots`, and PRs idle for 7 days. It prints nothing when all is clean and never fails the session, a missing `cargo` included.
 
 **Not checked by a script, and why.**
 
@@ -206,11 +214,11 @@ These run in `checks`, the one workflow the ruleset requires, so a PR that fails
 | The test was written before the code | Order inside a session leaves no trace in the diff | The "tests come with behaviour" check, and the whole-branch reviewer on Feature and Project |
 | The owner approved the design | A file cannot prove who wrote a line | The spec's `Status:` line, and the owner merging the PR |
 | The tier was judged honestly | Size is a judgement | The "Small stays small" limits |
-| The scratch folder was emptied on a cloud session's machine | The machine is gone with the session | Nothing needed |
+| The commands were run and passed | A pasted summary proves nothing | CI runs them itself |
 
 ## Cost
 
-This work is its own measure. The gate is bytes, which a script counts: the files loaded at start, before and after, in the PR body. Expected: from 34 KB (about 8,500 tokens) to at most 14 KB (about 3,500), the rest loading only with the files it governs; the skills list shorter by five plugins. An agent cannot run `/context`; the PR body asks the owner to look at it once in a fresh session, as a second reading and not a gate. `tidy.mjs` adds one process at session start, about a second, and no text when the repository is clean. Nothing changes in the app.
+This work is its own measure. The gate is bytes, which a script counts: the files loaded at start, before and after, in the PR body. Expected: from 34 KB (about 8,500 tokens) to at most 14 KB (about 3,500), the rest loading only with the files it governs; the skills list shorter by five plugins. An agent cannot run `/context`; the PR body asks the owner to look at it once in a fresh session, as a second reading and not a gate. The tidy command adds one process at session start and no text when the repository is clean; `checks` gains the build of a crate with no dependency. Nothing changes in the app.
 
 ## Acceptance checks
 
@@ -219,12 +227,13 @@ This work is its own measure. The gate is bytes, which a script counts: the file
 3. Every rule sentence of today's `AGENTS.md` (as on #353) is in one of the new files, or is listed in the PR body as cut or changed with this document's reason.
 4. Each `.claude/rules/*.md` has a `paths:` list, and every glob in it matches at least one tracked file. A test fails otherwise.
 5. A test reads each rules file's `paths:` and checks, for one sample file per area (`crates/grace/src/app.rs`, `src/renderer/App.tsx`, `.github/workflows/checks.yml`, `src/index.css`), which rules files match it: GPUI and Karate rules for the first and not Electron's or CI's, and so on. That Claude Code then loads them is its documented behaviour; the owner's one look with `/memory` confirms it.
-6. `scripts/tidy.mjs` prints nothing and exits 0 on a clean checkout, and names each leftover on a checkout that has a second worktree, a merged branch, a branch whose remote is gone, a stash, an untracked file or a junction. Its test builds each case in a temp repository.
+6. `cargo xtask tidy` prints nothing and exits 0 on a clean checkout, and names each leftover on a checkout that has a second worktree, a merged branch, a branch whose remote is gone, a stash, an untracked file or a junction. Its test builds each case in a temp repository.
 7. The byte counts of the files loaded at start, before and after, are in the PR body.
-8. Each row of the `check-pr.mjs` table in Enforcement has a unit test with a PR that passes and one that fails, in `scripts/check-pr.test.ts` beside the existing ones.
-9. With the hooks in place, a shell command that makes a junction is refused, and so is `git commit` on `develop` (each tried once by hand, recorded in the PR body).
-10. `housekeeping`, run by hand on a repository state with a branch that has no PR, opens the "Housekeeping" issue naming it; run again after the branch is deleted, it closes the issue.
-11. `npm run lint`, `npm run typecheck` and `npm test` pass.
+8. Each row of the check table in Enforcement has a unit test with a PR that passes and one that fails, in `crates/xtask`, and every test of `scripts/check-pr.test.ts` has its port there; `scripts/check-pr.mjs` and its test are deleted.
+9. With the settings in place, a shell command that makes a junction is refused (tried once by hand, recorded in the PR body).
+10. `cargo xtask tidy` names a remote branch that has no open PR (its test feeds it a branch list and a PR list), and prints nothing and exits 0 when `cargo` or `gh` is missing from the hook's path.
+11. `crates/xtask` has `#![forbid(unsafe_code)]` and no dependency, and passes `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+12. `npm run lint`, `npm run typecheck`, `npm test` and `cargo test --workspace` pass.
 
 ## The owner decided
 
@@ -233,26 +242,30 @@ This work is its own measure. The gate is bytes, which a script counts: the file
 - Quality, documentation for agents and code quality are not traded for speed.
 - Housekeeping must be stronger.
 - Following the workflow is verified by machines: guardrails and CI checks.
+- Scripts: one convention, Rust first, then Python, then JavaScript; toolchain place and version configurable; existing scripts ported when touched.
+- The whole must stay simple: control and documentation, not complexity.
 
 ## Calls made in this document (the owner can overrule each)
 
 - Three tiers, not four: a trivial change is a Small one.
 - The general layer is one file in the repository, copied by other projects, not a plugin or a user-level file: it is the only form that reaches local sessions, cloud sessions and other tools.
-- No template repository yet: `WORKFLOW.md` and `tidy.mjs` are copied from Grace until a second project needs them.
+- No template repository yet: `WORKFLOW.md` is copied from Grace until a second project needs it.
 - Rules by path live in `.claude/rules/`, not in nested `AGENTS.md` files: the Karate rules span two folders, and the documentation does not say a nested `AGENTS.md` loads beside a root `CLAUDE.md`.
 - Git flow stays.
 - A PR idle for 7 days, and a branch without a PR for a day, count as leftovers.
-- Enforcement is scripts only. A weekly agent that audits merged PRs against `WORKFLOW.md` would catch more, but it spends the licence usage this work is meant to save; it is left out.
+- Enforcement is scripts and settings only. A weekly agent that audits merged PRs against `WORKFLOW.md` would catch more, but it spends the licence usage this work is meant to save; it is left out.
+- Kept simple on purpose (the owner's steer): one script tool with three commands; refusals as settings, not as a hook script; no weekly workflow, since the tidy report at session start covers GitHub too; no "Verification" section to fill, since CI runs the commands itself; no second general file and no table of rules per language.
+- Toolchain configuration uses each toolchain's own pin file and variables. No new configuration file.
 - The Small limit is 400 changed lines outside docs, lock files and fixtures.
-- The work lands as three PRs, each a Project-tier phase with its own plan: the files and their split (sections 1 to 3), the checks in `check-pr.mjs` with the PR template (section 5), then `tidy.mjs` with the hooks and the `housekeeping` workflow.
+- The work lands as three PRs, each a Project-tier phase with its own plan: the files and their split (sections 1 to 3), the PR checks ported to Rust with the PR template (section 6), then the tidy command with its hook and the refusals. Phase 1 also starts `crates/xtask`.
 
-## Open questions for the owner
+## Questions the owner answered (2026-11-12)
 
-0. **PR #353's two changed rules**, which this work builds on: attribution as `.claude/settings.json` gives it, with no session link (the resume note said no attribution at all); and a go needed on your machine only for what opens windows, needs a quiet machine or installs something.
-2. **humanizer and i-have-adhd**: personal tools, left on unless you say otherwise.
-3. **`perf` on `crates/`-only PRs**: skip it until #334, yes or no (a follow-up of its own).
-4. **Sessions**: this design assumes most work now runs on your machine, with cloud sessions as the exception. In a cloud session superpowers is not there and `WORKFLOW.md` alone carries the process. If cloud is to be the main place again, the superpowers skills would have to be copied into the repository.
+- **PR #353's two changed rules** stand as written, and #353 is merged: attribution as `.claude/settings.json` gives it, with no session link; a go on his machine only for what opens windows, needs a quiet machine or installs something.
+- **humanizer and i-have-adhd** stay on.
+- **`perf` on `crates/`-only PRs** is skipped until #334, as a follow-up of its own.
+- **Sessions** run mostly on his machine. In a cloud session superpowers is not there and `WORKFLOW.md` alone carries the process.
 
 ## Left to the builder
 
-The exact wording of `WORKFLOW.md` within the limits above; the split of each sentence of `AGENTS.md` between files; the test file names; how `tidy.mjs` finds idle PRs (it may skip that check when `gh` is missing or offline).
+The exact wording of `WORKFLOW.md` within the limits above; the split of each sentence of `AGENTS.md` between files; the test file names; how the tidy command finds idle PRs (it skips that check when `gh` is missing or offline).
