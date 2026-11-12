@@ -314,4 +314,46 @@ mod tests {
         assert_eq!(matching_rules("src/b.ts", &read, &list, &rules), ["a.md"]);
         assert_eq!(matching_rules("docs/x.md", &read, &list, &rules), Vec::<String>::new());
     }
+
+    #[test]
+    fn the_repository_passes() {
+        let rules = list_index(".claude/rules/*.md");
+        assert_eq!(rules.len(), 6, "{rules:?}");
+        assert_eq!(
+            rules_files_errors(&read_index, &list_index, &rules),
+            Vec::<String>::new()
+        );
+    }
+
+    /// Each area's rules load with its files and with no other's, and a rule that binds both apps loads on both sides.
+    #[test]
+    fn rules_load_by_area() {
+        let rules = list_index(".claude/rules/*.md");
+        // one git call per glob, not one per glob and sample file
+        let listed: HashMap<String, Vec<String>> = rules
+            .iter()
+            .flat_map(|rule| rule_paths(&read_index(rule).unwrap()))
+            .map(|glob| (glob.clone(), list_index(&glob)))
+            .collect();
+        let list_index = |glob: &str| listed[glob].clone();
+        for (file, expected) in [
+            ("crates/grace/src/app.rs", vec!["gpui.md"]),
+            ("crates/grace-core/src/karate/events.rs", vec!["gpui.md", "karate.md"]),
+            ("crates/grace/src/theme.rs", vec!["both-apps.md", "gpui.md"]),
+            ("crates/xtask/src/rules.rs", vec!["ci.md"]),
+            ("src/renderer/App.tsx", vec!["both-apps.md", "electron.md"]),
+            ("src/index.css", vec!["both-apps.md", "electron.md"]),
+            ("src/main/karate/http.ts", vec!["electron.md", "karate.md"]),
+            (".github/workflows/checks.yml", vec!["ci.md"]),
+            ("docs/features.md", vec!["docs.md"]),
+            ("README.md", vec![]),
+        ] {
+            let found = matching_rules(file, &read_index, &list_index, &rules);
+            let names: Vec<&str> = found
+                .iter()
+                .map(|rule| rule.trim_start_matches(".claude/rules/"))
+                .collect();
+            assert_eq!(names, expected, "{file}");
+        }
+    }
 }
