@@ -423,7 +423,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
 | VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
 | VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
-| VL-29 | 2,000 tests are not slower (perf) | Misses in [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md) on one measure: with no UI Automation client, app CPU 5,438 ms against Electron's 4,156 ms during Run all (+31%, from +58% before #327); run time, Java's CPU and memory are as good or better (#320) | ☐ |
+| VL-29 | 2,000 tests are not slower (perf) | Passes in [the VL-29 check](../checks/2026-11-12-gpui-p2-vl29.md), after #351: with no UI Automation client, app CPU 1,156 ms against Electron's 4,922 ms during Run all (-77%); run time, Java's CPU and memory are as good or better (#320) | ☑ |
 
 ### LF · Light and fast: numbers on every PR, a benchmark before every release
 
