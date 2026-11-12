@@ -66,12 +66,24 @@ pub fn leftovers(facts: &Facts) -> Vec<String> {
         let name = &branch.name;
         // a branch just cut has no commit of its own yet, so git calls it merged: that is work in progress
         if branch.merged && (*name != facts.current || branch.gone) {
-            lines.push(format!("branch {name} is merged into {default}: git branch -d {name}"));
+            let first = if *name == facts.current {
+                format!("switch to {default}, then ")
+            } else {
+                String::new()
+            };
+            lines.push(format!(
+                "branch {name} is merged into {default}: {first}git branch -d {name}"
+            ));
         } else if branch.gone && !branch.merged {
             lines.push(format!(
                 "branch {name} lost its remote branch (its PR was merged or closed): check it holds nothing, then delete it"
             ));
-        } else if facts.remote.is_some() && !branch.merged && !open(name) && branch.age_days >= 1 {
+        } else if facts.remote.is_some()
+            && !branch.merged
+            && !open(name)
+            && branch.age_days >= 1
+            && *name != facts.current
+        {
             lines.push(format!(
                 "branch {name} has no open PR after {} days: open its PR or delete it",
                 branch.age_days
@@ -79,7 +91,15 @@ pub fn leftovers(facts: &Facts) -> Vec<String> {
         }
     }
     if facts.remote.is_some() {
-        for (path, branch) in facts.worktrees.iter().filter(|(_, branch)| !open(branch)) {
+        let age = |name: &str| {
+            facts
+                .branches
+                .iter()
+                .find(|branch| branch.name == name)
+                .map_or(u64::MAX, |branch| branch.age_days)
+        };
+        let left = |(_, branch): &&(String, String)| !open(branch) && *branch != facts.current && age(branch) >= 1;
+        for (path, branch) in facts.worktrees.iter().filter(left) {
             lines.push(format!(
                 "worktree {path} ({branch}) has no open PR: finish it or git worktree remove it"
             ));
@@ -107,7 +127,17 @@ pub fn leftovers(facts: &Facts) -> Vec<String> {
     }
     // the folder of the task in hand is work in progress
     let task = facts.current.rsplit('/').next().unwrap_or_default();
-    for folder in facts.scratch.iter().filter(|folder| folder.as_str() != task) {
+    let reviewed = |folder: &str| {
+        facts
+            .remote
+            .as_ref()
+            .is_some_and(|remote| remote.prs.iter().any(|pr| pr.branch.rsplit('/').next() == Some(folder)))
+    };
+    for folder in facts
+        .scratch
+        .iter()
+        .filter(|folder| folder.as_str() != task && !reviewed(folder))
+    {
         lines.push(format!(
             "scratch folder {folder} is not empty: its task is over, remove what it left"
         ));
@@ -139,21 +169,13 @@ pub fn leftovers(facts: &Facts) -> Vec<String> {
 const SKIPPED: [&str; 5] = ["node_modules", "vendor", "out", "target", ".git"];
 
 /// The jq filter that turns `gh pr list` into one line a PR: number, branch, whole days idle, whether a bot opened it.
-const PRS: &str = ".[] | [.number, .headRefName, ((now - (.updatedAt | fromdate)) / 86400 | floor), (.author.is_bot // false)] | @tsv";
+const PRS: &str = ".[] | [.number, .headRefName, ([0, ((now - (.updatedAt | fromdate)) / 86400 | floor)] | max), (.author.is_bot // false)] | @tsv";
 
 /// Whether `path` is a symbolic link or, on Windows, a junction.
 fn is_link(path: &Path) -> bool {
     let Ok(meta) = std::fs::symlink_metadata(path) else {
         return false;
     };
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        // FILE_ATTRIBUTE_REPARSE_POINT: a junction is a reparse point that is no symbolic link
-        if meta.file_attributes() & 0x400 != 0 {
-            return true;
-        }
-    }
     meta.file_type().is_symlink()
 }
 
@@ -223,7 +245,16 @@ pub fn local_facts(root: &Path, scratch: &Path, now: u64, git: &dyn Fn(&[&str]) 
         })
         .collect();
 
-    let status = lines(&["status", "--porcelain", "--ignored"]);
+    let status = git(&[
+        "--no-optional-locks",
+        "status",
+        "--porcelain",
+        "-z",
+        "--untracked-files=normal",
+        "--ignored",
+    ])
+    .unwrap_or_default();
+    let status: Vec<String> = status.split('\0').map(String::from).collect();
     let untracked: Vec<String> = status
         .iter()
         .filter_map(|line| line.strip_prefix("?? "))
@@ -241,7 +272,7 @@ pub fn local_facts(root: &Path, scratch: &Path, now: u64, git: &dyn Fn(&[&str]) 
         let path = root.join(folder);
         if is_link(&path) {
             links.push(folder.to_string());
-        } else if !SKIPPED.contains(&folder) {
+        } else if !SKIPPED.contains(&folder.rsplit('/').next().unwrap_or(folder)) {
             links_in(root, &path, 3, &mut links);
         }
     }
@@ -309,7 +340,11 @@ pub fn remote(git: &dyn Fn(&[&str]) -> Option<String>, gh: &dyn Fn(&[&str]) -> O
         Some(Pr {
             number: fields.next()?.parse().ok()?,
             branch: fields.next()?.to_string(),
-            idle_days: fields.next()?.parse().ok()?,
+            idle_days: fields
+                .next()?
+                .trim()
+                .parse::<i64>()
+                .map_or(0, |days| days.max(0) as u64),
             bot: fields.next()?.trim() == "true",
         })
     });
@@ -323,10 +358,16 @@ pub fn remote(git: &dyn Fn(&[&str]) -> Option<String>, gh: &dyn Fn(&[&str]) -> O
 pub fn run() -> u8 {
     let root = crate::rules::root();
     let git = |args: &[&str]| crate::rules::git(root, args);
-    let gh = |args: &[&str]| {
-        let out = std::process::Command::new("gh")
+    // GitHub is read without a prompt and with a short wait: the start of a session never hangs on a passphrase,
+    // a host key or a login
+    let quiet = |program: &str, args: &[&str]| {
+        let out = std::process::Command::new(program)
             .current_dir(root)
             .args(args)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o ConnectTimeout=5")
+            .env("GH_PROMPT_DISABLED", "1")
+            .stdin(std::process::Stdio::null())
             .output()
             .ok()?;
         out.status
@@ -344,7 +385,7 @@ pub fn run() -> u8 {
         .map_or(0, |since| since.as_secs());
 
     let mut facts = local_facts(root, &scratch, now, &git);
-    facts.remote = remote(&git, &gh);
+    facts.remote = remote(&|args| quiet("git", args), &|args| quiet("gh", args));
     let found = leftovers(&facts);
     if !found.is_empty() {
         println!(
@@ -511,6 +552,50 @@ mod tests {
         };
         none(&reviewed);
         none(&Facts { worktrees, ..clean() });
+    }
+
+    #[test]
+    fn the_session_in_hand_is_work_in_progress() {
+        // the current branch has no PR yet and sits in its own worktree: neither is a leftover
+        let facts = Facts {
+            current: "feature/x".to_string(),
+            branches: vec![branch("feature/x", false, false, 3)],
+            worktrees: vec![("/tmp/w".to_string(), "feature/x".to_string())],
+            remote: remote(&["develop"], Vec::new()),
+            ..clean()
+        };
+        none(&facts);
+    }
+
+    #[test]
+    fn a_worktree_cut_today_is_work_in_progress() {
+        let facts = Facts {
+            branches: vec![branch("feature/y", false, false, 0)],
+            worktrees: vec![("/tmp/w".to_string(), "feature/y".to_string())],
+            remote: remote(&["develop"], Vec::new()),
+            ..clean()
+        };
+        none(&facts);
+    }
+
+    #[test]
+    fn a_scratch_folder_of_an_open_pr_is_left_alone() {
+        let facts = Facts {
+            scratch: vec!["other-task".to_string()],
+            remote: remote(&["develop", "feature/other-task"], vec![pr(9, "feature/other-task", 0)]),
+            ..clean()
+        };
+        none(&facts);
+    }
+
+    #[test]
+    fn a_stale_current_branch_is_told_to_switch_first() {
+        let facts = Facts {
+            current: "feature/x".to_string(),
+            branches: vec![branch("feature/x", true, true, 9)],
+            ..clean()
+        };
+        assert!(one(&facts).contains("switch to develop, then git branch -d feature/x"));
     }
 
     #[test]
@@ -699,7 +784,7 @@ mod repository_tests {
     impl Drop for Repo {
         fn drop(&mut self) {
             // the link first, alone: nothing here may be deleted through it
-            let link = self.dir.join("stray").join("inner").join("link");
+            let link = self.dir.join("stray dir").join("inner").join("link");
             let _ = std::fs::remove_dir(&link).or_else(|_| std::fs::remove_file(&link));
             let _ = std::fs::remove_dir_all(self.dir.parent().unwrap());
         }
@@ -730,11 +815,12 @@ mod repository_tests {
         repo.write("a.txt", "changed\n");
         repo.git(&["stash", "-q"]);
         repo.write("loose.txt", "x\n");
+        repo.write("loose file.txt", "x\n");
         std::fs::create_dir_all(repo.scratch.join("old-task")).unwrap();
         std::fs::write(repo.scratch.join("old-task").join("log.txt"), "x").unwrap();
         std::fs::create_dir_all(repo.scratch.join("empty-task")).unwrap();
         // a link two levels deep in an untracked folder, as the one found on 2026-11-12
-        let inner = repo.dir.join("stray").join("inner");
+        let inner = repo.dir.join("stray dir").join("inner");
         std::fs::create_dir_all(&inner).unwrap();
         #[cfg(windows)]
         {
@@ -756,7 +842,8 @@ mod repository_tests {
             "1 stash: git stash list",
             "untracked files on develop: ",
             "loose.txt",
-            "link inside the checkout: stray/inner/link",
+            "loose file.txt",
+            "link inside the checkout: stray dir/inner/link",
             "scratch folder old-task is not empty",
         ] {
             assert!(found.contains(expected), "no \"{expected}\" in:\n{found}");
@@ -764,11 +851,16 @@ mod repository_tests {
         assert!(!found.contains("empty-task") && !found.contains("worktree"), "{found}");
         assert_eq!(facts.worktrees.len(), 1, "{:?}", facts.worktrees);
         assert_eq!(facts.worktrees[0].1, "feature/w");
-        // with GitHub read and no PR for its branch, the worktree is a leftover too
+        // with GitHub read and no PR for its branch, the worktree is a leftover too, once it is a day old
         facts.remote = Some(Remote {
             branches: vec!["develop".to_string()],
             prs: Vec::new(),
         });
+        assert!(
+            !leftovers(&facts).join("\n").contains("worktree"),
+            "a worktree cut today is work in progress"
+        );
+        facts.branches.iter_mut().for_each(|branch| branch.age_days = 2);
         let found = leftovers(&facts).join("\n");
         assert!(found.contains("(feature/w) has no open PR"), "{found}");
         repo.git(&["worktree", "remove", "--force", &repo.worktree.to_string_lossy()]);
@@ -802,11 +894,12 @@ mod repository_tests {
         };
         let gh = |args: &[&str]| {
             assert_eq!(&args[..3], ["pr", "list", "--state"]);
-            Some("12\tfeature/x\t8\tfalse\n13\tdependabot/npm/y\t30\ttrue\n".to_string())
+            Some("12\tfeature/x\t8\tfalse\n13\tdependabot/npm/y\t30\ttrue\n14\tfeature/z\t-1\tfalse\n".to_string())
         };
         let remote = remote(&git, &gh).unwrap();
         assert_eq!(remote.branches, ["develop", "feature/x"]);
-        assert_eq!(remote.prs.len(), 2);
+        assert_eq!(remote.prs.len(), 3);
+        assert_eq!((remote.prs[2].number, remote.prs[2].idle_days), (14, 0));
         let first = &remote.prs[0];
         assert_eq!(
             (first.number, first.branch.as_str(), first.idle_days, first.bot),

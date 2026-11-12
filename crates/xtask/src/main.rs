@@ -13,8 +13,8 @@ const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
   check-rules  the agent rules files stay within their limits
-  check-pr     the pull request follows the way of working (reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
-               EVENT_NAME and PR_BODY)
+  check-pr     the pull request follows the way of working; in CI it reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
+               EVENT_NAME and PR_BODY, without them it checks the branch in hand against origin/develop
   scope        the areas of git diff <base>...HEAD as name=true|false lines for $GITHUB_OUTPUT; every area
                without a base (cargo xtask scope [<base>])
   tidy         what was left behind: branches, worktrees, stashes, links, scratch folders, idle PRs; prints

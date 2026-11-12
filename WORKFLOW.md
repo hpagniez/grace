@@ -61,6 +61,6 @@ Ask before a run that opens windows, needs a quiet machine or installs something
 
 ## Pull requests
 
-Draft while working; ready when the project's checks pass; merged only on the owner's word or the project's merge rule; the branch deleted with the merge.
+Run the project's PR check, when it has one, before a push. Draft while working; ready when the project's checks pass; merged only on the owner's word or the project's merge rule; the branch deleted with the merge.
 
 When sources disagree: the project's rules, then this file, then superpowers, then ponytail.
