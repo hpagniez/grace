@@ -360,12 +360,18 @@ pub fn run() -> u8 {
     let git = |args: &[&str]| crate::rules::git(root, args);
     // GitHub is read without a prompt and with a short wait: the start of a session never hangs on a passphrase,
     // a host key or a login
+    // the user's own ssh command, when git is told to use one: another ssh may not reach their key agent
+    let ssh = git(&["config", "--get", "core.sshCommand"]).unwrap_or_default();
+    let ssh = format!(
+        "{} -o BatchMode=yes -o ConnectTimeout=5",
+        if ssh.trim().is_empty() { "ssh" } else { ssh.trim() }
+    );
     let quiet = |program: &str, args: &[&str]| {
         let out = std::process::Command::new(program)
             .current_dir(root)
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
-            .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o ConnectTimeout=5")
+            .env("GIT_SSH_COMMAND", &ssh)
             .env("GH_PROMPT_DISABLED", "1")
             .stdin(std::process::Stdio::null())
             .output()
