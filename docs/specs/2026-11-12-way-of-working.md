@@ -1,6 +1,6 @@
 # Way of working: tiers, lean context, housekeeping
 
-Date 2026-11-12. Status: proposed, for the owner's approval. Nothing here is applied yet.
+Date 2026-11-12. Status: approved by the owner on 2026-11-12. Built in three phases; plan of phase 1: [way-of-working-p1-files](../plans/2026-11-12-way-of-working-p1-files.md).
 
 ## Why
 
