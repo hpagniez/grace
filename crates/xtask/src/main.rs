@@ -5,7 +5,6 @@
 mod pr;
 mod rules;
 mod scope;
-#[allow(dead_code)] // called from main in the next task of the plan
 mod tidy;
 
 use std::process::ExitCode;
@@ -17,12 +16,15 @@ commands:
   check-pr     the pull request follows the way of working (reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
                EVENT_NAME and PR_BODY)
   scope        the areas of git diff <base>...HEAD as name=true|false lines for $GITHUB_OUTPUT; every area
-               without a base (cargo xtask scope [<base>])";
+               without a base (cargo xtask scope [<base>])
+  tidy         what was left behind: branches, worktrees, stashes, links, scratch folders, idle PRs; prints
+               nothing when all is clean, changes nothing, never fails";
 
 fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
         Some("check-rules") => ExitCode::from(rules::run()),
         Some("check-pr") => ExitCode::from(pr::run()),
+        Some("tidy") => ExitCode::from(tidy::run()),
         Some("scope") => ExitCode::from(scope::run(std::env::args().nth(2))),
         _ => {
             eprintln!("{USAGE}");

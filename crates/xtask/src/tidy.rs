@@ -4,6 +4,8 @@
 //! branch, a scratch folder, a link inside the checkout. Work in progress is not one. The command only reports: it
 //! changes nothing, prints nothing when all is clean, and never fails, so a session-start hook can run it.
 
+use std::path::Path;
+
 /// A local branch, other than the default one and `main`.
 pub struct Branch {
     pub name: String,
@@ -131,6 +133,231 @@ pub fn leftovers(facts: &Facts) -> Vec<String> {
         }
     }
     lines
+}
+
+/// Folders never searched for links: too large, and never where an agent works.
+const SKIPPED: [&str; 5] = ["node_modules", "vendor", "out", "target", ".git"];
+
+/// The jq filter that turns `gh pr list` into one line a PR: number, branch, whole days idle, whether a bot opened it.
+const PRS: &str = ".[] | [.number, .headRefName, ((now - (.updatedAt | fromdate)) / 86400 | floor), (.author.is_bot // false)] | @tsv";
+
+/// Whether `path` is a symbolic link or, on Windows, a junction.
+fn is_link(path: &Path) -> bool {
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return false;
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT: a junction is a reparse point that is no symbolic link
+        if meta.file_attributes() & 0x400 != 0 {
+            return true;
+        }
+    }
+    meta.file_type().is_symlink()
+}
+
+/// The links in `dir`, down to `depth` folders below it, as paths from `root`. A link is named, never followed.
+fn links_in(root: &Path, dir: &Path, depth: usize, found: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for path in entries.flatten().map(|entry| entry.path()) {
+        let skipped = path
+            .file_name()
+            .is_some_and(|name| SKIPPED.iter().any(|skip| name == *skip));
+        if is_link(&path) {
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            found.push(relative.to_string_lossy().replace('\\', "/"));
+        } else if depth > 0 && !skipped && path.is_dir() {
+            links_in(root, &path, depth - 1, found);
+        }
+    }
+}
+
+/// What the checkout at `root` holds, without GitHub. `scratch` is this repository's folder of task folders, `now`
+/// the time in seconds since 1970, and `git` gives git's output for its arguments, `None` when it fails.
+pub fn local_facts(root: &Path, scratch: &Path, now: u64, git: &dyn Fn(&[&str]) -> Option<String>) -> Facts {
+    let lines = |args: &[&str]| -> Vec<String> { git(args).unwrap_or_default().lines().map(String::from).collect() };
+    let head = git(&["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).unwrap_or_default();
+    let default = head.trim().strip_prefix("origin/").unwrap_or("develop").to_string();
+    let current = git(&["branch", "--show-current"])
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    // against the remote's default branch when there is one: the local one may be behind
+    let format = "--format=%(refname:short)";
+    let merged = git(&["branch", "--merged", &format!("origin/{default}"), format])
+        .or_else(|| git(&["branch", "--merged", &default, format]))
+        .unwrap_or_default();
+    let merged: Vec<&str> = merged.lines().map(str::trim).collect();
+    let refs = "--format=%(refname:short)%09%(upstream:track)%09%(committerdate:unix)";
+    let branches = lines(&["for-each-ref", "refs/heads", refs])
+        .iter()
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let name = fields.next()?.to_string();
+            let gone = fields.next()?.contains("gone");
+            let committed = fields.next()?.trim().parse::<u64>().ok()?;
+            let age_days = now.saturating_sub(committed) / 86_400;
+            (name != default && name != "main").then(|| Branch {
+                merged: merged.contains(&name.as_str()),
+                name,
+                gone,
+                age_days,
+            })
+        })
+        .collect();
+
+    // git lists the main checkout first, each worktree as a block of lines
+    let worktrees = git(&["worktree", "list", "--porcelain"])
+        .unwrap_or_default()
+        .replace("\r\n", "\n")
+        .split("\n\n")
+        .skip(1)
+        .filter_map(|block| {
+            let field = |name: &str| block.lines().find_map(|line| line.strip_prefix(name));
+            let branch = field("branch refs/heads/").unwrap_or("detached");
+            Some((field("worktree ")?.to_string(), branch.to_string()))
+        })
+        .collect();
+
+    let status = lines(&["status", "--porcelain", "--ignored"]);
+    let untracked: Vec<String> = status
+        .iter()
+        .filter_map(|line| line.strip_prefix("?? "))
+        .map(String::from)
+        .collect();
+    let mut links = Vec::new();
+    // an agent's stray folder is untracked or ignored: tracked files are what the project chose to hold
+    for folder in status
+        .iter()
+        .filter_map(|line| line.strip_prefix("?? ").or_else(|| line.strip_prefix("!! ")))
+    {
+        let Some(folder) = folder.strip_suffix('/') else {
+            continue;
+        };
+        let path = root.join(folder);
+        if is_link(&path) {
+            links.push(folder.to_string());
+        } else if !SKIPPED.contains(&folder) {
+            links_in(root, &path, 3, &mut links);
+        }
+    }
+
+    // git lists no folder that holds no file, so a link to an empty folder hides from it: look at the top level too
+    let tracked = lines(&["ls-tree", "--name-only", "HEAD"]);
+    for path in std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+    {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if tracked.contains(&name) || SKIPPED.contains(&name.as_str()) {
+            continue;
+        }
+        if is_link(&path) {
+            links.push(name);
+        } else if path.is_dir() {
+            links_in(root, &path, 3, &mut links);
+        }
+    }
+    links.sort();
+    links.dedup();
+
+    let filled = |dir: &Path| std::fs::read_dir(dir).is_ok_and(|mut entries| entries.next().is_some());
+    let mut scratch: Vec<String> = std::fs::read_dir(scratch)
+        .map(|entries| entries.flatten().map(|entry| entry.path()).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .iter()
+        .filter(|path| path.is_dir() && filled(path))
+        .filter_map(|path| Some(path.file_name()?.to_string_lossy().into_owned()))
+        .collect();
+    scratch.sort();
+
+    Facts {
+        default,
+        current,
+        branches,
+        worktrees,
+        stashes: lines(&["stash", "list"]).len(),
+        untracked,
+        links,
+        scratch,
+        remote: None,
+    }
+}
+
+/// What GitHub holds, `None` when `git` cannot list the remote's branches or `gh` its pull requests.
+pub fn remote(git: &dyn Fn(&[&str]) -> Option<String>, gh: &dyn Fn(&[&str]) -> Option<String>) -> Option<Remote> {
+    let heads = git(&["ls-remote", "--heads", "origin"])?;
+    let branches = heads
+        .lines()
+        .filter_map(|line| line.split_once("refs/heads/"))
+        .map(|(_, name)| name.trim().to_string());
+    let fields = ["number,headRefName,updatedAt,author", "--jq", PRS];
+    let listed = gh(&[
+        "pr", "list", "--state", "open", "--limit", "200", "--json", fields[0], fields[1], fields[2],
+    ])?;
+    let prs = listed.lines().filter_map(|line| {
+        let mut fields = line.split('\t');
+        Some(Pr {
+            number: fields.next()?.parse().ok()?,
+            branch: fields.next()?.to_string(),
+            idle_days: fields.next()?.parse().ok()?,
+            bot: fields.next()?.trim() == "true",
+        })
+    });
+    Some(Remote {
+        branches: branches.collect(),
+        prs: prs.collect(),
+    })
+}
+
+/// Prints the leftovers of this repository, if any. Always 0: a report never fails a session.
+pub fn run() -> u8 {
+    let root = crate::rules::root();
+    let git = |args: &[&str]| crate::rules::git(root, args);
+    let gh = |args: &[&str]| {
+        let out = std::process::Command::new("gh")
+            .current_dir(root)
+            .args(args)
+            .output()
+            .ok()?;
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    };
+    // <temp>/agent-work/<repository>/<task>/ (WORKFLOW.md)
+    let name = root
+        .canonicalize()
+        .ok()
+        .and_then(|path| path.file_name().map(|name| name.to_os_string()));
+    let scratch = std::env::temp_dir().join("agent-work").join(name.unwrap_or_default());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+
+    let mut facts = local_facts(root, &scratch, now, &git);
+    facts.remote = remote(&git, &gh);
+    let found = leftovers(&facts);
+    if !found.is_empty() {
+        println!(
+            "Leftovers in this repository (cargo xtask tidy). Delete on your own only what cannot lose work; show the rest to the owner (WORKFLOW.md, Housekeeping):"
+        );
+        for line in found {
+            println!("- {line}");
+        }
+        if facts.remote.is_none() {
+            println!("- GitHub could not be read (gh or the network): its branches and pull requests were not checked");
+        }
+    }
+    0
 }
 
 #[cfg(test)]
@@ -369,5 +596,229 @@ mod tests {
         }));
         none(&with(pr(14, "release/v1.0.0-rc.10", 30)));
         none(&with(pr(15, "hotfix/v1.0.0-rc.11", 30)));
+    }
+}
+
+/// The facts, read from real repositories made in temporary folders and removed after their test.
+#[cfg(test)]
+mod repository_tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A repository on `develop` with one commit, a bare `origin` beside it, and a scratch folder.
+    struct Repo {
+        dir: PathBuf,
+        origin: PathBuf,
+        scratch: PathBuf,
+        target: PathBuf,
+        worktree: PathBuf,
+    }
+
+    impl Repo {
+        fn new() -> Repo {
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            let name = format!(
+                "grace-xtask-tidy-{}-{}",
+                std::process::id(),
+                COUNT.fetch_add(1, Ordering::Relaxed)
+            );
+            let base = std::env::temp_dir().join(name);
+            let repo = Repo {
+                dir: base.join("repo"),
+                origin: base.join("origin.git"),
+                scratch: base.join("scratch"),
+                target: base.join("target"),
+                worktree: base.join("worktree"),
+            };
+            for dir in [&repo.dir, &repo.scratch, &repo.target] {
+                std::fs::create_dir_all(dir).unwrap();
+            }
+            repo.git(&["init", "-q", "-b", "develop"]);
+            repo.write("a.txt", "a\n");
+            repo.commit("chore: init");
+            repo
+        }
+
+        /// Git in this repository, with none of the machine's settings (as in `pr.rs`).
+        fn try_git(&self, args: &[&str]) -> Option<String> {
+            let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+            let mut git = std::process::Command::new("git");
+            git.env("GIT_CONFIG_GLOBAL", null).env("GIT_CONFIG_NOSYSTEM", "1");
+            for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
+                git.env_remove(name);
+            }
+            let out = git
+                .arg("-C")
+                .arg(&self.dir)
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                .args(args)
+                .output()
+                .ok()?;
+            out.status
+                .success()
+                .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+        }
+
+        fn git(&self, args: &[&str]) -> String {
+            self.try_git(args)
+                .unwrap_or_else(|| panic!("git {args:?} failed"))
+                .trim()
+                .to_string()
+        }
+
+        fn write(&self, path: &str, text: &str) {
+            let file = self.dir.join(path);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+
+        fn commit(&self, message: &str) {
+            self.git(&["add", "-A"]);
+            self.git(&["commit", "-q", "-m", message]);
+        }
+
+        /// Pushes `develop` to a bare `origin` whose default branch it is.
+        fn with_origin(&self) {
+            let origin = self.origin.to_string_lossy().into_owned();
+            self.git(&["init", "-q", "--bare", "-b", "develop", &origin]);
+            self.git(&["remote", "add", "origin", &origin]);
+            self.git(&["push", "-q", "-u", "origin", "develop"]);
+            self.git(&["remote", "set-head", "origin", "develop"]);
+        }
+
+        fn facts(&self) -> Facts {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            local_facts(&self.dir, &self.scratch, now, &|args| self.try_git(args))
+        }
+    }
+
+    impl Drop for Repo {
+        fn drop(&mut self) {
+            // the link first, alone: nothing here may be deleted through it
+            let link = self.dir.join("stray").join("inner").join("link");
+            let _ = std::fs::remove_dir(&link).or_else(|_| std::fs::remove_file(&link));
+            let _ = std::fs::remove_dir_all(self.dir.parent().unwrap());
+        }
+    }
+
+    #[test]
+    fn a_fresh_repository_is_clean() {
+        let repo = Repo::new();
+        let facts = repo.facts();
+        assert_eq!((facts.default.as_str(), facts.current.as_str()), ("develop", "develop"));
+        assert_eq!(leftovers(&facts), Vec::<String>::new());
+        repo.with_origin();
+        assert_eq!(leftovers(&repo.facts()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn it_finds_what_was_left() {
+        let repo = Repo::new();
+        repo.git(&["branch", "feature/merged"]);
+        repo.git(&[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "feature/w",
+            &repo.worktree.to_string_lossy(),
+        ]);
+        repo.write("a.txt", "changed\n");
+        repo.git(&["stash", "-q"]);
+        repo.write("loose.txt", "x\n");
+        std::fs::create_dir_all(repo.scratch.join("old-task")).unwrap();
+        std::fs::write(repo.scratch.join("old-task").join("log.txt"), "x").unwrap();
+        std::fs::create_dir_all(repo.scratch.join("empty-task")).unwrap();
+        // a link two levels deep in an untracked folder, as the one found on 2026-11-12
+        let inner = repo.dir.join("stray").join("inner");
+        std::fs::create_dir_all(&inner).unwrap();
+        #[cfg(windows)]
+        {
+            let made = std::process::Command::new("cmd")
+                .args(["/c", "mklink", "/J"])
+                .arg(inner.join("link"))
+                .arg(&repo.target)
+                .output()
+                .unwrap();
+            assert!(made.status.success(), "{}", String::from_utf8_lossy(&made.stderr));
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&repo.target, inner.join("link")).unwrap();
+
+        let mut facts = repo.facts();
+        let found = leftovers(&facts).join("\n");
+        for expected in [
+            "branch feature/merged is merged into develop",
+            "1 stash: git stash list",
+            "untracked files on develop: ",
+            "loose.txt",
+            "link inside the checkout: stray/inner/link",
+            "scratch folder old-task is not empty",
+        ] {
+            assert!(found.contains(expected), "no \"{expected}\" in:\n{found}");
+        }
+        assert!(!found.contains("empty-task") && !found.contains("worktree"), "{found}");
+        assert_eq!(facts.worktrees.len(), 1, "{:?}", facts.worktrees);
+        assert_eq!(facts.worktrees[0].1, "feature/w");
+        // with GitHub read and no PR for its branch, the worktree is a leftover too
+        facts.remote = Some(Remote {
+            branches: vec!["develop".to_string()],
+            prs: Vec::new(),
+        });
+        let found = leftovers(&facts).join("\n");
+        assert!(found.contains("(feature/w) has no open PR"), "{found}");
+        repo.git(&["worktree", "remove", "--force", &repo.worktree.to_string_lossy()]);
+    }
+
+    #[test]
+    fn a_gone_upstream_is_seen() {
+        let repo = Repo::new();
+        repo.with_origin();
+        repo.git(&["switch", "-q", "-c", "feature/x"]);
+        repo.write("b.txt", "b\n");
+        repo.commit("docs: add b");
+        repo.git(&["push", "-q", "-u", "origin", "feature/x"]);
+        repo.git(&["switch", "-q", "develop"]);
+        assert_eq!(leftovers(&repo.facts()), Vec::<String>::new());
+        repo.git(&["push", "-q", "origin", "--delete", "feature/x"]);
+        repo.git(&["fetch", "-q", "--prune"]);
+        let found = leftovers(&repo.facts());
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("branch feature/x lost its remote branch"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn remote_reads_branches_and_prs() {
+        let git = |args: &[&str]| {
+            assert_eq!(args, ["ls-remote", "--heads", "origin"]);
+            Some("abc\trefs/heads/develop\ndef\trefs/heads/feature/x\n".to_string())
+        };
+        let gh = |args: &[&str]| {
+            assert_eq!(&args[..3], ["pr", "list", "--state"]);
+            Some("12\tfeature/x\t8\tfalse\n13\tdependabot/npm/y\t30\ttrue\n".to_string())
+        };
+        let remote = remote(&git, &gh).unwrap();
+        assert_eq!(remote.branches, ["develop", "feature/x"]);
+        assert_eq!(remote.prs.len(), 2);
+        let first = &remote.prs[0];
+        assert_eq!(
+            (first.number, first.branch.as_str(), first.idle_days, first.bot),
+            (12, "feature/x", 8, false)
+        );
+        assert!(remote.prs[1].bot);
+    }
+
+    #[test]
+    fn remote_is_none_when_github_cannot_be_read() {
+        let branches = |_: &[&str]| Some("abc\trefs/heads/develop\n".to_string());
+        assert!(remote(&branches, &|_| None).is_none());
+        assert!(remote(&|_| None, &|_| Some(String::new())).is_none());
     }
 }
