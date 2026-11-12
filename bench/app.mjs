@@ -1,6 +1,6 @@
 // Starts a packaged Grace exe the way the bench measures it: its own data folder, the last project reopened, no update
 // check, and, when asked, a Chromium debugging port to drive the page over CDP. The exe's `EnableNodeCliInspectArguments`
-// fuse is off, so Playwright's `_electron` cannot launch it (AGENTS.md, Stack); `connectOverCDP` can. Ported from the
+// fuse is off, so Playwright's `_electron` cannot launch it (.claude/rules/electron.md); `connectOverCDP` can. Ported from the
 // Tauri spike (docs/research/2026-10-29-tauri-spike/measure/measure.mjs).
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";

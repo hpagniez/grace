@@ -41,7 +41,7 @@ export function branchError(head, base) {
 
 /**
  * Null unless a release or hotfix PR into main lacks its packaged-app check record or the record's
- * `## Public docs` section (AGENTS.md). `files` are the paths under docs/checks; `read` gives one's text.
+ * `## Public docs` section (docs/process/release.md). `files` are the paths under docs/checks; `read` gives one's text.
  */
 export function publicDocsError(head, base, files, read) {
   if (base !== "main" || !VERSIONED.test(head)) return null;
@@ -49,7 +49,7 @@ export function publicDocsError(head, base, files, read) {
   const record = files.find((f) => f.endsWith(`-${version}-packaged.md`));
   if (!record) return `${head} has no docs/checks/<date>-<release|hotfix>-${version}-packaged.md`;
   if (!/^## Public docs\s*$/m.test(read(record)))
-    return `${record} has no "## Public docs" section: check README.md and its screenshots against ${version} (AGENTS.md)`;
+    return `${record} has no "## Public docs" section: check README.md and its screenshots against ${version} (docs/process/release.md)`;
   return null;
 }
 
@@ -65,7 +65,7 @@ export function limitRaiseError(base, head, added) {
     return "bench/limits.json is not valid JSON";
   }
   if (!ids.length || added.some((f) => f.startsWith("docs/decisions/"))) return null;
-  return `bench/limits.json raises ${ids.join(", ")} without a new docs/decisions/ record (AGENTS.md)`;
+  return `bench/limits.json raises ${ids.join(", ")} without a new docs/decisions/ record (.claude/rules/ci.md)`;
 }
 
 /**
@@ -82,7 +82,7 @@ export function performanceError(head, base, files, read, limits) {
   if (!record) return `${head} has no docs/checks/<date>-<release|hotfix>-${version}-packaged.md`;
   const text = read(record);
   if (!/^## Performance\s*$/m.test(text))
-    return `${record} has no "## Performance" section: run npm run bench in release mode and add its table (AGENTS.md)`;
+    return `${record} has no "## Performance" section: run npm run bench in release mode and add its table (docs/process/release.md)`;
   const json = record.replace(/\.md$/, ".bench.json");
   if (!files.includes(json)) return `${record} has no ${json}: commit the bench's JSON beside it`;
   const said = /^Result: (pass|miss)\s*$/m.exec(text)?.[1];
@@ -117,7 +117,7 @@ export function performanceError(head, base, files, read, limits) {
   if (/^Decision: no-go\s*$/m.test(text))
     return `${record} says "Decision: no-go": the release stops`;
   if (said === "miss" && !/^Decision: go\s*$/m.test(text))
-    return `${record} says "Result: miss" without "Decision: go": the owner decides after the ### Analysis (AGENTS.md)`;
+    return `${record} says "Result: miss" without "Decision: go": the owner decides after the ### Analysis (docs/process/release.md)`;
   return null;
 }
 

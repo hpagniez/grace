@@ -1,4 +1,4 @@
-//! `src/main/karate/tree.ts`: the test tree, built from the depth-0 events of a dry run (AGENTS.md: key nodes by
+//! `src/main/karate/tree.ts`: the test tree, built from the depth-0 events of a dry run (.claude/rules/karate.md: key nodes by
 //! feature + `refId`; filter `callDepth == 0`), and the lookups the runner makes in it.
 use super::events::{DataError, EventKind, KarateEvent};
 use super::js;
