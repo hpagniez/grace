@@ -12,6 +12,8 @@ on:
   workflow_dispatch:
 
 permissions:
+  # scope asks whether this commit already passed this workflow
+  actions: read
   contents: read
   pull-requests: write
 
@@ -38,6 +40,12 @@ jobs:
         run: cargo xtask scope "$BASE" | tee -a "$GITHUB_OUTPUT"
         env:
           BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+          # marking a PR ready on a commit that already passed this workflow runs nothing again
+          SCOPE_ACTION: ${{ github.event.action }}
+          SCOPE_BASE_REF: ${{ github.base_ref }}
+          SCOPE_WORKFLOW: perf.yml
+          SCOPE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
 
   perf:
     needs: scope
