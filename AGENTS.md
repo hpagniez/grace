@@ -33,7 +33,7 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run e2e` | Package the app, then run the Playwright end-to-end tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | oxlint and oxfmt check |
-| `cargo xtask <command>` | Grace's Rust scripts: `check-rules`, `check-pr` |
+| `cargo xtask <command>` | Grace's Rust scripts: `check-rules`, `check-pr`, `scope`, `tidy` (run at session start) |
 
 Never run any two of `npm test`, `npm run e2e` and `npm run bench` at the same time. The e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes, so never run two e2e runs at once either. Nor run Karate yourself during e2e (a measurement script, the big project): its thousands of local HTTP calls make Windows refuse Playwright's connection to a starting app, and the test fails with `Process failed to launch!` ([#191](https://github.com/hpagniez/grace/issues/191)). The bench needs a quiet machine, and it and e2e both package into `out/`. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 
@@ -95,6 +95,6 @@ Release and hotfix branches: [docs/process/release.md](docs/process/release.md).
 
 ## Grace's own
 
-- Scripts are Rust, in `crates/xtask`, run as `cargo xtask <command>`. The toolchain's version is `rust-toolchain.toml`; its place is `RUSTUP_HOME` and `CARGO_HOME`. The existing JavaScript and shell scripts are ported when touched; `bench/` stays JavaScript until the cut-over.
+- Scripts are Rust, in `crates/xtask`. The toolchain's version is `rust-toolchain.toml`; its place is `RUSTUP_HOME` and `CARGO_HOME`. The existing JavaScript and shell scripts are ported when touched; `bench/` stays JavaScript until the cut-over.
 - Subagent models: `haiku`, `sonnet` and `opus` are the smallest, the middle one and the largest. Never Fable. Never leave the model unset: an unset model inherits the main agent's.
 - Plugins: superpowers carries the process; ponytail keeps the change small; claude-mem is for recall only, never the to-do list or a rule's home.
