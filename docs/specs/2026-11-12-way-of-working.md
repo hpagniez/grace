@@ -153,7 +153,7 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 | Dead stack rules (scaffold command, Kobalte, TanStack Router) | Cut | The code is gone (#353) |
 | `perf` on PRs that change only `crates/` | **For the owner** (not part of this work): skip it until the bench measures GPUI Grace (#334) | 20 Windows minutes for a comment that says nothing; ADR 0023 asks for the comment on every code PR, so skipping needs his word |
 
-**Plugins and connectors, for this repository** (`.claude/settings.json`): off for Vercel, Supabase, Firecrawl, taste-skill and impeccable; claude.ai connectors off. Superpowers, ponytail and claude-mem stay on together (the owner, 2026-11-12), each with one job, so they do not compete:
+**Plugins and connectors, for this repository** (`.claude/settings.json`): off for Vercel, Supabase, Firecrawl, taste-skill and impeccable. Connectors and the plugins of the claude.ai account cannot be switched off from the repository in the desktop app (seen on 2026-11-12: `disableClaudeAiConnectors` changed nothing there): the owner switches them in the app. Superpowers, ponytail and claude-mem stay on together (the owner, 2026-11-12), each with one job, so they do not compete:
 
 | Plugin | Its job | Not its job |
 |---|---|---|

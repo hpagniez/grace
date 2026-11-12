@@ -9,6 +9,5 @@
     "firecrawl@anthropic-plugin-directory": false,
     "taste-skill@taste-skill": false,
     "impeccable@impeccable": false
-  },
-  "disableClaudeAiConnectors": true
+  }
 }
