@@ -67,7 +67,7 @@ The owner picked **B** on 2026-11-12. C was set aside because it removes documen
 
 `CLAUDE.md` becomes two lines: `@WORKFLOW.md` and `@AGENTS.md`. `AGENTS.md` starts with "Follow `WORKFLOW.md`", for tools that read only `AGENTS.md`.
 
-Size limits, checked by a test: `WORKFLOW.md` at most 120 lines, `AGENTS.md` at most 100 lines, the two together at most 14 KB (from 34 KB).
+Size limits, in bytes (lines mean little when one bullet runs to 1 KB): `WORKFLOW.md` at most 5 KB, `AGENTS.md` at most 9 KB, 14 KB together (from 34 KB). When the text does not fit, more of it moves to a rules file or to `docs/process/`: the commands of one app go with that app's rules, the `gh project` recipe with the CI rules. A rule is never cut to fit; cuts are only those of the verdict table below.
 
 ### 2. The general way (`WORKFLOW.md`)
 
@@ -108,7 +108,8 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 - A task ends with its PR merged or closed, its branch deleted on the machine and on the remote, its worktree removed, and the default branch up to date on the machine.
 - Nothing is parked. A branch has a PR within a day, and a PR nobody has touched for 7 days is finished or closed with a note (its commits stay reachable from the closed PR).
 - Everything an agent makes outside the checkout goes under one scratch folder, `<temp>/agent-work/<repository>/<task>/`, and is removed when the task ends. No junction or symbolic link into the checkout, ever.
-- `scripts/tidy.mjs` reports what is left over: more than one worktree, a branch whose remote is gone or that is merged, a branch with no PR, a stash, untracked files, a link inside the checkout, a scratch folder that is not empty, a PR idle for 7 days. It changes nothing and prints nothing when all is clean. A `SessionStart` hook in `.claude/settings.json` runs it, so leftovers show at the start of the next session, at no cost when there are none.
+- A leftover is something with no open PR behind it. `scripts/tidy.mjs` reports: a branch that is merged, whose remote is gone, or that has no open PR; a worktree whose branch has no open PR; a stash; untracked files while on the default branch; a link inside the checkout; a scratch folder whose task has no open PR; a PR idle for 7 days. Work in progress is not a leftover: the current branch with its open PR, its worktree and its untracked files are left alone, and so are release and hotfix branches with an open PR and PRs opened by a bot. It changes nothing and prints nothing when all is clean. A `SessionStart` hook in `.claude/settings.json` runs it, so leftovers show at the start of the next session, at no cost when there are none.
+- What an agent may do with the report: delete on its own only what cannot lose work, that is a merged branch (`git branch -d`), a worktree with no changes whose branch is merged, an empty folder. Anything else (an unmerged branch, a stash, untracked files, a folder with content, an idle PR) it shows to the owner and asks.
 
 **The person's machine.** Ask before a run that opens windows, needs a quiet machine or installs something; say how long and what will show; one yes covers one run. Builds, unit tests and git need no ask.
 
@@ -127,6 +128,7 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 | Release and hotfix steps, the release benchmark | `docs/process/release.md` | linked from `AGENTS.md` |
 | Stack, Solid 2 rules, UI conventions | `.claude/rules/electron.md` | `src/**`, `e2e/**`, `bench/**`, `*.config.*`, `package.json` |
 | GPUI rules | `.claude/rules/gpui.md` | `crates/**`, `patches/**`, `Cargo.*`, `rust-toolchain.toml`, `scripts/e2e-gpui.sh` |
+| Rules that bind both apps until the cut-over (the theme tokens equal `src/index.css`, a new icon is added on both sides) | `.claude/rules/both-apps.md`, so they load whichever side is edited | `src/index.css`, `src/renderer/**`, `crates/grace/src/theme*`, `crates/grace/assets/**` |
 | Karate integration rules | `.claude/rules/karate.md` | `src/main/karate/**`, `src/main/runner*`, `crates/grace-core/**`, `listener/**`, `test/fixtures/**` |
 
 **Keep, change, cut.**
@@ -156,24 +158,64 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 
 ### 4. What this replaces
 
-- PR #353 is folded in: its text moves into the new files, and #353 is closed when this lands.
+- PR #353 merges first, once the owner has confirmed its two changed rules (Open questions). This work then starts from `develop`; no PR is opened on another PR's branch. #353's text is split like the rest.
+- Files that cite a section of `AGENTS.md` are updated with it: `.github/pull_request_template.md`, and the messages of `scripts/check-pr.mjs` and `scripts/bump-pr.mjs`. Accepted decision records are not edited: the headings they link (`Git workflow`, `No backward compatibility`) stay in `AGENTS.md`.
 - The Subagents section's "always extra high" rule.
 - The "every PR links an issue" rule, for Small PRs only.
 
+### 5. Enforcement
+
+The owner's requirement (2026-11-12): whether the workflow was followed is checked by machines, not by trust. Every check below is a script: none costs licence usage. A rule that no script can check is listed at the end, so nobody takes it for enforced.
+
+**The PR says its tier.** The PR template shrinks from 107 lines to a summary, one `Tier: small|feature|project` line, the issue line, and `## Verification`. `scripts/check-pr.mjs` reads the PR body (passed by `checks.yml`, which also runs when the body is edited) and the diff:
+
+| Check in `check-pr.mjs`, on every PR | Fails when |
+|---|---|
+| Tier | The body has no `Tier:` line. A bot branch (`dependabot/*`, `feature/bump-*`) counts as Small without one |
+| Small stays small | A Small PR adds a dependency (a new name in `package.json` or a `Cargo.toml`), adds a file under `docs/decisions/`, or changes more than 400 lines outside docs, lock files and fixtures: the message says to step up a tier |
+| Feature and Project have their papers | The body has no `Closes #N` or `Part of #N`, or no `Spec:` and `Plan:` lines naming files that exist at the PR's head |
+| Tests come with behaviour | A PR with a `feat` or `fix` commit changes code under `src/` or `crates/` and no test file |
+| Verification | A PR that changes code has an empty `## Verification` section (it holds the commands run and their summary lines) |
+| Agent traces | A commit message or the body holds a claude.ai session or project link, a `Claude-Session:` trailer or a "Requested by" line |
+| Rules files | `WORKFLOW.md` or `AGENTS.md` is over its size limit, `WORKFLOW.md` names the project, or a glob in a `.claude/rules/*.md` `paths:` list matches no tracked file |
+
+These run in `checks`, the one workflow the ruleset requires, so a PR that fails them cannot merge. The existing checks (commit headers, branch target, release records, raised limits) stay.
+
+**Guardrails on the machine**, as hooks in `.claude/settings.json`, which load in local and cloud sessions alike:
+
+| Hook | Does |
+|---|---|
+| `SessionStart` | Runs `scripts/tidy.mjs`; its report, when there is one, is the first thing the session reads |
+| `PreToolUse` on shell commands | Refuses a command that makes a junction or symbolic link (`mklink`, `New-Item -ItemType Junction` or `SymbolicLink`, `ln -s`), and a `git commit` while on `main` or `develop` |
+
+**A weekly sweep on GitHub.** A new workflow, `housekeeping` (scheduled, Linux, GitHub-owned actions only), runs `scripts/tidy.mjs --remote`: branches with no open PR other than `main`, `develop` and `feature/pr-screenshots`, PRs idle for 7 days, issues still open whose closing PR merged. It keeps one issue, "Housekeeping", open with the list while there is one, and closes it when there is none.
+
+**Not checked by a script, and why.**
+
+| Rule | Why not | What stands in |
+|---|---|---|
+| The test was written before the code | Order inside a session leaves no trace in the diff | The "tests come with behaviour" check, and the whole-branch reviewer on Feature and Project |
+| The owner approved the design | A file cannot prove who wrote a line | The spec's `Status:` line, and the owner merging the PR |
+| The tier was judged honestly | Size is a judgement | The "Small stays small" limits |
+| The scratch folder was emptied on a cloud session's machine | The machine is gone with the session | Nothing needed |
+
 ## Cost
 
-This work is its own measure. Before and after, in a fresh session at the repository root, `/context` gives the tokens of memory files and of skills; both numbers go in the PR body. Expected: memory files from about 8,500 tokens to about 3,500 at start, the rest loading only with the files it governs; the skills list shorter by five plugins. `tidy.mjs` adds one process at session start, about a second, and no text when the repository is clean. Nothing changes in the app.
+This work is its own measure. The gate is bytes, which a script counts: the files loaded at start, before and after, in the PR body. Expected: from 34 KB (about 8,500 tokens) to at most 14 KB (about 3,500), the rest loading only with the files it governs; the skills list shorter by five plugins. An agent cannot run `/context`; the PR body asks the owner to look at it once in a fresh session, as a second reading and not a gate. `tidy.mjs` adds one process at session start, about a second, and no text when the repository is clean. Nothing changes in the app.
 
 ## Acceptance checks
 
 1. `WORKFLOW.md` names no Grace file, command, issue or person. A test fails if it contains `grace`, `karate`, `gpui` or `hpagniez`, whatever the case.
-2. `WORKFLOW.md` is at most 120 lines, `AGENTS.md` at most 100, and the two together at most 14 KB. A test fails otherwise.
+2. `WORKFLOW.md` is at most 5 KB, `AGENTS.md` at most 9 KB, and the two together at most 14 KB. A test fails otherwise.
 3. Every rule sentence of today's `AGENTS.md` (as on #353) is in one of the new files, or is listed in the PR body as cut or changed with this document's reason.
 4. Each `.claude/rules/*.md` has a `paths:` list, and every glob in it matches at least one tracked file. A test fails otherwise.
-5. In a session that reads only a file under `crates/`, the GPUI and Karate rules load and the Electron and CI rules do not (checked once by hand with `/context` or `/memory`, recorded in the PR body).
+5. A test reads each rules file's `paths:` and checks, for one sample file per area (`crates/grace/src/app.rs`, `src/renderer/App.tsx`, `.github/workflows/checks.yml`, `src/index.css`), which rules files match it: GPUI and Karate rules for the first and not Electron's or CI's, and so on. That Claude Code then loads them is its documented behaviour; the owner's one look with `/memory` confirms it.
 6. `scripts/tidy.mjs` prints nothing and exits 0 on a clean checkout, and names each leftover on a checkout that has a second worktree, a merged branch, a branch whose remote is gone, a stash, an untracked file or a junction. Its test builds each case in a temp repository.
-7. The `/context` numbers before and after are in the PR body.
-8. `npm run lint`, `npm run typecheck` and `npm test` pass.
+7. The byte counts of the files loaded at start, before and after, are in the PR body.
+8. Each row of the `check-pr.mjs` table in Enforcement has a unit test with a PR that passes and one that fails, in `scripts/check-pr.test.ts` beside the existing ones.
+9. With the hooks in place, a shell command that makes a junction is refused, and so is `git commit` on `develop` (each tried once by hand, recorded in the PR body).
+10. `housekeeping`, run by hand on a repository state with a branch that has no PR, opens the "Housekeeping" issue naming it; run again after the branch is deleted, it closes the issue.
+11. `npm run lint`, `npm run typecheck` and `npm test` pass.
 
 ## The owner decided
 
@@ -181,6 +223,7 @@ This work is its own measure. Before and after, in a fresh session at the reposi
 - Superpowers is the basis of the general way.
 - Quality, documentation for agents and code quality are not traded for speed.
 - Housekeeping must be stronger.
+- Following the workflow is verified by machines: guardrails and CI checks.
 
 ## Calls made in this document (the owner can overrule each)
 
@@ -190,9 +233,13 @@ This work is its own measure. Before and after, in a fresh session at the reposi
 - Rules by path live in `.claude/rules/`, not in nested `AGENTS.md` files: the Karate rules span two folders, and the documentation does not say a nested `AGENTS.md` loads beside a root `CLAUDE.md`.
 - Git flow stays.
 - A PR idle for 7 days, and a branch without a PR for a day, count as leftovers.
+- Enforcement is scripts only. A weekly agent that audits merged PRs against `WORKFLOW.md` would catch more, but it spends the licence usage this work is meant to save; it is left out.
+- The Small limit is 400 changed lines outside docs, lock files and fixtures.
+- The work lands as three PRs, each a Project-tier phase with its own plan: the files and their split (sections 1 to 3), the checks in `check-pr.mjs` with the PR template (section 5), then `tidy.mjs` with the hooks and the `housekeeping` workflow.
 
 ## Open questions for the owner
 
+0. **PR #353's two changed rules**, which this work builds on: attribution as `.claude/settings.json` gives it, with no session link (the resume note said no attribution at all); and a go needed on your machine only for what opens windows, needs a quiet machine or installs something.
 1. **claude-mem** in this repository: keep it on, or off? It adds a second memory and a second to-do list, and its session-start text is paid in every session. Off fits "the repository is the memory"; on keeps its search over past sessions.
 2. **humanizer and i-have-adhd**: personal tools, left on unless you say otherwise.
 3. **`perf` on `crates/`-only PRs**: skip it until #334, yes or no (a follow-up of its own).
