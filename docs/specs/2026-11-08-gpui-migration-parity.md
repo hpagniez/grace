@@ -129,8 +129,8 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | FL-05 | The mark stays on its test when the tree changes | | ☐ |
 | FL-06 | Marks survive a restart | | ☐ |
 | FL-07 | Clear history removes the marks | | ☐ |
-| FL-08 | A file saved during a run does not count (unit) | | ☐ |
-| FL-09 | Runs without a fingerprint prove nothing (unit) | | ☐ |
+| FL-08 | A file saved during a run does not count (unit) | `grace-core::runner::tests::fingerprint::a_file_saved_during_a_run_stores_no_fingerprint`, `different_walks_store_no_fingerprint` | ☑ |
+| FL-09 | Runs without a fingerprint prove nothing (unit) | `grace-core::flaky::tests::find_flaky::a_null_fingerprint_proves_nothing` | ☑ |
 
 ### TC · Thread count
 
@@ -633,10 +633,10 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| ER-01 | The project asks for JUnit XML | | ☐ |
-| ER-02 | The project does not ask for JUnit XML | | ☐ |
-| ER-03 | A wrong value makes the file unreadable | | ☐ |
-| ER-04 | The other output keys are listed as unused | | ☐ |
+| ER-01 | The project asks for JUnit XML | `grace-core::runner::tests::runs::a_project_that_asks_for_junit_xml_gets_it_in_runs_and_not_in_the_dry_run`; `grace-core::karate::command::tests::build_args::asks_for_junit_xml_when_told_to` | ☑ |
+| ER-02 | The project does not ask for JUnit XML | `grace-core::runner::tests::runs::a_project_that_asks_for_junit_xml_gets_it_in_runs_and_not_in_the_dry_run` (its `false` case) | ☑ |
+| ER-03 | A wrong value makes the file unreadable | `grace-core::karate::command::tests::detect_layout::karate_pom_json::a_wrong_junit_xml_makes_the_file_unreadable_and_says_so`; `grace-core::karate::pom::tests::read_pom::refuses_a_junit_xml_that_is_not_true_or_false` | ☑ |
+| ER-04 | The other output keys are listed as unused | `grace-core::karate::command::tests::detect_layout::karate_pom_json::lists_the_other_output_keys_as_unused` | ☑ |
 | ER-05 | Export follows Report | | ☐ |
 | ER-06 | Main refuses a malformed id | | ☐ |
 | ER-07 | Closing the dialog does nothing | | ☐ |
@@ -695,14 +695,14 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| SC-01 | A run's step keeps Karate's comments | | ☐ |
-| SC-02 | The file reader attaches comments as Karate does | | ☐ |
-| SC-03 | Background steps keep their comments | | ☐ |
-| SC-04 | A comment attached to no step is not shown | | ☐ |
-| SC-05 | Comments show above their step | | ☐ |
-| SC-06 | The paused step shows its comments | | ☐ |
-| SC-07 | Comments are masked | | ☐ |
-| SC-08 | Comments before and after a run (e2e) | | ☐ |
+| SC-01 | A run's step keeps Karate's comments | `grace-core::karate::steps::tests::extract_steps::keeps_the_comments_karate_attached_to_a_step_backgrounds_too_step_comments_r1` | ☑ |
+| SC-02 | The file reader attaches comments as Karate does | `grace-core::karate::steps::tests::file_steps::attaches_the_comments_above_a_step_as_karate_does_step_comments_r1` | ☑ |
+| SC-03 | Background steps keep their comments | `grace-core::karate::steps::tests::file_steps::attaches_the_comments_above_a_step_as_karate_does_step_comments_r1` (the file); `grace-core::karate::steps::tests::extract_steps::keeps_the_comments_karate_attached_to_a_step_backgrounds_too_step_comments_r1` (a run) | ☑ |
+| SC-04 | A comment attached to no step is not shown | `grace-core::karate::steps::tests::file_steps::attaches_the_comments_above_a_step_as_karate_does_step_comments_r1` (the six places of the table) | ☑ |
+| SC-05 | Comments show above their step | `grace::details::tests::a_test::shows_a_steps_comments_above_it` | ☑ |
+| SC-06 | The paused step shows its comments | Waits for the step debugger, phase P4: a pause needs it | ☐ |
+| SC-07 | Comments are masked | `grace-core::mask::tests::mask_event::masks_the_run_text_of_every_event` (a secret in a step comment) | ☑ |
+| SC-08 | Comments before and after a run (e2e) | Waits for the step debugger, phase P4, for the steps from the file before a run. After a run: `grace-e2e/tests/details.rs::failure_details` (the error box: place, comment, step); the comment above the step: `grace::details::tests::a_test::shows_a_steps_comments_above_it` | ☐ |
 
 ### TO · Open the test tree with only its folders open
 
@@ -809,14 +809,14 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| GF-01 | A test whose config failed is failed | | ☐ |
-| GF-02 | A test with its own SCENARIO_EXIT keeps its status | | ☐ |
-| GF-03 | Karate's synthetic step shows without "undefined" | | ☐ |
-| GF-04 | Karate's synthetic step has no breakpoint dot | | ☐ |
-| GF-05 | The reason is Karate's errorReason | | ☐ |
-| GF-06 | Two karate.fail calls at different lines share an error | | ☐ |
-| GF-07 | A thrown string's position is left out | | ☐ |
-| GF-08 | A config failure's reason is its whole error | | ☐ |
+| GF-01 | A test whose config failed is failed | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::fails_the_tests_whose_config_failed` | ☑ |
+| GF-02 | A test with its own SCENARIO_EXIT keeps its status | `grace-core::karate::run_state::tests::run_state::marks_running_then_passed_or_failed`, `…::run_state_config_failures_and_karates_reason_229::does_not_fail_a_test_twice_across_batches` | ☑ |
+| GF-03 | Karate's synthetic step shows without "undefined" | `grace-core::karate::steps::tests::extract_steps::shows_a_step_with_no_keyword_by_its_text_alone_229_r1_3` | ☑ |
+| GF-04 | Karate's synthetic step has no breakpoint dot | Waits for the step debugger, phase P4: the breakpoint dots are its | ☐ |
+| GF-05 | The reason is Karate's errorReason | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::sends_where_karates_reason_starts`; `grace-core::state::tests::reduce_karates_reason_229_r2_1::keeps_where_the_reason_starts_until_the_test_runs_again` | ☑ |
+| GF-06 | Two karate.fail calls at different lines share an error | Waits for the failure groups, slice 10 of the P3 plan (`grace-core::failures`) | ☐ |
+| GF-07 | A thrown string's position is left out | Waits for the failure groups, slice 10 of the P3 plan (`grace-core::failures`) | ☐ |
+| GF-08 | A config failure's reason is its whole error | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::fails_the_tests_whose_config_failed` (its reason starts at 0, the whole error) | ☑ |
 | GF-09 | Failures at different places with one message form a group | | ☐ |
 | GF-10 | A test hidden by the tag filter is left out | | ☐ |
 | GF-11 | No group while a run goes on | | ☐ |
@@ -862,20 +862,20 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| RP-01 | The tabs start in their usual order | | ☐ |
-| RP-02 | Variables stays after the three | | ☐ |
-| RP-03 | Dragging a tab onto another takes its place | | ☐ |
-| RP-04 | A drop marker shows where the tab will land | | ☐ |
-| RP-05 | Dragging "HTTP" over "History" marks the left side | | ☐ |
-| RP-06 | A drag that goes nowhere changes nothing | | ☐ |
-| RP-07 | A drag keeps the shown tab | | ☐ |
-| RP-08 | Something dragged in from outside is ignored | | ☐ |
-| RP-09 | Alt+Right moves a tab one place right | | ☐ |
-| RP-10 | Alt+Left moves a tab one place left, and stops at the first place | | ☐ |
-| RP-11 | Moving a tab does not change the shown tab | | ☐ |
-| RP-12 | The order is remembered | | ☐ |
-| RP-13 | An unusable saved order shows the default | | ☐ |
-| RP-14 | Storage that fails costs nothing | | ☐ |
+| RP-01 | The tabs start in their usual order | `grace::bottom_panel::tests::tabs::start_with_console_history_http`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` (the names in the accessibility tree) | ☑ |
+| RP-02 | Variables stays after the three | `grace-core::panel_tabs::tests::falls_back_to_the_default` (an order naming "variables" is unusable, and `TabId` holds only the three). The Variables tab itself, and "cannot be dragged", come with the step debugger, phase P4 | ☑ |
+| RP-03 | Dragging a tab onto another takes its place | `grace::bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` (HTTP onto Console); `grace-core::panel_tabs::tests::puts_the_tab_in_the_place_asked_and_shifts_the_ones_between` (the three examples) | ☑ |
+| RP-04 | A drop marker shows where the tab will land | `grace::bottom_panel::tests::tabs::a_drop_bar_shows_on_the_side_the_tab_will_land_and_not_over_the_dragged_tab` | ☑ |
+| RP-05 | Dragging "HTTP" over "History" marks the left side | `grace::bottom_panel::tests::tabs::dragging_a_tab_from_the_right_marks_the_left_side` | ☑ |
+| RP-06 | A drag that goes nowhere changes nothing | Two of the three ends: `grace::bottom_panel::tests::tabs::a_drag_that_ends_on_itself_changes_and_saves_nothing`; `grace::bottom_panel::tests::tabs::a_drop_outside_the_tabs_changes_and_saves_nothing`. Escape is left: GPUI has no Escape handler for a drag, and in a headless window any key ends it, so no test can tell Escape's. Looked at by hand in slice 11 (plan) | ☐ |
+| RP-07 | A drag keeps the shown tab | `grace::bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` (the shown tab stays Console) | ☑ |
+| RP-08 | Something dragged in from outside is ignored | `grace::bottom_panel::tests::tabs::a_file_dragged_in_from_outside_shows_no_bar_and_moves_no_tab` | ☑ |
+| RP-09 | Alt+Right moves a tab one place right | `grace::bottom_panel::tests::tabs::alt_right_and_alt_left_move_a_focused_tab_keep_its_focus_and_save`; `grace::bottom_panel::tests::tabs::alt_right_stops_at_the_last_place_and_the_shown_tab_stays`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` | ☑ |
+| RP-10 | Alt+Left moves a tab one place left, and stops at the first place | `grace::bottom_panel::tests::tabs::alt_left_stops_at_the_first_place_without_saving`; `grace::bottom_panel::tests::tabs::alt_right_and_alt_left_move_a_focused_tab_keep_its_focus_and_save`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` | ☑ |
+| RP-11 | Moving a tab does not change the shown tab | `grace::bottom_panel::tests::tabs::alt_right_stops_at_the_last_place_and_the_shown_tab_stays` | ☑ |
+| RP-12 | The order is remembered | `grace::bottom_panel::tests::tabs::read_the_saved_order_before_the_first_paint`; `grace-core::settings::tests::panel_tabs::save_then_load_returns_the_order_as_a_json_list`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` (after a restart) | ☑ |
+| RP-13 | An unusable saved order shows the default | `grace-core::panel_tabs::tests::falls_back_to_the_default` (each saved value of the table); `grace::bottom_panel::tests::tabs::an_unusable_saved_order_shows_the_default_and_stays_until_the_next_move` | ☑ |
+| RP-14 | Storage that fails costs nothing | `grace::bottom_panel::tests::tabs::an_order_that_cannot_be_saved_is_only_forgotten`; `grace-core::settings::tests::panel_tabs::falls_back_to_the_default_when_the_file_cannot_be_read` | ☑ |
 
 ### SO · Offer the sub-folder that holds the Karate project
 
