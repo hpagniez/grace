@@ -41,7 +41,7 @@ One PR each, in this order, each `Part of #282`, each from the merged `develop`.
 
 | Slice | What it does | Rows that end it | Model |
 |---|---|---|---|
-| 1 | Tick what P1 and P2 already built, each row with the test that proves it; write the test where none does | RP-01 to RP-14; SC-01 to SC-05, SC-07; FL-08, FL-09; ER-01 to ER-04; GF-01 to GF-03, GF-05 to GF-08. SC-06, SC-08 and GF-04 handed on to P4 | `sonnet` |
+| 1 | Tick what P1 and P2 already built, each row with the test that proves it; write the test where none does | RP-01 to RP-05, RP-07 to RP-14; SC-01 to SC-05, SC-07; FL-08, FL-09; ER-01 to ER-04; GF-01 to GF-03, GF-05, GF-08. SC-06, SC-08 and GF-04 handed on to P4 | `sonnet` |
 | 2 | Open in VS Code: `grace-core::editor`, the URL seam, the button and the error's link in Details, the tree's context menu | OE-01 to OE-11, OT-01 to OT-06; E-editor-01 to 03; `editor.test.ts`, `runner.editor.test.ts`; `Details.test.tsx` 18 to 22; `Tree.test.tsx` 86 to 91; #219, #220 | `sonnet` |
 | 3 | The HTTP tab's list: groups, only the calls that went wrong, the tree selection, the count, the keys | HI-01, 02, 03, 05, 06, 11; VL-13, VL-19, VL-25; PU-11; E-http-02, E-http-04, E-virtual-08; `http.test.ts`, `HttpCalls.test.tsx`; `store.test.tsx` `toggleGroup`; `VirtualList.test.tsx` 23 | `opus` |
 | 4 | A call's details and Copy as cURL | HI-04, 07, 08, 09, 10; E-http-01, E-http-03; `CallDetails.test.tsx` | `sonnet` |
@@ -50,10 +50,10 @@ One PR each, in this order, each `Part of #282`, each from the merged `develop`.
 | 7 | Trends: the strip above the runs | TR-01 to TR-18; E-trends-01 to 03; `Trends.test.tsx`, `trendLabels.test.ts` | `sonnet` |
 | 8 | The flaky proof in Details | FL-01 to FL-07; E-flaky-01 to 07; `FlakyProof.test.tsx`; `Tree.test.tsx` 28 | `sonnet` |
 | 9 | The data-driven view: an outline's Examples as a table | DD-01 to DD-07; E-examples-01; `Examples.test.tsx`; `VirtualList.test.tsx` 9 | `sonnet` |
-| 10 | The config banner and failures grouped by error | GF-09 to GF-22; E-failures-01; `failures.test.ts`, `ConfigBanner.test.tsx`; `Details.test.tsx` 23 to 28, 30 to 34 | `sonnet` |
-| 11 | The exit check | PU-33, VL-27; the regressions table; the check record | `sonnet` |
+| 10 | The config banner and failures grouped by error | GF-06, GF-07, GF-09 to GF-22; E-failures-01; `failures.test.ts`, `ConfigBanner.test.tsx`; `Details.test.tsx` 23 to 28, 30 to 34 | `sonnet` |
+| 11 | The exit check | PU-33, VL-27, RP-06; the regressions table; the check record | `sonnet` |
 
-The HTTP list is marked hard: it is P3's one virtual list with its own grouping, keyboard and anchoring, it must stay cheap during a run of thousands of calls (#124, VL-27), and four later rows lean on it. Spec rows: 36 + 17 + 10 + 5 + 15 + 7 + 18 + 7 + 7 + 14 + 2 = 138. E2e rows: 0 + 3 + 3 + 2 + 15 + 1 + 3 + 7 + 1 + 1 + 0 = 36.
+The HTTP list is marked hard: it is P3's one virtual list with its own grouping, keyboard and anchoring, it must stay cheap during a run of thousands of calls (#124, VL-27), and four later rows lean on it. Spec rows: 33 + 17 + 10 + 5 + 15 + 7 + 18 + 7 + 7 + 16 + 3 = 138 (slice 1 counts the 3 handed on to P4; RP-06, GF-06 and GF-07 moved, see slice 1). E2e rows: 0 + 3 + 3 + 2 + 15 + 1 + 3 + 7 + 1 + 1 + 0 = 36.
 
 ### Slice 1: what is already built
 
@@ -64,6 +64,8 @@ No new behaviour is expected. For each row, find the Rust test that proves it an
 - FL-08, FL-09: `grace-core::flaky::tests`, `fingerprint::tests`.
 - ER-01 to ER-04: `grace-core::karate::pom::tests`, `karate::command::tests` (`junit:xml` in `-f`).
 - GF-01 to GF-03, GF-05 to GF-08: the run's statuses and reasons in `grace-core::karate::{events, run_state}` and `state` (`reason_at`).
+
+What slice 1 found: RP-06, GF-06 and GF-07 were not ready to tick. GF-06 and GF-07 (two failures share an error once Karate's position is left out) are `failures.ts`'s rule, which is not ported: they go to slice 10. RP-06 has three ends of a drag: dropped on itself and outside the tabs are proven; Escape is not, because GPUI has no Escape handler for a drag and in a headless window any key ends it, so only a real window can tell. It goes to slice 11's by-hand run, with the tab drag; if Escape then does not cancel the drag, that is a bug to fix in a PR of its own. The other 30 rows are ticked. The tests written for them (the drop bar, a drop outside the tabs, a file dragged in, Alt+Right at the last place with the shown tab, an unusable saved order, the dry run without `junit:xml`, the two pom notices) passed at once, the behaviour being there. RP-02 is ticked for its order half: the Variables tab itself is P4's.
 
 A row with no test gets one, written first and seen failing where the behaviour is missing. A row whose behaviour turns out not to be built goes to its feature's slice (RP to this one, SC and GF to slice 10, ER to slice 6, FL to slice 8), said in the PR. SC-06, SC-08 and GF-04 get their Proof text "Waits for the step debugger, phase P4".
 
@@ -140,7 +142,7 @@ Spec: [data-driven view](../specs/2026-11-03-data-driven-view.md).
 
 Spec: [group failures](../specs/2026-11-04-group-failures.md).
 
-1. `failures.ts` in `grace-core::failures`, test for test: groups by error, a test hidden by the tag filter left out (GF-10), none while a run goes on (GF-11).
+1. `failures.ts` in `grace-core::failures`, test for test: two failures share an error once Karate's `Line: n, Col: m` and a thrown string's `at n:m` are left out (GF-06, GF-07), groups by error, a test hidden by the tag filter left out (GF-10), none while a run goes on (GF-11).
 2. Details: where a test sits in its group, Next and Previous wrapping round and keeping the focus, announced (GF-12 to GF-14); a folder's groups largest first with Go to first, which moves the focus to the test's heading (GF-15 to GF-17).
 3. `grace::failures`' banner from `ConfigBanner.tsx`: the config file and its line, opened through slice 2's editor call, line 1 when the message has none (GF-18, GF-19); gone when the next run starts (GF-20); none for ordinary failures (GF-21).
 4. `failures.rs` in `grace-e2e/tests` (GF-22).
@@ -156,7 +158,7 @@ Spec: [group failures](../specs/2026-11-04-group-failures.md).
 
 2. PU-33: GPUI beside Electron for each panel and detail view of P3, light and dark.
 3. VL-27's HTTP half: the HTTP tab at 10,000 tests, on the owner's machine with his go ([owner-machine](../process/owner-machine.md)).
-4. By hand on the owner's machine: a real tab drag, a link opening in a real VS Code, the Shell's save dialog, a paste of the copied cURL.
+4. By hand on the owner's machine: a real tab drag, also ended with Escape (RP-06), a link opening in a real VS Code, the Shell's save dialog, a paste of the copied cURL.
 5. `npm run bench:gpui` on the GPUI build, reported not judged (guide R7.1).
 6. The record in `docs/checks/<date>-gpui-p3-exit.md`; every row of the tables above ticked or handed on by its Proof text; #278's State edited. The owner closes #282.
 

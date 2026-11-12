@@ -1,6 +1,6 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
-//! (#229), step comments' own rows (SC-*), Open in VS Code, the flaky proof and the Examples table come with P3; the
+//! (#229), Open in VS Code, the flaky proof and the Examples table come with P3; the
 //! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases).
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;

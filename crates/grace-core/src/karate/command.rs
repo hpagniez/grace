@@ -724,6 +724,33 @@ mod tests {
             }
 
             #[test]
+            fn a_wrong_junit_xml_makes_the_file_unreadable_and_says_so() {
+                let dir = project(&[], &[]);
+                pom(dir.path(), r#"{"output":{"junitXml":"yes"}}"#);
+                let layout = detect_layout(dir.path());
+                assert!(!layout.junit_xml);
+                assert_eq!(
+                    layout.pom_notice.as_deref(),
+                    Some(
+                        "karate-pom.json could not be read: output.junitXml is not true or false. \
+                         Grace uses the default folders."
+                    )
+                );
+            }
+
+            #[test]
+            fn lists_the_other_output_keys_as_unused() {
+                let dir = project(&[], &[]);
+                pom(dir.path(), r#"{"output":{"junitXml":true,"dir":"target/x"}}"#);
+                let layout = detect_layout(dir.path());
+                assert!(layout.junit_xml);
+                assert_eq!(
+                    layout.pom_notice.as_deref(),
+                    Some("Grace does not use these karate-pom.json settings: output.dir.")
+                );
+            }
+
+            #[test]
             fn keeps_the_paths_inside_the_project_and_names_the_others() {
                 let dir = project(&[], &["tests/a"]);
                 let root = dir.path();
