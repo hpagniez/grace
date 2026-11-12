@@ -39,6 +39,7 @@ Measured or read in the documentation on 2026-11-12.
 | Cloud sessions load the repository's `CLAUDE.md`, rules, skills, agents and hooks. They load no user-level `CLAUDE.md` and no plugin, even one the repository declares | Claude Code docs, cloud environments |
 | `AGENTS.md` sets every subagent to extra-high effort, whatever the model. One documentation lookup run that way on 2026-11-12 used 223,000 tokens | `AGENTS.md`; that run's usage |
 | Ten plugins are on at user level. Five have nothing to do with Grace (Vercel, Supabase, Firecrawl, taste-skill, impeccable). Their skills are listed in every session | `~/.claude/settings.json` |
+| claude-mem's recall paid for itself on 2026-11-12: it told the session that the stopped VL-29 run had been cleaned up, and the three traps that run had hit | this session |
 | Three to-do lists compete (the app's, claude-mem's work state, superpowers' checklists), and three memories (claude-mem, Claude Code's memory folder, hand-over notes in issues) | session start text |
 | Rules given in conversation were not all written down: the resume note on #278 lists eleven, of which seven were missing from `AGENTS.md` | #353 |
 | Superpowers 7 already sizes the work: its design step has "a small change" and "a project", and its plan step offers building in the session with one review at the end, or a fresh agent and a reviewer per task | superpowers `brainstorming`, `writing-plans` |
@@ -152,7 +153,15 @@ Move up one step when a subagent returns weak work; do not retry on the same one
 | Dead stack rules (scaffold command, Kobalte, TanStack Router) | Cut | The code is gone (#353) |
 | `perf` on PRs that change only `crates/` | **For the owner** (not part of this work): skip it until the bench measures GPUI Grace (#334) | 20 Windows minutes for a comment that says nothing; ADR 0023 asks for the comment on every code PR, so skipping needs his word |
 
-**Plugins and connectors, for this repository** (`.claude/settings.json`): off for Vercel, Supabase, Firecrawl, taste-skill and impeccable; claude.ai connectors off. Superpowers and ponytail stay on. claude-mem, humanizer and i-have-adhd are the owner's to choose (Open questions).
+**Plugins and connectors, for this repository** (`.claude/settings.json`): off for Vercel, Supabase, Firecrawl, taste-skill and impeccable; claude.ai connectors off. Superpowers, ponytail and claude-mem stay on together (the owner, 2026-11-12), each with one job, so they do not compete:
+
+| Plugin | Its job | Not its job |
+|---|---|---|
+| superpowers | The process: design, plan, test first, review, finishing a branch | |
+| ponytail | How much gets built: the smallest complete change | It never drops a step of the tier or of the floor |
+| claude-mem | Recall: searching what earlier sessions did and found | The to-do list (the app's is the only one) and rules or decisions (they go in the repository) |
+
+Where they disagree, the order is: the project's rules, then `WORKFLOW.md`, then superpowers, then ponytail. None of the three loads in a cloud session. humanizer and i-have-adhd are the owner's to choose (Open questions).
 
 **Superpowers paths.** `AGENTS.md` keeps its two overrides: designs in `docs/specs/`, plans in `docs/plans/`.
 
@@ -240,7 +249,6 @@ This work is its own measure. The gate is bytes, which a script counts: the file
 ## Open questions for the owner
 
 0. **PR #353's two changed rules**, which this work builds on: attribution as `.claude/settings.json` gives it, with no session link (the resume note said no attribution at all); and a go needed on your machine only for what opens windows, needs a quiet machine or installs something.
-1. **claude-mem** in this repository: keep it on, or off? It adds a second memory and a second to-do list, and its session-start text is paid in every session. Off fits "the repository is the memory"; on keeps its search over past sessions.
 2. **humanizer and i-have-adhd**: personal tools, left on unless you say otherwise.
 3. **`perf` on `crates/`-only PRs**: skip it until #334, yes or no (a follow-up of its own).
 4. **Sessions**: this design assumes most work now runs on your machine, with cloud sessions as the exception. In a cloud session superpowers is not there and `WORKFLOW.md` alone carries the process. If cloud is to be the main place again, the superpowers skills would have to be copied into the repository.
