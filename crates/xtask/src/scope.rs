@@ -1,5 +1,6 @@
 //! `cargo xtask scope [<base>]`: the areas of the repository a diff touches, which say the CI jobs it needs
-//! (docs/specs/2026-11-12-ci-scope.md). `test.yml` and `perf.yml` read its lines from `$GITHUB_OUTPUT`.
+//! (docs/specs/2026-11-12-ci-scope.md). `test.yml` and `perf.yml` read its lines from `$GITHUB_OUTPUT`. A run that
+//! would only repeat a passed one touches no area: a PR into `develop` marked ready on a commit that already passed.
 
 /// Electron Grace: `unit`, `e2e` and `perf`.
 pub const ELECTRON: u8 = 1;
@@ -95,8 +96,41 @@ pub fn scope(base: Option<&str>, git: &dyn Fn(&[&str]) -> Option<String>) -> Res
     Ok(diff.lines().fold(0, |all, path| all | areas(path)))
 }
 
+/// Whether this workflow already ended in success on this commit, as GitHub says through `gh`. `false` when it
+/// cannot be asked: when unsure, everything runs.
+pub fn passed(repository: &str, workflow: &str, sha: &str, gh: &dyn Fn(&[&str]) -> Option<String>) -> bool {
+    if repository.is_empty() || workflow.is_empty() || sha.is_empty() {
+        return false;
+    }
+    let runs = format!("repos/{repository}/actions/workflows/{workflow}/runs?head_sha={sha}&status=success&per_page=1");
+    gh(&["api", &runs, "--jq", ".total_count"])
+        .is_some_and(|count| count.trim().parse::<u64>().is_ok_and(|count| count > 0))
+}
+
+/// Whether this run would only repeat one: a PR into `develop` marked ready on a commit that already passed. Marking
+/// ready starts CI for the bots' PRs, which no push started; on any other PR the commit has been through it. A PR
+/// into `main` runs again: its e2e only runs once it is ready.
+pub fn repeats(action: &str, base_ref: &str, passed: &dyn Fn() -> bool) -> bool {
+    action == "ready_for_review" && base_ref == "develop" && passed()
+}
+
 /// Prints the areas of the diff from `base`, or the reason it cannot, and gives the exit code.
 pub fn run(base: Option<String>) -> u8 {
+    let var = |name: &str| std::env::var(name).unwrap_or_default();
+    let gh = |args: &[&str]| {
+        let out = std::process::Command::new("gh").args(args).output().ok()?;
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    };
+    let workflow = var("SCOPE_WORKFLOW");
+    let already = || passed(&var("GITHUB_REPOSITORY"), &workflow, &var("SCOPE_HEAD_SHA"), &gh);
+    if repeats(&var("SCOPE_ACTION"), &var("SCOPE_BASE_REF"), &already) {
+        // stderr: stdout goes to $GITHUB_OUTPUT
+        eprintln!("::notice::this commit already passed {workflow}: marking the PR ready runs nothing again");
+        print!("{}", outputs(0));
+        return 0;
+    }
     match scope(base.as_deref(), &|args| crate::rules::git(crate::rules::root(), args)) {
         Ok(areas) => {
             print!("{}", outputs(areas));
@@ -258,5 +292,55 @@ mod tests {
     #[test]
     fn run_fails_when_git_fails() {
         assert!(scope(Some("no-such-ref"), &|_| None).is_err());
+    }
+
+    #[test]
+    fn marking_ready_a_commit_that_passed_repeats_nothing() {
+        assert!(repeats("ready_for_review", "develop", &|| true));
+    }
+
+    #[test]
+    fn a_commit_that_has_not_passed_runs() {
+        // a bot's PR: no push started CI, so marking it ready is its first run
+        assert!(!repeats("ready_for_review", "develop", &|| false));
+    }
+
+    #[test]
+    fn a_push_or_a_new_pr_runs_without_asking_github() {
+        for action in ["opened", "synchronize", "reopened", ""] {
+            assert!(
+                !repeats(action, "develop", &|| panic!("GitHub was asked on {action}")),
+                "{action}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pr_into_main_runs_again_when_ready() {
+        // its e2e jobs wait for it to be ready
+        assert!(!repeats("ready_for_review", "main", &|| panic!("GitHub was asked")));
+    }
+
+    #[test]
+    fn passed_asks_for_this_workflows_successful_runs_on_the_commit() {
+        let gh = |args: &[&str]| {
+            assert_eq!(args[0], "api");
+            assert_eq!(
+                args[1],
+                "repos/o/r/actions/workflows/test.yml/runs?head_sha=abc&status=success&per_page=1"
+            );
+            Some("2\n".to_string())
+        };
+        assert!(passed("o/r", "test.yml", "abc", &gh));
+        assert!(!passed("o/r", "test.yml", "abc", &|_| Some("0\n".to_string())));
+    }
+
+    #[test]
+    fn when_github_cannot_be_asked_everything_runs() {
+        assert!(!passed("o/r", "test.yml", "abc", &|_| None));
+        assert!(!passed("o/r", "test.yml", "abc", &|_| Some("not a number".to_string())));
+        assert!(!passed("", "test.yml", "abc", &|_| panic!(
+            "asked without a repository"
+        )));
     }
 }
