@@ -456,6 +456,19 @@ impl Runner {
         self.0.trend(key)
     }
 
+    /// A tree feature path, or an absolute path, as a file of the open project to open in an editor (open-in-editor
+    /// R3); None otherwise.
+    pub fn editor_file(&self, file: &str) -> Option<PathBuf> {
+        let root = lock(&self.0.state).project.as_ref()?.root.clone();
+        let root = Path::new(&root);
+        let abs = if Path::new(file).is_absolute() {
+            PathBuf::from(file)
+        } else {
+            locate(&detect_layout(root).bases, file)
+        };
+        crate::editor::project_file(root, &abs)
+    }
+
     /// The report of a listed run of the open project (R4); None if it has none. Never takes a path.
     pub fn run_report_path(&self, id: &str) -> Option<PathBuf> {
         self.0.run_report_path(id)

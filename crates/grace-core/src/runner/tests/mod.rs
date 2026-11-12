@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 mod discovery;
+mod editor;
 mod env;
 mod fingerprint;
 mod flaky;

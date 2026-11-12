@@ -27,12 +27,19 @@ fn project_file_with(root: &Path, file: &Path, real: &dyn Fn(&Path) -> io::Resul
     if !inside(&real_root, &real) || !fs::metadata(&real).ok()?.is_file() {
         return None;
     }
-    Some(root.join(real.components().skip(real_root.components().count()).collect::<PathBuf>()))
+    Some(
+        root.join(
+            real.components()
+                .skip(real_root.components().count())
+                .collect::<PathBuf>(),
+        ),
+    )
 }
 
 /// Node's `realpathSync.native`: the real path, links followed, without the `\\?\` prefix Rust's `canonicalize` adds.
 fn real_path(path: &Path) -> io::Result<PathBuf> {
-    path.canonicalize().map(|p| PathBuf::from(strip_verbatim(&p.to_string_lossy())))
+    path.canonicalize()
+        .map(|p| PathBuf::from(strip_verbatim(&p.to_string_lossy())))
 }
 
 /// `\\?\C:\p` as `C:\p` and `\\?\UNC\server\share` as `\\server\share`.
@@ -52,8 +59,27 @@ pub fn vscode_url(file: &Path, line: u32) -> String {
     let mut path = String::new();
     for b in file.to_string_lossy().replace('\\', "/").bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b';' | b',' | b'/' | b':' | b'@' | b'&' | b'=' | b'+' | b'$'
-            | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => path.push(b as char),
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b';'
+            | b','
+            | b'/'
+            | b':'
+            | b'@'
+            | b'&'
+            | b'='
+            | b'+'
+            | b'$'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'!'
+            | b'~'
+            | b'*'
+            | b'\''
+            | b'('
+            | b')' => path.push(b as char),
             _ => path.push_str(&format!("%{b:02X}")),
         }
     }
@@ -183,7 +209,10 @@ mod tests {
         #[test]
         fn drops_the_verbatim_prefix_of_a_real_path() {
             assert_eq!(strip_verbatim(r"\\?\C:\p\a.feature"), r"C:\p\a.feature");
-            assert_eq!(strip_verbatim(r"\\?\UNC\server\share\a.feature"), r"\\server\share\a.feature");
+            assert_eq!(
+                strip_verbatim(r"\\?\UNC\server\share\a.feature"),
+                r"\\server\share\a.feature"
+            );
             assert_eq!(strip_verbatim(r"C:\p\a.feature"), r"C:\p\a.feature");
         }
     }
