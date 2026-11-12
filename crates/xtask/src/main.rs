@@ -4,6 +4,7 @@
 
 mod pr;
 mod rules;
+mod scope;
 
 use std::process::ExitCode;
 
@@ -12,12 +13,15 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check-rules  the agent rules files stay within their limits
   check-pr     the pull request follows the way of working (reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
-               EVENT_NAME and PR_BODY)";
+               EVENT_NAME and PR_BODY)
+  scope        the areas of git diff <base>...HEAD as name=true|false lines for $GITHUB_OUTPUT; every area
+               without a base (cargo xtask scope [<base>])";
 
 fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
         Some("check-rules") => ExitCode::from(rules::run()),
         Some("check-pr") => ExitCode::from(pr::run()),
+        Some("scope") => ExitCode::from(scope::run(std::env::args().nth(2))),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
