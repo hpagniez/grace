@@ -9,7 +9,6 @@ import {
   titleFor,
   versionFromBranch,
 } from "./bump-pr.mjs";
-import { commitError } from "./check-pr.mjs";
 
 const bot = { authors: [{ email: BOT_EMAIL, login: "", name: "github-actions[bot]" }] };
 const person = { authors: [{ email: "hugo@example.com", login: "Tusquito", name: "Tusquito" }] };
@@ -33,15 +32,14 @@ describe("branchName", () => {
 });
 
 describe("titleFor", () => {
+  // crates/xtask/src/pr.rs pins these same titles against the header rule (the_bump_scripts_titles_pass)
   it("writes commit headers the PR check accepts", () => {
     expect(titleFor("karate", "2.1.4", "2.1.5")).toBe(
       "build(deps): bump karate from 2.1.4 to 2.1.5",
     );
-    expect(commitError(titleFor("karate", "2.1.4", "2.1.5"))).toBeNull();
     expect(titleFor("jre", "21.0.12.1+1", "21.0.13.1+12")).toBe(
       "build(deps): bump temurin jre from 21.0.12.1+1 to 21.0.13.1+12",
     );
-    expect(commitError(titleFor("jre", "21.0.12.1+1", "21.0.13.1+12"))).toBeNull();
   });
 });
 

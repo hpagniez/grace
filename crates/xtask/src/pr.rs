@@ -370,8 +370,16 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
 
     // a PR changes only what it added to where it left the base, not to the base's tip
     let fork = git(&["merge-base", base, head]).unwrap_or_default().trim().to_string();
-    let added = lines(&["diff", "--name-only", "--no-renames", "--diff-filter=A", &fork, head]);
-    let changes: Vec<Change> = lines(&["diff", "--numstat", "--no-renames", &fork, head])
+    let added = lines(&[
+        "diff",
+        "--no-color",
+        "--name-only",
+        "--no-renames",
+        "--diff-filter=A",
+        &fork,
+        head,
+    ]);
+    let changes: Vec<Change> = lines(&["diff", "--no-color", "--numstat", "--no-renames", &fork, head])
         .iter()
         .filter_map(|line| {
             let mut fields = line.splitn(3, '\t');
@@ -389,12 +397,11 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
 
     if let Some(body) = &env.body {
         errors.extend(trace_errors(std::slice::from_ref(body)));
-        errors.extend(script_language_error(&added, body));
     }
     if exempt(&env.head_ref) {
         return errors;
     }
-    let rust: Vec<String> = lines(&["diff", "-U0", "--no-renames", &fork, head, "--", "*.rs"])
+    let rust: Vec<String> = lines(&["diff", "--no-color", "-U0", "--no-renames", &fork, head, "--", "*.rs"])
         .into_iter()
         .filter(|line| line.starts_with('+') && !line.starts_with("+++"))
         .collect();
@@ -403,6 +410,7 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
         return errors;
     };
     errors.extend(tier_error(&env.head_ref, body));
+    errors.extend(script_language_error(&added, body));
     match tier(body) {
         Some(Tier::Small) => {
             let manifest = |change: &&Change| change.path == "package.json" || change.path.ends_with("Cargo.toml");
@@ -418,7 +426,9 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
             let docs_only = changes
                 .iter()
                 .all(|change| change.path.starts_with("docs/") || change.path.ends_with(".md"));
-            let exists = |path: &str| git(&["cat-file", "-e", &format!("{head}:{path}")]).is_some();
+            let exists = |path: &str| {
+                git(&["cat-file", "-t", &format!("{head}:{path}")]).is_some_and(|kind| kind.trim() == "blob")
+            };
             errors.extend(papers_errors(tier, body, docs_only, &exists));
         }
         None => {}
@@ -504,6 +514,21 @@ mod tests {
                 .unwrap()
                 .starts_with("not `<type>(<scope>)<!>: <subject>`")
         );
+    }
+
+    /// The titles scripts/bump-pr.mjs and scripts/bump-cargo.mjs write (their tests pin the same strings).
+    #[test]
+    fn the_bump_scripts_titles_pass() {
+        for header in [
+            "build(deps): bump karate from 2.1.4 to 2.1.5",
+            "build(deps): bump temurin jre from 21.0.12.1+1 to 21.0.13.1+12",
+            "build(deps): bump gpui-pre 0.3.12, gpui kit 0.9.1, rust 1.99.1",
+            "build(deps): bump rust 1.100.0",
+            "build(deps): update cargo.lock",
+            "build(deps): bump gpui-pre 0.3.1200, gpui kit 0.9.1000, rust 1.1000.10",
+        ] {
+            assert_eq!(commit_error(header), None, "{header}");
+        }
     }
 
     // branch targets, ported
@@ -1000,29 +1025,42 @@ mod repository_tests {
             repo
         }
 
-        /// Git in this repository, with none of the machine's identity or commit signing.
-        fn git(&self, args: &[&str]) -> String {
-            let settings = [
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@t",
-                "-c",
-                "commit.gpgsign=false",
-            ];
-            let out = std::process::Command::new("git")
-                .arg("-C")
+        /// Git in this repository, with none of the machine's settings: no global or system configuration (identity,
+        /// commit signing, hooks), and no repository a caller such as a git hook points to.
+        fn command(&self) -> std::process::Command {
+            let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+            let mut git = std::process::Command::new("git");
+            git.env("GIT_CONFIG_GLOBAL", null).env("GIT_CONFIG_NOSYSTEM", "1");
+            for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
+                git.env_remove(name);
+            }
+            git.arg("-C")
                 .arg(&self.dir)
-                .args(settings)
-                .args(args)
-                .output()
-                .unwrap();
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"]);
+            git
+        }
+
+        fn git(&self, args: &[&str]) -> String {
+            let out = self.command().args(args).output().unwrap();
             assert!(
                 out.status.success(),
                 "git {args:?}: {}",
                 String::from_utf8_lossy(&out.stderr)
             );
             String::from_utf8_lossy(&out.stdout).trim().to_string()
+        }
+
+        /// Git as `errors` calls it, on a machine that colours everything: its output must still be read right.
+        fn hostile_git(&self, args: &[&str]) -> Option<String> {
+            let out = self
+                .command()
+                .args(["-c", "color.ui=always"])
+                .args(args)
+                .output()
+                .ok()?;
+            out.status
+                .success()
+                .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
         }
 
         fn write(&self, path: &str, text: &str) {
@@ -1045,7 +1083,7 @@ mod repository_tests {
                 head_sha: self.git(&["rev-parse", "HEAD"]),
                 body: body.map(String::from),
             };
-            errors(&env, &|args| crate::rules::git(&self.dir, args))
+            errors(&env, &|args| self.hostile_git(args))
         }
     }
 
@@ -1088,9 +1126,76 @@ mod repository_tests {
     fn a_bad_header_is_reported_and_a_merge_commit_is_not() {
         let repo = Repo::new("feature/x");
         repo.commit("Bad header");
+        // a real merge inside the PR: its "Merge branch" header is no Conventional Commit, and is not checked
+        repo.git(&["switch", "-q", "-c", "side"]);
+        repo.commit("docs: a side note");
+        repo.git(&["switch", "-q", "feature/x"]);
+        repo.git(&[
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "Merge branch 'side' into feature/x",
+            "side",
+        ]);
         let errors = repo.check("develop", Some("Tier: small"));
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(errors[0].starts_with("commit \"Bad header\": "), "{errors:?}");
+    }
+
+    #[test]
+    fn what_the_base_gained_after_the_branch_was_cut_is_not_the_prs() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/a.md", "# A\n");
+        repo.commit("docs: note a");
+        // develop moves on: a dependency and 500 lines that this PR never touched
+        repo.git(&["switch", "-q", "main"]);
+        repo.write(
+            "package.json",
+            "{\n  \"dependencies\": {\n    \"a\": \"1.0.0\",\n    \"b\": \"2.0.0\"\n  }\n}\n",
+        );
+        repo.write("src/big.ts", &"export const x = 1;\n".repeat(500));
+        repo.commit("feat: add b");
+        let moved = repo.git(&["rev-parse", "HEAD"]);
+        repo.git(&["update-ref", "refs/remotes/origin/develop", "HEAD"]);
+        repo.git(&["switch", "-q", "feature/x"]);
+        let moved = Repo {
+            dir: repo.dir.clone(),
+            base: moved,
+        };
+        assert_eq!(moved.check("develop", Some("Tier: small")), Vec::<String>::new());
+        std::mem::forget(moved); // `repo` removes the folder
+    }
+
+    #[test]
+    fn a_release_into_main_is_not_asked_about_scripts_already_on_develop() {
+        let repo = Repo::new("feature/x");
+        // a script lands on develop through its own PR, where it was checked
+        repo.write("scripts/x.mjs", "console.log(1);\n");
+        repo.commit("build: add x");
+        repo.git(&["update-ref", "refs/remotes/origin/develop", "HEAD"]);
+        repo.git(&["switch", "-q", "-c", "release/v1.0.0-rc.1"]);
+        repo.write(
+            "docs/checks/2026-10-30-release-1.0.0-rc.1-packaged.md",
+            "# Check\n\n## Public docs\n\nFine.\n",
+        );
+        repo.commit("docs: record the 1.0.0-rc.1 packaged-app check");
+        assert_eq!(repo.check("main", Some("Release 1.0.0-rc.1")), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_spec_line_left_as_the_template_has_it_fails() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/specs/a.md", "# Spec\n");
+        repo.write("docs/plans/a.md", "# Plan\n");
+        repo.commit("docs: add the spec and the plan");
+        let body = "Tier: feature\nCloses #1\nSpec: docs/specs/\nPlan: docs/plans/a.md\n";
+        let errors = repo.check("develop", Some(body));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("Spec: docs/specs/ is not a file of this PR's head"),
+            "{errors:?}"
+        );
     }
 
     #[test]
