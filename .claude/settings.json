@@ -9,5 +9,40 @@
     "firecrawl@anthropic-plugin-directory": false,
     "taste-skill@taste-skill": false,
     "impeccable@impeccable": false
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && cargo xtask tidy 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(mklink *)",
+      "Bash(cmd /c mklink *)",
+      "Bash(cmd //c mklink *)",
+      "Bash(cmd.exe /c mklink *)",
+      "Bash(ln -s*)",
+      "PowerShell(cmd /c mklink *)",
+      "PowerShell(New-Item *Junction*)",
+      "PowerShell(New-Item *SymbolicLink*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f *)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f *)",
+      "PowerShell(git push * --force*)",
+      "PowerShell(git push * -f *)"
+    ]
   }
 }
