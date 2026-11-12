@@ -436,17 +436,29 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
     errors
 }
 
+/// The PR to check: what CI's variables say, and without them the branch in hand against `origin/develop`, with no
+/// body, so the check also runs on a machine before a push.
+pub fn env_from(var: &dyn Fn(&str) -> Option<String>, current: &str) -> Env {
+    let or = |name: &str, default: &str| {
+        var(name)
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| default.to_string())
+    };
+    Env {
+        head_ref: or("HEAD_REF", current),
+        base_ref: or("BASE_REF", "develop"),
+        base_sha: or("BASE_SHA", "origin/develop"),
+        head_sha: or("HEAD_SHA", "HEAD"),
+        body: (var("EVENT_NAME").as_deref() == Some("pull_request")).then(|| var("PR_BODY").unwrap_or_default()),
+    }
+}
+
 /// Checks the PR the environment describes, prints each failure as a CI error, and gives the exit code.
 pub fn run() -> u8 {
-    let var = |name: &str| std::env::var(name).unwrap_or_default();
-    let env = Env {
-        head_ref: var("HEAD_REF"),
-        base_ref: var("BASE_REF"),
-        base_sha: var("BASE_SHA"),
-        head_sha: var("HEAD_SHA"),
-        body: (var("EVENT_NAME") == "pull_request").then(|| var("PR_BODY")),
-    };
-    let errors = errors(&env, &|args| crate::rules::git(crate::rules::root(), args));
+    let root = crate::rules::root();
+    let current = crate::rules::git(root, &["branch", "--show-current"]).unwrap_or_default();
+    let env = env_from(&|name| std::env::var(name).ok(), current.trim());
+    let errors = errors(&env, &|args| crate::rules::git(root, args));
     for error in &errors {
         println!("::error::{error}");
     }
@@ -467,6 +479,55 @@ mod tests {
             lines,
             added: false,
         }
+    }
+
+    #[test]
+    fn without_ci_the_branch_in_hand_is_checked() {
+        let env = env_from(&|_| None, "feature/x");
+        let refs = (
+            env.head_ref.as_str(),
+            env.base_ref.as_str(),
+            env.base_sha.as_str(),
+            env.head_sha.as_str(),
+        );
+        assert_eq!(refs, ("feature/x", "develop", "origin/develop", "HEAD"));
+        assert_eq!(env.body, None);
+    }
+
+    #[test]
+    fn ci_says_which_pr_to_check() {
+        let var = |name: &str| {
+            let value = match name {
+                "HEAD_REF" => "feature/y",
+                "BASE_REF" => "main",
+                "BASE_SHA" => "abc",
+                "HEAD_SHA" => "def",
+                "EVENT_NAME" => "pull_request",
+                "PR_BODY" => "Tier: small",
+                _ => return None,
+            };
+            Some(value.to_string())
+        };
+        let env = env_from(&var, "feature/x");
+        let refs = (
+            env.head_ref.as_str(),
+            env.base_ref.as_str(),
+            env.base_sha.as_str(),
+            env.head_sha.as_str(),
+        );
+        assert_eq!(refs, ("feature/y", "main", "abc", "def"));
+        assert_eq!(env.body.as_deref(), Some("Tier: small"));
+        // a run by hand in CI has the refs and no body
+        let dispatch = |name: &str| {
+            if name == "EVENT_NAME" {
+                Some("workflow_dispatch".to_string())
+            } else {
+                var(name)
+            }
+        };
+        assert_eq!(env_from(&dispatch, "feature/x").body, None);
+        // an empty variable is an unset one
+        assert_eq!(env_from(&|_| Some(String::new()), "feature/x").head_sha, "HEAD");
     }
 
     // commit headers, ported from scripts/check-pr.test.ts
