@@ -5,6 +5,8 @@
 mod pr;
 mod rules;
 mod scope;
+#[allow(dead_code)] // called from main in the next task of the plan
+mod tidy;
 
 use std::process::ExitCode;
 
