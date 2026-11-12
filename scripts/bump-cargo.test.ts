@@ -30,7 +30,6 @@ import {
   titleFor,
   zedRev,
 } from "./bump-cargo.mjs";
-import { commitError } from "./check-pr.mjs";
 
 const read = (file: string) => readFileSync(join(ROOT, file), "utf8");
 
@@ -256,7 +255,7 @@ describe("titleFor", () => {
       "build(deps): update cargo.lock",
       "build(deps): bump gpui-pre 0.3.1200, gpui kit 0.9.1000, rust 1.1000.10",
     ]);
-    for (const t of titles) expect(commitError(t)).toBeNull();
+    // crates/xtask/src/pr.rs pins these same titles against the header rule (the_bump_scripts_titles_pass)
   });
 });
 

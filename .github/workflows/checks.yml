@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [develop, main]
     # ready_for_review: a bump PR opened by vendor-updates starts CI only when a person marks it ready
-    types: [opened, synchronize, reopened, ready_for_review]
+    # edited: check-pr reads the PR body, so a body that gains its Tier line is checked again
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
 
 permissions:
@@ -49,6 +50,17 @@ jobs:
       # The agent rules files stay within their limits (docs/specs/2026-11-12-way-of-working.md)
       - run: cargo xtask check-rules
         if: ${{ !cancelled() }}
+      # The PR follows the way of working: its tier and what follows from it, commit headers, branch target
+      - run: cargo xtask check-pr
+        if: ${{ !cancelled() }}
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          BASE_REF: ${{ github.base_ref || 'develop' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/develop' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+      # The two checks that judge the bench's JSON: a release's performance record, a raised limit
       - run: node scripts/check-pr.mjs
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
         env:

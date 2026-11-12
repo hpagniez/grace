@@ -110,7 +110,7 @@ pub fn matching_rules(
 }
 
 /// The repository this crate is in.
-fn root() -> &'static Path {
+pub(crate) fn root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 
@@ -138,7 +138,7 @@ pub fn run() -> u8 {
 }
 
 /// Git's output for `args` in `dir`, or `None` when it fails.
-fn git(dir: &Path, args: &[&str]) -> Option<String> {
+pub(crate) fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git").arg("-C").arg(dir).args(args).output().ok()?;
     out.status
         .success()

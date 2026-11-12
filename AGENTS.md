@@ -33,7 +33,7 @@ Windows 11, Node 24. Run `npm install`, then `npm run vendor` once (downloads th
 | `npm run e2e` | Package the app, then run the Playwright end-to-end tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | oxlint and oxfmt check |
-| `cargo xtask <command>` | Grace's scripts, in Rust (`crates/xtask`): `check-rules` |
+| `cargo xtask <command>` | Grace's Rust scripts: `check-rules`, `check-pr` |
 
 Never run any two of `npm test`, `npm run e2e` and `npm run bench` at the same time. The e2e Java leak checks scan every `java.exe` under `vendor/jre` and see the unit tests' processes, so never run two e2e runs at once either. Nor run Karate yourself during e2e (a measurement script, the big project): its thousands of local HTTP calls make Windows refuse Playwright's connection to a starting app, and the test fails with `Process failed to launch!` ([#191](https://github.com/hpagniez/grace/issues/191)). The bench needs a quiet machine, and it and e2e both package into `out/`. Unit test files run in parallel; their leak checks see only their own project's Java ([ADR 0020](docs/decisions/0020-run-unit-test-files-in-parallel.md)).
 

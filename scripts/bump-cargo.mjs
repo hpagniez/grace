@@ -462,7 +462,7 @@ export async function bump({
 /** The bump branch of a day. */
 export const branchFor = (date) => `feature/bump-cargo-${date}`;
 
-/** The commit and PR title: what moved, in a header check-pr.mjs takes. */
+/** The commit and PR title: what moved, in a header `cargo xtask check-pr` takes. */
 export function titleFor(from, to) {
   const parts = [];
   if (to.gpui !== from.gpui) parts.push(`gpui-pre ${to.gpui}`);
