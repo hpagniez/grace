@@ -27,6 +27,7 @@ const RULES: &[(&str, u8)] = &[
     // GPUI Grace's tests read them: the icons, the theme, the fixtures, the versions, the JRE and jar
     ("src/renderer/", ELECTRON | GPUI),
     ("src/index.css", ELECTRON | GPUI),
+    ("index.html", ELECTRON | GPUI),
     ("assets/", ELECTRON | GPUI),
     ("test/", ELECTRON | GPUI),
     ("listener/", ELECTRON | GPUI),
@@ -37,17 +38,17 @@ const RULES: &[(&str, u8)] = &[
     ("e2e/", ELECTRON),
     ("bench/", ELECTRON),
     ("package-lock.json", ELECTRON),
-    ("index.html", ELECTRON),
     ("tsconfig.json", ELECTRON),
     ("forge.config.mts", ELECTRON),
     ("vite.*", ELECTRON),
     ("vitest.config.mts", ELECTRON),
     ("playwright.*", ELECTRON),
     ("crates/", GPUI),
-    ("patches/", GPUI),
-    ("Cargo.toml", GPUI),
+    // scripts/bump-cargo.test.ts reads the pins and the patches
+    ("patches/", GPUI | SCRIPTS),
+    ("Cargo.toml", GPUI | SCRIPTS),
+    ("rust-toolchain.toml", GPUI | SCRIPTS),
     ("Cargo.lock", GPUI),
-    ("rust-toolchain.toml", GPUI),
     (".cargo/", GPUI),
     ("scripts/e2e-gpui.sh", GPUI),
     ("scripts/", SCRIPTS),
@@ -102,7 +103,8 @@ pub fn run(base: Option<String>) -> u8 {
             0
         }
         Err(error) => {
-            println!("::error::{error}");
+            // stderr: stdout goes to $GITHUB_OUTPUT
+            eprintln!("::error::{error}");
             1
         }
     }
@@ -147,6 +149,7 @@ mod tests {
             &[
                 "src/renderer/App.tsx",
                 "src/index.css",
+                "index.html",
                 "test/fixtures/events/a.jsonl",
                 "assets/icon.svg",
                 "listener/grace/DebugListener.java",
@@ -166,6 +169,7 @@ mod tests {
                 "e2e/run.spec.ts",
                 "bench/bench.mjs",
                 "package-lock.json",
+                "tsconfig.json",
                 "vite.main.config.mts",
                 "playwright.config.ts",
                 "forge.config.mts",
@@ -180,14 +184,26 @@ mod tests {
             &[
                 "crates/grace/src/lib.rs",
                 "crates/grace-core/src/lib.rs",
-                "patches/series",
-                "Cargo.toml",
                 "Cargo.lock",
-                "rust-toolchain.toml",
                 ".cargo/config.toml",
                 "scripts/e2e-gpui.sh",
             ],
             GPUI,
+        );
+    }
+
+    #[test]
+    fn the_cargo_bump_tests_read_the_pins_and_patches() {
+        // scripts/bump-cargo.test.ts, in `npm test`, reads them
+        each(
+            &[
+                "Cargo.toml",
+                "rust-toolchain.toml",
+                "patches/series",
+                "patches/check.sh",
+                "patches/gpui-pre-windows/Cargo.toml",
+            ],
+            GPUI | SCRIPTS,
         );
     }
 
