@@ -1,0 +1,3 @@
+# `cargo xtask <command>` runs Grace's scripts (crates/xtask).
+[alias]
+xtask = "run --quiet --package xtask --"
