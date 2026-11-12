@@ -2,6 +2,8 @@
 //! Each command is a module of pure functions with unit tests; `main` reads the arguments and sets the exit code.
 #![forbid(unsafe_code)]
 
+#[allow(dead_code)] // wired into main in the next step of the plan
+mod pr;
 mod rules;
 
 use std::process::ExitCode;
