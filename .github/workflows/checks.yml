@@ -50,6 +50,11 @@ jobs:
       # The agent rules files stay within their limits (docs/specs/2026-11-12-way-of-working.md)
       - run: cargo xtask check-rules
         if: ${{ !cancelled() }}
+      # The script crate has no dependency, so it builds in seconds: a PR that changes only it needs no test run
+      - run: cargo clippy -p xtask --all-targets --locked -- -D warnings
+        if: ${{ !cancelled() }}
+      - run: cargo test -p xtask --locked
+        if: ${{ !cancelled() }}
       # The PR follows the way of working: its tier and what follows from it, commit headers, branch target
       - run: cargo xtask check-pr
         if: ${{ !cancelled() }}

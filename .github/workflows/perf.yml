@@ -1,4 +1,5 @@
-# Bench numbers on every code PR (docs/specs/2026-10-31-light-and-fast.md, R4). One Windows runner packages the PR's base
+# Bench numbers on every PR that changes Electron Grace (docs/specs/2026-10-31-light-and-fast.md, R4): the bench
+# measures only it until #334. One Windows runner packages the PR's base
 # and head, runs bench/bench.mjs on both, and posts the table as one PR comment, updated on every push, and in the job
 # summary. A worse number never fails the job; only a bench that cannot measure does. Same triggers and skips as test.yml.
 # A fork's or Dependabot's token is read-only: those PRs get the job summary only. By hand: the chosen ref against develop.
@@ -8,7 +9,6 @@ on:
   pull_request:
     branches: [develop, main]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 permissions:
@@ -20,8 +20,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  perf:
+  # as in test.yml: the areas the PR changes; every area by hand; skipped on a back-merge
+  scope:
     if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      electron: ${{ steps.scope.outputs.electron }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - run: rustup show active-toolchain || rustup toolchain install
+      - id: scope
+        shell: bash
+        run: cargo xtask scope "$BASE" | tee -a "$GITHUB_OUTPUT"
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+
+  perf:
+    needs: scope
+    if: ${{ needs.scope.outputs.electron == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:

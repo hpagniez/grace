@@ -1,13 +1,13 @@
 # Windows unit and e2e tests (ADR 0007, ADR 0016, ADR 0017), and GPUI Grace's Rust tests on Windows and Linux (ADR 0031), its minimised idle on runs by hand (ADR 0032). Each job runs on its own VM, so the suites' Java leak
-# checks never see each other's processes. Unit tests run on every PR; e2e only on PRs into main once ready for
-# review, and on manual runs. A release/* or hotfix/* merge back into develop runs nothing: its PR into main did.
+# checks never see each other's processes. Each job runs only for the areas the PR changes (scope); e2e only on PRs
+# into main once ready for review. A run by hand runs every job. A release/* or hotfix/* merge back into develop runs
+# nothing: its PR into main did.
 name: test
 
 on:
   pull_request:
     branches: [develop, main]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 permissions:
@@ -19,8 +19,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit:
+  # The areas the PR changes (cargo xtask scope, docs/specs/2026-11-12-ci-scope.md); a run by hand has no diff and
+  # touches every area. Skipped on a back-merge, so every job after it is too and the run stays skipped.
+  scope:
     if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      electron: ${{ steps.scope.outputs.electron }}
+      gpui: ${{ steps.scope.outputs.gpui }}
+      scripts: ${{ steps.scope.outputs.scripts }}
+    steps:
+      # the PR's merge commit and its first parent, the base it merges into
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - run: rustup show active-toolchain || rustup toolchain install
+      - id: scope
+        shell: bash
+        run: cargo xtask scope "$BASE" | tee -a "$GITHUB_OUTPUT"
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+
+  unit:
+    needs: scope
+    if: ${{ needs.scope.outputs.electron == 'true' || needs.scope.outputs.scripts == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
@@ -66,7 +90,8 @@ jobs:
   # GPUI Grace (ADR 0031, migration guide R6.5): clippy and cargo test on both platforms it builds on. Its own job,
   # so the Electron halves keep their time. The first build of GPUI takes several minutes; the cache keeps target/.
   rust:
-    if: ${{ !(github.base_ref == 'develop' && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))) }}
+    needs: scope
+    if: ${{ needs.scope.outputs.gpui == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -171,7 +196,8 @@ jobs:
             }'
 
   e2e:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
+    needs: scope
+    if: ${{ needs.scope.outputs.electron == 'true' && (github.event_name == 'workflow_dispatch' || github.base_ref == 'main') }}
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
