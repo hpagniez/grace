@@ -2,5 +2,13 @@
   "attribution": {
     "commit": "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
     "pr": "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-  }
+  },
+  "enabledPlugins": {
+    "vercel-plugin@vercel": false,
+    "supabase@anthropic-plugin-directory": false,
+    "firecrawl@anthropic-plugin-directory": false,
+    "taste-skill@taste-skill": false,
+    "impeccable@impeccable": false
+  },
+  "disableClaudeAiConnectors": true
 }
