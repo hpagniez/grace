@@ -28,7 +28,8 @@ fn row<'a>(tree: &'a Node, label: &str) -> Option<&'a Node> {
 /// The link a file of the project opens at: `vscode://file/<project path>/<file>` without the line.
 fn link(dir: &Path, file: &str) -> String {
     let dir = dir.to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/");
-    format!("vscode://file/{dir}/{file}")
+    // a Linux path starts with its own `/`: the link has one slash after `file`, a share's alone has two
+    format!("vscode://file/{}/{file}", dir.trim_start_matches('/'))
 }
 
 fn menu_item(t: &Node) -> bool {
