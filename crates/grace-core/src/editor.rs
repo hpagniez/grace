@@ -36,6 +36,30 @@ fn project_file_with(root: &Path, file: &Path, real: &dyn Fn(&Path) -> io::Resul
     )
 }
 
+/// Where Karate says a test failed: the first line of its error, an absolute Windows path, a colon and a line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Place {
+    pub file: String,
+    pub line: u32,
+}
+
+/// The place on a failed test's error's first line (open-in-editor R2.1); `None` when it names none: `failedAt` of
+/// `nodes.ts`. A line of 0 is no place: VS Code has no line 0, and Electron Grace's request check refused it.
+pub fn failed_at(error: &str) -> Option<Place> {
+    let first = error.split('\n').next()?;
+    let b = first.as_bytes();
+    if b.len() < 3 || !b[0].is_ascii_alphabetic() || b[1] != b':' || !matches!(b[2], b'\\' | b'/') {
+        return None;
+    }
+    let (file, line) = first.rsplit_once(':')?;
+    // `file` keeps the drive's own colon, so a line-less first line leaves the drive alone: `C` and no `\`
+    if file.len() < 3 || line.is_empty() || !line.bytes().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let line: u32 = line.parse().ok().filter(|l| *l >= 1)?;
+    Some(Place { file: file.into(), line })
+}
+
 /// Node's `realpathSync.native`: the real path, links followed, without the `\\?\` prefix Rust's `canonicalize` adds.
 fn real_path(path: &Path) -> io::Result<PathBuf> {
     path.canonicalize()
@@ -214,6 +238,47 @@ mod tests {
                 r"\\server\share\a.feature"
             );
             assert_eq!(strip_verbatim(r"C:\p\a.feature"), r"C:\p\a.feature");
+        }
+    }
+
+    mod failed_at {
+        use super::*;
+
+        fn place(file: &str, line: u32) -> Option<Place> {
+            Some(Place { file: file.into(), line })
+        }
+
+        #[test]
+        fn takes_the_place_karate_names_on_the_first_line() {
+            let error = "C:\\p\\tests\\auth.feature:9\nThen status 200\nexpected status: 200";
+            assert_eq!(failed_at(error), place("C:\\p\\tests\\auth.feature", 9));
+        }
+
+        #[test]
+        fn takes_a_lowercase_drive_and_slash_separators() {
+            assert_eq!(failed_at("c:/p/a.feature:3\nboom"), place("c:/p/a.feature", 3));
+        }
+
+        #[test]
+        fn takes_the_last_colon_as_the_line() {
+            assert_eq!(failed_at("C:/p/a:b.feature:12"), place("C:/p/a:b.feature", 12));
+        }
+
+        #[test]
+        fn finds_none_in_an_error_without_a_place() {
+            for error in [
+                "Config evaluation failed: karate-config.js - js failed:\nLine: 4",
+                "boom at x.feature:7",
+                "",
+                "C:\\p\\a.feature",
+                "C:\\p\\a.feature:",
+                "C:\\p\\a.feature:x1",
+                "C:\\p\\a.feature:0",
+                "\nC:\\p\\a.feature:3",
+                "tests/a.feature:3",
+            ] {
+                assert_eq!(failed_at(error), None, "{error:?}");
+            }
         }
     }
 
