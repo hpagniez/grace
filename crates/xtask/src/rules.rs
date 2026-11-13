@@ -5,8 +5,10 @@
 //! globs match, so a glob that matches nothing is a rule nobody ever reads. The docs agents work from are checked
 //! here too: their frontmatter and the index of each docs folder (`docs.rs`).
 
+use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// The files loaded at the start of every session, and their size limits in bytes of the git blob.
 pub const LIMITS: [(&str, usize); 2] = [("WORKFLOW.md", 5000), ("AGENTS.md", 9000)];
@@ -129,10 +131,62 @@ fn list_index(glob: &str) -> Vec<String> {
         .collect()
 }
 
+/// The texts `git cat-file --batch` printed for `paths`, asked in that order: for each one a `<id> blob <size>`
+/// line, its bytes and a line end, or one `missing` line when the index does not hold it.
+fn batch_texts(paths: &[String], out: &[u8]) -> HashMap<String, String> {
+    let mut texts = HashMap::new();
+    let mut rest = out;
+    for path in paths {
+        let Some(end) = rest.iter().position(|byte| *byte == b'\n') else {
+            break;
+        };
+        let header = String::from_utf8_lossy(&rest[..end]).into_owned();
+        rest = &rest[end + 1..];
+        let mut words = header.split(' ').skip(1);
+        if words.next() != Some("blob") {
+            continue;
+        }
+        let Some(size) = words.next().and_then(|size| size.parse::<usize>().ok()) else {
+            break;
+        };
+        if rest.len() <= size {
+            break;
+        }
+        texts.insert(path.clone(), String::from_utf8_lossy(&rest[..size]).into_owned());
+        rest = &rest[size + 1..];
+    }
+    texts
+}
+
+/// A reader of the index for the files `glob` matches, which asks git for them all at once: a `git show` per doc
+/// takes 70 ms on Windows, 25 s for the docs. A file outside the glob, or any file when git fails, reads as `None`.
+fn index_reader(glob: &str) -> impl Fn(&str) -> Option<String> {
+    let paths = list_index(glob);
+    let read = || {
+        let mut child = Command::new("git")
+            .arg("-C")
+            .arg(root())
+            .args(["cat-file", "--batch"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .ok()?;
+        let mut stdin = child.stdin.take()?;
+        let names: String = paths.iter().map(|path| format!(":{path}\n")).collect();
+        // on its own thread: git answers while it reads, and a full pipe on one side would stop both
+        let writer = std::thread::spawn(move || stdin.write_all(names.as_bytes()));
+        let out = child.wait_with_output().ok()?;
+        writer.join().ok()?.ok()?;
+        Some(batch_texts(&paths, &out.stdout))
+    };
+    let texts = read().unwrap_or_default();
+    move |path| texts.get(path).cloned()
+}
+
 /// Checks the repository's index, prints each failure as a CI error, and gives the exit code.
 pub fn run() -> u8 {
     let mut errors = rules_files_errors(&read_index, &list_index, &list_index(".claude/rules/*.md"));
-    errors.extend(crate::docs::docs_errors(&read_index, &list_index));
+    errors.extend(crate::docs::docs_errors(&index_reader("docs/**/*.md"), &list_index));
     for error in &errors {
         println!("::error::{error}");
     }
@@ -329,7 +383,37 @@ mod tests {
 
     #[test]
     fn the_repository_docs_have_their_fields_and_indexes() {
-        assert_eq!(crate::docs::docs_errors(&read_index, &list_index), Vec::<String>::new());
+        assert_eq!(
+            crate::docs::docs_errors(&index_reader("docs/**/*.md"), &list_index),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn reads_each_file_of_a_batch_by_its_size_in_bytes() {
+        let paths = ["a.md".to_string(), "gone.md".to_string(), "b.md".to_string()];
+        let out = "1111 blob 6\n# A\n\nx\n:gone.md missing\n2222 blob 3\né\n\n";
+        let texts = batch_texts(&paths, out.as_bytes());
+        assert_eq!(texts.get("a.md").map(String::as_str), Some("# A\n\nx"));
+        assert_eq!(texts.get("b.md").map(String::as_str), Some("é\n"));
+        assert_eq!(texts.len(), 2, "{texts:?}");
+    }
+
+    #[test]
+    fn a_batch_cut_short_gives_what_it_holds() {
+        let paths = ["a.md".to_string(), "b.md".to_string()];
+        let texts = batch_texts(&paths, b"1111 blob 2\nab\n2222 blob 50\ncut");
+        assert_eq!(texts.get("a.md").map(String::as_str), Some("ab"));
+        assert_eq!(texts.len(), 1, "{texts:?}");
+    }
+
+    #[test]
+    fn the_batch_reader_reads_what_git_show_reads() {
+        let read = index_reader("*.md");
+        for path in ["AGENTS.md", "WORKFLOW.md"] {
+            assert_eq!(read(path), read_index(path), "{path}");
+        }
+        assert_eq!(read("no-such-file.md"), None);
     }
 
     /// Each area's rules load with its files and with no other's, and a rule that binds both apps loads on both sides.
