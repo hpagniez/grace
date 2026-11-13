@@ -1,7 +1,7 @@
 ---
 status: approved
 issue: 373
-summary: Frontmatter on specs, plans, checks and research, and a generated README index per docs folder, so agents and people find the live doc in one read
+summary: "Frontmatter on specs, plans, checks and research, and a generated README index per docs folder, so agents and people find the live doc in one read"
 ---
 
 # Docs index: find the right doc in one read
@@ -72,7 +72,7 @@ R1.3. `status` of a spec or a plan is one of:
 | `built` | the PR that finishes it is merged |
 | `superseded` | replaced or given up; the text says by what |
 
-R1.4. `summary` is one line of at most 160 characters. It says what the doc decides or found, not what it is about: a check's result, a research note's verdict, a spec's behaviour.
+R1.4. `summary` is one line of at most 160 characters, in double quotes, with no `"` and no `\` inside: valid YAML whatever it says. It says what the doc decides or found, not what it is about: a check's result, a research note's verdict, a spec's behaviour.
 
 R1.5. `issue` is the issue number, or a list `[64, 231]`. It is left out only when the work has no issue.
 
