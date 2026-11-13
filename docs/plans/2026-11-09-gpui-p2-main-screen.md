@@ -395,12 +395,12 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 
 | Vitest test | Class | Rust test or reason |
 |---|---|---|
-| 86. asks for the menu at the pointer, for a test at its line, and keeps the selection | later | P3 (OT-*). |
-| 87. asks from a row's run button and from the focused row itself, as the menu key does | later | P3 (OT-*). |
-| 88. opens a feature at line 1, and asks nothing for a folder or the list's padding | later | P3 (OT-*). |
-| 89. opens a failed test at its failed step during a run, even in a called feature | later | P3 (OT-*). |
-| 90. asks from an open tooltip over a row | later | P3 (OT-*). |
-| 91. opens a failed test without a place at its own line | later | P3 (OT-*). |
+| 86. asks for the menu at the pointer, for a test at its line, and keeps the selection | ported | `grace::tree::tests::open_in_vs_code::a_right_click_shows_the_menu_at_the_pointer_for_a_test_at_its_line_and_keeps_the_selection` |
+| 87. asks from a row's run button and from the focused row itself, as the menu key does | ported | `grace::tree::tests::open_in_vs_code::a_right_click_on_a_rows_run_button_and_the_menu_key_on_the_focus_row_show_it_too` (the menu key and Shift+F10) |
+| 88. opens a feature at line 1, and asks nothing for a folder or the list's padding | ported | `grace::tree::tests::open_in_vs_code::a_feature_opens_at_its_top_and_a_folder_and_the_lists_padding_show_no_menu` |
+| 89. opens a failed test at its failed step during a run, even in a called feature | ported | `grace::tree::tests::open_in_vs_code::a_failed_test_opens_at_its_failed_step_even_in_a_called_feature` |
+| 90. asks from an open tooltip over a row | ported | `grace::tree::tests::open_in_vs_code::a_right_click_on_an_open_tooltip_over_a_row_reaches_the_row` (a tooltip takes no pointer event of its own, so the click reaches the row) |
+| 91. opens a failed test without a place at its own line | ported | `grace::tree::tests::open_in_vs_code::a_failed_test_without_a_place_opens_at_its_own_line` |
 
 ##### tree: reveal a test from Details (#229 R4.3)
 
@@ -595,12 +595,12 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | 15 toggles a breakpoint on a step | P4 | Breakpoints |
 | 16 marks the step the run is paused before | P4 | Debugger |
 | 17 the run's steps replace the file's, same toggles | P4 | Breakpoint toggles |
-| 18 opens the test at its line, during a run too | P3 | Open in VS Code |
-| 19 no button for a row with no line | P3 | |
-| 20 the place on the error's first line is a link | P3 | |
-| 21 takes a lowercase drive and `/` separators | P3 | |
-| 22a error without a place as text: "Config evaluation failed..." | P3 | `it.each` case 1 |
-| 22b error without a place as text: "boom at x.feature:7" | P3 | `it.each` case 2 (the error as plain text is `a_test::puts_a_failed_tests_error_in_a_box_...`) |
+| 18 opens the test at its line, during a run too | ported | `grace::details::tests::open_in_vs_code::opens_the_test_at_its_line_during_a_run_too` |
+| 19 no button for a row with no line | ported | `grace::details::tests::open_in_vs_code::shows_no_button_for_a_row_with_no_line` |
+| 20 the place on the error's first line is a link | ported | `grace::details::tests::open_in_vs_code::makes_the_place_karate_names_on_the_errors_first_line_a_link`; bug #220: `grace::details::tests::open_in_vs_code::a_long_place_that_wraps_starts_at_the_left` |
+| 21 takes a lowercase drive and `/` separators | ported | `grace::details::tests::open_in_vs_code::takes_a_lowercase_drive_and_slash_separators` |
+| 22a error without a place as text: "Config evaluation failed..." | ported | `grace::details::tests::open_in_vs_code::shows_an_error_without_a_place_as_text_a_config_failure` |
+| 22b error without a place as text: "boom at x.feature:7" | ported | `grace::details::tests::open_in_vs_code::shows_an_error_without_a_place_as_text_a_place_inside_a_sentence` (the error as plain text is `a_test::puts_a_failed_tests_error_in_a_box_...`) |
 | 23 says where the test sits in its group (#229 R4) | P3 | Failure groups and stepping |
 | 24 Next selects the next test, keeps the focus | P3 | |
 | 25 announces where the selected test sits | P3 | |
