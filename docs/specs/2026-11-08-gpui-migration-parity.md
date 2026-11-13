@@ -84,17 +84,17 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| HI-01 | Every call of a run is listed and grouped | | ☐ |
-| HI-02 | Showing only the calls that went wrong | | ☐ |
-| HI-03 | The tree selection narrows the list | | ☐ |
+| HI-01 | Every call of a run is listed and grouped | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("HTTP (13)", the seven chips and their counts); `grace::http::tests::shows_every_group_chip_with_its_count`, `grace_core::http_list::tests::group_counts_counts_every_group_zeros_included` | ☑ |
+| HI-02 | Showing only the calls that went wrong | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (4xx, 5xx and No response: 6 calls, none 2xx or 3xx; All turns them off); `grace::http::tests::filters_by_the_chosen_groups` | ☑ |
+| HI-03 | The tree selection narrows the list | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("retry": three 404s reading "attempt 1 of 3" to "attempt 3 of 3", "HTTP (3)"); `grace::http::tests::narrows_to_the_tree_selection` | ☑ |
 | HI-04 | A call's request and response | | ☐ |
-| HI-05 | A call made in a called feature | | ☐ |
-| HI-06 | A shared setup call shows under the scenario Karate ran it in | | ☐ |
+| HI-05 | A call made in a called feature | `grace-e2e/tests/http.rs::a_call_made_in_a_called_feature` (one POST, 201, "via tests/common/create-user.feature:8") | ☑ |
+| HI-06 | A shared setup call shows under the scenario Karate ran it in | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("first": one POST, 201, via the helper; "second": "No HTTP calls in second") | ☑ |
 | HI-07 | A call that got no response | | ☐ |
 | HI-08 | Copy as cURL | | ☐ |
 | HI-09 | A secret never shows in a call | | ☐ |
 | HI-10 | Clicking a test gives the details pane back | | ☐ |
-| HI-11 | A run of one test replaces only its calls | | ☐ |
+| HI-11 | A run of one test replaces only its calls | `grace-e2e/tests/http.rs::a_run_of_one_test_replaces_only_its_calls` (the tab open through the run, "HTTP (13)" after it); `grace::http::tests::shows_the_new_calls_in_place_when_a_tests_calls_are_replaced` | ☑ |
 
 ### RH · Run history
 
@@ -365,7 +365,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-08 | Each status has its own icon and name | `crates/grace::elements::tests::marks_each_status_as_electron_grace_does`, `…tells_statuses_apart_by_shape_or_name`; through the tree, `crates/grace-e2e/tests/elements.rs::names_each_status_mark` | ☑ |
 | PU-09 | A cancelled run marks its interrupted tests | `grace-e2e/tests/run.rs::cancel_leaves_nothing_behind` ("slow loop" named interrupted, the progress line's "Cancelled"), `grace::elements::tests::marks_each_status_as_electron_grace_does` (Interrupted: circle-slash), `grace::progress::tests::after_a_run_r14_2::names_the_outcome_with_its_icon` | ☑ |
 | PU-10 | Tag chip states differ by shape, not only colour (unit) | `grace::filter_bar::tests::words::a_chips_state_shows_in_its_shape_and_its_name_not_only_its_colour` | ☑ |
-| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | Waits for the HTTP tab, phase P3 | ☐ |
+| PU-11 | An HTTP status shows its code in a badge with its group in the tooltip (unit) | `grace::http::tests::the_badge_shows_the_code_tinted_by_its_group_with_the_group_in_a_tooltip`, `grace::http::tests::keeps_a_code_outside_100_599_neutral_named_in_the_tooltip`; `grace_core::http_list::tests::added::a_status_is_named_by_its_group` | ☑ |
 | PU-12 | Reduced motion stops every animation | `grace::window::tests::reduced_motion_stops_every_animation_during_a_run` (the whole window during a run: nothing asks for a frame); each one: `grace::elements::tests::turns_only_while_running_and_never_with_reduced_motion`, `grace::progress::tests::the_bar_r14_1::reduced_motion_keeps_the_stripe_still`, `grace::console::tests::banner::the_cursor_blinks_only_while_grace_works_and_never_with_reduced_motion`, `grace::theme::tests::the_caret_stops_blinking_when_idle_and_never_blinks_with_reduced_motion`; GPUI's `with_animation` and springs draw at rest with it set | ☑ |
 | PU-13 | The logo is the Home button | `grace::toolbar::tests::home_and_refresh_the_icon_only_buttons::home_holds_the_logo_and_shows_home_in_a_tooltip`, `…home_goes_home_and_is_off_while_busy`, `grace-e2e/tests/home.rs::home_closes_the_project_and_survives_a_restart` | ☑ |
 | PU-14 | The startup screen shows the logo in the active theme (by hand) | GPUI Grace has no startup screen (E-startup-02): its first frame is the window in the theme (UP-17, UP-18). Its title bar takes the theme too, as Electron Grace's follows `nativeTheme.themeSource`: `grace::theme::apply` sets the window's `DWMWA_USE_IMMERSIVE_DARK_MODE` from Grace's theme, which GPUI sets only from Windows' (#337, found in [the P2 recheck](../checks/2026-11-10-gpui-p2-recheck.md)). On Windows, `grace-e2e/tests/appearance.rs::a_saved_dark_is_in_force_at_start` and `…choosing_a_theme_applies_at_once_with_a_project_open_and_survives_a_restart` read the attribute and the colour the screen shows in the title bar: dark with Dark, light with Light, at once and after a restart; `…a_switch_of_windows_theme_leaves_graces_on_the_title_bar` switches CI's Windows to the other theme under Grace and reads Grace's still, then Follow Windows takes Windows' new one. By hand on the owner's PC on 2026-11-11, the release build of `develop` at 420c6d8: with Grace on Light, switching Windows to dark left the title bar light, and with Windows dark, Follow Windows, Light and Dark each drew the title bar in their own theme | ☑ |
@@ -385,7 +385,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-28 | A project with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` ("No feature files found" and where Grace looks, both in the tree) | ☑ |
 | PU-29 | Before any run the progress line says so | `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`; through the tree, `grace-e2e/tests/details.rs::failure_details` ("9 tests · Not run yet") | ☑ |
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
-| PU-31 | Empty history and HTTP tabs | Waits for the History and HTTP tabs, phase P3 | ☐ |
+| PU-31 | Empty history and HTTP tabs | The HTTP half: `grace::http::tests::shows_the_three_empty_states`, `grace_core::http_list::tests::added::the_empty_text_says_why_the_list_is_empty`. The History half waits for the History tab, phase P3 slice 5 | ☐ |
 | PU-32 | Dialogs keep their order and keyboard behaviour | Waits for Clear history, phase P3 | ☐ |
 | PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
 
@@ -407,19 +407,19 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-10 | Ctrl+Enter runs the focused row | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` | ☑ |
 | VL-11 | The row's buttons left the tab order but still click | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` | ☑ |
 | VL-12 | A click makes the row focused | `grace::tree::tests::a_click_makes_the_row_focused` | ☑ |
-| VL-13 | The HTTP list is one tab stop and arrows open calls | Waits for the HTTP tab, phase P3 | ☐ |
+| VL-13 | The HTTP list is one tab stop and arrows open calls | `grace::http::tests::selects_a_call_with_the_arrow_keys_and_opens_it` (one focus handle on the first call; Down selects the second, which `selected_call` opens); `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (Down selects and focuses the next option). The details pane that shows the call is HI-04's, slice 4 | ☑ |
 | VL-14 | A moved-to row scrolls into view (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End) | ☑ |
 | VL-15 | Focus survives scrolling away (e2e) | `grace::tree::tests::focus_survives_scrolling_away` (headless: plan, Redesigns) | ☑ |
 | VL-16 | Closing a folder takes focus to it | `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` | ☑ |
 | VL-17 | Hiding the focused row | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` | ☑ |
 | VL-18 | A new tree keeps the rows in view still (e2e) | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it`, `grace-core::rows::tests::anchored_scroll_top` (headless: plan, Redesigns) | ☑ |
-| VL-19 | Calls arriving above the view keep the rows in view still | Waits for the HTTP tab, phase P3 | ☐ |
+| VL-19 | Calls arriving above the view keep the rows in view still | `grace::http::tests::keeps_the_calls_in_view_still_when_an_earlier_call_arrives` (headless: P2 plan, Redesigns); `grace_core::rows::tests::anchored_scroll_top` | ☑ |
 | VL-20 | A filter change scrolls to the selected row (e2e) | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | VL-21 | A cut label shows whole on keyboard focus | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` | ☑ |
 | VL-22 | The run shortcut can be found | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` (the tooltip "Run passing hello (Ctrl+Enter)"); every row carries `tree::SHORTCUTS`, "Control+Enter", which AT-SPI does not pass on | ☑ |
 | VL-23 | Tree rows carry their level and position | `grace_core::rows::tests::lists_every_node_but_the_root_in_tree_order_with_its_level_and_place_among_its_siblings` (each tree item takes its level, position and set size from its row); the tree named "Tests" in `grace-e2e/tests/tree.rs` | ☑ |
 | VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
-| VL-25 | Calls are options | Waits for the HTTP tab, phase P3 | ☐ |
+| VL-25 | Calls are options | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (the list box "HTTP calls", 13 options, none selected, then one); each option's place and set size: `grace::http::HttpCalls::row`; its name: `grace_core::http_list::tests::added::a_call_is_named_by_status_method_url_and_test` | ☑ |
 | VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
 | VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
 | VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
@@ -1098,9 +1098,9 @@ Phase P3 · 4 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-http-01 | Reading the calls of one Run all | | ☐ |
-| E-http-02 | A call made in a called feature | | ☐ |
+| E-http-02 | A call made in a called feature | `grace-e2e/tests/http.rs::a_call_made_in_a_called_feature` | ☑ |
 | E-http-03 | A secret never shows in a call | | ☐ |
-| E-http-04 | A run of one test replaces only its calls | | ☐ |
+| E-http-04 | A run of one test replaces only its calls | `grace-e2e/tests/http.rs::a_run_of_one_test_replaces_only_its_calls` | ☑ |
 
 ### e2e/look.spec.ts
 
@@ -1295,7 +1295,7 @@ Phase P2 · 9 tests
 | E-virtual-05 | The filter bar keeps one line with 54 tags | `grace-e2e/tests/tags.rs::many_tags_keep_a_one_line_bar` (54 generated tags) | ☑ |
 | E-virtual-06 | A filter change scrolls to the selected row | `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row` | ☑ |
 | E-virtual-07 | A click shows neither the focus ring nor a tooltip | `grace::tree::tests::a_click_makes_the_row_focused`, `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus` (a click shows no tooltip) | ☑ |
-| E-virtual-08 | A click on an HTTP call shows no focus ring | Waits for the HTTP tab, phase P3 | ☐ |
+| E-virtual-08 | A click on an HTTP call shows no focus ring | `grace::http::tests::a_click_on_a_call_shows_no_focus_ring` (headless: P2 plan, Redesigns) | ☑ |
 | E-virtual-09 | The keyboard shows the focus ring and a cut label's tooltip | `grace::tree::tests::a_cut_label_shows_whole_on_keyboard_focus`, `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` | ☑ |
 
 ### e2e/watch.spec.ts
@@ -1400,7 +1400,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
 | `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests`, `grace::window::tests`, `grace::toolbar::tests`, `grace_core::state::tests` and `grace-e2e/tests/home.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (all 26 ported) | ☑ |
-| `src/renderer/HttpCalls.test.tsx` | 26 | view `HttpCalls` (`grace::ui`), headless | ☐ |
+| `src/renderer/HttpCalls.test.tsx` | 26 | `grace::http::tests` (23 tests: 20 for 21 Vitest tests, and 3 added), test for test in [P3 plan, slice 3](../plans/2026-11-12-gpui-p3-panels.md#httpcallstesttsx-26-in-gracehttptests); the list box and its options in `grace-e2e/tests/http.rs`; 3 by eye (Tailwind classes) | ☑ |
 | `src/renderer/Icon.test.tsx` | 3 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes`, `grace::assets::tests` ("one child per node" is `n/a`: GPUI draws the Lucide file); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/Notice.test.tsx` | 6 | `grace::ui::tests` (6 tests) | ☑ |
 | `src/renderer/Progress.test.tsx` | 18 | `grace::progress::tests` (all 18; the Chromium hold test is replaced by the spring, the palette test by `theme::tests::colours_come_only_from_the_theme`) | ☑ |
@@ -1417,12 +1417,12 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
-| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 2 wait for P3's lists (the data-driven view, the HTTP tab) | ☑ |
+| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 1 waits for P3's data-driven view; test 23 is the HTTP tab's | ☑ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
 | `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
-| `src/renderer/http.test.ts` | 9 | `grace::ui::http` | ☐ |
+| `src/renderer/http.test.ts` | 9 | `grace_core::http_list::tests` (12 tests: 8 Vitest tests and 4 added); 1 `n/a` (a `WeakMap`'s object identity), its intent in `grace::http::tests::rows_are_built_again_only_when_what_they_show_changes` | ☑ |
 | `src/renderer/importPlan.test.ts` | 6 | `grace-core::import_plan::tests` (6 tests) | ☑ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
 | `src/renderer/nodes.test.ts` | 3 | `grace_core::rows::tests::feature_of` (all 3) | ☑ |
@@ -1431,7 +1431,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/panelTabs.test.ts` | 7 | `grace::ui::panelTabs`: `grace-core::panel_tabs::tests`; `settings::tests::panel_tabs` | ☑ |
 | `src/renderer/placeTip.test.ts` | 16 | `grace::tooltip::tests::goes_beside_its_target_on_the_side_asked_and_below_by_default`, `stays_in_the_window_flipping_where_it_has_no_room`, `a_click_on_an_over_tooltip_within_its_target_reaches_the_target` (GPUI Kit's `Positioner` places it); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/reduce.test.ts` | 45 | `grace-core::state::tests` (45 tests, every Vitest test; the state lives in `grace-core`, P2 plan, Redesigns) | ☑ |
-| `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (7 ported; `toggleGroup` ports with the HTTP tab in P3) | ☑ |
+| `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (8 ported, `toggleGroup` with the HTTP tab in P3) | ☑ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace_core::rows::tests::tree_rows`, `row_name_…` (all 5) | ☑ |
 | `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |

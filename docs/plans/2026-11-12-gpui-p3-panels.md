@@ -90,6 +90,57 @@ Spec: [HTTP inspector](../specs/2026-10-25-http-inspector.md), [virtual lists](.
 4. Keys and accessibility: one tab stop, arrows open calls (VL-13), calls are options of a list box (VL-25), no focus ring after a click (E-virtual-08), rows in view stay still when calls arrive above (VL-19).
 5. Cost during a run (#124): a headless test that a run's calls build no rows while the tab is closed.
 
+What slice 3 built: `grace_core::http_list` (`http.ts`'s rules, and the tab's count read without listing the calls), `AppState::toggle_group` and `calls_changes`, and `grace::http`, drawn by the bottom panel only while its tab shows. The list is flat in run order, each row naming its test, as Electron Grace's: "grouped by test" above means the calls belong to the test that made them, a called feature's and a shared setup's included (HI-05, HI-06). Selecting a call sets `selected_call`; the details pane still shows the node until slice 4. The tests, test for test:
+
+#### `http.test.ts` (9) in `grace_core::http_list::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. narrowedCalls: lists every call in start-time order | ported | `narrowed_calls::lists_every_call_in_start_time_order` |
+| 2. narrows to the selected node | ported | `narrowed_calls::narrows_to_the_selected_node` |
+| 3. keeps the rows of a test whose calls did not change | n/a | A `WeakMap`'s object identity, so unchanged DOM rows were not drawn again. `uniform_list` draws the rows in view each frame; the list builds its rows again only when what they show changes: `grace::http::tests::rows_are_built_again_only_when_what_they_show_changes` |
+| 4. lists kept calls under the nodes of a refreshed tree | ported | `narrowed_calls::lists_kept_calls_under_the_nodes_of_a_refreshed_tree` |
+| 5. groupCounts: counts every group, zeros included | ported | `group_counts_counts_every_group_zeros_included` |
+| 6. shownCalls: with no group on shows all; with 4xx and none on shows only those | ported | `shown_calls_with_no_group_on_shows_all_with_4xx_and_none_on_shows_only_those` |
+| 7. toggledGroups: turns a group on and off; All turns every group off | ported | `toggled_groups_turns_a_group_on_and_off_all_turns_every_group_off` |
+| 8. totalCalls: adds up the calls of every test | ported | `total_calls_adds_up_the_calls_of_every_test` |
+| 9. findCall: resolves the selected call and is null once it is gone | ported | `find_call_resolves_the_selected_call_and_is_none_once_it_is_gone` |
+
+Added: `shown_count_is_the_length_of_the_shown_list` (#124), `a_call_is_named_by_status_method_url_and_test` (`callName`), `a_status_is_named_by_its_group` (`groupLabel`), `the_empty_text_says_why_the_list_is_empty` (`empty`).
+
+#### `HttpCalls.test.tsx` (26) in `grace::http::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. adds the HTTP tab after History | ported | `adds_the_http_tab_after_history` (its name with its count, kept open through a run's start); the tab list's name is `bottom_panel::TABS` |
+| 2. shows every group chip with its count | ported | `shows_every_group_chip_with_its_count` |
+| 3. shows a row per call | ported | `shows_a_row_per_call`; each row an option: `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` |
+| 4. maps each group to the tint of its colour | ported | `maps_each_group_to_the_tint_of_its_colour` |
+| 5. status badge: shows the code tinted by its group, with the group in a tooltip | ported | `the_badge_shows_the_code_tinted_by_its_group_with_the_group_in_a_tooltip` (right of the badge, on its row) |
+| 6. status badge: is a rounded pill with the code in tabular mono, never white on a fill | by eye | Tailwind classes. `HttpCalls::row` draws it `rounded_full`, 20 px, in `MONO`, the status colour on its tint (`Tint::colours`, read in test 5) |
+| 7. status badge: keeps a code outside 100-599 neutral, named in the tooltip | ported | `keeps_a_code_outside_100_599_neutral_named_in_the_tooltip` |
+| 8. filters by the chosen groups | ported | `filters_by_the_chosen_groups` |
+| 9. narrows to the tree selection | ported | `narrows_to_the_tree_selection` |
+| 10. shows the three empty states | ported | `shows_the_three_empty_states` |
+| 11. keeps a row and its focus when more calls arrive | ported | `keeps_a_row_and_its_focus_when_more_calls_arrive` |
+| 12. shows the new calls in place when a test's calls are replaced | ported | `shows_the_new_calls_in_place_when_a_tests_calls_are_replaced` |
+| 13. selects a call and marks it selected | ported | `selects_a_call_and_marks_it_selected`; the option's selected state in `grace-e2e/tests/http.rs` |
+| 14. marks the pressed chips with a check and the selected fill | by eye | Tailwind classes. The pressed state: tests 2 and 8; `HttpCalls::chip` draws the check and the fill |
+| 15. makes a row 28 px, with the selected one on the selected fill and the accent bar | ported | `makes_a_row_28_px`; the fill and the bar by eye, as the tree's |
+| 16. sets the method, URL and time in the mono and the rest in muted | by eye | Tailwind classes |
+| 17. is a listbox of options named HTTP calls | ported | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (headless windows build no accessibility tree) |
+| 18. names a call by status, method, URL and test | ported | `grace_core::http_list::tests::added::a_call_is_named_by_status_method_url_and_test` |
+| 19. keyboard: selects a call with the arrow keys and opens it | ported | `selects_a_call_with_the_arrow_keys_and_opens_it`; `tabindex` is DOM: one focus handle |
+| 20. keyboard: moves focus up when the focused call is cleared by a new run | ported | `moves_focus_up_when_the_focused_call_is_cleared_by_a_new_run` |
+| 21. long lists: scrolls to the selected call when the chips change | ported | `scrolls_to_the_selected_call_when_the_chips_change` |
+| 22. long lists: shows the selected call after the chips take rows away above the view | ported | `shows_the_selected_call_after_the_chips_take_rows_away_above_the_view` |
+| 23. long lists: keeps the calls in view still when an earlier call arrives | ported | `keeps_the_calls_in_view_still_when_an_earlier_call_arrives` (VL-19) |
+| 24. cut text: shows a cut URL, test name and via whole in a tooltip | ported | `shows_a_cut_url_test_name_and_via_whole_in_a_tooltip` |
+| 25. cut text: shows nothing for text that fits | ported | `shows_nothing_for_text_that_fits` |
+| 26. shows an empty list as an EmptyState with the globe | ported | `shows_the_three_empty_states` (`ui::empty_state` with `Icon::Globe`, at its 24 px) |
+
+Added: `a_click_on_a_call_shows_no_focus_ring` (E-virtual-08), `rows_are_built_again_only_when_what_they_show_changes`, `a_runs_calls_build_no_rows_while_the_tab_is_closed` (#124).
+
 ### Slice 4: a call's details and Copy as cURL
 
 1. `grace::http`'s details pane from `CallDetails.tsx`: request and response, headers and bodies as selectable text (guide R4), a call with no response (HI-07), and a click on a test giving Details back (HI-10).
@@ -173,6 +224,9 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 | `tree` | The row's menu is GPUI Kit's `PopupMenu`, which the Tree opens and draws itself on a right press and on the menu key or Shift+F10 at the focus row, where Electron Grace asked main for a native `Menu.popup`. Not Kit's `ContextMenu` wrapper: it opens only on a right press, with no way to open it from a key | Guide R4; no native menu in GPUI; the spec asks for the menu key (OT-01, R1.1). No patch: only the Kit's public API | `tree::tests::open_in_vs_code` (tests 86 to 91), `grace-e2e/tests/editor.rs` |
 | `details` (link) | The error's place is `elements::link`, a GPUI Kit `Button` whose text is its own child, left-aligned and wrapping, where a browser's `<button>` centred a wrapped place (#220) and Kit's button content never wraps at all | Bug #220; a long place must not run past the pane | `details::tests::open_in_vs_code::a_long_place_that_wraps_starts_at_the_left` |
 | `http`, `examples` | The lists are `uniform_list`s with the tree's focus rule, where Electron Grace shared `VirtualList.tsx` | P2 Redesigns, `tree` | VL-13, VL-19, VL-25, DD-04, DD-07 |
+| `http` (cost) | The tab's count is `http_list::shown_count`, which counts the calls under the selection without listing them; the list is built only while the tab shows, and again only when `AppState::calls_changes`, the tree, the selection or the chips move. Electron Grace listed the narrowed calls on every change to count them, and kept each test's listed calls per calls array (`WeakMap`) so unchanged DOM rows were not drawn again | #124: `uniform_list` draws the rows in view each frame, so the saving is in not listing at all; a count needs no list | `grace::http::tests::a_runs_calls_build_no_rows_while_the_tab_is_closed`, `rows_are_built_again_only_when_what_they_show_changes`; `grace_core::http_list::tests::added::shown_count_is_the_length_of_the_shown_list` |
+| `http` (options) | An option's description says what its row shows beyond its name: "attempt 2 of 3", "via tests/common/create-user.feature:8". Electron Grace's `aria-label` (status, method, URL, test) hid them from a screen reader. A chip's pressed state is AccessKit's `toggled`, which UI Automation and AT-SPI read as checked, where Electron Grace set `aria-pressed` | A screen reader hears what a sighted person reads; the e2e driver reads them too | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all`, `a_call_made_in_a_called_feature` |
+| `http` (selected row) | The selected row's accent bar is a 2 px left border, as the tree's, where Electron Grace drew an inset shadow | GPUI has no inset shadow; the tree's row does the same (P2) | By eye |
 
 ## Traps
 

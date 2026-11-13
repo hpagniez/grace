@@ -273,7 +273,7 @@ The tree is GPUI's `uniform_list`, so the list's tests are the tree's. "later" n
 | 20. falls back to the selected row when an unfocused active row leaves | ported | `grace::tree::tests::an_active_row_that_leaves_falls_back_to_the_selected_one` |
 | 21. falls back to the nearest row above when an unfocused active row leaves with the selected one | ported | `grace::tree::tests::closing_the_feature_of_the_focus_row_hands_the_focus_to_the_nearest_row_above` (the other `Tree::build` branch: selected not kept) and the `survivor` tests above. |
 | 22. draws rows after the list shrinks below the scroll position | ported | `grace::tree::tests::rows_show_after_the_list_shrinks_below_the_scroll` |
-| 23. reveals a row by key | later | P3: `reveal(key)` is the HTTP tab's (`HttpCalls.tsx`, VL-13, VL-19, VL-25); the tree reveals its selected row (VL-20, row 24). The scroll rule itself is `grace_core::rows::tests::scroll_to_show`. |
+| 23. reveals a row by key | ported | The HTTP tab, phase P3: `grace::http::tests::scrolls_to_the_selected_call_when_the_chips_change` (a chip the person presses brings the selected call into view with the least scroll), `shows_the_selected_call_after_the_chips_take_rows_away_above_the_view`; a call the chips hide is not revealed (`toggle_group` drops it). The tree reveals its selected row (VL-20, row 24). The scroll rule itself is `grace_core::rows::tests::scroll_to_show`. |
 | 24. reveals the selected row after keeping the rows in view still, when revealSelectedOn changes | ported | `grace::tree::tests::only_a_new_filter_scrolls_to_the_selected_row`; `grace-e2e/tests/tags.rs::a_filter_change_scrolls_to_the_selected_row`; `grace_core::rows::tests::anchored_scroll_top` |
 | 25. moves to a row by key from the handle, as an arrow key does | ported | `grace-e2e/tests/tree.rs::the_keys_move_through_the_rows` (Right goes to the first child, Left to the parent, each focused and selected, through `Tree::move_to_key`). The handle is the Solid API. |
 | 26. tells a row when it has keyboard focus | ported | `grace::tree::tests::a_click_makes_the_row_focused` (the ring only after a key); `grace::tree::tests::the_focus_ring_starts_at_the_rows_indent`. |
@@ -460,7 +460,7 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | 5 tag filter: filter event replaces the filter | ported | `...::tag_filter::filter_event_replaces_the_filter` |
 | 6 tag filter: opening another project resets the filter | ported | `...::tag_filter::opening_another_project_resets_the_filter` ("own copy, never the shared constant" is by value in Rust) |
 | 7 http calls: selectCall, select and showPanel | ported | `...::create_app_store::http_calls::select_call_select_and_show_panel` |
-| 8 http calls: toggleGroup drops a call it hides | P3 | `AppState` has `http_groups` but no `toggle_group` yet; it ports with the HTTP tab (plan, PR 1 item 1) |
+| 8 http calls: toggleGroup drops a call it hides | ported | `grace_core::state::tests::create_app_store::http_calls::toggle_group_drops_a_call_it_hides` (phase P3) |
 
 #### `Toolbar.test.tsx` (36)
 
