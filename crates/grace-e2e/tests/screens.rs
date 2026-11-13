@@ -52,17 +52,20 @@ public class Win {
   [StructLayout(LayoutKind.Sequential)] public struct R { public int L, T, Rt, B; }
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, string t);
-  [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int a, out R r, int size);
+  [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int a, out R r, int size);
+  public static int[] Frame(IntPtr h) {
+    R r;
+    DwmGetWindowAttribute(h, 9, out r, 16);
+    return new int[] { r.L, r.T, r.Rt - r.L, r.B - r.T };
+  }
 }
 '@
 [Win]::SetProcessDPIAware() | Out-Null
-$h = [Win]::FindWindowW($null, 'Grace')
-$r = New-Object Win+R
-[Win]::DwmGetWindowAttribute($h, 9, [ref]$r, 16) | Out-Null
-$w = $r.Rt - $r.L; $ht = $r.B - $r.T
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
+$h = [Win]::FindWindowW([NullString]::Value, 'Grace')
+$f = [Win]::Frame($h)
+$bmp = New-Object System.Drawing.Bitmap $f[2], $f[3]
 $g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size)
+$g.CopyFromScreen($f[0], $f[1], 0, 0, $bmp.Size)
 $bmp.Save($args[0], [System.Drawing.Imaging.ImageFormat]::Png)
 "#;
     let script = path.with_extension("ps1");
