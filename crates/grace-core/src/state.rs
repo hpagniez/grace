@@ -493,6 +493,20 @@ impl AppState {
         self.selected_call = Some(call);
     }
 
+    /// A click on a status group's chip; `None` is All. A call the chips hide leaves the details pane.
+    pub fn toggle_group(&mut self, group: Option<HttpGroup>) {
+        self.http_groups = crate::http_list::toggled_groups(&self.http_groups, group);
+        use crate::http_list::{narrowed_calls, shown_calls};
+        let hidden = self.selected_call.as_ref().is_some_and(|open| {
+            !shown_calls(narrowed_calls(self), &self.http_groups)
+                .iter()
+                .any(|l| &l.at == open)
+        });
+        if hidden {
+            self.selected_call = None;
+        }
+    }
+
     pub fn dismiss_prompt(&mut self) {
         self.update_prompt = None;
     }

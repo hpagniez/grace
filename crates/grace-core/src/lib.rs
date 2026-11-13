@@ -8,6 +8,7 @@ pub mod editor;
 pub mod fingerprint;
 pub mod flaky;
 pub mod history;
+pub mod http_list;
 pub mod import_plan;
 pub mod karate;
 pub mod mask;

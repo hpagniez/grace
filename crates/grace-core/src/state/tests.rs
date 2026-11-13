@@ -1,5 +1,5 @@
 // `src/renderer/reduce.test.ts`, test for test, on the same fixtures; then `store.test.tsx`'s tests of phase P2
-// (`toggleGroup` ports with the HTTP tab in P3).
+// (`toggleGroup` with the HTTP tab, phase P3).
 use super::*;
 use crate::karate::events::read_all_events;
 use crate::karate::run_state::RunState;
@@ -1223,6 +1223,53 @@ mod create_app_store {
             s.select("s:a#2"); // a tree click gives the details pane back
             assert_eq!(s.selected.as_deref(), Some("s:a#2"));
             assert_eq!(s.selected_call, None);
+        }
+
+        #[test]
+        fn toggle_group_drops_a_call_it_hides() {
+            use crate::model::http::HttpGroup::{ClientError, NoResponse};
+            let mut s = AppState::new();
+            s.reduce(&project_tree(Some(node(
+                "f:a.feature",
+                NodeKind::Feature,
+                vec![
+                    node("s:a#1", NodeKind::Scenario, vec![]),
+                    node("s:a#2", NodeKind::Scenario, vec![]),
+                ],
+            ))));
+            let not_found_call = HttpCall {
+                status: Some(404),
+                ..a_call()
+            };
+            s.reduce(&AppEvent::Calls {
+                key: "s:a#1".into(),
+                calls: vec![a_call(), not_found_call],
+            });
+            let ok = CallRef {
+                key: "s:a#1".into(),
+                index: 0,
+            };
+            let not_found = CallRef {
+                key: "s:a#1".into(),
+                index: 1,
+            };
+            s.select_call(ok.clone());
+            s.toggle_group(None);
+            assert_eq!(s.selected_call, Some(ok.clone())); // All hides nothing
+            s.toggle_group(Some(ClientError));
+            assert_eq!(s.http_groups, [ClientError]);
+            assert_eq!(s.selected_call, None); // the 200 is hidden
+            s.select_call(not_found.clone());
+            s.toggle_group(Some(NoResponse));
+            assert_eq!(s.http_groups, [ClientError, NoResponse]);
+            assert_eq!(s.selected_call, Some(not_found.clone()));
+            s.toggle_group(Some(ClientError));
+            assert_eq!(s.http_groups, [NoResponse]);
+            assert_eq!(s.selected_call, None); // the 404 is hidden
+            s.select_call(not_found.clone());
+            s.toggle_group(None);
+            assert!(s.http_groups.is_empty());
+            assert_eq!(s.selected_call, Some(not_found));
         }
     }
 }
