@@ -1,5 +1,5 @@
 ---
-status: approved
+status: built
 issue: 373
 summary: "Five tasks: the frontmatter reader and index writer in crates/xtask, fields on 146 docs, the five indexes and rule lines, then the two checks"
 ---

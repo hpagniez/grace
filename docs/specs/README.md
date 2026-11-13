@@ -4,12 +4,12 @@
 
 ## Approved
 
-- 2026-11-13 [Docs index: find the right doc in one read](2026-11-13-docs-index.md) #373: Frontmatter on specs, plans, checks and research, and a generated README index per docs folder, so agents and people find the live doc in one read
 - 2026-11-08 [GPUI migration guide: port every feature of Grace to Rust and GPUI](2026-11-08-gpui-migration.md) #278: Guide to port every feature of Grace from Electron to Rust and GPUI: phases, proof for each feature and the bar for the cut-over
 - 2026-11-08 [GPUI migration: parity checklist](2026-11-08-gpui-migration-parity.md) #278: The checklist of every spec scenario, e2e test and unit test that the GPUI port must prove before it replaces the Electron app
 
 ## Built
 
+- 2026-11-13 [Docs index: find the right doc in one read](2026-11-13-docs-index.md) #373: Frontmatter on specs, plans, checks and research, and a generated README index per docs folder, so agents and people find the live doc in one read
 - 2026-11-12 [Way of working: tiers, lean context, housekeeping](2026-11-12-way-of-working.md) #356: Cut agent cost with tiers by task size, lean context, subagent model rules and housekeeping, written into WORKFLOW.md and AGENTS.md
 - 2026-11-12 [CI by what a PR changes](2026-11-12-ci-scope.md) #363: Choose which CI jobs run from the areas a PR diff touches, with one Rust rule, so docs and tooling PRs skip the slow Windows jobs
 - 2026-11-10 [Cargo updates](2026-11-10-cargo-updates.md) #328: Open a PR on its own when a new GPUI, GPUI Kit or Rust release comes out, tested with the patches, and merge bump PRs once tests pass

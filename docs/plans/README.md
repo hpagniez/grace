@@ -4,11 +4,11 @@
 
 ## Approved
 
-- 2026-11-13 [Docs index Implementation Plan](2026-11-13-docs-index.md) #373: Five tasks: the frontmatter reader and index writer in crates/xtask, fields on 146 docs, the five indexes and rule lines, then the two checks
 - 2026-11-12 [Plan: GPUI migration, phase P3 panels](2026-11-12-gpui-p3-panels.md) #282: GPUI phase 3: the History and HTTP tabs and detail views in GPUI: HTTP inspector, run history, trends, flaky proof, report export, grouped failures
 
 ## Built
 
+- 2026-11-13 [Docs index Implementation Plan](2026-11-13-docs-index.md) #373: Five tasks: the frontmatter reader and index writer in crates/xtask, fields on 146 docs, the five indexes and rule lines, then the two checks
 - 2026-11-12 [Way of working, phase 3: the tidy report and the refusals. Implementation Plan](2026-11-12-way-of-working-p3-tidy.md) #356: cargo xtask tidy lists leftovers at session start, and deny rules refuse junctions and force pushes
 - 2026-11-12 [Way of working, phase 2: the PR checks in Rust. Implementation Plan](2026-11-12-way-of-working-p2-checks.md) #356: The checks job fails a PR that skips the way of working: no tier, a big Small PR, missing papers, untested behaviour, a new script language
 - 2026-11-12 [Way of working, phase 1: the files and their split. Implementation Plan](2026-11-12-way-of-working-p1-files.md) #356: Split AGENTS.md into WORKFLOW.md, a Grace-only AGENTS.md and path-scoped rules files, and make CI fail when they outgrow their limits

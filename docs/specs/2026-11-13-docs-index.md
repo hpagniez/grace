@@ -1,5 +1,5 @@
 ---
-status: approved
+status: built
 issue: 373
 summary: "Frontmatter on specs, plans, checks and research, and a generated README index per docs folder, so agents and people find the live doc in one read"
 ---
