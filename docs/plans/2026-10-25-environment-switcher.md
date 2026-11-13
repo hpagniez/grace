@@ -1,3 +1,9 @@
+---
+status: built
+issue: 59
+summary: "A per-project Karate environment (-e) combo box, and per-environment run properties, plain or secret, passed by argument file and masked in the UI"
+---
+
 # Environment Switcher Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

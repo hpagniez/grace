@@ -1,6 +1,12 @@
+---
+status: built
+issue: 84
+summary: "Open a draft PR on its own when a new Karate jar or Temurin JRE comes out, with the new URL and checksum, so CI proves the app still works"
+---
+
 # Bundled dependency updates
 
-Date 2026-10-27. Status: approved. Covers [feature](../features.md) F33.
+Date 2026-10-27. Covers [feature](../features.md) F33.
 
 ## Intent
 

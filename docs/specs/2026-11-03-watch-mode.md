@@ -1,6 +1,12 @@
+---
+status: built
+issue: 67
+summary: "A toolbar toggle that re-runs the tests of a feature file when it is saved, remembered per project and waiting for a run in progress"
+---
+
 # Watch mode: re-run on save
 
-Date 2026-11-03. Status: approved. Covers [#67](https://github.com/hpagniez/grace/issues/67).
+Date 2026-11-03. Covers [#67](https://github.com/hpagniez/grace/issues/67).
 
 ## Intent
 

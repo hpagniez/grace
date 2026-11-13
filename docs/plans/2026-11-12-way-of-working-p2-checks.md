@@ -1,3 +1,9 @@
+---
+status: built
+issue: 356
+summary: "The checks job fails a PR that skips the way of working: no tier, a big Small PR, missing papers, untested behaviour, a new script language"
+---
+
 # Way of working, phase 2: the PR checks in Rust. Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

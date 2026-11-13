@@ -1,6 +1,12 @@
+---
+status: built
+issue: 59
+summary: "Pick an environment and set run properties per environment, with encrypted secrets masked on screen and kept out of the Java command line"
+---
+
 # Environment switcher and run properties
 
-Date 2026-10-25. Status: approved. Covers [features](../features.md) F08.
+Date 2026-10-25. Covers [features](../features.md) F08.
 
 ## Intent
 

@@ -1,3 +1,7 @@
+---
+summary: "Flaky tests (F15): automated checks pass and all 4 hand checks pass"
+---
+
 # App check: flaky tests (F15)
 
 Date: 2026-10-27

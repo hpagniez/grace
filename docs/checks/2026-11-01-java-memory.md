@@ -1,3 +1,7 @@
+---
+summary: "Java memory limit (#149): run.memory.java@10k falls from 481.6 to 319.1 MB and the 10,000-test run passes; the bench still misses elsewhere"
+---
+
 # Bench: Java's memory limit (#149)
 
 Date: 2026-11-01

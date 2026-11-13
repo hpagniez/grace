@@ -1,6 +1,12 @@
+---
+status: built
+issue: 80
+summary: "Show a visible loader whenever Grace waits on Karate to find tests, so the window never looks idle"
+---
+
 # Loading always visible
 
-Date 2026-10-28. Status: approved. Covers [#80](https://github.com/hpagniez/grace/issues/80).
+Date 2026-10-28. Covers [#80](https://github.com/hpagniez/grace/issues/80).
 
 ## Intent
 

@@ -1,6 +1,12 @@
+---
+status: built
+issue: 230
+summary: "Let a run property be an environment variable of the Karate process, kept encrypted, and import secrets from a properties file once"
+---
+
 # Run properties as environment variables, imported from a secrets file
 
-Date 2026-11-04. Status: approved. Covers [#230](https://github.com/hpagniez/grace/issues/230). Builds on [Environment switcher and run properties](2026-10-25-environment-switcher.md) (#59) and [ADR 0008](../decisions/0008-secret-run-properties-and-java-argument-file.md).
+Date 2026-11-04. Covers [#230](https://github.com/hpagniez/grace/issues/230). Builds on [Environment switcher and run properties](2026-10-25-environment-switcher.md) (#59) and [ADR 0008](../decisions/0008-secret-run-properties-and-java-argument-file.md).
 
 ## Intent
 

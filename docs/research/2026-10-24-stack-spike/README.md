@@ -1,3 +1,7 @@
+---
+summary: "Stack spike: Electron Forge 8, Solid 2 RC, TanStack Router and Tailwind v4 build, run and package; 21 s package, 152 KB app.asar"
+---
+
 # Stack spike: Electron Forge 8 + Solid 2 RC + TanStack Router + Tailwind v4
 
 Date 2026-10-24. Windows 11, Node 24.15. Proves [ADR 0001](../../decisions/0001-solid-router-spa-without-tanstack-start.md) builds, runs and packages. Throwaway; the files here are a reference for the real scaffold (`node_modules`, `out/`, lockfile and lint configs not kept).

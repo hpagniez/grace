@@ -1,6 +1,12 @@
+---
+status: built
+issue: 55
+summary: "Filter the test tree by Karate tags, with include and exclude chips; Run all runs only the matching tests and the filter is remembered"
+---
+
 # Tag filter: run by tag
 
-Date 2026-10-24. Status: approved. Covers [features](../features.md) F04.
+Date 2026-10-24. Covers [features](../features.md) F04.
 
 ## Intent
 

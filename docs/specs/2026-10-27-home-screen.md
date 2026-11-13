@@ -1,6 +1,12 @@
+---
+status: built
+issue: 78
+summary: "A home screen with a folder picker and the recently opened projects, and a Home button to close the project and go back to it"
+---
+
 # Home screen
 
-Date 2026-10-27. Status: approved. Covers [feature](../features.md) F27.
+Date 2026-10-27. Covers [feature](../features.md) F27.
 
 ## Intent
 

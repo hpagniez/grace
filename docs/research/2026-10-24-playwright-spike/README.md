@@ -1,3 +1,7 @@
+---
+summary: "Playwright works for Electron e2e tests; the packaged exe fails to launch with the Forge fuse off, so test the built app with the dev Electron binary"
+---
+
 # Playwright spike: end-to-end tests for the Electron app
 
 Date 2026-10-24. Windows 11, Node 24.15. Ran `@playwright/test` 1.64.1 against a copy of the [stack spike](../2026-10-24-stack-spike/README.md) (Electron 45.0.0, Forge 8.0.1). Supports [ADR 0004](../../decisions/0004-playwright-for-end-to-end-tests.md). Throwaway; [playwright.config.ts](playwright.config.ts) and [e2e/app.spec.ts](e2e/app.spec.ts) are a reference for the real setup.

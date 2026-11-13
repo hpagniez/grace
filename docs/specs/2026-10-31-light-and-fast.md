@@ -1,6 +1,12 @@
+---
+status: built
+issue: 147
+summary: "Run lightly as a release requirement: measure memory, CPU and start on every PR with a bench, and a benchmark before every release"
+---
+
 # Light and fast: numbers on every PR, a benchmark before every release
 
-Date 2026-10-31. Status: approved. Covers [#147](https://github.com/hpagniez/grace/issues/147).
+Date 2026-10-31. Covers [#147](https://github.com/hpagniez/grace/issues/147).
 
 ## Intent
 

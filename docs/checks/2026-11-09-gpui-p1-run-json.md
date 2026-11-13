@@ -1,3 +1,7 @@
+---
+summary: "GPUI Grace phase P1 passes: a headless 2,000-test run writes the same run.json as Electron Grace, on Linux and on Windows"
+---
+
 # GPUI Grace check: phase P1's headless run against Electron Grace
 
 Date: 2026-11-09

@@ -1,3 +1,7 @@
+---
+summary: "Karate v2 CLI spike on Windows: corrects the inventory, fixes how to spawn, cancel and read the JSONL events; live step and HTTP detail need a Java listener"
+---
+
 # Karate v2 CLI spike on Windows
 
 Date 2026-10-24. Windows 11 (French locale), Node 24, portable Temurin JRE 21.0.12.1+1, `karate-2.1.4.jar` (the only jar in the [v2.1.4 release](https://github.com/karatelabs/karate/releases/tag/v2.1.4)). Checked against [inventory/karate-core.md §19](../../inventory/karate-core.md#19-integration-surface-for-a-gui).

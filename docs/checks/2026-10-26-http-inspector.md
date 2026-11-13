@@ -1,3 +1,7 @@
+---
+summary: "HTTP inspector (F11): 529 unit and 52 e2e tests pass, and all 13 hand checks pass; the tab count was fixed after feedback"
+---
+
 # App check: HTTP inspector (F11)
 
 Date: 2026-10-26

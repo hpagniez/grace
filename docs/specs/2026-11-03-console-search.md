@@ -1,6 +1,12 @@
+---
+status: built
+issue: 73
+summary: "Find text in the console and step through the matches, and jump from one error line or failed test to the next"
+---
+
 # Find in the console, and step through its errors
 
-Date 2026-11-03. Status: approved. Covers [#73](https://github.com/hpagniez/grace/issues/73).
+Date 2026-11-03. Covers [#73](https://github.com/hpagniez/grace/issues/73).
 
 ## Intent
 

@@ -1,3 +1,7 @@
+---
+summary: "Java JIT: C1 only cuts CPU 53 to 75% but heavy JavaScript runs 4 times slower; two compiler threads cut CPU 10 to 52% with no JavaScript loss"
+---
+
 # Java's JIT during a Karate run: C1 only, fewer compiler threads
 
 Checked on 2026-11-01 and 2026-11-02 on the reference desktop (Windows 11 Pro, Ryzen 7 5800X, 16 threads, 32 GB), with the bundled Temurin 21.0.12.1 and Karate 2.1.4, for [#179](https://github.com/hpagniez/grace/issues/179). Spec: [docs/specs/2026-11-02-java-jit.md](../../specs/2026-11-02-java-jit.md).

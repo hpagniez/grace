@@ -1,3 +1,9 @@
+---
+status: built
+issue: 147
+summary: "Measure the packaged app on every PR and before every release, lock today's numbers in as limits, and put the rule in the merge and release workflow"
+---
+
 # Light and Fast Guard Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

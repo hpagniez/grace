@@ -1,6 +1,12 @@
+---
+status: built
+issue: 66
+summary: "Mark tests that pass and fail with no project change between runs as flaky in the tree, and show the runs that prove it"
+---
+
 # Flaky tests
 
-Date 2026-10-26. Status: approved. Covers [feature](../features.md) F15 (flaky tests). The pass rate over time, the other half of the old F15 row, moves to its own row, F42.
+Date 2026-10-26. Covers [feature](../features.md) F15 (flaky tests). The pass rate over time, the other half of the old F15 row, moves to its own row, F42.
 
 ## Intent
 

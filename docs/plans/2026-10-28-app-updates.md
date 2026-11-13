@@ -1,3 +1,9 @@
+---
+status: built
+issue: 77
+summary: "Grace shows its version, checks GitHub Releases on a stable or pre-release channel, installs any version in place, backs up first and rolls back"
+---
+
 # App Updates Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

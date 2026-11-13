@@ -1,6 +1,12 @@
+---
+status: built
+issue: 92
+summary: "Reopen the window with the size, position, screen and maximized state it had at close, and never leave it off screen"
+---
+
 # Window bounds
 
-Date 2026-10-26. Status: approved. Covers [feature](../features.md) F41.
+Date 2026-10-26. Covers [feature](../features.md) F41.
 
 ## Intent
 

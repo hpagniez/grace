@@ -1,3 +1,7 @@
+---
+summary: "Only the en-US locale (#150): the zip is 12.6 MB smaller and the unpacked folder 50.6 MB smaller; the updater contract and behaviour are unchanged"
+---
+
 # Check: only the en-US locale (#150)
 
 Date: 2026-11-02

@@ -1,3 +1,7 @@
+---
+summary: "Bench baseline at e3cfe3b7: 59 measures over 5 rounds each; the first limits are written to bench/limits.json"
+---
+
 # Bench baseline: `develop` at e3cfe3b7, the first limits
 
 Date: 2026-10-31

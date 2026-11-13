@@ -1,6 +1,12 @@
+---
+status: built
+issue: 107
+summary: "A graphic chart of tokens (colours, type, spacing, icons, motion) and a screen-by-screen pass so Grace looks deliberate in light and dark"
+---
+
 # Premium look and feel with a defined graphic chart
 
-Date 2026-10-29. Status: approved. Covers [#107](https://github.com/hpagniez/grace/issues/107).
+Date 2026-10-29. Covers [#107](https://github.com/hpagniez/grace/issues/107).
 
 ## Intent
 

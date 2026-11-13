@@ -1,3 +1,9 @@
+---
+status: built
+issue: [125, 91]
+summary: "The test tree and the HTTP list draw only the rows on screen and take arrow-key navigation, so Grace stays smooth at 10,000 tests"
+---
+
 # Big projects: virtual lists and keyboard navigation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

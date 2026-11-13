@@ -1,3 +1,7 @@
+---
+summary: "Java memory: -Xms64m -Xmx2g cuts the 10,000-test peak from 455 to 318 MB for 5% more CPU; serial GC does not help, class-data sharing costs 19 MB"
+---
+
 # Java's memory during a Karate run: heap flags, collector, class-data sharing
 
 Checked on 2026-11-01 on the reference desktop (Windows 11 Pro, Ryzen 7 5800X, 16 threads, 32 GB), with the bundled Temurin 21.0.12.1 and Karate 2.1.4, for [#149](https://github.com/hpagniez/grace/issues/149). Spec: [docs/specs/2026-11-01-java-memory.md](../../specs/2026-11-01-java-memory.md).

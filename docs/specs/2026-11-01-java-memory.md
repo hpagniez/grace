@@ -1,6 +1,12 @@
+---
+status: built
+issue: 149
+summary: "Cap the bundled Java heap with memory flags to cut its peak memory during runs, based on measurements on 2,000 and 10,000 tests"
+---
+
 # Java memory
 
-Date 2026-11-01. Status: approved. Covers [#149](https://github.com/hpagniez/grace/issues/149).
+Date 2026-11-01. Covers [#149](https://github.com/hpagniez/grace/issues/149).
 
 ## Intent
 

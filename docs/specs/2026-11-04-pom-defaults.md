@@ -1,6 +1,12 @@
+---
+status: built
+issue: 228
+summary: "Start the environment, tag filter and thread count from karate-pom.json, and the default karate.env from the Maven pom, as the CLI does"
+---
+
 # Start from the project's pom
 
-Date 2026-11-04. Status: approved. Covers [#228](https://github.com/hpagniez/grace/issues/228). A later slice of [#64](https://github.com/hpagniez/grace/issues/64); builds on [Project setup](2026-11-02-project-setup.md).
+Date 2026-11-04. Covers [#228](https://github.com/hpagniez/grace/issues/228). A later slice of [#64](https://github.com/hpagniez/grace/issues/64); builds on [Project setup](2026-11-02-project-setup.md).
 
 ## Intent
 

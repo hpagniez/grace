@@ -1,6 +1,12 @@
+---
+status: built
+issue: 63
+summary: "A Threads box that sets how many scenarios Karate runs at once, shown per run in the History tab"
+---
+
 # Thread count
 
-Date 2026-10-26. Status: approved. Covers [feature](../features.md) F12.
+Date 2026-10-26. Covers [feature](../features.md) F12.
 
 ## Intent
 

@@ -1,3 +1,9 @@
+---
+status: built
+issue: 64
+summary: "Grace reads karate-pom.json itself and passes --no-pom, names unused pom keys in a notice, and puts Maven and Gradle output on the classpath"
+---
+
 # Project setup Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

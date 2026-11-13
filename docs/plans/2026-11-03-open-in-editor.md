@@ -1,3 +1,9 @@
+---
+status: built
+issue: 68
+summary: "One click in Details opens a test's feature file in VS Code at the test's line, or at the line Karate names in a failed test's error"
+---
+
 # Open in editor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

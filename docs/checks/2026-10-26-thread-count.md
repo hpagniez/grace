@@ -1,3 +1,7 @@
+---
+summary: "Thread count (F12): 593 unit and 94 e2e tests pass, and all 13 hand checks pass"
+---
+
 # App check: thread count (F12)
 
 Date: 2026-10-26

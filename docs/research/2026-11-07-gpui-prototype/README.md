@@ -1,3 +1,7 @@
+---
+summary: "GPUI prototype on Windows: go for a migration with the idle patch; 28 MB idle against 167 MB, 192 MB unpacked against 489 MB, faster first paint"
+---
+
 # GPUI prototype: Grace's main screen in Rust and GPUI, measured against Grace on Linux (#152)
 
 Date 2026-11-07. A cloud Linux machine: Intel Xeon at 2.10 GHz, 4 vCPU, 17 GB, no GPU, Ubuntu 24.04, Xvfb 21.1 at 1920 x 1080. Grace: `develop` at `dc88524` (1.0.0-rc.9, Electron 45.1.0), packaged for Linux with a two-line patch ([below](#what-was-built)). The prototype: `gpui-pre` 0.3.11 (a snapshot of Zed's GPUI, `zed@f816e1f`), Rust 1.97. Both run the same Karate 2.1.4 jar on the same OpenJDK 21.0.12.

@@ -1,3 +1,9 @@
+---
+status: built
+issue: 62
+summary: "An HTTP tab lists every call a finished feature made, grouped by status class, with request and response in Details and Copy as cURL"
+---
+
 # HTTP Inspector Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

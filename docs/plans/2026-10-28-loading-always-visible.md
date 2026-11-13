@@ -1,3 +1,9 @@
+---
+status: built
+issue: 80
+summary: "A sliding stripe in the progress bar while Grace finds tests and waits for a first result, then a smooth fill, readable by screen readers"
+---
+
 # Loading always visible Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

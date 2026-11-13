@@ -1,3 +1,7 @@
+---
+summary: "Vitest spike: Node and jsdom tests of Solid 2 pass in about 1.5 s with two projects split by file name and Solid's browser build inlined"
+---
+
 # Vitest spike: unit tests for main-process logic and Solid 2 components
 
 Date 2026-10-24. Windows 11, Node 24.15. Ran Vitest 5.0.5 against a copy of the [stack spike](../2026-10-24-stack-spike/README.md) (Vite 8.3.5, `@solidjs/vite-plugin` 3.0.0-next.51, Solid 2.0.0-rc.18). Supports [ADR 0005](../../decisions/0005-vitest-for-unit-tests.md). Throwaway; [vitest.config.mts](vitest.config.mts) and the two tests in [test/](test/) are a reference for the real setup.

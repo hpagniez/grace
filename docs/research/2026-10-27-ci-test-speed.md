@@ -1,3 +1,7 @@
+---
+summary: "CI test speed: one Java test file takes 422 s; split unit and e2e into jobs and cut a ready PR from 20 to 7 minutes for 3 more billed minutes"
+---
+
 # CI test speed: why the `test` workflow takes 20 minutes, and how to cut it
 
 Checked on 2026-10-27 against the `test` runs of PR #31 ([run 40584412059](https://github.com/Tusquito/karate-kid/actions/runs/40584412059/job/122471971018)) and PR #30 ([run 40582544583](https://github.com/Tusquito/karate-kid/actions/runs/40582544583)), the test code on `develop` (9c45f75), GitHub's runner docs, the Vitest 5.0.5 and `@solidjs/signals` 2.0.0-rc.18 sources in `node_modules/`, and a local timing run pinned to 2 CPUs. Backlog rows: F44 (CI speed) and F45 (Solid warnings) in [features.md](../features.md).

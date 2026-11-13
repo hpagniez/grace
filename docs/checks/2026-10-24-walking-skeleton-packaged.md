@@ -1,3 +1,7 @@
+---
+summary: "Walking skeleton packaged app: the zip builds and starts without Java; the 4 by-hand window checks were left blank for a person"
+---
+
 # Packaged app check: walking skeleton
 
 Date: 2026-10-24

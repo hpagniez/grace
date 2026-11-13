@@ -1,3 +1,7 @@
+---
+summary: "Sample Maven and Gradle projects and a by-hand Playwright check that Grace lists and runs a project's libraries; results are in docs/checks"
+---
+
 # Project libraries: sample projects and their check
 
 Date 2026-11-02. For [#64](https://github.com/hpagniez/grace/issues/64), spec [docs/specs/2026-11-02-project-libraries.md](../../specs/2026-11-02-project-libraries.md). Results: [docs/checks/2026-11-02-project-libraries.md](../../checks/2026-11-02-project-libraries.md).

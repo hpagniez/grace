@@ -1,3 +1,9 @@
+---
+status: built
+issue: 65
+summary: "Breakpoints on steps, and a debug run that pauses, steps and shows the paused scenario's variables"
+---
+
 # Step Debugger Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

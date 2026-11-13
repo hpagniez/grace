@@ -1,3 +1,9 @@
+---
+status: built
+issue: 228
+summary: "Controls with nothing saved (environment, tag filter, threads) start from karate-pom.json, and the environment from a Maven pom's karate.env"
+---
+
 # Start from the project's pom: implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

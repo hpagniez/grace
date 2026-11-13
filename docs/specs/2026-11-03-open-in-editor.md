@@ -1,6 +1,12 @@
+---
+status: built
+issue: 68
+summary: "Open a failed scenario in VS Code at its line, or at the line where Karate says it failed, in one click from the details pane"
+---
+
 # Open a test in VS Code
 
-Date 2026-11-03. Status: approved. Covers [#68](https://github.com/hpagniez/grace/issues/68).
+Date 2026-11-03. Covers [#68](https://github.com/hpagniez/grace/issues/68).
 
 ## Intent
 

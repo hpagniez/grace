@@ -1,3 +1,9 @@
+---
+status: built
+issue: 67
+summary: "A toolbar toggle that, while on, runs a .feature file's matching tests each time the file is saved"
+---
+
 # Watch mode Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

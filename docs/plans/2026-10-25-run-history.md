@@ -1,3 +1,9 @@
+---
+status: built
+issue: 61
+summary: "The last 20 runs per project in a History tab: open a past report, re-run it on its environment and tags, or re-run only its failed tests"
+---
+
 # Run History Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

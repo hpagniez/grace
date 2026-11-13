@@ -1,3 +1,7 @@
+---
+summary: "Tauri 2 spike: no-go, stay on Electron; zip shrinks 71% but memory and start time do not improve and it needs a Rust rewrite"
+---
+
 # Tauri spike: Tauri 2 as a replacement for Electron (#106)
 
 Date 2026-10-29. Windows 11 Pro 10.0.26300, AMD Ryzen 7 5800X (8 cores), 32 GB, Node 24.15.0, WebView2 Runtime 156.0.4314.50. Electron baseline: Grace 1.0.0-rc.3 on Electron 45.0.0, built with `npm run make` from `develop` at cee6dc98.

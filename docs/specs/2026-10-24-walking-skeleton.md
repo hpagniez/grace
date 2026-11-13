@@ -1,6 +1,12 @@
+---
+status: built
+issue: [52, 53, 54, 56, 57, 58, 60]
+summary: "First usable version: open a Karate folder, see the test tree, run any part, watch live results and read failures, with Java and Karate bundled"
+---
+
 # Walking skeleton: open, discover, run, watch
 
-Date 2026-10-24. Status: draft for approval. Covers [features](../features.md) F01, F02, F03, F05, F06, F07, F09.
+Date 2026-10-24. Covers [features](../features.md) F01, F02, F03, F05, F06, F07, F09.
 
 ## Intent
 

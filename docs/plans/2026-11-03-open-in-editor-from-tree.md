@@ -1,3 +1,9 @@
+---
+status: built
+issue: 222
+summary: "A right-click on a tree row shows Windows' menu with Open in VS Code, which opens the row's file where Details would"
+---
+
 # Open in VS Code from the Test Tree Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

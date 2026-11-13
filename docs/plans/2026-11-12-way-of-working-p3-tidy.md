@@ -1,3 +1,9 @@
+---
+status: built
+issue: 356
+summary: "cargo xtask tidy lists leftovers at session start, and deny rules refuse junctions and force pushes"
+---
+
 # Way of working, phase 3: the tidy report and the refusals. Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

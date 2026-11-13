@@ -1,3 +1,7 @@
+---
+summary: "Big-project perf: tooltips are not the cause; batching run events (18.6 s to 7 s), scroll fixes and a virtualized tree fix 2,000 and 10,000 tests"
+---
+
 # Big-project performance: 2,000 and 10,000 tests in the premium UI
 
 Measured on 2026-10-29 against the head of PR #116 (premium UI, issue #107, `55ac9e5e`, still a draft) and `develop` at `60c1e1b5`. All builds were packaged (`npm run package`): Electron 45, minified renderer. The machine was a Windows 11 desktop with a Ryzen 7 5800X (8 cores, 16 threads). Other agent sessions ran on it at the same time, so every comparison below ran the builds in turn, round after round. Figures are the median of 3 rounds at 2,000 tests and the range of 2 rounds at 10,000.

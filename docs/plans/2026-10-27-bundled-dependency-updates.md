@@ -1,3 +1,9 @@
+---
+status: built
+issue: 84
+summary: "A weekly workflow opens a draft PR for a newer Temurin 21 JRE or Karate 2.x, with the new pin and checksum and re-recorded event fixtures"
+---
+
 # Bundled Dependency Updates Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

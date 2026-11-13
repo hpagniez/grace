@@ -1,3 +1,7 @@
+---
+summary: "Console banner (F24): automated checks pass and all 7 hand checks pass"
+---
+
 # App check: console banner (F24)
 
 Date: 2026-10-27

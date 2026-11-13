@@ -1,3 +1,9 @@
+---
+status: built
+issue: 63
+summary: "A per-project Threads box in the toolbar passes -T to Karate, is saved in each run.json and shown in a History column"
+---
+
 # Thread Count Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

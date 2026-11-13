@@ -1,3 +1,9 @@
+---
+status: built
+issue: 107
+summary: "A token-based graphic chart (logo colours, IBM Plex, Lucide, motion, tooltips, Appearance setting) and every screen restyled to it, with screenshots"
+---
+
 # Premium look and feel Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

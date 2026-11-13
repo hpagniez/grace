@@ -1,6 +1,12 @@
+---
+status: built
+issue: 328
+summary: "Open a PR on its own when a new GPUI, GPUI Kit or Rust release comes out, tested with the patches, and merge bump PRs once tests pass"
+---
+
 # Cargo updates
 
-Date 2026-11-10. Status: approved by the owner's rule of 2026-11-10 ("everything must always be up to date and tested with the latest changes against our patches and versions"). Decision: [ADR 0032](../decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md). Updated 2026-11-11 by the owner's rule that bump PRs merge on their own once all tests pass: [ADR 0033](../decisions/0033-merge-the-weekly-cargo-bump-prs-on-green.md), requirements 6 and 9.
+Date 2026-11-10. Approved by the owner's rule of 2026-11-10 ("everything must always be up to date and tested with the latest changes against our patches and versions"). Decision: [ADR 0032](../decisions/0032-keep-the-gpui-set-rust-and-cargo-lock-current.md). Updated 2026-11-11 by the owner's rule that bump PRs merge on their own once all tests pass: [ADR 0033](../decisions/0033-merge-the-weekly-cargo-bump-prs-on-green.md), requirements 6 and 9.
 
 ## Intent
 
