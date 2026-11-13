@@ -13,8 +13,8 @@ use std::rc::Rc;
 use gpui::accesskit::{Role, Toggled};
 use gpui::{
     AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement,
-    Render, ScrollStrategy, SharedString, StatefulInteractiveElement as _, Styled, UniformListScrollHandle, Window,
-    div, point, prelude::FluentBuilder as _, px, uniform_list,
+    Render, ScrollStrategy, SharedString, StatefulInteractiveElement as _, Styled, Subscription,
+    UniformListScrollHandle, Window, div, point, prelude::FluentBuilder as _, px, uniform_list,
 };
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_component::scroll::ScrollableElement as _;
@@ -24,7 +24,7 @@ use grace_core::http_list::{
 use grace_core::model::http::{HTTP_GROUPS, HttpCall, HttpGroup, http_group};
 use grace_core::model::node::TestNode;
 use grace_core::rows::{View, anchored_scroll_top, node_name, page_rows, survivor};
-use grace_core::state::{AppState, CallRef};
+use grace_core::state::{AppState, CallRef, Panel};
 
 use crate::app::Grace;
 use crate::assets::Icon;
@@ -187,11 +187,26 @@ pub struct HttpCalls {
     keyboard: bool,
     /// The selected call scrolls into view once the rows are built, after a chip the person pressed (R4.7).
     reveal_selected: bool,
+    /// The tab was closed, or another project opened, since the list was drawn: it starts afresh, at the top with no
+    /// focus row of its own, as Electron Grace's list mounted again.
+    stale: bool,
+    root: Option<String>,
+    _observe: Subscription,
 }
 
 impl HttpCalls {
     pub fn new(grace: Entity<Grace>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&grace, |list: &mut HttpCalls, grace, cx| {
+            let s = &grace.read(cx).state;
+            let root = s.project.as_ref().map(|p| &p.root);
+            if s.panel != Panel::Http || root != list.root.as_ref() {
+                list.stale = true;
+            }
+        });
         Self {
+            stale: false,
+            root: grace.read(cx).state.project.as_ref().map(|p| p.root.clone()),
+            _observe: observe,
             grace,
             // the list is one tab stop (VL-13)
             focus: cx.focus_handle().tab_stop(true),
@@ -218,6 +233,13 @@ impl HttpCalls {
     /// The rows again, when what they show changed. Rows added or removed above the view keep the rows in view
     /// still (VL-19); a focus row that left hands over to the nearest row above.
     fn build(&mut self, state: &AppState) {
+        if std::mem::take(&mut self.stale) {
+            self.root = state.project.as_ref().map(|p| p.root.clone());
+            self.active = None;
+            self.keyboard = false;
+            self.keys = Rc::default(); // nothing to keep in view
+            self.scroll.0.borrow().base_handle.set_offset(point(px(0.), px(0.)));
+        }
         let from = Built {
             trees: state.trees,
             selected: state.selected.clone(),
@@ -309,8 +331,10 @@ impl HttpCalls {
     }
 
     fn on_key(&mut self, e: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let state = self.grace.read(cx).state.clone();
-        let Some(f) = self.focus_index(&state) else { return };
+        // a borrow, not a clone of the `Rc`: one held while selecting would make `state_mut` copy the whole state
+        let Some(f) = self.focus_index(&self.grace.read(cx).state) else {
+            return;
+        };
         let k = &e.keystroke;
         let m = k.modifiers;
         if m.control || m.platform || m.alt {
@@ -567,6 +591,7 @@ impl HttpCalls {
             .aria_position_in_set(i + 1)
             .when(is_focus_row, |d| d.aria_active_descendant())
             .cursor_pointer()
+            .relative()
             .w_full()
             .h(px(ROW_HEIGHT))
             .flex()
@@ -580,13 +605,40 @@ impl HttpCalls {
             .map(|d| {
                 if selected {
                     d.bg(Theme::color(t.selected))
-                        .border_l_2()
-                        .border_color(Theme::color(t.accent))
                 } else {
                     d.hover(|s| s.bg(Theme::color(t.hover)))
                 }
             })
-            .when(ring, |d| d.border_2().border_color(Theme::color(t.focus)))
+            // GPUI gives a box one border colour: the accent bar and the ring are children over the row, so the
+            // separator below keeps its colour and the text does not move
+            .when(selected, |d| {
+                d.child(
+                    div()
+                        .debug_selector({
+                            let i = i + 1;
+                            move || format!("http-call-bar:{i}")
+                        })
+                        .absolute()
+                        .left_0()
+                        .top_0()
+                        .bottom_0()
+                        .w(px(2.))
+                        .bg(Theme::color(t.accent)),
+                )
+            })
+            .when(ring, |d| {
+                d.child(
+                    div()
+                        .debug_selector({
+                            let i = i + 1;
+                            move || format!("http-call-ring:{i}")
+                        })
+                        .absolute()
+                        .inset_0()
+                        .border_2()
+                        .border_color(Theme::color(t.focus)),
+                )
+            })
             .on_click(move |_, window, cx| {
                 let at = click_at.clone();
                 me.update(cx, |list, cx| list.clicked(at, window, cx));

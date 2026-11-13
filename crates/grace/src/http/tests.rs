@@ -221,10 +221,10 @@ fn adds_the_http_tab_after_history(cx: &mut TestAppContext) {
     assert_eq!(tab_name(TabId::Http, &state), "HTTP (4)");
     h.update(&mut cx, |s| {
         s.reduce(&AppEvent::RunStarted {
-            selection: "d:".into(),
+            selection: TWO.into(),
             run_id: "20261025-150000-000".into(),
-            keys: vec![],
-            total: 0,
+            keys: vec![TWO.into()], // clears the call of "list users" only
+            total: 1,
             started_at: 0.,
             env: None,
             debug: false,
@@ -232,7 +232,8 @@ fn adds_the_http_tab_after_history(cx: &mut TestAppContext) {
     });
     let state = cx.update(|_, cx| h.grace.read(cx).state.clone());
     assert_eq!(state.panel, Panel::Http);
-    assert_eq!(tab_name(TabId::Http, &state), "HTTP (4)");
+    assert_eq!(tab_name(TabId::Http, &state), "HTTP (3)");
+    assert_eq!(state.calls[ONE].len(), 3, "the calls of the test outside the run stay");
 }
 
 /// 2. Seven chips with their counts, zeros included, All pressed.
@@ -535,6 +536,16 @@ fn makes_a_row_28_px(cx: &mut TestAppContext) {
     for i in 1..=4 {
         assert_eq!(bounds(&mut cx, format!("http-call:{i}")).size.height, px(ROW_HEIGHT));
     }
+    // the selected row's accent bar: 2 px down its left side, over the row, which keeps its height
+    assert!(cx.debug_bounds("http-call-bar:2").is_none());
+    click(&mut cx, "http-call:2".into());
+    let (row, bar) = (
+        bounds(&mut cx, "http-call:2".into()),
+        bounds(&mut cx, "http-call-bar:2".into()),
+    );
+    assert_eq!(row.size.height, px(ROW_HEIGHT));
+    assert_eq!((bar.left(), bar.size.width), (row.left(), px(2.)));
+    assert!(cx.debug_bounds("http-call-bar:1").is_none());
 }
 
 /// 19. VL-13: the list is one tab stop on the first call when none is selected; the arrows select the call they
@@ -690,11 +701,16 @@ fn a_click_on_a_call_shows_no_focus_ring(cx: &mut TestAppContext) {
     assert!(cx.update(|window, cx| list.read(cx).focus.is_focused(window)));
     assert!(!cx.update(|_, cx| list.read(cx).keyboard), "no ring after a click");
     assert!(!cx.update(|window, _| window.last_input_was_keyboard()));
+    assert!(cx.debug_bounds("http-call-ring:3").is_none(), "no ring drawn");
     cx.simulate_keystrokes("down");
     assert_eq!(active(&list, &mut cx), Some(3));
     assert!(
         cx.update(|_, cx| list.read(cx).keyboard),
         "the ring once a key moves it"
+    );
+    assert!(
+        cx.debug_bounds("http-call-ring:4").is_some(),
+        "the ring drawn on the row moved to"
     );
 }
 
@@ -747,4 +763,41 @@ fn a_runs_calls_build_no_rows_while_the_tab_is_closed(cx: &mut TestAppContext) {
     draw(&mut cx);
     assert_eq!(builds(&mut cx), 1);
     assert_eq!(cx.update(|_, cx| http.read(cx).rows().len()), 4);
+}
+
+/// 20, the other way: with a call above the cleared one still listed, the focus row goes up to it (R4.5).
+#[gpui::test]
+fn the_focus_goes_up_to_the_nearest_call_still_listed(cx: &mut TestAppContext) {
+    let (h, mut cx, list) = setup(cx, all());
+    click(&mut cx, "http-call:4".into()); // the call of "list users"
+    h.update(&mut cx, |s| {
+        s.reduce(&AppEvent::RunStarted {
+            selection: TWO.into(),
+            run_id: "20261025-150000-000".into(),
+            keys: vec![TWO.into()],
+            total: 1,
+            started_at: 0.,
+            env: None,
+            debug: false,
+        })
+    });
+    assert_eq!(rows(&list, &mut cx).len(), 3);
+    assert_eq!(active(&list, &mut cx), Some(2));
+}
+
+/// The tab reopened, or another project, starts the list afresh, as Electron Grace mounted it again: at the top,
+/// its focus row the selected call or the first.
+#[gpui::test]
+fn reopening_the_tab_starts_the_list_afresh(cx: &mut TestAppContext) {
+    let (h, mut cx, list) = setup(cx, vec![(ONE, many(200, 0))]);
+    scroll_to(&list, &mut cx, 50. * ROW_HEIGHT);
+    click(&mut cx, "http-call:55".into());
+    cx.simulate_keystrokes("down");
+    assert_eq!(active(&list, &mut cx), Some(55));
+    h.update(&mut cx, |s| s.show_panel(Panel::Console));
+    h.update(&mut cx, |s| s.show_panel(Panel::Http));
+    draw(&mut cx);
+    assert_eq!(active(&list, &mut cx), None);
+    assert_eq!(view(&list, &mut cx).scroll_top, 0.);
+    assert!(!cx.update(|_, cx| list.read(cx).keyboard));
 }
