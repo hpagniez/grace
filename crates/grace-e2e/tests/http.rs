@@ -147,6 +147,13 @@ fn reading_the_calls_of_one_run_all() {
         c.len() == 13 && !c[0].states.selected && c[1].states.selected && c[1].states.focused
     })
     .unwrap();
+    // one tab stop: Tab leaves the list rather than moving on to the next call
+    app.key(Key::Tab).unwrap();
+    app.wait_for("the focus out of the list", WAIT, |t| {
+        let c = calls(t);
+        c.len() == 13 && c[1].states.selected && c.iter().all(|o| !o.states.focused)
+    })
+    .unwrap();
 
     // HI-03: the tree selection narrows the list
     select(&app, "retry");
@@ -160,7 +167,11 @@ fn reading_the_calls_of_one_run_all() {
     assert_eq!(attempts, ["attempt 1 of 3", "attempt 2 of 3", "attempt 3 of 3"]);
 
     // HI-06: a shared setup call shows under the scenario Karate ran it in
+    // the panel is tall: close http.feature so shared.feature's rows are in view, and so in the accessibility tree
     if row(&app.tree().unwrap(), "first").is_none() {
+        app.press_named(Role::Button, "Collapse http.feature").unwrap();
+        app.wait_for("http.feature closed", WAIT, |t| row(t, "retry").is_none())
+            .unwrap();
         app.press_named(Role::Button, "Expand shared.feature").unwrap();
         app.wait_for("the shared scenarios", WAIT, |t| row(t, "first").is_some())
             .unwrap();
@@ -229,4 +240,15 @@ fn a_run_of_one_test_replaces_only_its_calls() {
         .unwrap();
     // starting the run kept the HTTP tab open
     assert!(tab(&t).unwrap().states.selected);
+    // "ok" has its new call, and another test kept its calls of Run all
+    select(&app, "ok");
+    let t = app
+        .wait_for("the call of ok", WAIT, |t| tab_is(t, "HTTP (1)") && calls(t).len() == 1)
+        .unwrap();
+    assert!(calls(&t)[0].name.starts_with("200, GET, "), "{}", calls(&t)[0].name);
+    select(&app, "retry");
+    app.wait_for("the calls of retry", WAIT, |t| {
+        tab_is(t, "HTTP (3)") && statuses(t) == ["404", "404", "404"]
+    })
+    .unwrap();
 }
