@@ -1,3 +1,9 @@
+---
+status: built
+issue: 279
+summary: "GPUI phase 0: Rust workspace, pinned crates, theme, assets and CI, ending in an empty Grace window that meets the idle budget and that Narrator reads"
+---
+
 # Plan: GPUI migration, phase P0 foundation
 
 Date 2026-11-08. Issue [#279](https://github.com/hpagniez/grace/issues/279), under [#278](https://github.com/hpagniez/grace/issues/278). Spec: the [migration guide](../specs/2026-11-08-gpui-migration.md) (Phases, R4 to R8), [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Checklist: [parity](../specs/2026-11-08-gpui-migration-parity.md), phase P0 rows.

@@ -1,6 +1,12 @@
+---
+status: built
+issue: 64
+summary: "Open a project the way its own setup runs it: say when karate-pom.json changes a run, and put compiled Java classes on the classpath"
+---
+
 # Project setup
 
-Date 2026-11-02. Status: approved. Part of [#64](https://github.com/hpagniez/grace/issues/64) (first slice).
+Date 2026-11-02. Part of [#64](https://github.com/hpagniez/grace/issues/64) (first slice).
 
 ## Intent
 

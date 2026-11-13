@@ -1,6 +1,12 @@
+---
+status: built
+issue: 61
+summary: "Keep the last 20 runs of each project, reopen their reports and re-run only the failed tests on the same environment and tag filter"
+---
+
 # Run history
 
-Date 2026-10-25. Status: approved. Covers [features](../features.md) F10.
+Date 2026-10-25. Covers [features](../features.md) F10.
 
 ## Intent
 

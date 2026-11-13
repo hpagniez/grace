@@ -1,6 +1,12 @@
+---
+status: built
+issue: 62
+summary: "List every HTTP call of a run in one tab, grouped by status class, with each request and response, to find the call that failed"
+---
+
 # HTTP inspector
 
-Date 2026-10-25. Status: approved. Covers [features](../features.md) F11, after-run version. The live version waits for the `RunListener` of F14.
+Date 2026-10-25. Covers [features](../features.md) F11, after-run version. The live version waits for the `RunListener` of F14.
 
 ## Intent
 

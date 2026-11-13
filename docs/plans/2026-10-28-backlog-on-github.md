@@ -1,3 +1,8 @@
+---
+status: built
+summary: "A one-off script moves the 45 rows of docs/features.md to GitHub issues on a project board, and the repo's rules change to match"
+---
+
 # Backlog on GitHub Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

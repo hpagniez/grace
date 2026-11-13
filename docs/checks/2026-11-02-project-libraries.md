@@ -1,3 +1,7 @@
+---
+summary: "Project libraries (#64): a Maven and a Gradle project using SQLite pass with nothing copied by hand; a first open takes about 3.5 s and 7.7 s"
+---
+
 # Check: project libraries with a real Maven and Gradle (#64)
 
 Date: 2026-11-02

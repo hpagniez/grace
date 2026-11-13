@@ -1,3 +1,9 @@
+---
+status: built
+issue: 281
+summary: "GPUI phase 2: the main screen in GPUI (window, home, toolbar, tree, filter bar, details, console), within the bench limits it shares with Electron"
+---
+
 # Plan: GPUI migration, phase P2 main screen
 
 Date 2026-11-09. Issue [#281](https://github.com/hpagniez/grace/issues/281), under [#278](https://github.com/hpagniez/grace/issues/278). Spec: the [migration guide](../specs/2026-11-08-gpui-migration.md) (Architecture, R1 to R8, feature map P2), [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Checklist: [parity](../specs/2026-11-08-gpui-migration-parity.md), the P2 rows: 241 spec scenarios, the P2 e2e files and the renderer tests of P2's views.

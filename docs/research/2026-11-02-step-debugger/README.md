@@ -1,3 +1,7 @@
+---
+summary: "Step debugger spike: Karate 2.1.4's RunListener can pause every step and read variables; ECJ compiles the listener in 0.9 s on the bundled JRE"
+---
+
 # Step debugger spike: a Karate `RunListener` that pauses steps
 
 Checked on 2026-11-02 on the reference desktop with the bundled Temurin 21.0.12.1 and Karate 2.1.4, for [#65](https://github.com/hpagniez/grace/issues/65). Source read from Maven Central's `karate-core-2.1.4-sources.jar` and `karate-js-2.1.4-sources.jar` (MIT).

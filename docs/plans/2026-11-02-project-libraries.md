@@ -1,3 +1,9 @@
+---
+status: built
+issue: 64
+summary: "A project's libraries join Karate's classpath: the CLI's .karate/ext jars, and the test libraries a Maven or Gradle build lists"
+---
+
 # Project Libraries Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

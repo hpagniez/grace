@@ -1,3 +1,9 @@
+---
+status: built
+issue: 92
+summary: "The window's size, position, screen and maximized state come back at start, pulled onto a connected screen, and settings.json saves are atomic"
+---
+
 # Window Bounds Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -1,3 +1,9 @@
+---
+status: built
+issue: 70
+summary: "Runs write JUnit XML when karate-pom.json asks, and each history row can save its run's report as a zip"
+---
+
 # Export a run's report Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

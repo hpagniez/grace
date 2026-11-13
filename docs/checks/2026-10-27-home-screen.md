@@ -1,3 +1,7 @@
+---
+summary: "Home screen (F27): automated checks pass and all 6 hand checks pass"
+---
+
 # App check: home screen (F27)
 
 Date: 2026-10-27

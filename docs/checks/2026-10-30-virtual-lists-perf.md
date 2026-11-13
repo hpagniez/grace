@@ -1,3 +1,7 @@
+---
+summary: "Virtual lists at 10,000 tests (#125, #91): R6 is met after three renderer fixes; the longest frame in Run all is 350 ms against 500 ms"
+---
+
 # App check: virtual list speed at 10,000 tests (#125, #91)
 
 Date: 2026-10-30

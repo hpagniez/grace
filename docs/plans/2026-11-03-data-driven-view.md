@@ -1,3 +1,9 @@
+---
+status: built
+issue: 71
+summary: "Selecting an outline shows its Examples in Details as a table of rows with values, status and time; a click or Enter opens a row"
+---
+
 # Data-driven view Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

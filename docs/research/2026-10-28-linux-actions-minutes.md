@@ -1,3 +1,7 @@
+---
+summary: "October Linux Actions minutes: grace used 171 of 775, the rest came from another repo; merge-when-green waste is not fixable, Windows drives the quota"
+---
+
 # Linux Actions minutes in October 2026
 
 Checked on 2026-10-28. Question: which workflows in `hpagniez/grace` used the 775 Linux minutes billed on the account in October, and which of them waste minutes?

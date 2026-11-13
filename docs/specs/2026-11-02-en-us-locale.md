@@ -1,6 +1,12 @@
+---
+status: built
+issue: 150
+summary: "Ship only the en-US Chromium locale and drop the other 54 locale files to make the download smaller"
+---
+
 # Ship only the en-US locale
 
-Date 2026-11-02. Status: approved. Covers [#150](https://github.com/hpagniez/grace/issues/150).
+Date 2026-11-02. Covers [#150](https://github.com/hpagniez/grace/issues/150).
 
 ## Intent
 

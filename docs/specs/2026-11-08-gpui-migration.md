@@ -1,6 +1,12 @@
+---
+status: approved
+issue: 278
+summary: "Guide to port every feature of Grace from Electron to Rust and GPUI: phases, proof for each feature and the bar for the cut-over"
+---
+
 # GPUI migration guide: port every feature of Grace to Rust and GPUI
 
-Date 2026-11-08. Status: draft. Decision: [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Issue: [#278](https://github.com/hpagniez/grace/issues/278), under [#152](https://github.com/hpagniez/grace/issues/152). Checklist: [parity](2026-11-08-gpui-migration-parity.md).
+Date 2026-11-08. Decision: [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Issue: [#278](https://github.com/hpagniez/grace/issues/278), under [#152](https://github.com/hpagniez/grace/issues/152). Checklist: [parity](2026-11-08-gpui-migration-parity.md).
 
 ## Intent
 

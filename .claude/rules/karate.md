@@ -14,6 +14,7 @@ paths:
 
 Full detail: [docs/inventory/karate-core.md §19](../../docs/inventory/karate-core.md#19-integration-surface-for-a-gui). Where they disagree, the [CLI spike](../../docs/research/2026-10-24-karate-cli-spike/README.md) wins: it ran Karate 2.1.4 for real. Its `samples/` are real event-stream fixtures.
 
+- Before changing behaviour, read the indexes [docs/specs/README.md](../../docs/specs/README.md) and [docs/decisions/README.md](../../docs/decisions/README.md), and open only the docs whose line matches.
 - Follow the Karate CLI first: for every feature and every kind of project, do what the Karate CLI does, and build Grace's own way only where it has none ([ADR 0026](../../docs/decisions/0026-follow-the-karate-cli-first.md)).
 - Spawn from the Electron main process only, without a shell: `java -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "<karate.jar>;<project classpath roots>" io.karatelabs.Main run --no-color -w <root> -o <absolute> -f html,karate:jsonl ...` with `cwd` = project root. Relative paths resolve from the process cwd, not `-w`.
 - Remove `KARATE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and `_JAVA_OPTIONS` from the child environment; they override the app's values.

@@ -1,3 +1,9 @@
+---
+status: built
+issue: 73
+summary: "Find text in the Console tab and step through its matches, and step through its errors from the tab row"
+---
+
 # Console search Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

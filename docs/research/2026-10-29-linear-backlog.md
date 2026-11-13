@@ -1,3 +1,7 @@
+---
+summary: "Linear backlog move: no-go, stay on GitHub Issues; it saves one manual step but makes the backlog private and the free plan caps at 250 issues"
+---
+
 # Moving the backlog to Linear
 
 Checked on 2026-10-29 against Linear's pricing page and docs, Anthropic's Claude Code plugin directory, and the backlog of `hpagniez/grace` (issues, `AGENTS.md`, `.github/`). No Linear workspace was created: anything that needs one (the in-app plan table, a real sync) is marked as not checked. Issue: #114.

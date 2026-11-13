@@ -1,6 +1,12 @@
+---
+status: built
+issue: 65
+summary: "Set breakpoints on steps, pause a debug run, step over or into, and read the scenario variables, through a small Java RunListener"
+---
+
 # Step debugger: breakpoints on steps, pause, step, inspect variables
 
-Date 2026-11-02. Status: approved. Covers [#65](https://github.com/hpagniez/grace/issues/65). Research: [docs/research/2026-11-02-step-debugger/](../research/2026-11-02-step-debugger/README.md). Toolchain: [ADR 0025](../decisions/0025-compile-the-debug-listener-with-ecj-on-the-bundled-jre.md).
+Date 2026-11-02. Covers [#65](https://github.com/hpagniez/grace/issues/65). Research: [docs/research/2026-11-02-step-debugger/](../research/2026-11-02-step-debugger/README.md). Toolchain: [ADR 0025](../decisions/0025-compile-the-debug-listener-with-ecj-on-the-bundled-jre.md).
 
 ## Intent
 

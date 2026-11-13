@@ -1,3 +1,9 @@
+---
+status: built
+issue: 224
+summary: "The tree starts with folders open and features closed; clicking a feature's name, running it or a failure in it opens it"
+---
+
 # Open the test tree with only its folders open: implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

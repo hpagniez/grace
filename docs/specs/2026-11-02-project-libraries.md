@@ -1,6 +1,12 @@
+---
+status: built
+issue: 64
+summary: "Run a Maven or Gradle project with its own libraries on the classpath, listed by its build tool or taken from the CLI ext folders"
+---
+
 # Project libraries
 
-Date 2026-11-02. Status: draft. Part of [#64](https://github.com/hpagniez/grace/issues/64) (second slice). Follows [the first slice](2026-11-02-project-setup.md), whose Non-goals name this work.
+Date 2026-11-02. Part of [#64](https://github.com/hpagniez/grace/issues/64) (second slice). Follows [the first slice](2026-11-02-project-setup.md), whose Non-goals name this work.
 
 ## Intent
 

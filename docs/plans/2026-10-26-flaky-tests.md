@@ -1,3 +1,9 @@
+---
+status: built
+issue: 66
+summary: "Tests that passed in one run and failed in another, on the same files and environment, are marked in the tree and proved in Details"
+---
+
 # Flaky Tests Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

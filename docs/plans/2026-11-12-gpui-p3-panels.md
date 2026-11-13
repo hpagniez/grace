@@ -1,3 +1,9 @@
+---
+status: approved
+issue: 282
+summary: "GPUI phase 3: the History and HTTP tabs and detail views in GPUI: HTTP inspector, run history, trends, flaky proof, report export, grouped failures"
+---
+
 # Plan: GPUI migration, phase P3 panels
 
 Date 2026-11-12. Issue [#282](https://github.com/hpagniez/grace/issues/282), under [#278](https://github.com/hpagniez/grace/issues/278). Spec: the [migration guide](../specs/2026-11-08-gpui-migration.md) (R1 to R9, feature map P3, regressions #219 and #220), [ADR 0031](../decisions/0031-move-grace-to-rust-and-gpui.md). Checklist: [parity](../specs/2026-11-08-gpui-migration-parity.md). Model: the [P2 plan](2026-11-09-gpui-p2-main-screen.md).

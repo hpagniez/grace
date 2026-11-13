@@ -1,6 +1,12 @@
+---
+status: built
+issue: 232
+summary: "When the opened folder has no test, offer the sub-folders that look like a Karate project in the empty tree and open the one picked"
+---
+
 # Offer the sub-folder that holds the Karate project
 
-Date 2026-11-04. Status: approved. Covers [#232](https://github.com/hpagniez/grace/issues/232), a later slice of [#64](https://github.com/hpagniez/grace/issues/64). Narrows R4.1 of [Project libraries](2026-11-02-project-libraries.md).
+Date 2026-11-04. Covers [#232](https://github.com/hpagniez/grace/issues/232), a later slice of [#64](https://github.com/hpagniez/grace/issues/64). Narrows R4.1 of [Project libraries](2026-11-02-project-libraries.md).
 
 ## Intent
 

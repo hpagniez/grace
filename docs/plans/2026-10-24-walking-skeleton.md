@@ -1,3 +1,9 @@
+---
+status: built
+issue: [52, 53, 54, 56, 57, 58, 60]
+summary: "The first usable app: open a Karate project, see its tests, run any node with live status, step details and console, cancel, open the report"
+---
+
 # Walking Skeleton Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

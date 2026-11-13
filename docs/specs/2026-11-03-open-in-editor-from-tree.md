@@ -1,6 +1,12 @@
+---
+status: built
+issue: 222
+summary: "Right-click a test in the tree to open it in VS Code, at the failing line for a failed test or at the top for a feature"
+---
+
 # Open in VS Code from the test tree
 
-Date 2026-11-03. Status: approved. Covers [#222](https://github.com/hpagniez/grace/issues/222). Builds on [Open a test in VS Code](2026-11-03-open-in-editor.md) (#68).
+Date 2026-11-03. Covers [#222](https://github.com/hpagniez/grace/issues/222). Builds on [Open a test in VS Code](2026-11-03-open-in-editor.md) (#68).
 
 ## Intent
 

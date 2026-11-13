@@ -1,3 +1,9 @@
+---
+status: built
+issue: 149
+summary: "Every Karate JVM starts with a small heap, a 2 GB ceiling and an exit on the first OutOfMemoryError, and a run that ran out of memory says so"
+---
+
 # Java Memory Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

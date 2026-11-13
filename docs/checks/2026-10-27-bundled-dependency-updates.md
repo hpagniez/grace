@@ -1,3 +1,7 @@
+---
+summary: "Bundled dependency updates (F33): 695 tests pass; the first real CI run passed after two fixes (stale recorded durations, a broken console e2e test)"
+---
+
 # Check: bundled dependency updates (F33)
 
 Date: 2026-10-27

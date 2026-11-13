@@ -1,3 +1,7 @@
+---
+summary: "Window bounds (F41): automated checks pass and all 8 hand checks pass"
+---
+
 # App check: window bounds (F41)
 
 Date: 2026-10-26

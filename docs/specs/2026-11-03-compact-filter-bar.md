@@ -1,6 +1,12 @@
+---
+status: built
+issue: 127
+summary: "Keep the tag filter bar to one line and fold the tags that do not fit into a menu, with folded active tags still shown as on"
+---
+
 # A one-line filter bar
 
-Date 2026-11-03. Status: approved. Covers [#127](https://github.com/hpagniez/grace/issues/127). Builds on the [tag filter](2026-10-24-tag-filter.md) and the filter bar of the [premium UI](2026-10-29-premium-ui.md) (R7.3).
+Date 2026-11-03. Covers [#127](https://github.com/hpagniez/grace/issues/127). Builds on the [tag filter](2026-10-24-tag-filter.md) and the filter bar of the [premium UI](2026-10-29-premium-ui.md) (R7.3).
 
 ## Intent
 

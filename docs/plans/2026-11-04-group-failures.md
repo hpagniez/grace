@@ -1,3 +1,9 @@
+---
+status: built
+issue: 229
+summary: "A test whose karate-config.js failed shows as failed, a banner links the file and line, and failures sharing a message are grouped in Details"
+---
+
 # Group failures that share an error: implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

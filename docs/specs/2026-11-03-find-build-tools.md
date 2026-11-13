@@ -1,6 +1,12 @@
+---
+status: built
+issue: 231
+summary: "Find Maven and Gradle from their own variables and IntelliJ bundled Maven when not on PATH, and say where it looked when none is found"
+---
+
 # Find Maven and Gradle when they are not on PATH
 
-Date 2026-11-03. Status: draft. [#231](https://github.com/hpagniez/grace/issues/231). Extends R2 and R6.3 of [the project libraries spec](2026-11-02-project-libraries.md).
+Date 2026-11-03. [#231](https://github.com/hpagniez/grace/issues/231). Extends R2 and R6.3 of [the project libraries spec](2026-11-02-project-libraries.md).
 
 ## Intent
 

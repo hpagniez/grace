@@ -1,3 +1,7 @@
+---
+summary: "GPUI Grace phase P0 on Windows: tests pass, the zip is 64.7 MiB and every measured bench value is within its limit; Narrator and other-GPU checks left optional"
+---
+
 # GPUI Grace check: phase P0 on Windows
 
 Date: 2026-11-09

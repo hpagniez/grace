@@ -1,6 +1,12 @@
+---
+status: built
+issue: 243
+summary: "Show the # comments written above each step in the details pane, muted, before and after a run and on a paused debug step"
+---
+
 # Step comments in Details
 
-Date 2026-11-03. Status: approved. Covers [#243](https://github.com/hpagniez/grace/issues/243). Builds on [the step debugger](2026-11-02-step-debugger.md) (steps read from the feature file, R4.1).
+Date 2026-11-03. Covers [#243](https://github.com/hpagniez/grace/issues/243). Builds on [the step debugger](2026-11-02-step-debugger.md) (steps read from the feature file, R4.1).
 
 ## Intent
 

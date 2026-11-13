@@ -15,6 +15,7 @@ paths:
 
 Grace is moving to Rust and GPUI ([ADR 0031](../../docs/decisions/0031-move-grace-to-rust-and-gpui.md)); the [migration guide](../../docs/specs/2026-11-08-gpui-migration.md) holds the phases, and the [parity checklist](../../docs/specs/2026-11-08-gpui-migration-parity.md) what each must prove. Until the cut-over the Electron app above ships, and GPUI Grace lives beside it in a Cargo workspace at the root: `crates/grace-core` (no GPUI, plain `cargo test`) and `crates/grace` (the app, built as `Grace.exe`).
 
+- Before changing behaviour, read the indexes [docs/specs/README.md](../../docs/specs/README.md) and [docs/decisions/README.md](../../docs/decisions/README.md), and open only the docs whose line matches.
 - A port is not a transcription (guide R3.6): where Rust or GPUI does better than the TypeScript, do it that way, keeping what people see, the data on disk and the Karate command line at parity. Record each such change in the phase plan's Redesigns table, in the PR that makes it. Tick a parity row in the PR that ports it. Only the owner accepts an `n/a` on a row someone using Grace would notice (R3.3).
 - A phase's issue closes only when all its work is done: every PR merged, every row ticked or handed on by its Proof text, its exit check passed.
 - Stock GPUI and GPUI Kit first: their public API and stock behaviour. A new patch or a replaced widget states its reason in the PR and in the Redesigns table. Drop a patch as soon as upstream has the fix.

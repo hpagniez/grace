@@ -1,3 +1,9 @@
+---
+status: built
+issue: 356
+summary: "Split AGENTS.md into WORKFLOW.md, a Grace-only AGENTS.md and path-scoped rules files, and make CI fail when they outgrow their limits"
+---
+
 # Way of working, phase 1: the files and their split. Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

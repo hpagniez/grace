@@ -1,6 +1,12 @@
+---
+status: built
+issue: 229
+summary: "Report a failed karate-config.js once after the run, with a link to the file and line, and group failures that share an error"
+---
+
 # Say once when the config fails, and group failures that share an error
 
-Date 2026-11-04. Status: approved. Covers [#229](https://github.com/hpagniez/grace/issues/229).
+Date 2026-11-04. Covers [#229](https://github.com/hpagniez/grace/issues/229).
 
 ## Intent
 

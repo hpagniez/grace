@@ -1,3 +1,7 @@
+---
+summary: "Idle CPU after the still cursor (#171): idle.cpu.shown falls from at most 3,343 ms to at most 1,453 ms; no other limit changes"
+---
+
 # Bench: idle CPU after the still cursor, a lower `idle.cpu.shown`
 
 Date: 2026-11-01

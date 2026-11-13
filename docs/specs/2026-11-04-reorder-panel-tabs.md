@@ -1,6 +1,12 @@
+---
+status: built
+issue: 94
+summary: "Reorder the Console, History and HTTP tabs of the bottom panel by drag or keyboard, and remember the order"
+---
+
 # Reorder the bottom panel tabs
 
-Date 2026-11-04. Status: draft. Covers [#94](https://github.com/hpagniez/grace/issues/94).
+Date 2026-11-04. Covers [#94](https://github.com/hpagniez/grace/issues/94).
 
 ## Intent
 

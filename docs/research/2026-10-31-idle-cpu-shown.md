@@ -1,3 +1,7 @@
+---
+summary: "Idle CPU while shown: the console cursor blinked forever; blinking only during work cut idle CPU from 1.3-2.1 s to 0.23 s a minute"
+---
+
 # Idle CPU while shown: the console cursor's blink
 
 Checked on 2026-10-31 on the reference desktop (Windows 11 Pro, Ryzen 7 5800X, 32 GB; main screen 2560x1440 at 120 Hz, the window on the second screen at 59 Hz), with the packaged app built from `develop` at 6bdd936a and from this fix. Bench of [#147](https://github.com/hpagniez/grace/issues/147): the baseline's `idle.cpu.shown` read 1.5 to 2.8 s of CPU per 60 s idle on this machine, against 157 to 266 ms on the GitHub Windows runner.

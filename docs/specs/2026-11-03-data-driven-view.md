@@ -1,6 +1,12 @@
+---
+status: built
+issue: 71
+summary: "Show a selected Scenario Outline Examples as a table in the details pane, with each row status and time, and open a row on click"
+---
+
 # Data-driven view: an outline's Examples as a table
 
-Date 2026-11-03. Status: draft. Covers [#71](https://github.com/hpagniez/grace/issues/71).
+Date 2026-11-03. Covers [#71](https://github.com/hpagniez/grace/issues/71).
 
 ## Intent
 

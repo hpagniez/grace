@@ -1,6 +1,12 @@
+---
+status: built
+issue: 224
+summary: "Start the test tree with folders open and features closed, open a feature on click or when a run touches it, and keep it on refresh"
+---
+
 # Open the test tree with only its folders open
 
-Date 2026-11-03. Status: approved. Covers [#224](https://github.com/hpagniez/grace/issues/224). Replaces R2.2 of [Big projects: virtual lists and keyboard navigation](2026-10-30-virtual-lists.md) and narrows its R2.3.
+Date 2026-11-03. Covers [#224](https://github.com/hpagniez/grace/issues/224). Replaces R2.2 of [Big projects: virtual lists and keyboard navigation](2026-10-30-virtual-lists.md) and narrows its R2.3.
 
 ## Intent
 

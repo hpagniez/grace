@@ -1,6 +1,12 @@
+---
+status: built
+issue: [125, 91]
+summary: "Draw only the visible rows of the test tree and HTTP list so 10,000 tests stay smooth, with arrow-key navigation through every row"
+---
+
 # Big projects: virtual lists and keyboard navigation
 
-Date 2026-10-30. Status: approved. Covers [#125](https://github.com/hpagniez/grace/issues/125) and [#91](https://github.com/hpagniez/grace/issues/91).
+Date 2026-10-30. Covers [#125](https://github.com/hpagniez/grace/issues/125) and [#91](https://github.com/hpagniez/grace/issues/91).
 
 ## Intent
 

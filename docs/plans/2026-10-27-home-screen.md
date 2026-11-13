@@ -1,3 +1,9 @@
+---
+status: built
+issue: 78
+summary: "A home screen to pick a project folder or reopen one of the 10 most recent, plus a toolbar Home button that closes the project"
+---
+
 # Home Screen Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

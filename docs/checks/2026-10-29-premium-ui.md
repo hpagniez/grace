@@ -1,3 +1,7 @@
+---
+summary: "Premium look and feel (#107): 161 e2e tests pass and the hand walks pass; big-project scrolling fixed; a person must still judge the look"
+---
+
 # App check: premium look and feel (#107)
 
 Date: 2026-10-29

@@ -1,6 +1,12 @@
+---
+status: built
+issue: 75
+summary: "A startup banner in the console with app, Karate and Java versions, project folder and test count, then Ready, so the console reads like a terminal"
+---
+
 # Console banner
 
-Date 2026-10-27. Status: approved. Covers [feature](../features.md) F24.
+Date 2026-10-27. Covers [feature](../features.md) F24.
 
 ## Intent
 

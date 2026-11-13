@@ -1,3 +1,7 @@
+---
+summary: "GPUI P2 recheck: snap and cursors now pass, but VL-29 still misses (app CPU 5,438 ms against Electron's 4,156) and the Light title bar differs"
+---
+
 # GPUI Grace check: phase P2's misses, rechecked on Windows
 
 Date: 2026-11-11
