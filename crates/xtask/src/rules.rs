@@ -2,7 +2,8 @@
 //!
 //! `WORKFLOW.md` and `AGENTS.md` load in every session, so their size is capped; `WORKFLOW.md` is copied by other
 //! projects, so it names nothing of this one; a `.claude/rules/*.md` file loads only with the files its `paths:`
-//! globs match, so a glob that matches nothing is a rule nobody ever reads.
+//! globs match, so a glob that matches nothing is a rule nobody ever reads. The docs agents work from are checked
+//! here too: their frontmatter and the index of each docs folder (`docs.rs`).
 
 use std::path::Path;
 use std::process::Command;
@@ -130,7 +131,8 @@ fn list_index(glob: &str) -> Vec<String> {
 
 /// Checks the repository's index, prints each failure as a CI error, and gives the exit code.
 pub fn run() -> u8 {
-    let errors = rules_files_errors(&read_index, &list_index, &list_index(".claude/rules/*.md"));
+    let mut errors = rules_files_errors(&read_index, &list_index, &list_index(".claude/rules/*.md"));
+    errors.extend(crate::docs::docs_errors(&read_index, &list_index));
     for error in &errors {
         println!("::error::{error}");
     }
@@ -323,6 +325,11 @@ mod tests {
             rules_files_errors(&read_index, &list_index, &rules),
             Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn the_repository_docs_have_their_fields_and_indexes() {
+        assert_eq!(crate::docs::docs_errors(&read_index, &list_index), Vec::<String>::new());
     }
 
     /// Each area's rules load with its files and with no other's, and a rule that binds both apps loads on both sides.

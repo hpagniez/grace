@@ -13,7 +13,7 @@ use std::process::ExitCode;
 const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
-  check-rules  the agent rules files stay within their limits
+  check-rules  the agent rules files stay within their limits, and the docs keep their frontmatter and indexes
   check-pr     the pull request follows the way of working; in CI it reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
                EVENT_NAME and PR_BODY, without them it checks the branch in hand against origin/develop
   docs         writes the README.md index of each docs folder from the docs' frontmatter; fails, and

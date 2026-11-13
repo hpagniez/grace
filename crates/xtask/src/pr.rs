@@ -150,6 +150,38 @@ fn body_line<'a>(body: &'a str, label: &str) -> Option<&'a str> {
         .map(str::trim)
 }
 
+/// Whether `line` holds `words` followed by a digit: "Closes #12".
+fn numbered(line: &str, words: &str) -> bool {
+    line.split(words)
+        .skip(1)
+        .any(|after| after.starts_with(|c: char| c.is_ascii_digit()))
+}
+
+/// A PR that closes its issue finishes its spec and its plan: each one its body names says `status: built`
+/// (.claude/rules/docs.md), or the indexes would keep calling a built feature approved. `read` gives a file's text
+/// at the PR's head; a path that is no file is `papers_errors`' to report.
+pub fn built_errors(body: &str, read: &dyn Fn(&str) -> Option<String>) -> Vec<String> {
+    if !body.lines().any(|line| numbered(line, "Closes #")) {
+        return Vec::new();
+    }
+    let rule = "a PR that closes its issue sets it to built (.claude/rules/docs.md)";
+    let mut errors = Vec::new();
+    for label in ["Spec:", "Plan:"] {
+        let Some(path) = body_line(body, label) else {
+            continue;
+        };
+        let Some(text) = read(path) else {
+            continue;
+        };
+        match crate::docs::status(&text) {
+            Some("built") => {}
+            Some(status) => errors.push(format!("{label} {path} has status \"{status}\": {rule}")),
+            None => errors.push(format!("{label} {path} has no status: {rule}")),
+        }
+    }
+    errors
+}
+
 /// A Feature or Project PR links its issue and names a spec and a plan that exist at its head (`exists`). A PR
 /// that changes only docs (`docs_only`) may come before its plan.
 pub fn papers_errors(tier: Tier, body: &str, docs_only: bool, exists: &dyn Fn(&str) -> bool) -> Vec<String> {
@@ -159,11 +191,6 @@ pub fn papers_errors(tier: Tier, body: &str, docs_only: bool, exists: &dyn Fn(&s
         Tier::Project => "project",
     };
     let mut errors = Vec::new();
-    let numbered = |line: &str, words: &str| {
-        line.split(words)
-            .skip(1)
-            .any(|after| after.starts_with(|c: char| c.is_ascii_digit()))
-    };
     if !body
         .lines()
         .any(|line| numbered(line, "Closes #") || numbered(line, "Part of #"))
@@ -438,6 +465,10 @@ pub fn errors(env: &Env, git: &dyn Fn(&[&str]) -> Option<String>) -> Vec<String>
                 git(&["cat-file", "-t", &format!("{head}:{path}")]).is_some_and(|kind| kind.trim() == "blob")
             };
             errors.extend(papers_errors(tier, body, docs_only, &exists));
+            // git shows a folder too, as a list of its files: only a file has a status
+            errors.extend(built_errors(body, &|path| {
+                exists(path).then(|| show(head, path)).flatten()
+            }));
             if let (Tier::Project, Some(path)) = (tier, body_line(body, "Plan:"))
                 && exists(path)
             {
@@ -1081,6 +1112,39 @@ screens = []
             None
         );
     }
+
+    #[test]
+    fn a_pr_that_closes_its_issue_names_built_papers() {
+        let built = "---\nstatus: built\n---\n# A\n";
+        let read = |path: &str| match path {
+            "docs/specs/a.md" => Some(built.to_string()),
+            "docs/plans/a.md" => Some(built.replace("built", "approved")),
+            "docs/specs/old.md" => Some("# No frontmatter\n".to_string()),
+            _ => None,
+        };
+        let body = "Closes #12\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
+        let errors = built_errors(body, &read);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0]
+                .contains("Plan: docs/plans/a.md has status \"approved\": a PR that closes its issue sets it to built"),
+            "{errors:?}"
+        );
+        assert_eq!(
+            built_errors(&body.replace("Closes", "Part of"), &read),
+            Vec::<String>::new()
+        );
+        let errors = built_errors("Closes #12\nSpec: docs/specs/old.md\n", &read);
+        assert!(
+            errors[0].contains("Spec: docs/specs/old.md has no status"),
+            "{errors:?}"
+        );
+        // a path that is no file is papers_errors' to report
+        assert_eq!(
+            built_errors("Closes #12\nSpec: docs/specs/nope.md\n", &read),
+            Vec::<String>::new()
+        );
+    }
 }
 
 /// `errors` on real repositories, each made in a temporary folder and removed after its test.
@@ -1089,6 +1153,9 @@ mod repository_tests {
     use super::*;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A spec or a plan of a feature that is built, as a PR that closes its issue must leave it.
+    const BUILT: &str = "---\nstatus: built\n---\n# Doc\n";
 
     struct Repo {
         dir: PathBuf,
@@ -1284,8 +1351,8 @@ mod repository_tests {
     #[test]
     fn a_spec_line_left_as_the_template_has_it_fails() {
         let repo = Repo::new("feature/x");
-        repo.write("docs/specs/a.md", "# Spec\n");
-        repo.write("docs/plans/a.md", "# Plan\n");
+        repo.write("docs/specs/a.md", BUILT);
+        repo.write("docs/plans/a.md", BUILT);
         repo.commit("docs: add the spec and the plan");
         let body = "Tier: feature\nCloses #1\nSpec: docs/specs/\nPlan: docs/plans/a.md\n";
         let errors = repo.check("develop", Some(body));
@@ -1357,8 +1424,8 @@ mod repository_tests {
             "{errors:?}"
         );
         // the same change is fine in a feature PR with its papers
-        repo.write("docs/specs/a.md", "# Spec\n");
-        repo.write("docs/plans/a.md", "# Plan\n");
+        repo.write("docs/specs/a.md", BUILT);
+        repo.write("docs/plans/a.md", BUILT);
         repo.commit("docs: add the spec and the plan");
         let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
         assert_eq!(repo.check("develop", Some(body)), Vec::<String>::new());
@@ -1369,7 +1436,7 @@ mod repository_tests {
         let repo = Repo::new("feature/x");
         repo.write("src/a.ts", "export const a = 1;\n");
         repo.write("src/a.test.ts", "it('a', () => {});\n");
-        repo.write("docs/specs/a.md", "# Spec\n");
+        repo.write("docs/specs/a.md", BUILT);
         repo.commit("feat: add a");
         let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
         let errors = repo.check("develop", Some(body));

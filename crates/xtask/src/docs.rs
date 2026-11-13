@@ -225,6 +225,20 @@ fn indexes(read: &dyn Fn(&str) -> Option<String>, list: &dyn Fn(&str) -> Vec<Str
         .collect()
 }
 
+/// One message per doc that lacks a field; when there is none, one per index that is not what `cargo xtask docs`
+/// writes from the docs `read` and `list` give.
+pub fn docs_errors(read: &dyn Fn(&str) -> Option<String>, list: &dyn Fn(&str) -> Vec<String>) -> Vec<String> {
+    let errors = entries_errors(read, list);
+    if !errors.is_empty() {
+        return errors;
+    }
+    indexes(read, list)
+        .into_iter()
+        .filter(|(path, text)| read(path).as_deref() != Some(text.as_str()))
+        .map(|(path, _)| format!("{path} is not what cargo xtask docs writes: run it and commit the result"))
+        .collect()
+}
+
 /// Writes the indexes from the working tree's docs, new ones included, and gives the exit code. A doc that lacks a
 /// field stops it before it writes anything: an index must never be built on a guess.
 pub fn run() -> u8 {
@@ -484,6 +498,67 @@ mod tests {
             .find("## Superseded by ADR 0003\n\n- 0002 [T](0002-b.md)\n")
             .unwrap();
         assert!(accepted < superseded, "{text}");
+    }
+
+    const INDEXES: [&str; 5] = [
+        "docs/specs/README.md",
+        "docs/plans/README.md",
+        "docs/checks/README.md",
+        "docs/research/README.md",
+        "docs/decisions/README.md",
+    ];
+
+    /// `files()` with each folder's index as `cargo xtask docs` writes it.
+    fn indexed() -> HashMap<&'static str, String> {
+        let mut files = files();
+        let texts = indexes(&|path| files.get(path).cloned(), &|glob| list_in(&files, glob));
+        for (name, (path, text)) in INDEXES.into_iter().zip(texts) {
+            assert_eq!(name, path);
+            files.insert(name, text);
+        }
+        files
+    }
+
+    fn errors_in(files: &HashMap<&'static str, String>) -> Vec<String> {
+        docs_errors(&|path| files.get(path).cloned(), &|glob| list_in(files, glob))
+    }
+
+    #[test]
+    fn docs_with_their_fields_and_indexes_pass() {
+        assert_eq!(errors_in(&indexed()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn an_index_out_of_date_is_an_error() {
+        let mut files = indexed();
+        files.get_mut("docs/specs/README.md").unwrap().push_str("- by hand\n");
+        let errors = errors_in(&files);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("docs/specs/README.md is not what cargo xtask docs writes: run it"),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_missing_index_is_an_error() {
+        let mut files = indexed();
+        files.remove("docs/plans/README.md");
+        let errors = errors_in(&files);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("docs/plans/README.md is not what"), "{errors:?}");
+    }
+
+    #[test]
+    fn entry_errors_come_before_the_index() {
+        let mut files = indexed();
+        files.insert("docs/specs/2026-11-13-b.md", SPEC.replace("status: approved\n", ""));
+        let errors = errors_in(&files);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("docs/specs/2026-11-13-b.md: no status: line"),
+            "{errors:?}"
+        );
     }
 
     #[test]
