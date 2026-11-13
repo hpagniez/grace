@@ -5,6 +5,7 @@ vendor/
 test-results/
 playwright-report/
 .superpowers/
+.obsidian/
 .impeccable/
 bench-out/
 target/

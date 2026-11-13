@@ -12,6 +12,7 @@ paths:
 
 Electron Grace, the app that ships until the GPUI cut-over (`.claude/rules/gpui.md`): Electron + SolidJS 2 RC + Tailwind CSS v4, packaged with Electron Forge. Pin exact versions (no `^`) and upgrade the Solid set together.
 
+- Before changing behaviour, read the indexes [docs/specs/README.md](../../docs/specs/README.md) and [docs/decisions/README.md](../../docs/decisions/README.md), and open only the docs whose line matches.
 - Keep `contextIsolation` on, `nodeIntegration` off, `sandbox` on. The renderer reaches Node only through the typed preload API.
 - Forge dev reloads the renderer once after start: main-process code that runs per page load must be idempotent.
 - Java and Karate are bundled, not taken from the user's machine, decided in [ADR 0006](../../docs/decisions/0006-bundle-jre-and-karate-jar.md). Run Karate as `java -cp "karate.jar;<project classpath roots>" io.karatelabs.Main run ...`, not `java -jar`, so `classpath:` resolves in Maven and Gradle layouts.

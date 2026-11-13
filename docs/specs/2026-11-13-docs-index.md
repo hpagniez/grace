@@ -109,7 +109,7 @@ R4.2. A spec-only PR opens with `draft`. The session that gets the owner's appro
 
 R5.1. `.claude/rules/docs.md` holds the rules: the fields, the statuses, the command, and how to read an index. A `built` or `superseded` plan is history. A `built` spec is how the feature behaves. A `superseded` spec is history.
 
-R5.2. Each area rules file (`electron.md`, `gpui.md`, `karate.md`, `both-apps.md`) gets one line: read the specs and decisions indexes first, and open only the docs whose line matches. `AGENTS.md` gets nothing: it is 8,996 bytes of its 9,000.
+R5.2. The area rules files `electron.md`, `gpui.md` and `karate.md` each get one line: read the specs and decisions indexes first, and open only the docs whose line matches. `both-apps.md` gets none: every path it covers is also under `electron.md` or `gpui.md`. `AGENTS.md` gets none: it is 8,996 bytes of its 9,000.
 
 R5.3. On a merge conflict in an index, run `cargo xtask docs` and commit the result.
 

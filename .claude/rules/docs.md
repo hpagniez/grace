@@ -20,6 +20,18 @@ paths:
 | `docs/plans/` | Implementation plans, one per spec, task by task (overrides the superpowers default `docs/superpowers/plans/`) |
 | `docs/process/` | Steps that are followed, not designed: releases and hotfixes |
 
+## Frontmatter and indexes
+
+Spec: [docs/specs/2026-11-13-docs-index.md](../../docs/specs/2026-11-13-docs-index.md).
+
+- `docs/specs/`, `docs/plans/`, `docs/checks/`, `docs/research/` and `docs/decisions/` each hold a generated `README.md`, the folder's index: one line per doc with its title, issue and summary. Read the index first, and open only the docs whose line matches.
+- What the index says of a doc: a `built` spec is how the feature behaves; a `built` plan is history; anything `superseded` is history. A check or a research note is a record of its date.
+- Every spec and plan starts with frontmatter: `status`, `issue` and `summary`. A check or a research note (a file, or the `README.md` of a folder under `docs/research/`) has `summary` only. Decision records keep theirs as it is.
+- `status` is `draft` (written, not approved), `approved` (approved by the owner, not fully built), `built` (the PR that finishes it is merged) or `superseded` (replaced or given up; the text says by what). A new spec or plan starts as `draft`; the session that gets the owner's approval sets `approved`; the PR that says `Closes #N` sets its spec and plan to `built`, and `cargo xtask check-pr` fails it otherwise. The status has no other home: no `Status:` line in the text.
+- `issue` is the number, `373`, or a list, `[64, 231]`, never with `#`. Leave it out only when the work has no issue.
+- `summary` is one line in double quotes, at most 160 characters, with no `"` and no `\` inside. It says what the doc decides or found, not what it is about: a spec's behaviour, a plan's outcome, a check's result with its number, a research note's verdict.
+- After adding a doc or changing its frontmatter, run `cargo xtask docs` and commit the indexes with it. `cargo xtask check-rules` fails on a missing field or an index that is out of date. On a merge conflict in an index, run `cargo xtask docs` and commit the result.
+
 ## Doc rules
 
 - Design specs go in `docs/specs/YYYY-MM-DD-<topic>.md` (this overrides the superpowers default `docs/superpowers/specs/`). Write requirements, then acceptance checks: in Gherkin for behaviour someone using the app sees, as a plain list otherwise. End with a `## Cost` section: what the feature adds to memory, CPU, start time or size, idle and during a run, and how it keeps to the idle rule ([Performance](../../AGENTS.md#performance)); one line, "Cost: none", unless it adds a dependency, a process, a timer or work on the run path. A PR that adds a dependency states its size.
