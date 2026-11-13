@@ -57,7 +57,10 @@ pub fn failed_at(error: &str) -> Option<Place> {
         return None;
     }
     let line: u32 = line.parse().ok().filter(|l| *l >= 1)?;
-    Some(Place { file: file.into(), line })
+    Some(Place {
+        file: file.into(),
+        line,
+    })
 }
 
 /// Node's `realpathSync.native`: the real path, links followed, without the `\\?\` prefix Rust's `canonicalize` adds.
@@ -245,7 +248,10 @@ mod tests {
         use super::*;
 
         fn place(file: &str, line: u32) -> Option<Place> {
-            Some(Place { file: file.into(), line })
+            Some(Place {
+                file: file.into(),
+                line,
+            })
         }
 
         #[test]

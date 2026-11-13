@@ -1,6 +1,6 @@
 //! `Details.test.tsx`'s P2 tests, headless on the fake runner: a test, a group, nothing selected and long text.
 //! Classes have no GPUI twin, so the look is checked through the tokens a part takes and where the parts are drawn;
-//! what a screen reader reads is `grace-e2e/tests/details.rs`'s. The steps before a run, breakpoints, Open in VS Code
+//! what a screen reader reads is `grace-e2e/tests/details.rs`'s. The steps before a run, breakpoints
 //! and the failure groups come with their phases.
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -409,4 +409,114 @@ fn with_nothing_selected_a_runs_results_do_not_draw_it_again(cx: &mut TestAppCon
     h.update(&mut cx, |s| s.selected = None);
     assert_eq!(told.get(), 3, "back to nothing");
     assert!(drawn(&mut cx, "empty-state"));
+}
+
+/// `Details.test.tsx`'s "details: open in VS Code" tests 18 to 22 (open-in-editor R1, R2; OE-01 to OE-04, bug #220).
+/// The fake runner answers every file as one of the open project, so the link the seam got shows what Grace asked for.
+mod open_in_vs_code {
+    use super::*;
+
+    const ROW: &str = "s:tests/x.feature#4.1";
+    const BUTTON: &str = "open-in-editor";
+    const PLACE: &str = "error-place";
+
+    fn failing_with(error: &str) -> AppState {
+        let mut s = finished();
+        s.results.get_mut(BAD).unwrap().error = Some(error.into());
+        s
+    }
+
+    fn with_a_row_without_a_line() -> AppState {
+        let mut s = finished();
+        let mut t = tree();
+        t.children[0]
+            .children
+            .push(node(NodeKind::Row, ROW, "row 1", None, &[], vec![]));
+        s.tree = Some(t);
+        s
+    }
+
+    fn urls(h: &Harness) -> Vec<String> {
+        h.seams.urls()
+    }
+
+    // 18 opens the test at its line, during a run too
+    #[gpui::test]
+    fn opens_the_test_at_its_line_during_a_run_too(cx: &mut TestAppContext) {
+        let (h, mut cx, _) = setup(cx, 800., finished());
+        select(&h, &mut cx, OK);
+        click(&mut cx, BUTTON);
+        assert_eq!(h.backend.calls(), ["editor_file tests/x.feature"]);
+        assert_eq!(urls(&h), ["vscode://file/tests/x.feature:3"]);
+        h.update(&mut cx, |s| s.run.active = true);
+        assert!(drawn(&mut cx, BUTTON), "the button shows while a run goes on");
+        click(&mut cx, BUTTON);
+        assert_eq!(urls(&h).len(), 2);
+    }
+
+    // 19 no button for a row with no line
+    #[gpui::test]
+    fn shows_no_button_for_a_row_with_no_line(cx: &mut TestAppContext) {
+        let (h, mut cx, _) = setup(cx, 800., with_a_row_without_a_line());
+        select(&h, &mut cx, ROW);
+        assert!(drawn(&mut cx, "details-location"));
+        assert!(!drawn(&mut cx, BUTTON));
+        select(&h, &mut cx, OK);
+        assert!(drawn(&mut cx, BUTTON));
+    }
+
+    // 20 the place on the error's first line is a link
+    #[gpui::test]
+    fn makes_the_place_karate_names_on_the_errors_first_line_a_link(cx: &mut TestAppContext) {
+        let error = "C:\\p\\tests\\auth.feature:9\nThen status 200\nexpected status: 200";
+        let (h, mut cx, _) = setup(cx, 800., failing_with(error));
+        select(&h, &mut cx, BAD);
+        click(&mut cx, PLACE);
+        assert_eq!(h.backend.calls(), ["editor_file C:\\p\\tests\\auth.feature"]);
+        assert_eq!(urls(&h), ["vscode://file/C:/p/tests/auth.feature:9"]);
+    }
+
+    // 21 takes a lowercase drive and / separators
+    #[gpui::test]
+    fn takes_a_lowercase_drive_and_slash_separators(cx: &mut TestAppContext) {
+        let (h, mut cx, _) = setup(cx, 800., failing_with("c:/p/a.feature:3\nboom"));
+        select(&h, &mut cx, BAD);
+        click(&mut cx, PLACE);
+        assert_eq!(urls(&h), ["vscode://file/c:/p/a.feature:3"]);
+    }
+
+    // 22 shows an error without a place as text (an `it.each` of 2)
+    #[gpui::test]
+    fn shows_an_error_without_a_place_as_text_a_config_failure(cx: &mut TestAppContext) {
+        no_link(cx, "Config evaluation failed: karate-config.js - js failed:\nLine: 4");
+    }
+
+    #[gpui::test]
+    fn shows_an_error_without_a_place_as_text_a_place_inside_a_sentence(cx: &mut TestAppContext) {
+        no_link(cx, "boom at x.feature:7");
+    }
+
+    fn no_link(cx: &mut TestAppContext, error: &str) {
+        let (h, mut cx, _) = setup(cx, 800., failing_with(error));
+        select(&h, &mut cx, BAD);
+        assert!(drawn(&mut cx, "details-error"));
+        assert!(!drawn(&mut cx, PLACE));
+    }
+
+    // #220: a long place that wraps reads from the left, not centred
+    #[gpui::test]
+    fn a_long_place_that_wraps_starts_at_the_left(cx: &mut TestAppContext) {
+        let long = format!("C:\\{}auth.feature:9\nboom", "a-very-long-folder-name\\".repeat(8));
+        let (h, mut cx, _) = setup(cx, 360., failing_with(&long));
+        select(&h, &mut cx, BAD);
+        let place = at(&mut cx, PLACE);
+        let boxed = at(&mut cx, "details-error-box");
+        assert!(place.size.height > px(30.), "it wraps: {:?}", place.size);
+        // padded by the box's own 12 px and no more: a centred button would sit apart from the left edge
+        assert!(place.left() - boxed.left() <= px(13.), "{:?} in {:?}", place, boxed);
+        assert_eq!(
+            crate::elements::link("x", "t", "n").style().text.text_align,
+            Some(gpui::TextAlign::Left)
+        );
+    }
 }
