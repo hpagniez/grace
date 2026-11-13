@@ -157,11 +157,24 @@ fn numbered(line: &str, words: &str) -> bool {
         .any(|after| after.starts_with(|c: char| c.is_ascii_digit()))
 }
 
+/// The issues the body closes: the number after each `Closes #`.
+fn closed(body: &str) -> Vec<u32> {
+    body.split("Closes #")
+        .skip(1)
+        .filter_map(|after| {
+            let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
+            digits.parse().ok()
+        })
+        .collect()
+}
+
 /// A PR that closes its issue finishes its spec and its plan: each one its body names says `status: built`
-/// (.claude/rules/docs.md), or the indexes would keep calling a built feature approved. `read` gives a file's text
-/// at the PR's head; a path that is no file is `papers_errors`' to report.
+/// (.claude/rules/docs.md), or the indexes would keep calling a built feature approved. A doc with an issue the PR
+/// leaves open is not finished: the guide of a project when one phase closes, a spec of several issues. `read`
+/// gives a file's text at the PR's head; a path that is no file is `papers_errors`' to report.
 pub fn built_errors(body: &str, read: &dyn Fn(&str) -> Option<String>) -> Vec<String> {
-    if !body.lines().any(|line| numbered(line, "Closes #")) {
+    let closed = closed(body);
+    if closed.is_empty() {
         return Vec::new();
     }
     let rule = "a PR that closes its issue sets it to built (.claude/rules/docs.md)";
@@ -173,6 +186,10 @@ pub fn built_errors(body: &str, read: &dyn Fn(&str) -> Option<String>) -> Vec<St
         let Some(text) = read(path) else {
             continue;
         };
+        let issues = crate::docs::issues(&text).unwrap_or_default();
+        if !issues.iter().all(|issue| closed.contains(issue)) {
+            continue;
+        }
         match crate::docs::status(&text) {
             Some("built") => {}
             Some(status) => errors.push(format!("{label} {path} has status \"{status}\": {rule}")),
@@ -1145,6 +1162,37 @@ screens = []
             Vec::<String>::new()
         );
     }
+
+    #[test]
+    fn a_doc_with_an_issue_the_pr_leaves_open_stays_as_it_is() {
+        let doc = |issue: &str| format!("---\nstatus: approved\nissue: {issue}\n---\n# A\n");
+        let read = |path: &str| match path {
+            "docs/specs/guide.md" => Some(doc("278")),
+            "docs/plans/phase.md" => Some(doc("282")),
+            "docs/specs/polish.md" => Some(doc("[82, 87]")),
+            _ => None,
+        };
+        // the last slice of a phase closes the phase's issue: its plan is built, the guide of the whole work is not
+        let errors = built_errors(
+            "Closes #282\nSpec: docs/specs/guide.md\nPlan: docs/plans/phase.md\n",
+            &read,
+        );
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("Plan: docs/plans/phase.md has status \"approved\""),
+            "{errors:?}"
+        );
+        // a spec of several issues is built when the last of them closes
+        assert_eq!(
+            built_errors("Closes #82\nSpec: docs/specs/polish.md\n", &read),
+            Vec::<String>::new()
+        );
+        let errors = built_errors(
+            "Closes #82 and closes it.\nCloses #87\nSpec: docs/specs/polish.md\n",
+            &read,
+        );
+        assert_eq!(errors.len(), 1, "{errors:?}");
+    }
 }
 
 /// `errors` on real repositories, each made in a temporary folder and removed after its test.
@@ -1429,6 +1477,25 @@ mod repository_tests {
         repo.commit("docs: add the spec and the plan");
         let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
         assert_eq!(repo.check("develop", Some(body)), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_pr_that_closes_its_issue_with_an_approved_spec_fails() {
+        let repo = Repo::new("feature/x");
+        repo.write("docs/specs/a.md", "---\nstatus: approved\nissue: 1\n---\n# Spec\n");
+        repo.write("docs/plans/a.md", BUILT);
+        repo.commit("docs: add the spec and the plan");
+        let body = "Tier: feature\nCloses #1\nSpec: docs/specs/a.md\nPlan: docs/plans/a.md\n";
+        let errors = repo.check("develop", Some(body));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("Spec: docs/specs/a.md has status \"approved\""),
+            "{errors:?}"
+        );
+        assert_eq!(
+            repo.check("develop", Some(&body.replace("Closes #1", "Closes #2"))),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

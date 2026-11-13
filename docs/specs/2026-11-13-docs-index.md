@@ -101,7 +101,7 @@ It reads the git index, as it does today.
 
 ### R4. Status stays true
 
-R4.1. `cargo xtask check-pr` fails a PR whose body says `Closes #N` and names a `Spec:` or a `Plan:` whose status is not `built`.
+R4.1. `cargo xtask check-pr` fails a PR whose body says `Closes #N` and names a `Spec:` or a `Plan:` whose status is not `built`. A doc with an `issue` the PR does not close is left as it is: the guide of a project when one phase closes, a spec of several issues until the last one closes.
 
 R4.2. A spec-only PR opens with `draft`. The session that gets the owner's approval sets `approved`.
 
