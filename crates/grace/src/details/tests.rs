@@ -514,6 +514,11 @@ mod open_in_vs_code {
         assert!(place.size.height > px(30.), "it wraps: {:?}", place.size);
         // padded by the box's own 12 px and no more: a centred button would sit apart from the left edge
         assert!(place.left() - boxed.left() <= px(13.), "{:?} in {:?}", place, boxed);
+        // the text itself, where a button centres its content, and the button around it
+        assert_eq!(
+            crate::elements::link_text("t").style().text.text_align,
+            Some(gpui::TextAlign::Left)
+        );
         assert_eq!(
             crate::elements::link("x", "t", "n").style().text.text_align,
             Some(gpui::TextAlign::Left)

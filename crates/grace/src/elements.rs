@@ -250,16 +250,19 @@ pub fn link(id: impl Into<ElementId>, text: impl Into<SharedString>, name: impl 
         .justify_start()
         .text_left()
         // GPUI Kit's content is one centred line that never wraps: this child takes the width and wraps from the left
-        .child(
-            div()
-                .w_full()
-                .min_w_0()
-                .whitespace_normal()
-                .text_left()
-                .underline()
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .child(text.into()),
-        )
+        .child(link_text(text))
+}
+
+/// The link's text: the width of its button, wrapped and aligned from the left.
+pub(crate) fn link_text(text: impl Into<SharedString>) -> gpui::Div {
+    div()
+        .w_full()
+        .min_w_0()
+        .whitespace_normal()
+        .text_left()
+        .underline()
+        .font_weight(gpui::FontWeight::MEDIUM)
+        .child(text.into())
 }
 
 /// An icon-only, borderless button, 28 px square or 24 px when `small` (R10.3), its icon `glyph_size` px (16 in

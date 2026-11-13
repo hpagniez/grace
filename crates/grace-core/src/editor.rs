@@ -50,12 +50,15 @@ pub struct Place {
 pub fn failed_at(error: &str) -> Option<Place> {
     let first = error.split('\n').next()?;
     let b = first.as_bytes();
-    if b.len() < 3 || !b[0].is_ascii_alphabetic() || b[1] != b':' || !matches!(b[2], b'\\' | b'/') {
+    let drive = b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/');
+    // Rust-native: Karate writes a rooted path where it runs on Linux, which Electron Grace never did (guide R5.2)
+    let rooted = cfg!(not(windows)) && b.first() == Some(&b'/');
+    if !drive && !rooted {
         return None;
     }
     let (file, line) = first.rsplit_once(':')?;
     // `file` keeps the drive's own colon, so a line-less first line leaves the drive alone: `C` and no `\`
-    if file.len() < 3 || line.is_empty() || !line.bytes().all(|c| c.is_ascii_digit()) {
+    if file.len() < if drive { 3 } else { 2 } || line.is_empty() || !line.bytes().all(|c| c.is_ascii_digit()) {
         return None;
     }
     let line: u32 = line.parse().ok().filter(|l| *l >= 1)?;
@@ -286,6 +289,17 @@ mod tests {
         #[test]
         fn takes_the_last_colon_as_the_line() {
             assert_eq!(failed_at("C:/p/a:b.feature:12"), place("C:/p/a:b.feature", 12));
+        }
+
+        #[test]
+        fn takes_a_rooted_path_only_where_karate_writes_one() {
+            let error = "/tmp/p/tests/a.feature:20\nboom";
+            if cfg!(windows) {
+                assert_eq!(failed_at(error), None);
+            } else {
+                assert_eq!(failed_at(error), place("/tmp/p/tests/a.feature", 20));
+                assert_eq!(failed_at("/:3"), None);
+            }
         }
 
         #[test]

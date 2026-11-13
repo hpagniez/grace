@@ -974,6 +974,41 @@ mod open_in_vs_code {
         assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"]);
     }
 
+    #[gpui::test]
+    fn the_menu_key_on_a_folder_shows_no_menu_and_a_new_tree_closes_a_menu(cx: &mut TestAppContext) {
+        let (h, mut cx, _tree) = opened(cx, |_| {});
+        let d = row(&mut cx, FOLDER);
+        cx.simulate_click(point(d.left() + px(90.), d.center().y), Modifiers::none());
+        cx.simulate_keystrokes("menu");
+        assert!(menu(&mut cx).is_none(), "a folder has no menu");
+        let r = row(&mut cx, SCENARIO);
+        right_click(&mut cx, point(r.left() + px(90.), r.center().y));
+        assert!(menu(&mut cx).is_some());
+        h.update(&mut cx, |s| s.trees += 1);
+        assert!(menu(&mut cx).is_none(), "the menu of the old tree is gone");
+    }
+
+    #[gpui::test]
+    fn closing_the_menu_leaves_the_focus_where_a_click_out_of_it_put_it(cx: &mut TestAppContext) {
+        let (_h, mut cx, tree) = opened(cx, |_| {});
+        let r = row(&mut cx, SCENARIO);
+        right_click(&mut cx, point(r.left() + px(90.), r.center().y));
+        let view = cx.update(|_, cx| tree.read(cx).menu.as_ref().unwrap().view.clone());
+        let other = cx.update(|_, cx| cx.focus_handle());
+        cx.update(|window, cx| window.focus(&other, cx));
+        view.update(&mut cx, |_, cx| cx.emit(gpui::DismissEvent));
+        cx.run_until_parked();
+        assert!(menu(&mut cx).is_none());
+        assert!(
+            cx.update(|window, _| other.is_focused(window)),
+            "the focus stays where it was put"
+        );
+        // closed with Escape, the focus comes back to the tree
+        right_click(&mut cx, point(r.left() + px(90.), r.center().y));
+        cx.simulate_keystrokes("escape");
+        assert!(cx.update(|window, cx| tree.read(cx).focus.is_focused(window)));
+    }
+
     // 91 opens a failed test without a place at its own line
     #[gpui::test]
     fn a_failed_test_without_a_place_opens_at_its_own_line(cx: &mut TestAppContext) {
