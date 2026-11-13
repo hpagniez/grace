@@ -7,6 +7,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::karate::command::{absolute, inside};
+use crate::model::node::{NodeKind, Status, TestNode};
+use crate::state::AppState;
 
 /// `file` under `root` as the project was opened, if it is an existing file whose real path, links followed, is inside
 /// `root`'s real folder (R3.3); `None` otherwise. A mapped drive keeps its letter: its real path is the share's.
@@ -61,6 +63,22 @@ pub fn failed_at(error: &str) -> Option<Place> {
         file: file.into(),
         line,
     })
+}
+
+/// Where Open in VS Code opens a tree row (open-in-editor-from-tree R2): a failed test where Karate says it failed, any
+/// other test or outline at its line, a feature at its top; `None` for a folder. `editorPlace` of `Tree.tsx`.
+pub fn editor_place(node: &TestNode, state: &AppState) -> Option<Place> {
+    if node.kind == NodeKind::Folder {
+        return None;
+    }
+    let failed = node.is_leaf() && state.statuses.get(&node.key) == Some(&Status::Failed);
+    let place = failed
+        .then(|| state.results.get(&node.key)?.error.as_deref().and_then(failed_at))
+        .flatten();
+    Some(place.unwrap_or_else(|| Place {
+        file: node.file.clone(),
+        line: node.line.unwrap_or(1),
+    }))
 }
 
 /// Node's `realpathSync.native`: the real path, links followed, without the `\\?\` prefix Rust's `canonicalize` adds.
@@ -285,6 +303,103 @@ mod tests {
             ] {
                 assert_eq!(failed_at(error), None, "{error:?}");
             }
+        }
+    }
+
+    mod editor_place {
+        use super::*;
+        use crate::state::TestResult;
+
+        fn node(kind: NodeKind, line: Option<u32>) -> TestNode {
+            TestNode {
+                key: "s:tests/x.feature#1".into(),
+                kind,
+                name: "n".into(),
+                file: "tests/x.feature".into(),
+                line,
+                ref_id: None,
+                tags: vec![],
+                example: None,
+                children: vec![],
+            }
+        }
+
+        fn failed(error: &str) -> AppState {
+            let mut s = AppState::default();
+            s.statuses.insert("s:tests/x.feature#1".into(), Status::Failed);
+            s.results.insert(
+                "s:tests/x.feature#1".into(),
+                TestResult {
+                    duration_millis: None,
+                    error: Some(error.into()),
+                    reason_at: None,
+                },
+            );
+            s
+        }
+
+        fn place(file: &str, line: u32) -> Option<Place> {
+            Some(Place {
+                file: file.into(),
+                line,
+            })
+        }
+
+        #[test]
+        fn opens_a_feature_at_its_top_and_a_folder_nowhere() {
+            let state = AppState::default();
+            assert_eq!(
+                editor_place(&node(NodeKind::Feature, None), &state),
+                place("tests/x.feature", 1)
+            );
+            assert_eq!(editor_place(&node(NodeKind::Folder, None), &state), None);
+        }
+
+        #[test]
+        fn opens_a_test_or_an_outline_at_its_own_line_a_row_without_one_at_the_top() {
+            let state = AppState::default();
+            for kind in [NodeKind::Scenario, NodeKind::Outline, NodeKind::Row] {
+                assert_eq!(
+                    editor_place(&node(kind, Some(14)), &state),
+                    place("tests/x.feature", 14)
+                );
+            }
+            assert_eq!(
+                editor_place(&node(NodeKind::Row, None), &state),
+                place("tests/x.feature", 1)
+            );
+        }
+
+        #[test]
+        fn opens_a_failed_test_where_karate_says_it_failed_even_in_a_called_feature() {
+            let state = failed("C:\\p\\tests\\common.feature:20\nmatch failed");
+            assert_eq!(
+                editor_place(&node(NodeKind::Scenario, Some(14)), &state),
+                place("C:\\p\\tests\\common.feature", 20)
+            );
+        }
+
+        #[test]
+        fn opens_a_failed_test_without_a_place_and_a_passed_one_at_their_own_line() {
+            assert_eq!(
+                editor_place(&node(NodeKind::Scenario, Some(14)), &failed("boom")),
+                place("tests/x.feature", 14)
+            );
+            let mut passed = failed("C:\\p\\a.feature:9");
+            passed.statuses.insert("s:tests/x.feature#1".into(), Status::Passed);
+            assert_eq!(
+                editor_place(&node(NodeKind::Scenario, Some(14)), &passed),
+                place("tests/x.feature", 14)
+            );
+        }
+
+        #[test]
+        fn opens_an_outline_at_its_own_line_whatever_its_status() {
+            let state = failed("C:\\p\\a.feature:9");
+            assert_eq!(
+                editor_place(&node(NodeKind::Outline, Some(7)), &state),
+                place("tests/x.feature", 7)
+            );
         }
     }
 

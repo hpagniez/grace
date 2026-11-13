@@ -811,3 +811,176 @@ fn a_rows_run_button_shows_the_hand() {
         Some(CursorStyle::OperationNotAllowed)
     );
 }
+
+/// `Tree.test.tsx`'s "tree: open in VS Code" tests 86 to 91 (open-in-editor-from-tree R1, R2; OT-01 to OT-04). The
+/// fake runner answers every file as one of the open project, so the link the seam got shows what Grace asked for.
+mod open_in_vs_code {
+    use super::*;
+    use gpui::{Modifiers, MouseButton, point, px};
+
+    const FEATURE: &str = "f:tests/a.feature";
+    const SCENARIO: &str = "s:tests/a.feature#0";
+    const FOLDER: &str = "d:tests";
+    const MENU: &str = "row-menu";
+
+    /// One feature, its scenario at line 14, the feature open.
+    fn opened(
+        cx: &mut TestAppContext,
+        change: impl FnOnce(&mut AppState),
+    ) -> (Harness, VisualTestContext, Entity<Tree>) {
+        let mut s = state("/p", &["a"]);
+        fn set_line(n: &mut TestNode, key: &str) {
+            if n.key == key {
+                n.line = Some(14);
+            }
+            n.children.iter_mut().for_each(|c| set_line(c, key));
+        }
+        set_line(s.tree.as_mut().unwrap(), SCENARIO);
+        change(&mut s);
+        let (h, mut cx, tree) = setup(cx, s);
+        toggle(&tree, FEATURE, &mut cx);
+        (h, cx, tree)
+    }
+
+    fn row(cx: &mut VisualTestContext, key: &str) -> gpui::Bounds<gpui::Pixels> {
+        cx.debug_bounds(format!("tree-row:{key}").leak())
+            .unwrap_or_else(|| panic!("row {key}"))
+    }
+
+    fn right_click(cx: &mut VisualTestContext, at: gpui::Point<gpui::Pixels>) {
+        cx.simulate_mouse_move(at, None, Modifiers::none());
+        cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+        cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+        cx.run_until_parked();
+    }
+
+    fn menu(cx: &mut VisualTestContext) -> Option<gpui::Bounds<gpui::Pixels>> {
+        cx.debug_bounds(MENU)
+    }
+
+    /// Chooses the menu's one item.
+    fn choose(cx: &mut VisualTestContext) {
+        let m = menu(cx).expect("the menu shows");
+        cx.simulate_click(m.origin + point(px(30.), px(16.)), Modifiers::none());
+        cx.run_until_parked();
+    }
+
+    fn failing(error: &str) -> impl FnOnce(&mut AppState) + '_ {
+        move |s| {
+            s.statuses.insert(SCENARIO.into(), Status::Failed);
+            s.results.insert(
+                SCENARIO.into(),
+                grace_core::state::TestResult {
+                    duration_millis: None,
+                    error: Some(error.into()),
+                    reason_at: None,
+                },
+            );
+        }
+    }
+
+    // 86 asks for the menu at the pointer, for a test at its line, and keeps the selection
+    #[gpui::test]
+    fn a_right_click_shows_the_menu_at_the_pointer_for_a_test_at_its_line_and_keeps_the_selection(
+        cx: &mut TestAppContext,
+    ) {
+        let (h, mut cx, _tree) = opened(cx, |s| s.selected = Some(FEATURE.into()));
+        let r = row(&mut cx, SCENARIO);
+        let at = point(r.left() + px(90.), r.center().y);
+        right_click(&mut cx, at);
+        let m = menu(&mut cx).expect("the menu shows");
+        assert!(
+            (m.left() - at.x).abs() < px(1.) && (m.top() - at.y).abs() < px(1.),
+            "{m:?} at {at:?}"
+        );
+        assert_eq!(selected(&h, &mut cx).as_deref(), Some(FEATURE));
+        assert!(h.seams.urls().is_empty(), "opening the menu opens nothing");
+        choose(&mut cx);
+        assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"]);
+        assert!(menu(&mut cx).is_none(), "choosing closes it");
+        assert_eq!(selected(&h, &mut cx).as_deref(), Some(FEATURE));
+    }
+
+    // 87 asks from a row's run button and from the focused row itself, as the menu key does
+    #[gpui::test]
+    fn a_right_click_on_a_rows_run_button_and_the_menu_key_on_the_focus_row_show_it_too(cx: &mut TestAppContext) {
+        let (h, mut cx, tree) = opened(cx, |_| {});
+        let r = row(&mut cx, SCENARIO);
+        right_click(&mut cx, point(r.right() - px(16.), r.center().y));
+        assert!(menu(&mut cx).is_some(), "on the run button");
+        cx.simulate_keystrokes("escape");
+        assert!(menu(&mut cx).is_none(), "Escape closes it");
+        assert!(h.seams.urls().is_empty());
+        assert!(
+            cx.update(|window, cx| tree.read(cx).focus.is_focused(window)),
+            "the tree has the focus back"
+        );
+
+        // the focus row, from the keyboard
+        cx.simulate_click(point(r.left() + px(90.), r.center().y), Modifiers::none());
+        for keys in ["menu", "shift-f10"] {
+            cx.simulate_keystrokes(keys);
+            let m = menu(&mut cx).unwrap_or_else(|| panic!("{keys} shows the menu"));
+            assert!(
+                m.top() >= r.bottom() - px(1.) && m.top() <= r.bottom() + px(ROW_HEIGHT),
+                "under its row: {m:?}"
+            );
+            choose(&mut cx);
+        }
+        assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"; 2]);
+    }
+
+    // 88 opens a feature at line 1, and asks nothing for a folder or the list's padding
+    #[gpui::test]
+    fn a_feature_opens_at_its_top_and_a_folder_and_the_lists_padding_show_no_menu(cx: &mut TestAppContext) {
+        let (h, mut cx, _tree) = opened(cx, |_| {});
+        let f = row(&mut cx, FEATURE);
+        right_click(&mut cx, point(f.left() + px(90.), f.center().y));
+        choose(&mut cx);
+        assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:1"]);
+        let d = row(&mut cx, FOLDER);
+        right_click(&mut cx, point(d.left() + px(90.), d.center().y));
+        assert!(menu(&mut cx).is_none(), "a folder");
+        right_click(&mut cx, point(d.left() + px(90.), d.top() - px(PAD / 2.)));
+        assert!(menu(&mut cx).is_none(), "the padding");
+    }
+
+    // 89 opens a failed test at its failed step during a run, even in a called feature
+    #[gpui::test]
+    fn a_failed_test_opens_at_its_failed_step_even_in_a_called_feature(cx: &mut TestAppContext) {
+        let error = "C:\\p\\tests\\common.feature:20\nmatch failed";
+        let (h, mut cx, _tree) = opened(cx, failing(error));
+        h.update(&mut cx, |s| s.run.active = true);
+        let r = row(&mut cx, SCENARIO);
+        right_click(&mut cx, point(r.left() + px(90.), r.center().y));
+        choose(&mut cx);
+        assert_eq!(h.seams.urls(), ["vscode://file/C:/p/tests/common.feature:20"]);
+    }
+
+    // 90 asks from an open tooltip over a row
+    #[gpui::test]
+    fn a_right_click_on_an_open_tooltip_over_a_row_reaches_the_row(cx: &mut TestAppContext) {
+        let (h, mut cx, _tree) = opened(cx, |_| {});
+        let r = row(&mut cx, SCENARIO);
+        let run = point(r.right() - px(ROW_HEIGHT / 2.), r.center().y);
+        cx.simulate_mouse_move(point(px(5.), px(700.)), None, Modifiers::none());
+        cx.simulate_mouse_move(run, None, Modifiers::none());
+        cx.executor().advance_clock(crate::tooltip::DELAY);
+        cx.run_until_parked();
+        let tip = h.tip_bounds(&mut cx).expect("the run button's tooltip is open");
+        right_click(&mut cx, tip.center());
+        assert!(menu(&mut cx).is_some(), "the row's menu opens");
+        choose(&mut cx);
+        assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"]);
+    }
+
+    // 91 opens a failed test without a place at its own line
+    #[gpui::test]
+    fn a_failed_test_without_a_place_opens_at_its_own_line(cx: &mut TestAppContext) {
+        let (h, mut cx, _tree) = opened(cx, failing("boom"));
+        let r = row(&mut cx, SCENARIO);
+        right_click(&mut cx, point(r.left() + px(90.), r.center().y));
+        choose(&mut cx);
+        assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"]);
+    }
+}
