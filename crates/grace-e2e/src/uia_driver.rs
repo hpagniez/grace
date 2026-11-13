@@ -263,6 +263,7 @@ impl Driver for UiaDriver {
                 Key::ShiftF8 => "{shift}{F8}",
                 Key::AltLeft => "{alt}{left}",
                 Key::AltRight => "{alt}{right}",
+                Key::ShiftF10 => "{shift}{F10}",
             })
             .map_err(err)
     }
@@ -274,6 +275,15 @@ impl Driver for UiaDriver {
             .centre();
         self.to_foreground()?;
         Mouse::new().click(&Point::new(x, y)).map_err(err)
+    }
+
+    fn right_click(&self, node: &Node) -> Result<()> {
+        let (x, y) = node
+            .rect
+            .ok_or_else(|| format!("{:?} {:?} has no place on the screen", node.role, node.name))?
+            .centre();
+        self.to_foreground()?;
+        Mouse::new().right_click(&Point::new(x, y)).map_err(err)
     }
 
     fn type_text(&self, text: &str) -> Result<()> {

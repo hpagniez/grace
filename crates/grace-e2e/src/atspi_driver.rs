@@ -223,6 +223,7 @@ impl Driver for AtspiDriver {
                 Key::ShiftF8 => return fake_key(XK_F8, true),
                 Key::AltLeft => "alt+Left",
                 Key::AltRight => "alt+Right",
+                Key::ShiftF10 => return fake_key(XK_F10, true),
             },
         ])
     }
@@ -232,6 +233,13 @@ impl Driver for AtspiDriver {
         let window = self.x_window()?;
         xdotool(&["windowfocus", "--sync", &window])?;
         xdotool(&["click", "1"])
+    }
+
+    fn right_click(&self, node: &Node) -> Result<()> {
+        self.hover(node)?;
+        let window = self.x_window()?;
+        xdotool(&["windowfocus", "--sync", &window])?;
+        xdotool(&["click", "3"])
     }
 
     fn type_text(&self, text: &str) -> Result<()> {
@@ -272,6 +280,7 @@ fn ask_to_close(window: u32) -> Result<()> {
 }
 
 const XK_F8: u32 = 0xffc5;
+const XK_F10: u32 = 0xffc7;
 const XK_SHIFT_L: u32 = 0xffe1;
 
 /// Presses the key whose first level is `keysym`, with Shift when `shift`, through XTest: no other modifier, which

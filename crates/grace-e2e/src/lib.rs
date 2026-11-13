@@ -127,6 +127,8 @@ pub enum Key {
     AltLeft,
     /// Alt+Right.
     AltRight,
+    /// Shift+F10, the menu key's other form.
+    ShiftF10,
 }
 
 /// One node of the tree, as read. `path` is its position under the app's window, which `Driver::press` finds again.
@@ -208,6 +210,8 @@ pub trait Driver {
     fn key(&self, key: Key) -> Result<()>;
     /// Clicks the pointer on the node's centre, as a person does to put the focus in a text box.
     fn click(&self, node: &Node) -> Result<()>;
+    /// Clicks the pointer's right button on the node's centre, as a person does to ask for its menu.
+    fn right_click(&self, node: &Node) -> Result<()>;
     /// Types `text` on the keyboard, into the control with the focus.
     fn type_text(&self, text: &str) -> Result<()>;
     /// Asks the window to close, as its close button does: Grace then saves, stops a run and quits (Playwright's
@@ -397,6 +401,30 @@ impl App {
     /// Answers the next file dialogs, Import from file…'s, with `file`.
     pub fn answer_file(&self, file: Option<&Path>) -> Result<()> {
         self.answer("file", file)
+    }
+
+    /// Answers whether a program is registered for a link, as a machine with or without VS Code (OE-11): the app's
+    /// `e2e` seams then record the link or refuse it.
+    pub fn answer_vscode_installed(&self, installed: bool) -> Result<()> {
+        let file = seams_file(&self.data);
+        let mut answers = std::fs::read_to_string(&file)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .filter(|v| v.is_object())
+            .unwrap_or_else(|| serde_json::json!({}));
+        answers["vscode"] = serde_json::json!(installed);
+        std::fs::write(file, answers.to_string()).map_err(|e| e.to_string())
+    }
+
+    /// The links Grace handed to the system, in order (`e2e-seams.jsonl`): Open in VS Code's.
+    pub fn opened_urls(&self) -> Vec<String> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "url")
+            .filter_map(|v| v["url"].as_str().map(str::to_string))
+            .collect()
     }
 
     /// Sets one seam's answer and keeps the others'.
@@ -608,6 +636,10 @@ impl App {
 
     pub fn click(&self, node: &Node) -> Result<()> {
         self.driver.click(node)
+    }
+
+    pub fn right_click(&self, node: &Node) -> Result<()> {
+        self.driver.right_click(node)
     }
 
     pub fn type_text(&self, text: &str) -> Result<()> {
