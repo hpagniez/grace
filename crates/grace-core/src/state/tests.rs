@@ -1277,6 +1277,34 @@ mod create_app_store {
 mod added {
     use super::*;
 
+    // New in the port: the HTTP list builds its rows again only when this count moves (#124).
+    #[test]
+    fn calls_changes_counts_each_change_to_the_calls_and_nothing_else() {
+        let mut s = AppState::new();
+        s.reduce(&project());
+        let at = |s: &AppState| s.calls_changes;
+        let mut seen = at(&s);
+        let mut moved = |s: &AppState, yes: bool, what: &str| {
+            assert_eq!(at(s) != seen, yes, "{what}");
+            seen = at(s);
+        };
+        s.reduce(&AppEvent::Calls {
+            key: keys()[0].clone(),
+            calls: vec![a_call()],
+        });
+        moved(&s, true, "calls arrive");
+        s.reduce(&AppEvent::Console {
+            lines: vec!["x".into()],
+        });
+        moved(&s, false, "a console line");
+        s.reduce(&update(&keys()[0], Status::Passed));
+        moved(&s, false, "a status");
+        s.reduce(&started(&keys()[..1]));
+        moved(&s, true, "a run clears its tests' calls");
+        s.reduce(&project());
+        moved(&s, true, "a refresh may drop calls");
+    }
+
     // New in the port: `reduce.ts` gave the box a fresh object per `threads` event, so it reset even on the count it
     // held; the Rust state counts the events instead (P2 plan, Redesigns).
     #[test]

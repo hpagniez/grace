@@ -1,7 +1,7 @@
 //! `BottomPanel.tsx` and `Splitter.tsx`: the Console, History and HTTP tabs under the tree and details, and Variables
 //! during a debug run, one height for all, with the splitter on top that resizes it (UI polish R1, R18) and tabs that
-//! move (reorder panel tabs). P2 draws the Console; the History and HTTP tabs' content comes with P3 and Variables'
-//! with P4 (P2 plan), so their panels stay empty until then.
+//! move (reorder panel tabs). P2 drew the Console, P3 the HTTP tab (`http`); the History tab's content comes with P3
+//! and Variables' with P4 (P2 plan), so their panels stay empty until then.
 //!
 //! Electron Grace read the panel's and the main area's heights from the layout (`getBoundingClientRect`, a
 //! `ResizeObserver`); GPUI tells them after each layout, which the panel keeps (`canvas`), at no cost while idle,
@@ -39,11 +39,13 @@ fn tab_look(id: TabId) -> (Panel, Icon, &'static str) {
     }
 }
 
-/// The count a tab shows in its pill: History's runs. HTTP's calls come with its panel, in P3.
+/// The count a tab shows in its pill: History's runs, and the rows the HTTP tab shows, counted without listing them
+/// (#124).
 fn tab_count(id: TabId, state: &AppState) -> Option<usize> {
     match id {
         TabId::History => Some(state.history.len()),
-        _ => None,
+        TabId::Http => Some(grace_core::http_list::shown_count(state)),
+        TabId::Console => None,
     }
 }
 
@@ -76,6 +78,7 @@ struct Drag {
 pub struct BottomPanel {
     grace: Entity<Grace>,
     pub console: Entity<Console>,
+    pub http: Entity<crate::http::HttpCalls>,
     pub order: [TabId; 3],
     /// The saved height; the panel shows it clamped to the room there is.
     pub height: f32,
@@ -95,10 +98,12 @@ impl BottomPanel {
     pub fn new(grace: Entity<Grace>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let data_dir = grace.read(cx).data_dir().to_path_buf();
         let console = cx.new(|cx| Console::new(grace.clone(), window, cx));
+        let http = cx.new(|cx| crate::http::HttpCalls::new(grace.clone(), cx));
         let subscriptions = vec![cx.observe(&grace, |_, _, cx| cx.notify())];
         Self {
             grace,
             console,
+            http,
             // read before the first paint (R4.2)
             order: load_tab_order(&data_dir),
             height: load_panel_height(&data_dir),
@@ -490,7 +495,8 @@ impl Render for BottomPanel {
                     .min_h_0()
                     .when(state.panel == Panel::Console, |d| {
                         d.child(crate::window::cached(self.console.clone(), window))
-                    }),
+                    })
+                    .when(state.panel == Panel::Http, |d| d.child(self.http.clone())),
             )
     }
 }

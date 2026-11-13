@@ -86,7 +86,7 @@ mod tabs {
     use super::*;
 
     #[gpui::test]
-    fn name_history_with_its_count(cx: &mut TestAppContext) {
+    fn name_history_and_http_with_their_count(cx: &mut TestAppContext) {
         let (h, mut cx, _p) = setup(cx, data_dir("names"));
         h.update(&mut cx, |s| {
             s.history = vec![testing::run("a", 1, 0), testing::run("b", 0, 1)]
@@ -94,7 +94,7 @@ mod tabs {
         let state = cx.update(|_, cx| h.grace.read(cx).state.clone());
         assert_eq!(tab_name(TabId::Console, &state), "Console");
         assert_eq!(tab_name(TabId::History, &state), "History (2)");
-        assert_eq!(tab_name(TabId::Http, &state), "HTTP");
+        assert_eq!(tab_name(TabId::Http, &state), "HTTP (0)");
     }
 
     #[gpui::test]
