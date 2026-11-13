@@ -131,18 +131,12 @@ pub fn find_call(s: &AppState) -> Option<ListedCall<'_>> {
 /// How many calls under the tree selection are in `groups`, without listing them.
 fn count_in(s: &AppState, groups: &[HttpGroup]) -> usize {
     let Some(tree) = &s.tree else { return 0 };
-    let count = |list: &Vec<HttpCall>| list.iter().filter(|c| in_groups(c, groups)).count();
-    let scope = scope(tree, s.selected.as_deref());
-    if std::ptr::eq(scope, tree) {
-        // every test: the state holds calls only for the tree's tests, so the tree is not walked
-        s.calls.values().map(count).sum()
-    } else {
-        leaves(scope)
-            .iter()
-            .filter_map(|t| s.calls.get(&t.key))
-            .map(count)
-            .sum()
-    }
+    leaves(scope(tree, s.selected.as_deref()))
+        .iter()
+        .filter_map(|t| s.calls.get(&t.key))
+        .flatten()
+        .filter(|c| in_groups(c, groups))
+        .count()
 }
 
 /// The rows the HTTP tab shows, its count (R3): the calls under the tree selection in the groups switched on. It

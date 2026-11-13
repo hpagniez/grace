@@ -248,6 +248,9 @@ mod added {
             ] {
                 let mut s = state(selected);
                 s.http_groups = groups.clone();
+                // a call under a key the tree does not hold is in no list, so in no count
+                s.calls
+                    .insert("s:stray".into(), vec![call(Some(200), 1.), call(None, 2.)]);
                 let listed = shown_calls(narrowed_calls(&s), &groups).len();
                 assert_eq!(shown_count(&s), listed, "{selected:?} {groups:?}");
             }
