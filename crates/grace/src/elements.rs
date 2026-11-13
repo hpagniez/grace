@@ -234,6 +234,37 @@ fn labelled(
     }
 }
 
+/// A button that reads as a link, as `link` of `ui.ts`: the text underlined, with no box of its own. Its text starts at
+/// the left, wrapped lines included: a button centres its text, and a long place centred line by line read as a
+/// broken paragraph (#220). `name` is its accessible name; `text` is what shows.
+pub fn link(id: impl Into<ElementId>, text: impl Into<SharedString>, name: impl Into<SharedString>) -> Button {
+    Button::new(id)
+        .ghost()
+        .cursor_pointer()
+        .accessibility_label(name.into())
+        .h_auto()
+        .min_w_0()
+        .flex_shrink(1.)
+        .px(px(0.))
+        .py(px(0.))
+        .justify_start()
+        .text_left()
+        // GPUI Kit's content is one centred line that never wraps: this child takes the width and wraps from the left
+        .child(link_text(text))
+}
+
+/// The link's text: the width of its button, wrapped and aligned from the left.
+pub(crate) fn link_text(text: impl Into<SharedString>) -> gpui::Div {
+    div()
+        .w_full()
+        .min_w_0()
+        .whitespace_normal()
+        .text_left()
+        .underline()
+        .font_weight(gpui::FontWeight::MEDIUM)
+        .child(text.into())
+}
+
 /// An icon-only, borderless button, 28 px square or 24 px when `small` (R10.3), its icon `glyph_size` px (16 in
 /// `btnIcon` and the list rows' remove and delete, 14 in the console's and the panel's small buttons). `label` is its
 /// accessible name; give it the same tooltip with `tooltip::tooltip(..).focusable(|f| icon_button(..).track_focus(f))`.

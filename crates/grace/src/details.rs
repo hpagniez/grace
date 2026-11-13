@@ -1,6 +1,6 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
-//! (#229), Open in VS Code, the flaky proof and the Examples table come with P3; the
+//! (#229), the flaky proof and the Examples table come with P3; the
 //! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases).
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -10,6 +10,7 @@ use gpui::{
     App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _, px,
 };
+use grace_core::editor::failed_at;
 use grace_core::karate::tree::find_node;
 use grace_core::model::events::Step;
 use grace_core::model::node::{NodeKind, Status, TestNode};
@@ -19,7 +20,7 @@ use grace_core::state::AppState;
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, MarkStatus, icon, status_mark};
+use crate::elements::{ButtonKind, ButtonSize, MarkStatus, icon, icon_text_button, status_mark};
 use crate::theme::{METRICS, MONO, Theme};
 use crate::tooltip::{cut, tooltip};
 
@@ -27,6 +28,7 @@ pub const NOTHING_SELECTED: &str = "Select a test to see its details";
 pub const STEPS_LATER: &str = "Steps are available when the feature finishes";
 pub const ERROR: &str = "Error";
 pub const STEPS: &str = "Steps";
+pub const OPEN_IN_EDITOR: &str = "Open in VS Code";
 
 /// `formatMillis`: under a second in whole ms, else seconds with two decimals.
 pub fn format_millis(ms: f64) -> String {
@@ -225,6 +227,20 @@ impl Details {
             .text_size(px(METRICS.text_xs.size))
             .text_color(Theme::color(t.muted))
             .child(Self::place(location(node), cx))
+            // OE-01, OE-02: the button shows whatever the run state; opening a file never touches a run
+            .children(node.line.filter(|l| *l > 0).map(|line| {
+                let grace = self.grace.clone();
+                let file = node.file.clone();
+                icon_text_button(
+                    "open-in-editor",
+                    Icon::ExternalLink,
+                    OPEN_IN_EDITOR,
+                    ButtonKind::Ghost,
+                    ButtonSize::Small,
+                )
+                .debug_selector(|| "open-in-editor".into())
+                .on_click(move |_, _, cx| grace.update(cx, |g, cx| g.open_in_editor(file.clone(), line, cx)))
+            }))
             .children(duration.map(|d| {
                 div()
                     .id("details-duration")
@@ -243,6 +259,7 @@ impl Details {
             .map(|e| {
                 div()
                     .id("details-error-box")
+                    .debug_selector(|| "details-error-box".into())
                     .role(Role::Group)
                     .aria_label(ERROR)
                     .flex()
@@ -271,7 +288,7 @@ impl Details {
                             .font_family(MONO)
                             .text_size(px(METRICS.text_xs.size))
                             .text_color(Theme::color(t.ink))
-                            .child(e),
+                            .children(self.error_text(&e)),
                     )
             });
         let steps = match state.steps.get(&node.key) {
@@ -311,6 +328,27 @@ impl Details {
         .chain(error.map(|e| e.into_any_element()))
         .chain(std::iter::once(steps))
         .collect()
+    }
+
+    /// A failed test's error; the place on its first line opens in VS Code (OE-03, OE-04). The first line stays the
+    /// text Karate wrote, and the rest follows it.
+    fn error_text(&self, error: &str) -> Vec<gpui::AnyElement> {
+        let Some(place) = failed_at(error) else {
+            return vec![error.to_string().into_any_element()];
+        };
+        let first = error.split('\n').next().unwrap_or_default();
+        let grace = self.grace.clone();
+        let link = crate::elements::link("error-place", first.to_string(), format!("Open {first} in VS Code"))
+            .debug_selector(|| "error-place".into())
+            .on_click(move |_, _, cx| {
+                let file = place.file.clone();
+                grace.update(cx, |g, cx| g.open_in_editor(file, place.line, cx))
+            });
+        let rest = error[first.len()..].strip_prefix('\n').filter(|r| !r.is_empty());
+        vec![div().flex().min_w_0().child(link).into_any_element()]
+            .into_iter()
+            .chain(rest.map(|r| r.to_string().into_any_element()))
+            .collect()
     }
 
     fn steps(&self, this: &Entity<Self>, steps: &[Step], cx: &App) -> impl IntoElement {

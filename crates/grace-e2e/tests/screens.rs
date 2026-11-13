@@ -22,16 +22,61 @@ fn shot(app: &App, name: &str) {
     // the frame that follows the last change: read the tree twice, the window is drawn by then
     let _ = app.tree();
     let _ = app.tree();
+    capture(&out().join(format!("{name}.png")));
+}
+
+#[cfg(not(windows))]
+fn capture(path: &std::path::Path) {
     let id = Command::new("xdotool")
         .args(["search", "--onlyvisible", "--name", "^Grace$"])
         .output()
         .unwrap();
     let id = String::from_utf8_lossy(&id.stdout).lines().next().unwrap().to_string();
-    let path = out().join(format!("{name}.png"));
     let ok = Command::new("import")
         .args(["-window", &id, path.to_str().unwrap()])
         .status()
         .unwrap();
+    assert!(ok.success());
+}
+
+/// On Windows, with the owner's go (docs/process/owner-machine.md): the screen under the window "Grace", in its
+/// frame's own pixels, copied by PowerShell.
+#[cfg(windows)]
+fn capture(path: &std::path::Path) {
+    const SCRIPT: &str = r#"
+Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class Win {
+  [StructLayout(LayoutKind.Sequential)] public struct R { public int L, T, Rt, B; }
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, string t);
+  [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int a, out R r, int size);
+  public static int[] Frame(IntPtr h) {
+    R r;
+    DwmGetWindowAttribute(h, 9, out r, 16);
+    return new int[] { r.L, r.T, r.Rt - r.L, r.B - r.T };
+  }
+}
+'@
+[Win]::SetProcessDPIAware() | Out-Null
+$h = [Win]::FindWindowW([NullString]::Value, 'Grace')
+$f = [Win]::Frame($h)
+$bmp = New-Object System.Drawing.Bitmap $f[2], $f[3]
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($f[0], $f[1], 0, 0, $bmp.Size)
+$bmp.Save($args[0], [System.Drawing.Imaging.ImageFormat]::Png)
+"#;
+    let script = path.with_extension("ps1");
+    std::fs::write(&script, SCRIPT).unwrap();
+    let ok = Command::new("powershell")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script)
+        .arg(path)
+        .status()
+        .unwrap();
+    let _ = std::fs::remove_file(&script);
     assert!(ok.success());
 }
 
@@ -433,4 +478,25 @@ fn screens_narrow_toolbar() {
     app.hover(open.find(&Role::Button, "Open…").unwrap()).unwrap();
     app.wait_for_node(Role::Tooltip, "Open…").unwrap();
     shot(&app, "toolbar-narrow");
+}
+
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_open_in_vs_code() {
+    let dir = project("clean").unwrap();
+    let app = open(&dir, false);
+    app.press_named(Role::Button, "Expand basic.feature").unwrap();
+    run_all(&app);
+    let tree = app.tree().unwrap();
+    let row = starting(&tree, "failing match, ").unwrap().clone();
+    app.click(&row).unwrap();
+    app.wait_for("the details", WAIT, |t| starting(t, "tests/basic.feature:15").is_some())
+        .unwrap();
+    shot(&app, "details-open-in-vs-code");
+    // the build before this change has no menu: the wait is allowed to fail, and the shot shows the tree as it is
+    app.right_click(&row).unwrap();
+    let _ = app.wait_for("the menu", Duration::from_secs(3), |t| {
+        t.all().into_iter().any(|n| n.role == Role::MenuItem)
+    });
+    shot(&app, "tree-row-menu");
 }

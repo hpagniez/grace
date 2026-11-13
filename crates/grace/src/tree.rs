@@ -6,8 +6,11 @@
 //! (`aria_active_descendant`), so a screen reader follows the rows as it did. The rows' buttons are out of the tab
 //! order, as they were (VL-11).
 //!
-//! The debug button, the breakpoint dot (phase P4), "Open in VS Code" from a row's menu (P3) and the sub-folder
-//! buttons of an empty project (P4) come with their phases (P2 plan, Redesigns).
+//! A row's menu, "Open in VS Code", is GPUI Kit's `PopupMenu`, opened by the Tree itself: Kit's `ContextMenu` opens only
+//! on a right press, and the menu key must open it from the focus row (OT-01, P3 plan, Redesigns, `tree`).
+//!
+//! The debug button, the breakpoint dot (phase P4) and the sub-folder buttons of an empty project (P4) come with
+//! their phases (P2 plan, Redesigns).
 use crate::elements::Off as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -15,11 +18,15 @@ use std::rc::Rc;
 
 use gpui::accesskit::Role;
 use gpui::{
-    AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement,
-    Render, ScrollStrategy, SharedString, StatefulInteractiveElement as _, Styled, Subscription,
-    UniformListScrollHandle, Window, div, point, prelude::FluentBuilder as _, px, uniform_list,
+    Anchor, AnyElement, Context, DismissEvent, Entity, FocusHandle, Focusable as _, InteractiveElement as _,
+    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render, ScrollStrategy,
+    SharedString, StatefulInteractiveElement as _, Styled, Subscription, UniformListScrollHandle, Window, anchored,
+    deferred, div, point, prelude::FluentBuilder as _, px, uniform_list,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::menu::{PopupMenu, PopupMenuItem};
+use grace_core::editor::editor_place;
+use grace_core::karate::tree::find_node;
 use grace_core::model::flaky::FLAKY_TITLE;
 use grace_core::model::node::{NodeKind, Status};
 use grace_core::model::status::derive_status;
@@ -56,6 +63,13 @@ struct RunTrack {
     read: usize,
 }
 
+/// The open row menu: GPUI Kit's `PopupMenu` and where it was asked for, in window pixels.
+struct RowMenu {
+    view: Entity<PopupMenu>,
+    at: Point<Pixels>,
+    _dismissed: Subscription,
+}
+
 pub struct Tree {
     grace: Entity<Grace>,
     pub focus: FocusHandle,
@@ -81,6 +95,7 @@ pub struct Tree {
     seen_filter: Option<FilterState>,
     /// The selected row scrolls into view once the rows are built (VL-20, a pause, a reveal).
     reveal_selected: bool,
+    menu: Option<RowMenu>,
     _observe: Subscription,
 }
 
@@ -111,6 +126,7 @@ impl Tree {
             seen_pause: (None, 0),
             seen_filter: None,
             reveal_selected: false,
+            menu: None,
             _observe: observe,
         };
         tree.follow(&state);
@@ -212,6 +228,10 @@ impl Tree {
     fn build(&mut self, state: &AppState) {
         let from = (state.trees, state.filter.clone(), self.turns);
         if self.built.as_ref() != Some(&from) {
+            // another project or a new tree: a menu for the old one is gone
+            if self.built.as_ref().map(|b| b.0) != Some(state.trees) {
+                self.menu = None;
+            }
             self.built = Some(from);
             let before = Rc::clone(&self.keys);
             let rows = match &state.tree {
@@ -305,7 +325,7 @@ impl Tree {
         }
     }
 
-    fn on_key(&mut self, e: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn on_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let state = self.grace.read(cx).state.clone();
         let Some(f) = self.focus_index(&state) else { return };
         let k = &e.keystroke;
@@ -331,6 +351,13 @@ impl Tree {
                 && to != f
             {
                 self.move_to(to, cx);
+            }
+        } else if (k.key == "menu" || (m.shift && k.key == "f10")) && !m.control && !m.platform && !m.alt {
+            // the menu key and Shift+F10, on the focus row: a folder has no menu, so the key goes on
+            self.scroll.scroll_to_item(f, ScrollStrategy::Nearest);
+            let (key, at) = (self.keys[f].clone(), self.row_menu_at(f));
+            if self.open_menu(&key, at, window, cx) {
+                cx.stop_propagation();
             }
         } else if plain && matches!(k.key.as_str(), "enter" | "space") {
             cx.stop_propagation();
@@ -388,6 +415,62 @@ impl Tree {
             }
             _ => false,
         }
+    }
+
+    /// Opens the row's menu at `at`: "Open in VS Code" for a test, an outline or a feature, nothing for a folder
+    /// (OT-01 to OT-04). The place is worked out now and the file checked when the item is chosen, as Electron Grace's
+    /// main did. The selection and the focus row stay where they were (open-in-editor-from-tree R1.3).
+    fn open_menu(&mut self, key: &str, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let state = self.grace.read(cx).state.clone();
+        let Some(place) = state
+            .tree
+            .as_ref()
+            .and_then(|t| find_node(t, key))
+            .and_then(|n| editor_place(n, &state))
+        else {
+            return false;
+        };
+        let grace = self.grace.clone();
+        let view = PopupMenu::build(window, cx, move |menu, _, _| {
+            menu.item(
+                PopupMenuItem::new(crate::details::OPEN_IN_EDITOR).on_click(move |_, _, cx| {
+                    let place = place.clone();
+                    grace.update(cx, |g, cx| g.open_in_editor(place.file, place.line, cx));
+                }),
+            )
+        });
+        view.focus_handle(cx).focus(window, cx);
+        let dismissed = cx.subscribe_in(&view, window, |tree, menu, _: &DismissEvent, window, cx| {
+            // the focus goes back to the tree unless a click out of the menu already put it elsewhere
+            let elsewhere = window
+                .focused(cx)
+                .is_some_and(|f| !menu.focus_handle(cx).contains_focused(window, cx) && f != menu.focus_handle(cx));
+            tree.menu = None;
+            if !elsewhere {
+                window.focus(&tree.focus, cx);
+            }
+            cx.notify();
+        });
+        self.menu = Some(RowMenu {
+            view,
+            at,
+            _dismissed: dismissed,
+        });
+        cx.notify();
+        true
+    }
+
+    /// Where the menu key shows the menu: under the focus row, at the start of its name.
+    fn row_menu_at(&self, index: usize) -> Point<Pixels> {
+        let list = self.scroll.0.borrow().base_handle.bounds();
+        let v = self.view();
+        let level = self.rows[index].level;
+        // the scroll to the row is not applied yet: a row out of view gets the menu at the list's edge
+        let y = (PAD + (index + 1) as f32 * ROW_HEIGHT - v.scroll_top).clamp(0., f32::from(list.size.height));
+        point(
+            list.left() + px(8. + (level - 1) as f32 * INDENT + 2. * ROW_HEIGHT),
+            list.top() + px(y),
+        )
     }
 
     /// A click on a row: the row is the focus row, not from the keyboard, and the tree takes the focus.
@@ -533,6 +616,25 @@ impl Render for Tree {
                 .min_h_0(),
             )
             .vertical_scrollbar(&self.scroll)
+            .children(self.menu.as_ref().map(|m| {
+                // as GPUI Kit's `ContextMenu` draws its menu: above everything, kept inside the window
+                deferred(
+                    anchored().child(
+                        div()
+                            .w(window.bounds().size.width)
+                            .h(window.bounds().size.height)
+                            .on_scroll(|_, _, cx| cx.stop_propagation())
+                            .child(
+                                anchored()
+                                    .position(m.at)
+                                    .snap_to_window_with_margin(px(8.))
+                                    .anchor(Anchor::TopLeft)
+                                    .child(div().debug_selector(|| "row-menu".into()).child(m.view.clone())),
+                            ),
+                    ),
+                )
+                .with_priority(gpui_base::POPUP_PRIORITY)
+            }))
             .into_any_element()
     }
 }
@@ -749,6 +851,13 @@ impl Tree {
                     }
                 }
             }))
+            .on_mouse_down(MouseButton::Right, {
+                let key = key.clone();
+                cx.listener(move |tree, e: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    tree.open_menu(&key, e.position, window, cx);
+                })
+            })
             .on_click(move |_, window, cx| {
                 me.update(cx, |tree, cx| {
                     tree.clicked(&click_key, window, cx);

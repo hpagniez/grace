@@ -1,5 +1,6 @@
 //! What Grace asks of the platform and a test answers instead (migration guide, Architecture, "Seams for tests"):
-//! the folder dialog and opening a file with its program. A URL and the clipboard join with their first callers (P3).
+//! the folder dialog, opening a file with its program and opening a link with the program registered for it. The
+//! clipboard and the save dialog join with their first callers (P3).
 //!
 //! The app's seams are [`Platform`]. A build with the `e2e` feature reads `GRACE_E2E_SEAMS` and answers from it
 //! instead (`crate::e2e::E2eSeams`), as the Playwright tests stubbed `dialog.showOpenDialog`.
@@ -19,6 +20,9 @@ pub trait Seams: 'static {
     /// Opens a file with the program the system gives its type, as Electron's `shell.openPath`: the HTML report in
     /// the default browser (Report).
     fn open_path(&self, path: &std::path::Path, cx: &mut gpui::App);
+    /// Hands `url` to the program registered for its scheme, as Electron's `shell.openExternal` (Open in VS Code, OE-04).
+    /// False, with nothing opened, when no program is registered: Windows would otherwise offer to find an app.
+    fn open_url(&self, url: &str, cx: &mut gpui::App) -> bool;
 }
 
 /// The platform's own dialogs.
@@ -27,6 +31,16 @@ pub struct Platform;
 impl Seams for Platform {
     fn open_path(&self, path: &std::path::Path, cx: &mut gpui::App) {
         cx.open_with_system(path);
+    }
+
+    fn open_url(&self, url: &str, cx: &mut gpui::App) -> bool {
+        // Linux, which is not released (guide R5), has no registry to ask: its portal says if it cannot open the link
+        #[cfg(windows)]
+        if !windows_url::has_a_program(url) {
+            return false;
+        }
+        cx.open_url(url);
+        true
     }
 
     #[cfg(windows)]
@@ -66,6 +80,33 @@ impl Seams for Platform {
             })
         });
         Box::pin(async move { picked.await.ok()?.ok()?.and_then(|mut paths| paths.pop()) })
+    }
+}
+
+#[cfg(windows)]
+mod windows_url {
+    //! Electron's `app.getApplicationNameForProtocol`: the same Shell question, `AssocQueryString` for a protocol.
+    use windows::Win32::UI::Shell::{ASSOCF_IS_PROTOCOL, ASSOCSTR_FRIENDLYAPPNAME, AssocQueryStringW};
+    use windows::core::{HSTRING, PWSTR};
+
+    pub fn has_a_program(url: &str) -> bool {
+        let Some((scheme, _)) = url.split_once(':') else {
+            return false;
+        };
+        let mut name = [0u16; 260];
+        let mut len = name.len() as u32;
+        unsafe {
+            AssocQueryStringW(
+                ASSOCF_IS_PROTOCOL,
+                ASSOCSTR_FRIENDLYAPPNAME,
+                &HSTRING::from(scheme),
+                None,
+                Some(PWSTR(name.as_mut_ptr())),
+                &mut len,
+            )
+        }
+        .is_ok()
+            && name[0] != 0
     }
 }
 
@@ -178,6 +219,9 @@ pub mod fake {
         pub file: Mutex<Option<PathBuf>>,
         asked: Mutex<Vec<Option<PathBuf>>>,
         opened: Mutex<Vec<PathBuf>>,
+        urls: Mutex<Vec<String>>,
+        /// Answers every link with "no program registered".
+        pub no_program: std::sync::atomic::AtomicBool,
     }
 
     impl FakeSeams {
@@ -187,6 +231,8 @@ pub mod fake {
                 file: Mutex::default(),
                 asked: Mutex::default(),
                 opened: Mutex::default(),
+                urls: Mutex::default(),
+                no_program: Default::default(),
             }
         }
         pub fn asked(&self) -> Vec<Option<PathBuf>> {
@@ -194,6 +240,10 @@ pub mod fake {
         }
         pub fn opened(&self) -> Vec<PathBuf> {
             self.opened.lock().unwrap().clone()
+        }
+        /// Each link handed on, in order.
+        pub fn urls(&self) -> Vec<String> {
+            self.urls.lock().unwrap().clone()
         }
     }
 
@@ -210,5 +260,24 @@ pub mod fake {
         fn open_path(&self, path: &std::path::Path, _cx: &mut gpui::App) {
             self.opened.lock().unwrap().push(path.to_path_buf());
         }
+        fn open_url(&self, url: &str, _cx: &mut gpui::App) -> bool {
+            if self.no_program.load(std::sync::atomic::Ordering::SeqCst) {
+                return false;
+            }
+            self.urls.lock().unwrap().push(url.to_string());
+            true
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_url_tests {
+    use super::windows_url::has_a_program;
+
+    #[test]
+    fn asks_the_shell_whether_a_program_takes_the_scheme() {
+        assert!(has_a_program("https://example.com"));
+        assert!(!has_a_program("grace-no-such-scheme://x"));
+        assert!(!has_a_program("no scheme"));
     }
 }

@@ -664,12 +664,12 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| OT-01 | A right-click on a scenario asks for the menu | | ☐ |
-| OT-02 | A folder has no menu | | ☐ |
-| OT-03 | A failed test opens at its failed step | | ☐ |
-| OT-04 | A feature opens at its top | | ☐ |
-| OT-05 | Main refuses a malformed menu request | | ☐ |
-| OT-06 | Open a scenario from the tree (e2e) | | ☐ |
+| OT-01 | A right-click on a scenario asks for the menu | `grace::tree::tests::open_in_vs_code::a_right_click_shows_the_menu_at_the_pointer_for_a_test_at_its_line_and_keeps_the_selection`, `…a_right_click_on_a_rows_run_button_and_the_menu_key_on_the_focus_row_show_it_too` | ☑ |
+| OT-02 | A folder has no menu | `grace::tree::tests::open_in_vs_code::a_feature_opens_at_its_top_and_a_folder_and_the_lists_padding_show_no_menu`; `grace_core::editor::tests::editor_place::opens_a_feature_at_its_top_and_a_folder_nowhere` | ☑ |
+| OT-03 | A failed test opens at its failed step | `grace::tree::tests::open_in_vs_code::a_failed_test_opens_at_its_failed_step_even_in_a_called_feature`, `…a_failed_test_without_a_place_opens_at_its_own_line`; `grace_core::editor::tests::editor_place::opens_a_failed_test_where_karate_says_it_failed_even_in_a_called_feature` | ☑ |
+| OT-04 | A feature opens at its top | `grace::tree::tests::open_in_vs_code::a_feature_opens_at_its_top_and_a_folder_and_the_lists_padding_show_no_menu`; `grace_core::editor::tests::editor_place::opens_a_feature_at_its_top_and_a_folder_nowhere` | ☑ |
+| OT-05 | Main refuses a malformed menu request | Nothing to refuse: no IPC, and a path and a line are typed (plan P3, Redesigns, `app`) | ☑ |
+| OT-06 | Open a scenario from the tree (e2e) | `grace-e2e/tests/editor.rs::open_a_scenario_from_the_tree` | ☑ |
 
 ### OE · Open a test in VS Code
 
@@ -677,17 +677,17 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| OE-01 | The button opens the test at its line | | ☐ |
-| OE-02 | The button shows during a run | | ☐ |
-| OE-03 | The error's place is a link | | ☐ |
-| OE-04 | An error without a place has no link | | ☐ |
-| OE-05 | A feature of the tree resolves under the classpath | | ☐ |
-| OE-06 | Main opens only files of the open project | | ☐ |
-| OE-07 | Main refuses a malformed request (e2e) | | ☐ |
-| OE-08 | The link VS Code opens | | ☐ |
-| OE-09 | The link to a file on a share | | ☐ |
-| OE-10 | Open a scenario in VS Code (e2e) | | ☐ |
-| OE-11 | VS Code is not installed (e2e) | | ☐ |
+| OE-01 | The button opens the test at its line | `grace::details::tests::open_in_vs_code::opens_the_test_at_its_line_during_a_run_too`; `grace::app::tests::open_in_editor::hands_the_checked_file_to_the_system_as_a_vs_code_link` | ☑ |
+| OE-02 | The button shows during a run | `grace::details::tests::open_in_vs_code::opens_the_test_at_its_line_during_a_run_too` | ☑ |
+| OE-03 | The error's place is a link | `grace::details::tests::open_in_vs_code::makes_the_place_karate_names_on_the_errors_first_line_a_link`, `…takes_a_lowercase_drive_and_slash_separators`; `grace_core::editor::tests::failed_at` | ☑ |
+| OE-04 | An error without a place has no link | `grace::details::tests::open_in_vs_code::shows_an_error_without_a_place_as_text_a_config_failure`, `…_a_place_inside_a_sentence`; `grace_core::editor::tests::failed_at::finds_none_in_an_error_without_a_place` | ☑ |
+| OE-05 | A feature of the tree resolves under the classpath | `grace_core::runner::tests::editor::resolves_a_tree_path_through_the_classpath_and_keeps_an_absolute_path` (real Java and Karate) | ☑ |
+| OE-06 | Main opens only files of the open project | `grace_core::runner::tests::editor::refuses_a_file_outside_the_open_project_and_one_that_was_deleted`, `opens_nothing_with_no_project_open`; `grace_core::editor::tests::project_file::refuses_a_file_outside_the_project_a_missing_file_and_the_project_folder`, `…refuses_a_path_outside_the_project_without_reading_it_a_share_or_a_device_is_never_reached`, `…refuses_a_file_reached_through_a_link_to_a_folder_outside_the_project`; the notice: `grace::app::tests::open_in_editor::says_so_and_opens_nothing_for_a_file_outside_the_open_project` | ☑ |
+| OE-07 | Main refuses a malformed request (e2e) | Nothing to refuse: no IPC, and a path and a line are typed (plan P3, Redesigns, `app`) | ☑ |
+| OE-08 | The link VS Code opens | `grace_core::editor::tests::vscode_url::uses_slash_separators_and_encodes_what_a_url_needs` | ☑ |
+| OE-09 | The link to a file on a share | `grace_core::editor::tests::vscode_url::keeps_a_share_paths_two_leading_slashes_as_vs_code_reads_them` | ☑ |
+| OE-10 | Open a scenario in VS Code (e2e) | `grace-e2e/tests/editor.rs::open_a_scenario_in_vs_code` | ☑ |
+| OE-11 | VS Code is not installed (e2e) | `grace::app::tests::open_in_editor::says_so_and_opens_nothing_when_no_program_takes_the_link`; `grace-e2e/tests/editor.rs::it_says_so_when_vs_code_is_not_installed`; the Shell's own answer: `grace::seams::windows_url_tests::asks_the_shell_whether_a_program_takes_the_scheme` | ☑ |
 
 ### SC · Step comments in Details
 
@@ -995,9 +995,9 @@ Phase P3 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-editor-01 | Open a scenario in VS Code | | ☐ |
-| E-editor-02 | Open a scenario from the tree | | ☐ |
-| E-editor-03 | main refuses what it must not open | | ☐ |
+| E-editor-01 | Open a scenario in VS Code | `grace-e2e/tests/editor.rs::open_a_scenario_in_vs_code` | ☑ |
+| E-editor-02 | Open a scenario from the tree | `grace-e2e/tests/editor.rs::open_a_scenario_from_the_tree` | ☑ |
+| E-editor-03 | main refuses what it must not open | VS Code missing: `grace-e2e/tests/editor.rs::it_says_so_when_vs_code_is_not_installed`. A path outside the project: `grace_core::runner::tests::editor` (e2e has no way to name one). The malformed requests: nothing to refuse, no IPC (plan P3, Redesigns, `app`) | ☑ |
 
 ### e2e/env.spec.ts
 
@@ -1332,7 +1332,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | File | Tests | Moves to | Ported |
 |---|---|---|---|
 | `src/main/batch.test.ts` | 2 | `grace-core::batch::tests` (4 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/editor.test.ts` | 10 | `grace-core::editor` | ☐ |
+| `src/main/editor.test.ts` | 10 | `grace_core::editor::tests` (`project_file` 6 and `vscode_url` 2 on the same strings; `validRequest` and `validPoint`, 2, are `n/a`: a path and a line are typed, plan P3, Redesigns, `app`; 9 more for `failed_at` and `editor_place`) | ☑ |
 | `src/main/fingerprint.test.ts` | 10 | `grace-core::fingerprint::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/flaky.test.ts` | 19 | `grace-core::flaky::tests` (20 tests) | ☑ |
 | `src/main/history.test.ts` | 19 | `grace-core::history::tests` (37 tests) | ☑ |
@@ -1357,7 +1357,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/report-zip.test.ts` | 6 | `grace-core::report-zip` | ☐ |
 | `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
 | `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner::tests::discovery` (11 tests, real Java and Karate) | ☑ |
-| `src/main/runner.editor.test.ts` | 2 | `grace-core::runner` (editor) | ☐ |
+| `src/main/runner.editor.test.ts` | 2 | `grace_core::runner::tests::editor` (3 tests, real Java and Karate) | ☑ |
 | `src/main/runner.env.test.ts` | 12 | `grace-core::runner::tests::env` (12 tests, real Java and Karate) | ☑ |
 | `src/main/runner.fingerprint.test.ts` | 10 | `grace-core::runner::tests::fingerprint` (10 tests, real Java and Karate) | ☑ |
 | `src/main/runner.flaky.test.ts` | 3 | `grace-core::runner::tests::flaky` (3 tests, real Java and Karate) | ☑ |
@@ -1391,7 +1391,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 12 ported, 1 `n/a` that counts Solid memo calls; 17 wait for P3, Open in VS Code and the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
+| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 wait for P3, the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
@@ -1412,7 +1412,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 73 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 15 wait for P3, the VS Code menu, and P4, the debugger, Build and sub-folders) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 79 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 9 wait: test 28 for P3, the flaky mark's name, and 8 for P4, the debugger, Build and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |

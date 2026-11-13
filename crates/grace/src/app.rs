@@ -49,6 +49,8 @@ pub trait Backend: Send + Sync + 'static {
     fn save_properties(&self, edit: &PropertiesEdit) -> bool;
     /// The last run's HTML report, if it is there.
     fn report_path(&self) -> Option<PathBuf>;
+    /// A tree path or an absolute path as a file of the open project that Open in VS Code may open (OE-05, OE-06).
+    fn editor_file(&self, file: &str) -> Option<PathBuf>;
 }
 
 impl Backend for Runner {
@@ -99,6 +101,9 @@ impl Backend for Runner {
     }
     fn report_path(&self) -> Option<PathBuf> {
         Runner::report_path(self)
+    }
+    fn editor_file(&self, file: &str) -> Option<PathBuf> {
+        Runner::editor_file(self, file)
     }
 }
 
@@ -413,6 +418,32 @@ impl Grace {
         .detach();
     }
 
+    /// Open in VS Code (OE-01 to OE-06): `file`, a tree path or the place Karate wrote, at `line`. The runner checks it is
+    /// a file of the open project; a refusal and a machine without VS Code each say so in a notice.
+    pub fn open_in_editor(&mut self, file: String, line: u32, cx: &mut Context<Self>) {
+        let backend = Arc::clone(&self.backend);
+        let seams = Arc::clone(&self.seams);
+        let checked = cx.background_spawn(async move { backend.editor_file(&file) });
+        cx.spawn(async move |this, cx| {
+            let notice = match checked.await {
+                None => Some("Grace opens only files of the open project"),
+                Some(abs) => {
+                    let url = grace_core::editor::vscode_url(&abs, line);
+                    // Windows would otherwise offer to find an app for the link
+                    let opened = cx.update(|cx| seams.open_url(&url, cx));
+                    (!opened).then_some("Open in VS Code needs VS Code installed")
+                }
+            };
+            if let Some(text) = notice {
+                let _ = this.update(cx, |grace, cx| {
+                    grace.state_mut().reduce(&AppEvent::notice(text));
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
+    }
+
     /// Cancels a run and waits for Java to end, off the UI thread.
     pub fn dispose(&self, cx: &App) -> Task<()> {
         let backend = Arc::clone(&self.backend);
@@ -461,6 +492,8 @@ pub mod fake {
         pub edits: Mutex<Vec<PropertiesEdit>>,
         /// Answers Save with false, as the runner does after a notice.
         pub refuse_save: std::sync::atomic::AtomicBool,
+        /// Answers every file with "not a file of the open project".
+        pub refuse_editor: std::sync::atomic::AtomicBool,
     }
 
     impl FakeBackend {
@@ -530,6 +563,10 @@ pub mod fake {
         fn report_path(&self) -> Option<PathBuf> {
             self.record("report_path".into());
             Some(PathBuf::from("/out/karate-summary.html"))
+        }
+        fn editor_file(&self, file: &str) -> Option<PathBuf> {
+            self.record(format!("editor_file {file}"));
+            (!self.refuse_editor.load(std::sync::atomic::Ordering::SeqCst)).then(|| PathBuf::from(file))
         }
     }
 }
@@ -645,5 +682,59 @@ mod tests {
         cx.run_until_parked();
         assert_eq!(backend.calls(), ["open /work/api"]);
         assert_eq!(seams.asked(), vec![None]); // no recent folder: the dialog's own start
+    }
+
+    mod open_in_editor {
+        use super::*;
+
+        fn editor(cx: &mut TestAppContext) -> (Entity<Grace>, Arc<FakeBackend>, Arc<FakeSeams>) {
+            let backend = Arc::new(FakeBackend::default());
+            let seams = Arc::new(FakeSeams::default());
+            let (_tx, rx) = events();
+            std::mem::forget(_tx);
+            let (b, s): (Arc<dyn Backend>, Arc<dyn Seams>) = (backend.clone(), seams.clone());
+            let g = cx.update(|cx| cx.new(|cx| Grace::new(b, s, PathBuf::new(), rx, cx)));
+            (g, backend, seams)
+        }
+
+        fn notice(g: &Entity<Grace>, cx: &mut TestAppContext) -> Option<String> {
+            g.read_with(cx, |g, _| g.state.notice.as_ref().map(|n| n.text.clone()))
+        }
+
+        #[gpui::test]
+        fn hands_the_checked_file_to_the_system_as_a_vs_code_link(cx: &mut TestAppContext) {
+            let (g, backend, seams) = editor(cx);
+            g.update(cx, |g, cx| g.open_in_editor("C:/p/tests/a#b.feature".into(), 12, cx));
+            cx.run_until_parked();
+            assert_eq!(backend.calls(), ["editor_file C:/p/tests/a#b.feature"]);
+            assert_eq!(seams.urls(), ["vscode://file/C:/p/tests/a%23b.feature:12"]);
+            assert_eq!(notice(&g, cx), None);
+        }
+
+        #[gpui::test]
+        fn says_so_and_opens_nothing_for_a_file_outside_the_open_project(cx: &mut TestAppContext) {
+            let (g, backend, seams) = editor(cx);
+            backend.refuse_editor.store(true, std::sync::atomic::Ordering::SeqCst);
+            g.update(cx, |g, cx| g.open_in_editor("C:/Windows/win.ini".into(), 1, cx));
+            cx.run_until_parked();
+            assert_eq!(
+                notice(&g, cx).as_deref(),
+                Some("Grace opens only files of the open project")
+            );
+            assert!(seams.urls().is_empty());
+        }
+
+        #[gpui::test]
+        fn says_so_and_opens_nothing_when_no_program_takes_the_link(cx: &mut TestAppContext) {
+            let (g, _, seams) = editor(cx);
+            seams.no_program.store(true, std::sync::atomic::Ordering::SeqCst);
+            g.update(cx, |g, cx| g.open_in_editor("C:/p/tests/a.feature".into(), 3, cx));
+            cx.run_until_parked();
+            assert_eq!(
+                notice(&g, cx).as_deref(),
+                Some("Open in VS Code needs VS Code installed")
+            );
+            assert!(seams.urls().is_empty());
+        }
     }
 }

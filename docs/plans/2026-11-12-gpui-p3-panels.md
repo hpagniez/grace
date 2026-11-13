@@ -77,7 +77,7 @@ Specs: [open in editor](../specs/2026-11-03-open-in-editor.md), [from the tree](
 2. The runner's open-in-editor call from `runner.editor.test.ts`: only a file of the open project (OE-06), a tree feature resolved under the classpath (OE-05).
 3. `Seams::open_url`, with GPUI's `open_url`; the `e2e` build records the link and can answer that VS Code is not installed (OE-11).
 4. Details: the Open in VS Code button, shown during a run too (OE-01, OE-02), and the error's place as a link (OE-03, OE-04). A long place that wraps starts at the left (#220).
-5. The tree: GPUI Kit's context menu on a right-click and, from the focused row, on the menu key, with "Open in VS Code" for a test and a feature, none for a folder (OT-01 to OT-04).
+5. The tree: GPUI Kit's `PopupMenu`, opened by the Tree on a right-click and, from the focused row, on the menu key or Shift+F10, with "Open in VS Code" for a test and a feature, none for a folder (OT-01 to OT-04). Built as Redesigns, `tree`, says: Kit's `ContextMenu` has no way to open from a key.
 6. OE-07, OT-05 and E-editor-03's malformed requests: there is no IPC to send one through. The rows are `n/a` by the type of the call, as E-appearance-06 was; the runner's own refusal (item 2) keeps its test. Nobody using Grace could notice these.
 
 ### Slice 3: the HTTP list
@@ -153,8 +153,8 @@ Spec: [group failures](../specs/2026-11-04-group-failures.md).
 
    | Bug | What must hold | Test |
    |---|---|---|
-   | #219 | Open in VS Code works for a share or a mapped drive | Named by slice 2 |
-   | #220 | A long wrapped error place is not centred | Named by slice 2 |
+   | #219 | Open in VS Code works for a share or a mapped drive | `grace_core::editor::tests::project_file::names_the_file_under_the_project_folder_as_it_was_opened_a_mapped_drive_keeps_its_letter`, `grace_core::editor::tests::vscode_url::keeps_a_share_paths_two_leading_slashes_as_vs_code_reads_them` |
+   | #220 | A long wrapped error place is not centred | `grace::details::tests::open_in_vs_code::a_long_place_that_wraps_starts_at_the_left` |
 
 2. PU-33: GPUI beside Electron for each panel and detail view of P3, light and dark.
 3. VL-27's HTTP half: the HTTP tab at 10,000 tests, on the owner's machine with his go ([owner-machine](../process/owner-machine.md)).
@@ -168,9 +168,10 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 
 | Module | Change from Electron Grace | Why | Parity kept by |
 |---|---|---|---|
-| `app` | The requests `main.ts` refused as malformed (OE-07, OT-05, ER-06, half of E-editor-03) cannot be made: the calls are typed methods of `Grace` | One process, no IPC (P2 Redesigns, `app`) | The runner's own refusals: a file outside the project (OE-06), `valid_run_id` |
-| `seams` | `open_url`, `copy` and `pick_save` join the seams | Electron's `shell.openExternal`, `navigator.clipboard` and `dialog.showSaveDialog` (guide R4) | The `e2e` build's record of each ask; the real ones by hand in slice 11 |
-| `tree` | The row's menu is GPUI Kit's context menu, where Electron Grace asked main for a native `Menu.popup` | Guide R4; no native menu in GPUI | `tree::tests` (the six OT tests), `grace-e2e/tests/editor.rs` |
+| `app` | The requests `main.ts` refused as malformed (OE-07, OT-05, ER-06, half of E-editor-03) cannot be made: the calls are typed methods of `Grace`. `validRequest` and `validPoint` of `editor.ts` are not ported (2 of `editor.test.ts`'s 10 tests, `n/a`); a place whose line is 0 is no place, where Electron Grace showed its link and then refused it with "Invalid request" | One process, no IPC (P2 Redesigns, `app`) | The runner's own refusals: a file outside the project (OE-06), `valid_run_id` |
+| `seams` | `open_url`, `copy` and `pick_save` join the seams. `open_url` answers whether a program took the link: GPUI's `open_url` does not say, so the Windows build first asks the Shell (`AssocQueryString` for the scheme) as Electron's `app.getApplicationNameForProtocol` did, and Grace says "Open in VS Code needs VS Code installed" when none is registered | Electron's `shell.openExternal`, `navigator.clipboard` and `dialog.showSaveDialog` (guide R4); without the check Windows offers to find an app for the link | The `e2e` build's record of each link and its answer `{"vscode": false}`; `grace::seams::windows_url_tests`; the real ones by hand in slice 11 |
+| `tree` | The row's menu is GPUI Kit's `PopupMenu`, which the Tree opens and draws itself on a right press and on the menu key or Shift+F10 at the focus row, where Electron Grace asked main for a native `Menu.popup`. Not Kit's `ContextMenu` wrapper: it opens only on a right press, with no way to open it from a key | Guide R4; no native menu in GPUI; the spec asks for the menu key (OT-01, R1.1). No patch: only the Kit's public API | `tree::tests::open_in_vs_code` (tests 86 to 91), `grace-e2e/tests/editor.rs` |
+| `details` (link) | The error's place is `elements::link`, a GPUI Kit `Button` whose text is its own child, left-aligned and wrapping, where a browser's `<button>` centred a wrapped place (#220) and Kit's button content never wraps at all | Bug #220; a long place must not run past the pane | `details::tests::open_in_vs_code::a_long_place_that_wraps_starts_at_the_left` |
 | `http`, `examples` | The lists are `uniform_list`s with the tree's focus rule, where Electron Grace shared `VirtualList.tsx` | P2 Redesigns, `tree` | VL-13, VL-19, VL-25, DD-04, DD-07 |
 
 ## Traps
