@@ -170,7 +170,7 @@ impl Render for Gallery {
 }
 
 /// The seams' answers for an end-to-end test (migration guide, Architecture). `GRACE_E2E_SEAMS` names a JSON file the
-/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null}`. Each ask
+/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null, "vscode": false}`. Each ask
 /// is appended to `<data folder>/e2e-seams.jsonl`, `{"seam": "folder", "start": "<path>" | null}`, as the Playwright
 /// tests recorded `dialog.showOpenDialog`'s options.
 pub struct E2eSeams {
@@ -215,6 +215,20 @@ impl crate::seams::Seams for E2eSeams {
             .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
             .and_then(|v| v.get("file")?.as_str().map(std::path::PathBuf::from));
         Box::pin(async move { answer })
+    }
+
+    /// `{"vscode": false}`: no program is registered for a link, as on a machine without VS Code (OE-11); nothing is
+    /// recorded then. Otherwise the link is recorded, as `shell.openExternal` was stubbed, never opened.
+    fn open_url(&self, url: &str, _cx: &mut gpui::App) -> bool {
+        let installed = std::fs::read_to_string(&self.answers)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("vscode")?.as_bool())
+            .unwrap_or(true);
+        if installed {
+            self.record(serde_json::json!({ "seam": "url", "url": url }));
+        }
+        installed
     }
 
     /// Records the path instead of opening a browser on the test machine.
