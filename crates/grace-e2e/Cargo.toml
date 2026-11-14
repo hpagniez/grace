@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 serde_json = "1.0.154"
+# the seeded run folders (`history.rs`) are written as the app writes them
+grace-core = { path = "../grace-core" }
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 atspi = { version = "=0.29.0", default-features = false, features = [

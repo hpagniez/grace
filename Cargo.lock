@@ -2833,7 +2833,9 @@ name = "grace-e2e"
 version = "0.0.0"
 dependencies = [
  "atspi",
+ "chrono",
  "futures-lite",
+ "grace-core",
  "serde_json",
  "uiautomation",
  "windows 0.62.2",
