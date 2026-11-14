@@ -1,6 +1,8 @@
 //! What the views' headless tests share: a `Grace` on the fake runner, a window that draws one view of it with the
 //! window's tooltips, and the states the Electron tests built (`test/fixtures`, `Toolbar.test.tsx`'s `state()`).
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{
@@ -130,6 +132,49 @@ pub fn open_in(
         }
     });
     let view = window.root(cx).unwrap();
+    let vcx = VisualTestContext::from_window(window.into(), cx);
+    vcx.simulate_resize(size(px(width), px(700.)));
+    vcx.run_until_parked();
+    (
+        Harness {
+            grace,
+            backend,
+            seams,
+            view,
+        },
+        vcx,
+    )
+}
+
+/// As [`open_with`], with GPUI Kit's `Root` around the view, as the app's window has it: a dialog opens in it.
+pub fn open_rooted(
+    cx: &mut TestAppContext,
+    width: f32,
+    state: AppState,
+    draw: impl Fn(&Entity<Grace>, &mut Window, &mut gpui::App) -> AnyElement + 'static,
+) -> (Harness, VisualTestContext) {
+    cx.update(crate::init);
+    let backend = Arc::new(FakeBackend::default());
+    let seams = Arc::new(FakeSeams::answering(Some("/picked")));
+    let (tx, rx) = crate::app::events();
+    std::mem::forget(tx);
+    let b: Arc<dyn Backend> = backend.clone();
+    let s: Arc<dyn crate::seams::Seams> = seams.clone();
+    let grace = cx.update(|cx| cx.new(|cx| Grace::new(b, s, PathBuf::new(), rx, cx)));
+    grace.update(cx, |g, _| *g.state_mut() = state);
+    let g = grace.clone();
+    let slot: Rc<RefCell<Option<Entity<View>>>> = Rc::default();
+    let keep = slot.clone();
+    let window = cx.add_window(move |window, cx| {
+        let view = cx.new(|_| View {
+            grace: g,
+            tips: None,
+            draw: Box::new(draw),
+        });
+        *keep.borrow_mut() = Some(view.clone());
+        gpui_component::Root::new(view, window, cx)
+    });
+    let view = slot.borrow().clone().unwrap();
     let vcx = VisualTestContext::from_window(window.into(), cx);
     vcx.simulate_resize(size(px(width), px(700.)));
     vcx.run_until_parked();
