@@ -21,6 +21,8 @@ pub fn runs_dir(data: &Path, root: &Path) -> PathBuf {
 pub struct Seed {
     /// A `karate-summary.html` in each run folder: its Report can open.
     pub report: bool,
+    /// Minutes older than the default (one minute apart, the newest a minute ago): a run from yesterday.
+    pub ago: i64,
     /// Fields that replace those of every record (`record` of `seedRuns`), as an object.
     pub record: Value,
 }
@@ -33,7 +35,7 @@ pub fn seed_runs(data: &Path, root: &Path, n: usize, seed: &Seed) -> Vec<String>
     let now = Local::now();
     (0..n)
         .map(|i| {
-            let started = now - Duration::minutes((n - i) as i64);
+            let started = now - Duration::minutes((n - i) as i64 + seed.ago);
             let run = create_run_dir(&project, &started).expect("a run folder");
             let name = root
                 .file_name()
