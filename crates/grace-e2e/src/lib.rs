@@ -429,6 +429,17 @@ impl App {
             .collect()
     }
 
+    /// The texts Grace put on the clipboard, in order (`e2e-seams.jsonl`): Copy as cURL's.
+    pub fn copies(&self) -> Vec<String> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "copy")
+            .filter_map(|v| v["text"].as_str().map(str::to_string))
+            .collect()
+    }
+
     /// Sets one seam's answer and keeps the others'.
     fn answer(&self, seam: &str, path: Option<&Path>) -> Result<()> {
         let file = seams_file(&self.data);
