@@ -297,7 +297,7 @@ fn reading_the_calls_of_one_run_all() {
     assert_eq!(steps, Some(4), "{}", t.dump());
 
     // the arrow keys open the next call, and the pane follows
-    select(&app, "http.feature");
+    select_with(&app, "http.feature", Key::Up);
     let t = app
         .wait_for("the feature's calls", WAIT, |t| {
             tab_is(t, "HTTP (12)") && calls(t).len() == 12
