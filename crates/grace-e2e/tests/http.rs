@@ -282,14 +282,11 @@ fn reading_the_calls_of_one_run_all() {
     app.wait_for("the request headers", WAIT, |t| holding(t, "Host:").is_some())
         .unwrap();
     app.press_named(Role::Button, COPY).unwrap();
-    app.wait_for("Copied", WAIT, |t| t.find(&Role::Button, "Copied").is_some())
-        .unwrap();
+    // "Copied" lasts two seconds, which a read of the whole tree can miss; the copy itself stays
+    app.wait_until("the copy", WAIT, || !app.copies().is_empty()).unwrap();
     let copies = app.copies();
-    assert_eq!(
-        copies.len(),
-        1,
-        "the button of the call with no request copied nothing: {copies:?}"
-    );
+    // the press on the call with no request, before, copied nothing
+    assert_eq!(copies.len(), 1, "{copies:?}");
     let curl = &copies[0];
     assert!(curl.starts_with("curl -X GET 'http://localhost:"), "{curl}");
     assert!(curl.contains(" -H 'User-Agent: "), "{curl}");
@@ -452,6 +449,10 @@ fn a_secret_never_shows_in_a_call() {
     .unwrap();
 
     // the secret header scenario is the last of its feature: its row comes into view with the tree's arrow keys
+    if row(&app.tree().unwrap(), "ok").is_none() {
+        app.press_named(Role::Button, "Expand http.feature").unwrap();
+        app.wait_for("the scenarios", WAIT, |t| row(t, "ok").is_some()).unwrap();
+    }
     select(&app, "ok");
     select_with(&app, "secret header", Key::Down);
     app.press_named(Role::Button, "Run secret header").unwrap();
@@ -465,10 +466,11 @@ fn a_secret_never_shows_in_a_call() {
     app.wait_for("the masked header", WAIT, |t| holding(t, "X-Token: ****").is_some())
         .unwrap();
     app.press_named(Role::Button, COPY).unwrap();
-    app.wait_for("Copied", WAIT, |t| t.find(&Role::Button, "Copied").is_some())
-        .unwrap();
+    // "Copied" lasts two seconds, which a read of the whole tree can miss; the copy itself stays
+    app.wait_until("the copy", WAIT, || !app.copies().is_empty()).unwrap();
 
     let copies = app.copies();
+    assert_eq!(copies.len(), 1, "{copies:?}");
     assert!(copies[0].contains("-H 'X-Token: ****'"), "{copies:?}");
     assert!(!copies[0].contains(SECRET), "{copies:?}");
     // every name and text in the window: the tree is what Grace shows, to a person and to a screen reader
