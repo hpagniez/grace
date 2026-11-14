@@ -591,7 +591,9 @@ impl HttpCalls {
             .aria_selected(selected)
             .aria_size_of_set(self.rows.len())
             .aria_position_in_set(i + 1)
-            .when(is_focus_row, |d| d.aria_active_descendant())
+            // only while the list holds the focus: with the focus on the window's root, which is above this list and the
+            // tree both, two rows would claim it and GPUI refuses that
+            .when(is_focus_row && focused, |d| d.aria_active_descendant())
             .cursor_pointer()
             .relative()
             .w_full()
