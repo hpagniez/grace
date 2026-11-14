@@ -456,6 +456,11 @@ impl Grace {
         .detach();
     }
 
+    /// Copy as cURL: puts `text` on the clipboard.
+    pub fn copy(&self, text: &str, cx: &mut Context<Self>) {
+        self.seams.copy(text, cx);
+    }
+
     /// Cancels a run and waits for Java to end, off the UI thread.
     pub fn dispose(&self, cx: &App) -> Task<()> {
         let backend = Arc::clone(&self.backend);
