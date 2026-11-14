@@ -97,7 +97,7 @@ mod tabs {
         assert_eq!(tab_name(TabId::Http, &state), "HTTP (0)");
     }
 
-    /// `History.test.tsx` 1: Console has no Clear history; the History tab shows its runs and the button beside its tab list.
+    /// `History.test.tsx` 2: Console has no Clear history; the History tab shows its runs and the button beside its tab list.
     #[gpui::test]
     fn the_history_tab_shows_its_runs_and_clear_history_beside_the_tab_list(cx: &mut TestAppContext) {
         let (h, mut cx, _p) = setup(cx, data_dir("history-tab"));

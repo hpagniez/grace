@@ -99,7 +99,7 @@ fn selection(kind: NodeKind, file: &str, name: &str) -> StoredSelection {
     }
 }
 
-/// 3, 4: the rows say what `history_list::row_text` works out, newest first, each with its columns.
+/// 4, 5: the rows say what `history_list::row_text` works out, newest first, each with its columns.
 #[gpui::test]
 fn lists_a_row_per_run_with_its_labels(cx: &mut TestAppContext) {
     let runs = vec![
@@ -139,7 +139,7 @@ fn lists_a_row_per_run_with_its_labels(cx: &mut TestAppContext) {
     assert!(!drawn(&mut cx, "history-row:3"));
 }
 
-/// 7: a tag is drawn once per tag of the filter, a run with no filter says "—".
+/// 10: a tag is drawn once per tag of the filter, a run with no filter says "—".
 #[gpui::test]
 fn draws_a_tag_by_its_shape_and_a_run_with_no_filter_says_a_dash(cx: &mut TestAppContext) {
     let runs = vec![
@@ -174,7 +174,7 @@ fn draws_a_tag_by_its_shape_and_a_run_with_no_filter_says_a_dash(cx: &mut TestAp
     }
 }
 
-/// 5: where the node sits is a tooltip over its row, not a title; All and Re-run failed say nothing.
+/// 6, 7: where the node sits is a tooltip over its row, not a title; All and Re-run failed say nothing.
 #[gpui::test]
 fn puts_where_the_node_sits_in_a_tooltip_over_its_row(cx: &mut TestAppContext) {
     let runs = vec![
@@ -209,7 +209,7 @@ fn puts_where_the_node_sits_in_a_tooltip_over_its_row(cx: &mut TestAppContext) {
     assert_eq!(rest(&mut cx, 3).1, None, "Failed tests has no path");
 }
 
-/// 9: 28 px rows under a header that stays above the list, which scrolls.
+/// 12: 28 px rows under a header that stays above the list, which scrolls.
 #[gpui::test]
 fn makes_a_row_28_px_under_a_header_that_stays_above_the_rows(cx: &mut TestAppContext) {
     let (_h, mut cx, _list) = setup(cx, vec![entry("a"), entry("b")]);
@@ -228,7 +228,7 @@ fn makes_a_row_28_px_under_a_header_that_stays_above_the_rows(cx: &mut TestAppCo
     );
 }
 
-/// 12: no runs, the empty state with the history icon, and Clear history is off; a run replaces it.
+/// 15, 27: no runs, the empty state with the history icon, and Clear history is off; a run replaces it.
 #[gpui::test]
 fn says_no_runs_yet_in_an_empty_state_with_the_history_icon(cx: &mut TestAppContext) {
     let (h, mut cx, list) = setup(cx, vec![]);
@@ -244,7 +244,7 @@ fn says_no_runs_yet_in_an_empty_state_with_the_history_icon(cx: &mut TestAppCont
     assert_eq!(texts(&list, &mut cx).len(), 1);
 }
 
-/// 13, 14, 15: a row's buttons call the runner with its id; Report and Re-run failed are off where they have nothing to
+/// 16, 17, 18: a row's buttons call the runner with its id; Report and Re-run failed are off where they have nothing to
 /// do. Export is slice 6's.
 #[gpui::test]
 fn the_buttons_of_a_row_call_the_runner_with_its_id(cx: &mut TestAppContext) {
@@ -287,7 +287,7 @@ fn report_and_re_run_failed_do_nothing_where_they_are_off(cx: &mut TestAppContex
     assert_eq!(h.backend.calls(), ["rerun a"]);
 }
 
-/// 16: every action waits for the runner, a run in progress included; switching tabs stays possible.
+/// 19: every action waits for the runner, a run in progress included; switching tabs stays possible.
 #[gpui::test]
 fn every_action_is_off_while_the_runner_is_busy_or_a_run_is_active(cx: &mut TestAppContext) {
     let (h, mut cx, _list) = setup(cx, vec![entry("a"), entry("b")]);
@@ -348,7 +348,7 @@ mod clear {
         (h, cx)
     }
 
-    /// 17: the dialog says how many runs, Delete asks the runner, Cancel does nothing.
+    /// 20: the dialog says how many runs, Delete asks the runner, Cancel does nothing.
     #[gpui::test]
     fn confirms_with_the_count_cancel_does_nothing_delete_clears(cx: &mut TestAppContext) {
         let (h, mut cx) = open(cx, 3);
@@ -363,10 +363,10 @@ mod clear {
         assert_eq!(h.backend.calls(), ["clear_history"]);
     }
 
-    /// 18: Delete (danger) first, then Cancel, which has the focus (PU-32).
+    /// 21: Delete (danger) first, then Cancel, which has the focus (PU-32).
     #[gpui::test]
     fn puts_delete_first_then_cancel_which_has_the_focus(cx: &mut TestAppContext) {
-        let (_h, mut cx) = open(cx, 2);
+        let (h, mut cx) = open(cx, 2);
         let (delete, cancel) = (
             bounds(&mut cx, "clear-history-confirm".into()),
             bounds(&mut cx, "clear-history-cancel".into()),
@@ -381,9 +381,10 @@ mod clear {
         cx.executor().advance_clock(std::time::Duration::from_secs(1));
         cx.run_until_parked();
         assert!(!title(&mut cx));
+        assert!(h.backend.calls().is_empty(), "Enter pressed Cancel, not Delete");
     }
 
-    /// 18: Escape closes it and runs nothing.
+    /// 23: Escape closes it and runs nothing.
     #[gpui::test]
     fn escape_closes_it_and_deletes_nothing(cx: &mut TestAppContext) {
         let (h, mut cx) = open(cx, 2);
@@ -395,14 +396,14 @@ mod clear {
         assert!(h.backend.calls().is_empty());
     }
 
-    /// 19: one run is worded in the singular.
+    /// 22: one run is worded in the singular.
     #[gpui::test]
     fn words_one_run_in_the_singular(cx: &mut TestAppContext) {
         let (_h, mut cx) = open(cx, 1);
         assert!(says(&mut cx, "Delete the 1 run of this project and its report?"));
     }
 
-    /// 20 to 22: the dialog keeps the words it was opened with while the runner's empty list arrives, and counts again
+    /// 24, 25: the dialog keeps the words it was opened with while the runner's empty list arrives, and counts again
     /// each time it opens.
     #[gpui::test]
     fn keeps_the_count_it_was_opened_with_and_counts_again_each_time(cx: &mut TestAppContext) {

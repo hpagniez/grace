@@ -136,9 +136,11 @@ impl History {
         let text = &self.rows[i];
         let a = actions(e, locked);
         let id = e.id.clone();
+        // widgets are keyed by the run, not its place: the focus stays with a run when a new one pushes it down
+        let rid = id.clone();
         let cell = |what: &'static str, value: String| {
             div()
-                .id((what, i))
+                .id(SharedString::from(format!("history-{what}-{rid}")))
                 .debug_selector(move || format!("history-{what}:{}", i + 1))
                 .role(Role::Label)
                 .aria_value(value.clone())
@@ -151,18 +153,18 @@ impl History {
                 .debug_selector(move || format!("history-tags:{}", i + 1))
                 .flex()
                 .gap_1()
-                .children(text.tags.iter().enumerate().map(|(k, tag)| tag_chip(i, k, tag, cx)))
+                .children(text.tags.iter().enumerate().map(|(k, tag)| tag_chip(&rid, k, tag, cx)))
                 .into_any_element()
         };
         let what = div().flex_1().min_w_0().max_w(px(WHAT_MAX)).overflow_hidden().child(
             tooltip(
-                SharedString::from(format!("history-what-tip-{i}")),
+                SharedString::from(format!("history-what-tip-{rid}")),
                 text.path.clone().map(SharedString::from),
             )
             .side(Side::Over)
             .child(
                 div()
-                    .id(("history-what-text", i))
+                    .id(SharedString::from(format!("history-what-text-{rid}")))
                     .debug_selector(move || format!("history-what:{}", i + 1))
                     .role(Role::Label)
                     .aria_value(text.what.clone())
@@ -177,7 +179,7 @@ impl History {
             .items_center()
             .gap(px(6.))
             .child(status_mark(
-                ("history-mark", i),
+                SharedString::from(format!("history-mark-{rid}")),
                 mark(text.mark),
                 14.,
                 true,
@@ -186,7 +188,7 @@ impl History {
             ))
             .child(cell("result", text.result.clone()));
         div()
-            .id(("history-row", i))
+            .id(SharedString::from(format!("history-row-{rid}")))
             .debug_selector(move || format!("history-row:{}", i + 1))
             .role(Role::ListItem)
             .aria_label(format!("{}, {}, {}", text.when, text.what, text.result))
@@ -200,19 +202,13 @@ impl History {
             .border_color(Theme::color(t.line))
             .text_size(px(METRICS.text_xs.size))
             .text_color(Theme::color(t.ink))
-            .child(
-                cell("when", text.when.clone())
-                    .flex_none()
-                    .w(px(WHEN))
-                    .font_family(MONO),
-            )
+            .child(cell("when", text.when.clone()).flex_none().w(px(WHEN)))
             .child(cell("env", text.env.clone()).flex_none().w(px(ENV)))
             .child(
                 cell("threads", text.threads.clone())
                     .flex_none()
                     .w(px(THREADS))
-                    .text_right()
-                    .font_family(MONO),
+                    .text_right(),
             )
             .child(div().flex_1().min_w_0().overflow_hidden().child(tags))
             .child(what)
@@ -229,6 +225,7 @@ impl History {
     }
 
     fn buttons(&self, i: usize, id: String, a: Actions) -> impl IntoElement {
+        let key = id.clone();
         let (report, rerun, failed) = (id.clone(), id.clone(), id);
         let (g1, g2, g3) = (self.grace.clone(), self.grace.clone(), self.grace.clone());
         // each button in a frame that names it, for the tests' clicks
@@ -246,7 +243,7 @@ impl History {
             .child(frame(
                 "report",
                 icon_text_button(
-                    ("history-report", i),
+                    SharedString::from(format!("history-report-{key}")),
                     Icon::FileText,
                     "Report",
                     ButtonKind::Ghost,
@@ -258,7 +255,7 @@ impl History {
             .child(frame(
                 "rerun",
                 icon_text_button(
-                    ("history-rerun", i),
+                    SharedString::from(format!("history-rerun-{key}")),
                     Icon::Play,
                     "Re-run",
                     ButtonKind::Ghost,
@@ -270,7 +267,7 @@ impl History {
             .child(frame(
                 "rerun-failed",
                 icon_text_button(
-                    ("history-rerun-failed", i),
+                    SharedString::from(format!("history-rerun-failed-{key}")),
                     Icon::RotateCcw,
                     "Re-run failed",
                     ButtonKind::Ghost,
@@ -284,7 +281,7 @@ impl History {
 
 /// A tag of the run's filter, drawn by its shape: included with a check on the accent, excluded with a minus and a
 /// strike on the surface (`chipIncluded`, `chipExcluded`).
-fn tag_chip(i: usize, k: usize, tag: &Tag, cx: &App) -> AnyElement {
+fn tag_chip(rid: &str, k: usize, tag: &Tag, cx: &App) -> AnyElement {
     let t = Theme::global(cx).tokens;
     let (border, bg, fg, glyph) = if tag.excluded {
         (t.control, t.surface, t.ink, Icon::Minus)
@@ -292,7 +289,7 @@ fn tag_chip(i: usize, k: usize, tag: &Tag, cx: &App) -> AnyElement {
         (t.accent, t.accent, t.on_accent, Icon::Check)
     };
     div()
-        .id(SharedString::from(format!("history-tag-{i}-{k}")))
+        .id(SharedString::from(format!("history-tag-{rid}-{k}")))
         .role(Role::Label)
         .aria_value(SharedString::from(tag.text.clone()))
         .flex()
@@ -416,6 +413,9 @@ pub fn open_clear(grace: &Entity<Grace>, window: &mut Window, cx: &mut App) -> F
                     ),
             )
             .w(px(DIALOG_WIDTH))
+            // a native dialog has no close button and a click outside does not close it: Escape and Cancel do
+            .close_button(false)
+            .overlay_closable(false)
             .footer(
                 DialogFooter::new()
                     .child(div().debug_selector(|| "clear-history-confirm".into()).child(

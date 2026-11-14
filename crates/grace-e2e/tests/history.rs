@@ -349,6 +349,9 @@ fn re_run_switches_back_to_the_runs_environment_and_filter() {
     app.press(button(rows(&app.tree().unwrap())[0], "Re-run")).unwrap();
     app.wait_for("History (2)", RUN, |t| tab_is(t, "History (2)")).unwrap();
     assert_eq!(saved_env(&app), json!("qa"));
+    // the Env box says it too; a text box's text reaches the tree on Windows only (guide R8.4)
+    #[cfg(windows)]
+    app.wait_for_text(Role::ComboBox, "Env", "qa").unwrap();
     let t = app
         .wait_for("@smoke back", WAIT, |t| {
             t.find(&Role::Button, "@smoke, included").is_some()
@@ -381,6 +384,8 @@ fn cancelling_the_environment_switch_of_a_re_run_runs_nothing() {
     app.press(button(rows(&t)[0], "Re-run")).unwrap();
     // Cancel kills only a process that exists, and the discovery of "qa" lasts a second or two: press it quickly, without
     // reading the tree between presses (a read is slower than the discovery), until the discovery is cancelled
+    // shortcut: a timed loop, not a wait: the discovery lasts a second or two and no state of the tree says "now", so the
+    // presses cannot wait on one; replace it if the runner ever shows a discovery in the tree
     for _ in 0..40 {
         let _ = app.press(&cancel); // an error while it is off
         std::thread::sleep(Duration::from_millis(40));
@@ -397,6 +402,8 @@ fn cancelling_the_environment_switch_of_a_re_run_runs_nothing() {
     );
 
     assert!(app.settings()["projects"][dir.to_string_lossy().as_ref()]["env"].is_null());
+    #[cfg(windows)]
+    app.wait_for_text(Role::ComboBox, "Env", "").unwrap();
     app.wait_until("no Java", WAIT, || app.java_pids().is_empty()).unwrap();
     let t = app.tree().unwrap();
     assert!(tab_is(&t, "History (1)"), "{}", t.dump());
