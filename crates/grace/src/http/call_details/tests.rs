@@ -328,7 +328,10 @@ fn copies_the_call_as_curl(cx: &mut TestAppContext) {
     let (h, mut cx, d) = setup(cx);
     show(&h, &mut cx, 0);
     assert!(!copied(&d, &mut cx));
+    let width = |cx: &mut VisualTestContext| bounds(cx, "copy-curl").unwrap().size.width;
+    let before = width(&mut cx);
     click(&mut cx, "copy-curl");
+    assert_ne!(width(&mut cx), before, "the button draws \"Copied\", a different text");
     assert_eq!(
         h.seams.copies(),
         [
@@ -342,6 +345,7 @@ fn copies_the_call_as_curl(cx: &mut TestAppContext) {
     cx.executor().advance_clock(Duration::from_millis(1));
     cx.run_until_parked();
     assert!(!copied(&d, &mut cx), "Copy as cURL again");
+    assert_eq!(width(&mut cx), before);
 }
 
 // 6, 12: Electron's `navigator.clipboard` could refuse a write, which showed "Copy failed". GPUI's `write_to_clipboard`
@@ -386,6 +390,7 @@ fn disables_copy_as_curl_without_a_url(cx: &mut TestAppContext) {
     assert_eq!(text(&d, &mut cx).status, "No response");
     assert!(!drawn(&mut cx, "call-url"));
     assert!(text(&d, &mut cx).curl.is_none());
+    // that the button is off is the e2e test's (UI Automation reads it); a press does nothing here either way
     click(&mut cx, "copy-curl");
     assert!(h.seams.copies().is_empty());
     assert!(!copied(&d, &mut cx));
@@ -433,7 +438,8 @@ fn gives_the_pane_back_to_the_node_when_a_new_run_empties_its_calls(cx: &mut Tes
 mod added {
     use super::*;
 
-    /// P3 plan, Porting rules 2 (HI-09): a secret the runner masked is in no part of the pane nor in the cURL text.
+    /// P3 plan, Porting rules 2 (HI-09): an event the runner's `Masker` masked, through the state and the pane, holds
+    /// the secret in no part of the pane and not in the cURL text. The runner's own masking is `runner::tests`'.
     #[gpui::test]
     fn shows_and_copies_a_masked_secret_never_the_secret(cx: &mut TestAppContext) {
         let mut event = AppEvent::Calls {

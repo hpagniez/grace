@@ -6,6 +6,7 @@
 //! calls without listing them ([`shown_count`]), and the list is built only while the HTTP tab shows
 //! (`grace::http`).
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::karate::tree::find_node;
 use crate::model::http::{HTTP_GROUPS, HttpCall, HttpGroup, HttpHeader, curl_command, http_group, pretty_body};
@@ -148,15 +149,15 @@ pub fn shown_count(s: &AppState) -> usize {
 /// A message's headers as `Name: value` lines and its body indented, each present only when the call logged it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
-    pub headers: Option<String>,
-    pub body: Option<String>,
+    pub headers: Option<Arc<str>>,
+    pub body: Option<Arc<str>>,
 }
 
 /// What sits under a call's Response heading: what the server sent, or the error of a call that got no response.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Response {
     Received(Message),
-    Failed(String),
+    Failed(Arc<str>),
 }
 
 /// What the details pane reads of a call (`CallDetails.tsx`): worked out once for the call, not on each draw.
@@ -184,8 +185,9 @@ fn message(headers: &[HttpHeader], body: Option<&str>) -> Option<Message> {
             .map(|h| format!("{}: {}", h.name, h.value))
             .collect::<Vec<_>>()
             .join("\n")
+            .into()
     });
-    let body = body.filter(|b| !b.is_empty()).map(|b| pretty_body(b).into_owned());
+    let body = body.filter(|b| !b.is_empty()).map(|b| pretty_body(b).into());
     (headers.is_some() || body.is_some()).then_some(Message { headers, body })
 }
 
@@ -197,7 +199,11 @@ pub fn call_text(call: &HttpCall, test: &TestNode) -> CallText {
     };
     let response = match call.status {
         Some(_) => message(&call.response_headers, call.response_body.as_deref()).map(Response::Received),
-        None => call.error.clone().filter(|e| !e.is_empty()).map(Response::Failed),
+        None => call
+            .error
+            .clone()
+            .filter(|e| !e.is_empty())
+            .map(|e| Response::Failed(e.into())),
     };
     CallText {
         status,

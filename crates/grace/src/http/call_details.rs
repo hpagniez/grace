@@ -35,17 +35,17 @@ pub fn copy_label(copied: bool) -> (Icon, &'static str) {
 
 /// A part of the pane: found by the end-to-end tests by its debug selector, read by assistive technology by its role
 /// and its value (a `Label` reads `aria_value`).
-fn labelled(id: &'static str, at: &CallRef, text: &str) -> gpui::Stateful<gpui::Div> {
+fn labelled(id: &'static str, at: &CallRef, text: &SharedString) -> gpui::Stateful<gpui::Div> {
     div()
         .id(part(id, at))
         .debug_selector(move || id.into())
         .role(Role::Label)
-        .aria_value(SharedString::from(text.to_owned()))
+        .aria_value(text.clone())
 }
 
 /// Text that can be selected and copied: its own selection per call, so a selection does not outlive the call.
-fn selectable(id: &'static str, at: &CallRef, text: &str) -> SelectableText {
-    SelectableText::new(part(id, at), text.to_owned())
+fn selectable(id: &'static str, at: &CallRef, text: &SharedString) -> SelectableText {
+    SelectableText::new(part(&format!("select-{id}"), at), text.clone())
 }
 
 fn section_title(id: &'static str, title: &'static str, cx: &App) -> AnyElement {
@@ -66,8 +66,8 @@ fn section_title(id: &'static str, title: &'static str, cx: &App) -> AnyElement 
 /// A message's headers and body, each in a sunken box that scrolls past 320 px, as `BOX` of `CallDetails.tsx`.
 fn message(ids: [&'static str; 2], at: &CallRef, m: &Message, cx: &App) -> Vec<AnyElement> {
     let t = Theme::global(cx).tokens;
-    let boxed = |id: &'static str, text: &str| {
-        labelled(id, at, text)
+    let boxed = |id: &'static str, text: SharedString| {
+        labelled(id, at, &text)
             .w_full()
             .max_h(px(320.))
             .overflow_scroll()
@@ -77,17 +77,17 @@ fn message(ids: [&'static str; 2], at: &CallRef, m: &Message, cx: &App) -> Vec<A
             .font_family(MONO)
             .text_size(px(METRICS.text_xs.size))
             .whitespace_nowrap()
-            .child(selectable(id, at, text))
+            .child(selectable(id, at, &text))
             .into_any_element()
     };
     [(ids[0], &m.headers), (ids[1], &m.body)]
         .into_iter()
-        .filter_map(|(id, text)| text.as_deref().map(|text| boxed(id, text)))
+        .filter_map(|(id, text)| text.clone().map(|text| boxed(id, text.into())))
         .collect()
 }
 
 /// The error of a call that got no response, in a failed box under Response.
-fn failed(at: &CallRef, error: &str, cx: &App) -> AnyElement {
+fn failed(at: &CallRef, error: &SharedString, cx: &App) -> AnyElement {
     let t = Theme::global(cx).tokens;
     div()
         .id("call-error-box")
@@ -148,13 +148,13 @@ pub fn view(
             div()
                 .debug_selector(|| "call-method".into())
                 .flex_none()
-                .child(selectable("call-method", at, &call.method)),
+                .child(selectable("call-method", at, &call.method.clone().into())),
         )
         .children(call.url.as_ref().map(|url| {
             div()
                 .debug_selector(|| "call-url".into())
                 .min_w_0()
-                .child(selectable("call-url", at, url))
+                .child(selectable("call-url", at, &url.clone().into()))
         }));
 
     let (fill, ink) = status_tint(call.status).colours(t);
@@ -184,38 +184,42 @@ pub fn view(
                 .child(group.to_owned()),
         )
         .children(call.millis.map(|ms| {
-            div()
-                .debug_selector(|| "call-time".into())
+            let time = SharedString::from(format_millis(ms));
+            labelled("call-time", at, &time)
                 .font_family(MONO)
                 .text_size(px(METRICS.text_xs.size))
                 .text_color(Theme::color(t.muted))
-                .child(format_millis(ms))
+                .child(time)
         }));
 
     let muted = Theme::color(t.muted);
+    let (test, location) = (
+        SharedString::from(text.test.clone()),
+        SharedString::from(text.location.clone()),
+    );
     let whose = div()
         .flex()
         .flex_col()
         .gap_1()
         .child(
-            div()
+            labelled("call-test", at, &test)
                 .text_size(px(METRICS.text_sm.size))
                 .text_color(muted)
-                .child(selectable("call-test", at, &text.test)),
+                .child(selectable("call-test", at, &test)),
         )
         .child(
-            labelled("call-location", at, &text.location)
+            labelled("call-location", at, &location)
                 .font_family(MONO)
                 .text_size(px(METRICS.text_xs.size))
                 .text_color(muted)
-                .child(selectable("call-location", at, &text.location)),
+                .child(selectable("call-location", at, &location)),
         )
         .children(text.via.as_ref().map(|via| {
-            div()
-                .debug_selector(|| "call-via".into())
+            let via = SharedString::from(via.clone());
+            labelled("call-via", at, &via)
                 .text_size(px(METRICS.text_xs.size))
                 .text_color(muted)
-                .child(via.clone())
+                .child(via)
         }));
 
     let (glyph, label) = copy_label(copied);
@@ -255,7 +259,7 @@ pub fn view(
         out.push(section_title("call-response-title", RESPONSE, cx));
         match response {
             Response::Received(m) => out.extend(message(["call-response-headers", "call-response-body"], at, m, cx)),
-            Response::Failed(error) => out.push(failed(at, error, cx)),
+            Response::Failed(error) => out.push(failed(at, &error.clone().into(), cx)),
         }
     }
     div()
