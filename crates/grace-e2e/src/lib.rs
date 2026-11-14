@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+pub mod properties;
+
 #[cfg(target_os = "linux")]
 mod atspi_driver;
 #[cfg(windows)]
