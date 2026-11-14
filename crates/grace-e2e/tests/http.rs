@@ -55,11 +55,13 @@ fn statuses(tree: &Node) -> Vec<String> {
 
 /// A project open in a fresh app, with a bottom panel tall enough for every call of a run (13 rows of 28 px).
 fn open(name: &str) -> App {
-    open_dir(&project(name).unwrap())
+    open_dir(&project(name).unwrap(), 520)
 }
 
-fn open_dir(dir: &std::path::Path) -> App {
-    let settings = json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 520 });
+/// The bottom panel `panel` px tall: a short one leaves the details pane the room its Copy as cURL button needs, which
+/// a press in the tree clicks at the centre of (a button the pane has scrolled out of view is not clicked).
+fn open_dir(dir: &std::path::Path, panel: u32) -> App {
+    let settings = json!({ "lastProject": dir.to_string_lossy(), "panelHeight": panel });
     let app = App::launch_with_settings(&settings, &[]).unwrap();
     app.wait_for("the tests found", WAIT, |t| {
         starting(t, "tests ").is_some() && tab(t).is_some()
@@ -108,28 +110,29 @@ fn selected_row(tree: &Node) -> Option<String> {
         .map(|n| n.name.clone())
 }
 
-/// Clicks a test in the tree, which narrows the list to its calls. A row the tree has not drawn, out of its view, is
-/// brought in by moving the tree's selection with `key`, which scrolls it as a person's arrow keys do.
+/// Selects a test in the tree with its arrow keys, which select the row they move to and scroll it into view: for a
+/// row the tree has not drawn, and for one a click could miss while the tree scrolls. A click on the selected row
+/// gives the tree the focus first.
 fn select_with(app: &App, label: &str, key: Key) {
+    let prefix = format!("{label}, ");
+    let t = app.tree().unwrap();
+    if let Some(r) = t
+        .all()
+        .into_iter()
+        .find(|n| n.role == Role::TreeItem && n.states.selected)
+    {
+        app.click(r).unwrap();
+    }
     for _ in 0..12 {
-        let t = app.tree().unwrap();
-        if let Some(r) = row(&t, label) {
-            return app.click(r).unwrap();
-        }
-        let before = selected_row(&t);
-        // the keys go to the tree only when it has the focus: a click on its selected row gives it
-        if let Some(r) = t
-            .all()
-            .into_iter()
-            .find(|n| n.role == Role::TreeItem && n.states.selected)
-        {
-            app.click(r).unwrap();
+        let before = selected_row(&app.tree().unwrap());
+        if before.as_deref().is_some_and(|r| r.starts_with(&prefix)) {
+            return;
         }
         app.key(key).unwrap();
         app.wait_for("the tree's selection to move", WAIT, |t| selected_row(t) != before)
             .unwrap();
     }
-    panic!("{label} is not in the tree");
+    panic!("{label} was not reached");
 }
 
 /// Clicks a test in the tree, which narrows the list to its calls.
@@ -273,31 +276,14 @@ fn reading_the_calls_of_one_run_all() {
         assert!(app.press_named(Role::Button, COPY).is_err());
     }
 
-    // HI-08: Copy as cURL puts the call on the clipboard, without the headers curl sets itself
+    // HI-10: a click on a test gives the details pane back
     select_with(&app, "ok", Key::Up);
     let t = app
         .wait_for("the ok call", WAIT, |t| tab_is(t, "HTTP (1)") && calls(t).len() == 1)
         .unwrap();
     app.click(calls(&t)[0]).unwrap();
-    app.wait_for("the request headers", WAIT, |t| holding(t, "Host:").is_some())
+    app.wait_for("the call's details", WAIT, |t| t.find(&Role::Button, COPY).is_some())
         .unwrap();
-    app.press_named(Role::Button, COPY).unwrap();
-    // "Copied" lasts two seconds, which a read of the whole tree can miss; the copy itself stays
-    app.wait_until("the copy", WAIT, || !app.copies().is_empty()).unwrap();
-    let copies = app.copies();
-    // the press on the call with no request, before, copied nothing
-    assert_eq!(copies.len(), 1, "{copies:?}");
-    let curl = &copies[0];
-    assert!(curl.starts_with("curl -X GET 'http://localhost:"), "{curl}");
-    assert!(curl.contains(" -H 'User-Agent: "), "{curl}");
-    for set in ["Host", "Content-Length", "Connection"] {
-        assert!(
-            !curl.to_lowercase().contains(&format!("-h '{}:", set.to_lowercase())),
-            "{curl}"
-        );
-    }
-
-    // HI-10: a click on a test gives the details pane back
     select(&app, "ok");
     let t = app
         .wait_for("the test's details", WAIT, |t| {
@@ -426,6 +412,55 @@ fn a_run_of_one_test_replaces_only_its_calls() {
     .unwrap();
 }
 
+/// HI-08: Copy as cURL puts the call on the clipboard, without the headers curl sets itself, and a press on a call
+/// with no request copied nothing before it.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn copy_a_call_as_curl() {
+    let app = open_dir(&project("http").unwrap(), 220);
+    run_all(&app);
+    show_http(&app);
+    // the call with no request first: Copy as cURL is off, and a press copies nothing
+    select(&app, "refused");
+    let t = app
+        .wait_for("the refused call", WAIT, |t| {
+            tab_is(t, "HTTP (1)") && calls(t).len() == 1
+        })
+        .unwrap();
+    app.click(calls(&t)[0]).unwrap();
+    let t = app
+        .wait_for("its details", WAIT, |t| t.find(&Role::Button, COPY).is_some())
+        .unwrap();
+    // a button's disabled state reaches UI Automation only; through AT-SPI a disabled button offers no action
+    if cfg!(windows) {
+        assert!(!t.find(&Role::Button, COPY).unwrap().states.enabled);
+    } else {
+        assert!(app.press_named(Role::Button, COPY).is_err());
+    }
+
+    select(&app, "ok");
+    let t = app
+        .wait_for("the ok call", WAIT, |t| tab_is(t, "HTTP (1)") && calls(t).len() == 1)
+        .unwrap();
+    app.click(calls(&t)[0]).unwrap();
+    app.wait_for("the request headers", WAIT, |t| holding(t, "Host:").is_some())
+        .unwrap();
+    app.press_named(Role::Button, COPY).unwrap();
+    // "Copied" lasts two seconds, which a read of the whole tree can miss; the copy itself stays
+    app.wait_until("the copy", WAIT, || !app.copies().is_empty()).unwrap();
+    let copies = app.copies();
+    assert_eq!(copies.len(), 1, "{copies:?}");
+    let curl = &copies[0];
+    assert!(curl.starts_with("curl -X GET 'http://localhost:"), "{curl}");
+    assert!(curl.contains(" -H 'User-Agent: "), "{curl}");
+    for set in ["Host", "Content-Length", "Connection"] {
+        assert!(
+            !curl.to_lowercase().contains(&format!("-h '{}:", set.to_lowercase())),
+            "{curl}"
+        );
+    }
+}
+
 /// `SECRET` of `e2e/helpers.ts`: a value that must never reach the screen or the clipboard.
 #[cfg(windows)]
 const SECRET: &str = "s3cret-token-123";
@@ -438,7 +473,7 @@ const SECRET: &str = "s3cret-token-123";
 fn a_secret_never_shows_in_a_call() {
     use grace_e2e::properties::{add_property, open_properties, save_properties};
     let dir = project("http").unwrap();
-    let app = open_dir(&dir);
+    let app = open_dir(&dir, 220);
     open_properties(&app);
     add_property(&app, "All environments", "api.token", SECRET, true);
     save_properties(&app);
