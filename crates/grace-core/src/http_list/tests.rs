@@ -307,3 +307,149 @@ mod added {
         assert_eq!(empty_text(&s), "No calls in the chosen groups");
     }
 }
+
+// `CallDetails.tsx`'s rules, which the view only draws (HI-04, HI-07, HI-08).
+mod call_text {
+    use super::*;
+    use crate::model::http::HttpHeader;
+
+    fn header(name: &str, value: &str) -> HttpHeader {
+        HttpHeader {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    fn test(line: Option<u32>) -> TestNode {
+        TestNode {
+            name: "create user".into(),
+            file: "a.feature".into(),
+            line,
+            ..node("s:a.feature#1", NodeKind::Scenario, vec![])
+        }
+    }
+
+    fn text(c: HttpCall) -> CallText {
+        call_text(&c, &test(Some(3)))
+    }
+
+    #[test]
+    fn names_the_status_with_its_group_and_a_code_outside_100_599_alone() {
+        assert_eq!(text(call(Some(201), 0.)).status, "201 · 2xx Success");
+        assert_eq!(text(call(Some(404), 0.)).status, "404 · 4xx Client error");
+        assert_eq!(text(call(Some(503), 0.)).status, "503 · 5xx Server error");
+        assert_eq!(text(call(Some(999), 0.)).status, "999");
+        assert_eq!(text(call(None, 0.)).status, "No response");
+        // the code is the part drawn in the mono
+        assert_eq!(text(call(Some(201), 0.)).code_len, 3);
+        assert_eq!(text(call(None, 0.)).code_len, 0);
+    }
+
+    #[test]
+    fn places_the_call_under_its_test_and_its_line() {
+        let c = HttpCall {
+            via: Some("tests/common/create-user.feature:8".into()),
+            ..call(Some(200), 0.)
+        };
+        let t = call_text(&c, &test(Some(3)));
+        assert_eq!(t.test, "create user");
+        assert_eq!(t.location, "a.feature:3");
+        assert_eq!(t.via.as_deref(), Some("via tests/common/create-user.feature:8"));
+        assert_eq!(call_text(&c, &test(None)).location, "a.feature");
+        assert_eq!(text(call(Some(200), 0.)).via, None);
+    }
+
+    #[test]
+    fn shows_headers_and_an_indented_body_under_request_and_response() {
+        let t = text(HttpCall {
+            request_headers: vec![header("Content-Type", "application/json"), header("Accept", "*/*")],
+            request_body: Some(r#"{"name":"bob","tags":[1,2]}"#.into()),
+            response_headers: vec![header("X-Id", "7")],
+            response_body: Some(r#"{"id":7}"#.into()),
+            ..call(Some(201), 0.)
+        });
+        let request = t.request.unwrap();
+        assert_eq!(
+            request.headers.as_deref(),
+            Some("Content-Type: application/json\nAccept: */*")
+        );
+        assert_eq!(
+            request.body.as_deref(),
+            Some("{\n  \"name\": \"bob\",\n  \"tags\": [\n    1,\n    2\n  ]\n}")
+        );
+        let Some(Response::Received(response)) = t.response else {
+            panic!("a response")
+        };
+        assert_eq!(response.headers.as_deref(), Some("X-Id: 7"));
+        assert_eq!(response.body.as_deref(), Some("{\n  \"id\": 7\n}"));
+    }
+
+    #[test]
+    fn indents_an_xml_body_and_leaves_out_what_the_call_lacks() {
+        let t = text(HttpCall {
+            request_body: Some("<user><name>bob</name></user>".into()),
+            ..call(Some(200), 0.)
+        });
+        let request = t.request.unwrap();
+        assert_eq!(request.body.as_deref(), Some("<user>\n  <name>bob</name>\n</user>"));
+        assert_eq!(request.headers, None);
+        assert!(t.response.is_none());
+    }
+
+    /// HI-07: no response; the request that was logged still shows, and the error takes the response's place.
+    #[test]
+    fn a_call_with_no_response_shows_its_request_and_its_error() {
+        let t = text(HttpCall {
+            request_headers: vec![header("Accept", "*/*")],
+            error: Some("Read timed out\n  at java.net.Socket.read".into()),
+            ..call(None, 0.)
+        });
+        assert_eq!(t.request.unwrap().headers.as_deref(), Some("Accept: */*"));
+        assert_eq!(
+            t.response,
+            Some(Response::Failed("Read timed out\n  at java.net.Socket.read".into()))
+        );
+    }
+
+    #[test]
+    fn has_no_section_with_nothing_under_it() {
+        // a 204 with no headers and no body: the status says it all
+        let t = text(call(Some(204), 0.));
+        assert!(t.request.is_none() && t.response.is_none());
+        // no response and no error either
+        let t = text(call(None, 0.));
+        assert!(t.request.is_none() && t.response.is_none());
+        // no logged request: the response section still holds the error
+        let t = text(HttpCall {
+            url: None,
+            request_headers: vec![header("Accept", "*/*")],
+            error: Some("Connection refused".into()),
+            ..call(None, 0.)
+        });
+        assert!(t.request.is_none());
+        assert_eq!(t.response, Some(Response::Failed("Connection refused".into())));
+    }
+
+    /// HI-08: the same cURL text as `curlCommand`, none without a URL.
+    #[test]
+    fn copies_the_call_as_curl_none_without_a_url() {
+        let t = text(HttpCall {
+            method: "POST".into(),
+            request_headers: vec![header("Content-Type", "application/json"), header("Host", "localhost")],
+            request_body: Some(r#"{"name":"bob"}"#.into()),
+            ..call(Some(201), 0.)
+        });
+        assert_eq!(
+            t.curl.as_deref(),
+            Some(
+                "curl -X POST 'http://localhost/x' -H 'Content-Type: application/json' --data-raw '{\"name\":\"bob\"}'"
+            )
+        );
+        let refused = HttpCall {
+            url: None,
+            error: Some("Connection refused".into()),
+            ..call(None, 0.)
+        };
+        assert_eq!(text(refused).curl, None);
+    }
+}
