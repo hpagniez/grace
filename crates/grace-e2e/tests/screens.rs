@@ -212,7 +212,7 @@ fn screens_http() {
             .find(|n| n.role == Role::Tab && n.name.starts_with("HTTP"))
             .cloned()
     };
-    let t = app.tree().unwrap();
+    let t = app.wait_for("the tabs", WAIT, |t| tab(t).is_some()).unwrap();
     app.press(&tab(&t).unwrap()).unwrap();
     app.wait_for("the HTTP tab", WAIT, |t| tab(t).is_some_and(|n| n.states.selected))
         .unwrap();
