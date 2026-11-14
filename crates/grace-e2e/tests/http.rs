@@ -511,3 +511,28 @@ fn a_secret_never_shows_in_a_call() {
     // every name and text in the window: the tree is what Grace shows, to a person and to a screen reader
     assert!(!app.tree().unwrap().dump().contains(SECRET));
 }
+
+/// The HTTP list reports its focus row to assistive technology only while it has the focus. With the focus on the
+/// window's root, above this list and the tree both, two rows claimed it, which GPUI refuses: a panic in a debug
+/// build. Headless windows build no accessibility tree, so only a real window can show it.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_click_outside_the_lists_leaves_the_app_running() {
+    let app = open("http");
+    run_all(&app);
+    show_http(&app);
+    let t = app.wait_for("the calls", WAIT, |t| calls(t).len() == 13).unwrap();
+    // the list has the focus, and a focus row
+    app.click(calls(&t)[0]).unwrap();
+    let t = app
+        .wait_for("the first call selected", WAIT, |t| {
+            calls(t).first().is_some_and(|c| c.states.selected)
+        })
+        .unwrap();
+    // text takes no focus: a click on it leaves the focus on the window's root
+    app.click(starting(&t, "Finished").unwrap()).unwrap();
+    app.wait_for("the window answering", WAIT, |t| {
+        calls(t).len() == 13 && starting(t, "Finished").is_some()
+    })
+    .unwrap();
+}
