@@ -195,6 +195,59 @@ fn screens_panel_resized() {
     shot(&app, "panel-taller-tabs-moved");
 }
 
+/// The HTTP tab after a run of the http sample project, then narrowed to one test, then the calls that went wrong.
+/// The steps before the chips work on a build without the list too, for the "before" shots.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_http() {
+    let dir = project("http").unwrap();
+    let settings = json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 400 });
+    let app = App::launch_with_settings(&settings, &[]).unwrap();
+    app.wait_for("the tests found", WAIT, |t| starting(t, "tests ").is_some())
+        .unwrap();
+    run_all(&app);
+    let tab = |t: &Node| {
+        t.all()
+            .into_iter()
+            .find(|n| n.role == Role::Tab && n.name.starts_with("HTTP"))
+            .cloned()
+    };
+    let t = app.wait_for("the tabs", WAIT, |t| tab(t).is_some()).unwrap();
+    app.press(&tab(&t).unwrap()).unwrap();
+    app.wait_for("the HTTP tab", WAIT, |t| tab(t).is_some_and(|n| n.states.selected))
+        .unwrap();
+    shot(&app, "http-after-a-run");
+    let t = app.tree().unwrap();
+    let retry = t
+        .all()
+        .into_iter()
+        .find(|n| n.role == Role::TreeItem && n.name.starts_with("retry, "))
+        .cloned()
+        .unwrap();
+    app.click(&retry).unwrap();
+    app.wait_for("retry selected", WAIT, |t| {
+        t.all()
+            .into_iter()
+            .any(|n| n.role == Role::TreeItem && n.name.starts_with("retry, ") && n.states.selected)
+    })
+    .unwrap();
+    shot(&app, "http-narrowed");
+    app.click(
+        &t.all()
+            .into_iter()
+            .find(|n| n.name.starts_with("tests, "))
+            .cloned()
+            .unwrap(),
+    )
+    .unwrap();
+    for chip in ["4xx Client error 3", "5xx Server error 1", "No response 2"] {
+        app.press_named(Role::Button, chip).unwrap();
+    }
+    app.wait_for("six calls", WAIT, |t| tab(t).is_some_and(|n| n.name == "HTTP (6)"))
+        .unwrap();
+    shot(&app, "http-went-wrong");
+}
+
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_home() {

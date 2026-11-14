@@ -1,5 +1,5 @@
 // `src/renderer/reduce.test.ts`, test for test, on the same fixtures; then `store.test.tsx`'s tests of phase P2
-// (`toggleGroup` ports with the HTTP tab in P3).
+// (`toggleGroup` with the HTTP tab, phase P3).
 use super::*;
 use crate::karate::events::read_all_events;
 use crate::karate::run_state::RunState;
@@ -1224,11 +1224,86 @@ mod create_app_store {
             assert_eq!(s.selected.as_deref(), Some("s:a#2"));
             assert_eq!(s.selected_call, None);
         }
+
+        #[test]
+        fn toggle_group_drops_a_call_it_hides() {
+            use crate::model::http::HttpGroup::{ClientError, NoResponse};
+            let mut s = AppState::new();
+            s.reduce(&project_tree(Some(node(
+                "f:a.feature",
+                NodeKind::Feature,
+                vec![
+                    node("s:a#1", NodeKind::Scenario, vec![]),
+                    node("s:a#2", NodeKind::Scenario, vec![]),
+                ],
+            ))));
+            let not_found_call = HttpCall {
+                status: Some(404),
+                ..a_call()
+            };
+            s.reduce(&AppEvent::Calls {
+                key: "s:a#1".into(),
+                calls: vec![a_call(), not_found_call],
+            });
+            let ok = CallRef {
+                key: "s:a#1".into(),
+                index: 0,
+            };
+            let not_found = CallRef {
+                key: "s:a#1".into(),
+                index: 1,
+            };
+            s.select_call(ok.clone());
+            s.toggle_group(None);
+            assert_eq!(s.selected_call, Some(ok.clone())); // All hides nothing
+            s.toggle_group(Some(ClientError));
+            assert_eq!(s.http_groups, [ClientError]);
+            assert_eq!(s.selected_call, None); // the 200 is hidden
+            s.select_call(not_found.clone());
+            s.toggle_group(Some(NoResponse));
+            assert_eq!(s.http_groups, [ClientError, NoResponse]);
+            assert_eq!(s.selected_call, Some(not_found.clone()));
+            s.toggle_group(Some(ClientError));
+            assert_eq!(s.http_groups, [NoResponse]);
+            assert_eq!(s.selected_call, None); // the 404 is hidden
+            s.select_call(not_found.clone());
+            s.toggle_group(None);
+            assert!(s.http_groups.is_empty());
+            assert_eq!(s.selected_call, Some(not_found));
+        }
     }
 }
 
 mod added {
     use super::*;
+
+    // New in the port: the HTTP list builds its rows again only when this count moves (#124).
+    #[test]
+    fn calls_changes_counts_each_change_to_the_calls_and_nothing_else() {
+        let mut s = AppState::new();
+        s.reduce(&project());
+        let at = |s: &AppState| s.calls_changes;
+        let mut seen = at(&s);
+        let mut moved = |s: &AppState, yes: bool, what: &str| {
+            assert_eq!(at(s) != seen, yes, "{what}");
+            seen = at(s);
+        };
+        s.reduce(&AppEvent::Calls {
+            key: keys()[0].clone(),
+            calls: vec![a_call()],
+        });
+        moved(&s, true, "calls arrive");
+        s.reduce(&AppEvent::Console {
+            lines: vec!["x".into()],
+        });
+        moved(&s, false, "a console line");
+        s.reduce(&update(&keys()[0], Status::Passed));
+        moved(&s, false, "a status");
+        s.reduce(&started(&keys()[..1]));
+        moved(&s, true, "a run clears its tests' calls");
+        s.reduce(&project());
+        moved(&s, true, "a refresh may drop calls");
+    }
 
     // New in the port: `reduce.ts` gave the box a fresh object per `threads` event, so it reset even on the count it
     // held; the Rust state counts the events instead (P2 plan, Redesigns).

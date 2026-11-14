@@ -94,6 +94,9 @@ pub struct AppState {
     pub steps: HashMap<String, Vec<Step>>,
     /// Each test's HTTP calls, in run order; cleared exactly as `steps` is.
     pub calls: HashMap<String, Vec<HttpCall>>,
+    /// Counts the changes to `calls`: the HTTP list builds its rows again only when this or what else it reads changes
+    /// (#124), as `trees` does for the tree.
+    pub calls_changes: u64,
     /// The last `CONSOLE_LIMIT` lines. A `VecDeque`, so the oldest go without copying the rest.
     pub console: VecDeque<String>,
     /// The console lines dropped at `CONSOLE_LIMIT` or cleared by a run since the project opened: a line's number is
@@ -168,6 +171,7 @@ impl Default for AppState {
             results: HashMap::new(),
             steps: HashMap::new(),
             calls: HashMap::new(),
+            calls_changes: 0,
             console: VecDeque::new(),
             console_dropped: 0,
             run: RunView::default(),
@@ -242,6 +246,7 @@ impl AppState {
         self.results.clear();
         self.steps.clear();
         self.calls.clear();
+        self.calls_changes += 1;
         self.selected = None;
         self.selected_call = None;
         self.run = RunView::default();
@@ -286,6 +291,7 @@ impl AppState {
                     self.results.retain(|k, _| same(k));
                     self.steps.retain(|k, _| same(k));
                     self.calls.retain(|k, _| same(k));
+                    self.calls_changes += 1;
                     self.flaky.retain(|k, _| same(k));
                 }
                 self.project = project.clone();
@@ -327,6 +333,7 @@ impl AppState {
                     self.steps.remove(key);
                     self.calls.remove(key);
                 }
+                self.calls_changes += 1;
                 self.console_dropped += self.console.len() as u64;
                 self.console.clear();
             }
@@ -364,6 +371,7 @@ impl AppState {
             }
             AppEvent::Calls { key, calls } => {
                 self.calls.insert(key.clone(), calls.clone());
+                self.calls_changes += 1;
             }
             AppEvent::Console { lines } => {
                 self.console.extend(lines.iter().cloned());
@@ -491,6 +499,20 @@ impl AppState {
 
     pub fn select_call(&mut self, call: CallRef) {
         self.selected_call = Some(call);
+    }
+
+    /// A click on a status group's chip; `None` is All. A call the chips hide leaves the details pane.
+    pub fn toggle_group(&mut self, group: Option<HttpGroup>) {
+        self.http_groups = crate::http_list::toggled_groups(&self.http_groups, group);
+        use crate::http_list::{narrowed_calls, shown_calls};
+        let hidden = self.selected_call.as_ref().is_some_and(|open| {
+            !shown_calls(narrowed_calls(self), &self.http_groups)
+                .iter()
+                .any(|l| &l.at == open)
+        });
+        if hidden {
+            self.selected_call = None;
+        }
     }
 
     pub fn dismiss_prompt(&mut self) {

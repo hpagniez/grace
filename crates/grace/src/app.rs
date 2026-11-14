@@ -355,6 +355,18 @@ impl Grace {
         }
     }
 
+    /// The call the details pane shows in place of the node.
+    pub fn select_call(&mut self, at: grace_core::state::CallRef, cx: &mut Context<Self>) {
+        self.state_mut().select_call(at);
+        cx.notify();
+    }
+
+    /// A click on an HTTP status group's chip; `None` is All.
+    pub fn toggle_group(&mut self, group: Option<grace_core::model::http::HttpGroup>, cx: &mut Context<Self>) {
+        self.state_mut().toggle_group(group);
+        cx.notify();
+    }
+
     /// The tag filter. The window never edits the filter itself: the runner sends it back.
     pub fn set_filter(&mut self, filter: FilterState, cx: &mut Context<Self>) {
         self.background(cx, Order::End, move |b| {
