@@ -246,6 +246,22 @@ fn screens_http() {
     app.wait_for("six calls", WAIT, |t| tab(t).is_some_and(|n| n.name == "HTTP (6)"))
         .unwrap();
     shot(&app, "http-went-wrong");
+    // a call opened: its details in place of the test's (before this slice the pane keeps the test)
+    let t = app.tree().unwrap();
+    let call = t
+        .all()
+        .into_iter()
+        .find(|n| n.role == Role::ListItem && n.name.starts_with("500, "))
+        .cloned()
+        .unwrap();
+    app.click(&call).unwrap();
+    app.wait_for("the call selected", WAIT, |t| {
+        t.all()
+            .into_iter()
+            .any(|n| n.role == Role::ListItem && n.name.starts_with("500, ") && n.states.selected)
+    })
+    .unwrap();
+    shot(&app, "http-call-selected");
 }
 
 #[test]

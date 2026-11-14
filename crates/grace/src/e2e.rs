@@ -231,6 +231,11 @@ impl crate::seams::Seams for E2eSeams {
         installed
     }
 
+    /// Records the text instead of putting it on the clipboard of the machine the test runs on.
+    fn copy(&self, text: &str, _cx: &mut gpui::App) {
+        self.record(serde_json::json!({ "seam": "copy", "text": text }));
+    }
+
     /// Records the path instead of opening a browser on the test machine.
     fn open_path(&self, path: &std::path::Path, _cx: &mut gpui::App) {
         self.record(serde_json::json!({ "seam": "open", "path": path }));

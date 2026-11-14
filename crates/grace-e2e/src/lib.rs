@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+pub mod properties;
+
 #[cfg(target_os = "linux")]
 mod atspi_driver;
 #[cfg(windows)]
@@ -424,6 +426,17 @@ impl App {
             .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
             .filter(|v| v["seam"] == "url")
             .filter_map(|v| v["url"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    /// The texts Grace put on the clipboard, in order (`e2e-seams.jsonl`): Copy as cURL's.
+    pub fn copies(&self) -> Vec<String> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "copy")
+            .filter_map(|v| v["text"].as_str().map(str::to_string))
             .collect()
     }
 

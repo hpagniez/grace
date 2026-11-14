@@ -567,6 +567,9 @@ fn selects_a_call_with_the_arrow_keys_and_opens_it(cx: &mut TestAppContext) {
     h.update(&mut cx, |s| s.selected_call = None);
     cx.simulate_keystrokes("enter");
     assert_eq!(selected(&h, &mut cx), Some(at(ONE, 0)));
+    h.update(&mut cx, |s| s.selected_call = None);
+    cx.simulate_keystrokes("space");
+    assert_eq!(selected(&h, &mut cx), Some(at(ONE, 0)));
 }
 
 /// 20. A run that clears the focused call's test moves the focus row up to a call still there.

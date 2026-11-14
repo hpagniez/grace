@@ -7,8 +7,10 @@
 //! calls, the tree, the selection or the chips change (#124): a closed tab costs a run the tab's count alone
 //! (`grace_core::http_list::shown_count`).
 //!
-//! A call's details and Copy as cURL come with the next slice: selecting a call sets `selected_call`.
+//! Selecting a call sets `selected_call`, which the details pane shows in place of the node (`call_details`).
 use std::rc::Rc;
+
+pub mod call_details;
 
 use gpui::accesskit::{Role, Toggled};
 use gpui::{
@@ -589,7 +591,9 @@ impl HttpCalls {
             .aria_selected(selected)
             .aria_size_of_set(self.rows.len())
             .aria_position_in_set(i + 1)
-            .when(is_focus_row, |d| d.aria_active_descendant())
+            // only while the list holds the focus: with the focus on the window's root, which is above this list and the
+            // tree both, two rows would claim it and GPUI refuses that
+            .when(is_focus_row && focused, |d| d.aria_active_descendant())
             .cursor_pointer()
             .relative()
             .w_full()

@@ -6,9 +6,10 @@
 //! calls without listing them ([`shown_count`]), and the list is built only while the HTTP tab shows
 //! (`grace::http`).
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::karate::tree::find_node;
-use crate::model::http::{HTTP_GROUPS, HttpCall, HttpGroup, http_group};
+use crate::model::http::{HTTP_GROUPS, HttpCall, HttpGroup, HttpHeader, curl_command, http_group, pretty_body};
 use crate::model::node::TestNode;
 use crate::rows::{leaves, node_name};
 use crate::state::{AppState, CallRef};
@@ -143,6 +144,84 @@ fn count_in(s: &AppState, groups: &[HttpGroup]) -> usize {
 /// lists nothing, so a run's calls cost the closed tab only this count (#124).
 pub fn shown_count(s: &AppState) -> usize {
     count_in(s, &s.http_groups)
+}
+
+/// A message's headers as `Name: value` lines and its body indented, each present only when the call logged it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Message {
+    pub headers: Option<Arc<str>>,
+    pub body: Option<Arc<str>>,
+}
+
+/// What sits under a call's Response heading: what the server sent, or the error of a call that got no response.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Response {
+    Received(Message),
+    Failed(Arc<str>),
+}
+
+/// What the details pane reads of a call (`CallDetails.tsx`): worked out once for the call, not on each draw.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallText {
+    /// The code and its group, `201 · 2xx Success`; `No response`; a code outside 100–599 alone.
+    pub status: String,
+    /// How many bytes of `status` are the code, which the badge sets in the mono.
+    pub code_len: usize,
+    pub test: String,
+    /// The test's file and line.
+    pub location: String,
+    pub via: Option<String>,
+    /// Under a Request heading, which shows only when a logged request has something to show.
+    pub request: Option<Message>,
+    pub response: Option<Response>,
+    /// Copy as cURL's text; `None` when no request was logged.
+    pub curl: Option<String>,
+}
+
+fn message(headers: &[HttpHeader], body: Option<&str>) -> Option<Message> {
+    let headers = (!headers.is_empty()).then(|| {
+        headers
+            .iter()
+            .map(|h| format!("{}: {}", h.name, h.value))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into()
+    });
+    let body = body.filter(|b| !b.is_empty()).map(|b| pretty_body(b).into());
+    (headers.is_some() || body.is_some()).then_some(Message { headers, body })
+}
+
+pub fn call_text(call: &HttpCall, test: &TestNode) -> CallText {
+    let (status, code_len) = match (call.status, http_group(call.status)) {
+        (None, _) => ("No response".to_owned(), 0),
+        (Some(s), None) => (s.to_string(), s.to_string().len()),
+        (Some(s), Some(_)) => (format!("{s} · {}", group_label(Some(s))), s.to_string().len()),
+    };
+    let response = match call.status {
+        Some(_) => message(&call.response_headers, call.response_body.as_deref()).map(Response::Received),
+        None => call
+            .error
+            .clone()
+            .filter(|e| !e.is_empty())
+            .map(|e| Response::Failed(e.into())),
+    };
+    CallText {
+        status,
+        code_len,
+        test: node_name(test),
+        location: match test.line {
+            Some(line) => format!("{}:{line}", test.file),
+            None => test.file.clone(),
+        },
+        via: call.via.as_ref().map(|v| format!("via {v}")),
+        // a request is the call's own only when it was logged: with no URL the headers are not its own
+        request: call
+            .url
+            .as_ref()
+            .and_then(|_| message(&call.request_headers, call.request_body.as_deref())),
+        response,
+        curl: curl_command(call),
+    }
 }
 
 /// A call's accessible name: what its row reads, status first (virtual lists R5.4).

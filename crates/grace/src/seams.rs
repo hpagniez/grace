@@ -1,6 +1,6 @@
 //! What Grace asks of the platform and a test answers instead (migration guide, Architecture, "Seams for tests"):
-//! the folder dialog, opening a file with its program and opening a link with the program registered for it. The
-//! clipboard and the save dialog join with their first callers (P3).
+//! the folder dialog, opening a file with its program, opening a link with the program registered for it and the
+//! clipboard. The save dialog joins with its first caller (P3).
 //!
 //! The app's seams are [`Platform`]. A build with the `e2e` feature reads `GRACE_E2E_SEAMS` and answers from it
 //! instead (`crate::e2e::E2eSeams`), as the Playwright tests stubbed `dialog.showOpenDialog`.
@@ -23,6 +23,8 @@ pub trait Seams: 'static {
     /// Hands `url` to the program registered for its scheme, as Electron's `shell.openExternal` (Open in VS Code, OE-04).
     /// False, with nothing opened, when no program is registered: Windows would otherwise offer to find an app.
     fn open_url(&self, url: &str, cx: &mut gpui::App) -> bool;
+    /// Puts `text` on the clipboard, as Electron's `navigator.clipboard.writeText` (Copy as cURL, HI-08).
+    fn copy(&self, text: &str, cx: &mut gpui::App);
 }
 
 /// The platform's own dialogs.
@@ -41,6 +43,10 @@ impl Seams for Platform {
         }
         cx.open_url(url);
         true
+    }
+
+    fn copy(&self, text: &str, cx: &mut gpui::App) {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
     }
 
     #[cfg(windows)]
@@ -220,6 +226,7 @@ pub mod fake {
         asked: Mutex<Vec<Option<PathBuf>>>,
         opened: Mutex<Vec<PathBuf>>,
         urls: Mutex<Vec<String>>,
+        copies: Mutex<Vec<String>>,
         /// Answers every link with "no program registered".
         pub no_program: std::sync::atomic::AtomicBool,
     }
@@ -232,6 +239,7 @@ pub mod fake {
                 asked: Mutex::default(),
                 opened: Mutex::default(),
                 urls: Mutex::default(),
+                copies: Mutex::default(),
                 no_program: Default::default(),
             }
         }
@@ -244,6 +252,10 @@ pub mod fake {
         /// Each link handed on, in order.
         pub fn urls(&self) -> Vec<String> {
             self.urls.lock().unwrap().clone()
+        }
+        /// Each text put on the clipboard, in order.
+        pub fn copies(&self) -> Vec<String> {
+            self.copies.lock().unwrap().clone()
         }
     }
 
@@ -266,6 +278,9 @@ pub mod fake {
             }
             self.urls.lock().unwrap().push(url.to_string());
             true
+        }
+        fn copy(&self, text: &str, _cx: &mut gpui::App) {
+            self.copies.lock().unwrap().push(text.to_string());
         }
     }
 }

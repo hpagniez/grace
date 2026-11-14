@@ -93,13 +93,13 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 | HI-01 | Every call of a run is listed and grouped | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("HTTP (13)", the seven chips and their counts); `grace::http::tests::shows_every_group_chip_with_its_count`, `grace_core::http_list::tests::group_counts_counts_every_group_zeros_included` | ☑ |
 | HI-02 | Showing only the calls that went wrong | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (4xx, 5xx and No response: 6 calls, none 2xx or 3xx; All turns them off); `grace::http::tests::filters_by_the_chosen_groups` | ☑ |
 | HI-03 | The tree selection narrows the list | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("retry": three 404s reading "attempt 1 of 3" to "attempt 3 of 3", "HTTP (3)"); `grace::http::tests::narrows_to_the_tree_selection` | ☑ |
-| HI-04 | A call's request and response | | ☐ |
+| HI-04 | A call's request and response | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (the xml call: its heading "POST …/echo", "200 · 2xx Success", the indented body); `grace::http::call_details::tests::shows_the_selected_call`, `indents_an_xml_body_and_leaves_out_what_the_call_lacks`; `grace_core::http_list::tests::call_text::shows_headers_and_an_indented_body_under_request_and_response` | ☑ |
 | HI-05 | A call made in a called feature | `grace-e2e/tests/http.rs::a_call_made_in_a_called_feature` (one POST, 201, "via tests/common/create-user.feature:8") | ☑ |
 | HI-06 | A shared setup call shows under the scenario Karate ran it in | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("first": one POST, 201, via the helper; "second": "No HTTP calls in second") | ☑ |
-| HI-07 | A call that got no response | | ☐ |
-| HI-08 | Copy as cURL | | ☐ |
-| HI-09 | A secret never shows in a call | | ☐ |
-| HI-10 | Clicking a test gives the details pane back | | ☐ |
+| HI-07 | A call that got no response | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("refused": "no status", its error, "No response", Copy as cURL off); `grace::http::call_details::tests::shows_a_call_with_no_response`, `has_no_heading_with_nothing_under_it`; `grace_core::http_list::tests::call_text::a_call_with_no_response_shows_its_request_and_its_error` | ☑ |
+| HI-08 | Copy as cURL | `grace-e2e/tests/http.rs::copy_a_call_as_curl` ("ok": the clipboard seam got `curl -X GET 'http://localhost:…'` with `User-Agent` and none of `Host`, `Content-Length`, `Connection`; the call with no request first: its button is off and copies nothing); `grace::http::call_details::tests::copies_the_call_as_curl` (the button reads "Copied" for two seconds), `does_not_carry_copied_over_to_another_call`; `grace_core::http_list::tests::call_text::copies_the_call_as_curl_none_without_a_url` | ☑ |
+| HI-09 | A secret never shows in a call | `grace-e2e/tests/http.rs::a_secret_never_shows_in_a_call` (a secret property sent in `X-Token`: the call reads `X-Token: ****`, the clipboard seam got `-H 'X-Token: ****'`, the window's tree never holds the secret; Windows only, Linux has no secret storage, guide R5.3); `grace::http::call_details::tests::added::shows_and_copies_a_masked_secret_never_the_secret` | ☑ |
+| HI-10 | Clicking a test gives the details pane back | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` ("ok" clicked in the tree: Copy as cURL gone, "tests/http.feature:6", its four steps); `grace::http::call_details::tests::gives_the_pane_back_to_the_node`, `gives_the_pane_back_to_the_node_when_a_new_run_empties_its_calls` | ☑ |
 | HI-11 | A run of one test replaces only its calls | `grace-e2e/tests/http.rs::a_run_of_one_test_replaces_only_its_calls` (the tab open through the run, "HTTP (13)" after it); `grace::http::tests::shows_the_new_calls_in_place_when_a_tests_calls_are_replaced` | ☑ |
 
 ### RH · Run history
@@ -413,7 +413,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-10 | Ctrl+Enter runs the focused row | `grace-e2e/tests/tree.rs::ctrl_enter_runs_the_focused_row` | ☑ |
 | VL-11 | The row's buttons left the tab order but still click | `grace-e2e/tests/tree.rs::the_rows_buttons_are_out_of_the_tab_order_but_still_click` | ☑ |
 | VL-12 | A click makes the row focused | `grace::tree::tests::a_click_makes_the_row_focused` | ☑ |
-| VL-13 | The HTTP list is one tab stop and arrows open calls | `grace::http::tests::selects_a_call_with_the_arrow_keys_and_opens_it` (one focus handle on the first call; Down selects the second, which `selected_call` opens); `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (Down selects and focuses the next option). The details pane that shows the call is HI-04's, slice 4 | ☑ |
+| VL-13 | The HTTP list is one tab stop and arrows open calls | `grace::http::tests::selects_a_call_with_the_arrow_keys_and_opens_it` (one focus handle on the first call; Down selects the second, which `selected_call` opens); `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (Down selects and focuses the next option). `grace::http::call_details::tests::shows_the_selected_call` (the details pane shows the call `selected_call` names), and the e2e test's Down opens the second call and the pane follows | ☑ |
 | VL-14 | A moved-to row scrolls into view (e2e) | `grace-e2e/tests/tree.rs::only_the_rows_in_view_are_drawn` (End) | ☑ |
 | VL-15 | Focus survives scrolling away (e2e) | `grace::tree::tests::focus_survives_scrolling_away` (headless: plan, Redesigns) | ☑ |
 | VL-16 | Closing a folder takes focus to it | `grace::tree::tests::closing_a_feature_with_its_chevron_takes_the_focus_to_it` | ☑ |
@@ -1103,9 +1103,9 @@ Phase P3 · 4 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-http-01 | Reading the calls of one Run all | | ☐ |
+| E-http-01 | Reading the calls of one Run all | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (every step of `http.spec.ts`: the chips, the groups, the tree selection, a call's request and response, no response, Copy as cURL, a shared setup call, the pane given back; a click and the arrow keys open a call and the pane follows) and `copy_a_call_as_curl` (Copy as cURL, in a short panel). The Enter and Space step is `grace::http::tests::selects_a_call_with_the_arrow_keys_and_opens_it`: a key press that needs the list focused with no call open, which the driver cannot reach without a click | ☑ |
 | E-http-02 | A call made in a called feature | `grace-e2e/tests/http.rs::a_call_made_in_a_called_feature` | ☑ |
-| E-http-03 | A secret never shows in a call | | ☐ |
+| E-http-03 | A secret never shows in a call | `grace-e2e/tests/http.rs::a_secret_never_shows_in_a_call` (Windows only, as `properties.rs`'s secret tests) | ☑ |
 | E-http-04 | A run of one test replaces only its calls | `grace-e2e/tests/http.rs::a_run_of_one_test_replaces_only_its_calls` | ☑ |
 
 ### e2e/look.spec.ts
@@ -1394,7 +1394,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
 | `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
-| `src/renderer/CallDetails.test.tsx` | 16 | view `CallDetails` (`grace::ui`), headless | ☐ |
+| `src/renderer/CallDetails.test.tsx` | 16 | `grace::http::call_details::tests` (12 tests: 10 for 12 Vitest tests, 2 added) and `grace_core::http_list::tests::call_text` (7 tests, the rules the view only draws), test for test in [P3 plan, slice 4](../plans/2026-11-12-gpui-p3-panels.md#calldetailstesttsx-16-in-gracehttpcall_detailstests); 2 `n/a` (a clipboard write that fails), 2 by eye (Tailwind classes) | ☑ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
 | `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 wait for P3, the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
