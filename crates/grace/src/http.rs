@@ -7,8 +7,10 @@
 //! calls, the tree, the selection or the chips change (#124): a closed tab costs a run the tab's count alone
 //! (`grace_core::http_list::shown_count`).
 //!
-//! A call's details and Copy as cURL come with the next slice: selecting a call sets `selected_call`.
+//! Selecting a call sets `selected_call`, which the details pane shows in place of the node (`call_details`).
 use std::rc::Rc;
+
+pub mod call_details;
 
 use gpui::accesskit::{Role, Toggled};
 use gpui::{

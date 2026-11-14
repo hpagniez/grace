@@ -1,22 +1,26 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
 //! (#229), the flaky proof and the Examples table come with P3; the
-//! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases).
+//! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases). A call selected in the
+//! HTTP tab takes the pane from the node (`http::call_details`).
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
+use std::rc::Rc;
+use std::time::Duration;
 
 use gpui::accesskit::Role;
 use gpui::{
     App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _, px,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, Window, div, prelude::FluentBuilder as _, px,
 };
 use grace_core::editor::failed_at;
+use grace_core::http_list::{CallText, call_text, find_call};
 use grace_core::karate::tree::find_node;
 use grace_core::model::events::Step;
 use grace_core::model::node::{NodeKind, Status, TestNode};
 use grace_core::model::status::derive_status;
 use grace_core::rows::{leaves, node_name, status_label};
-use grace_core::state::AppState;
+use grace_core::state::{AppState, CallRef, Panel};
 
 use crate::app::Grace;
 use crate::assets::Icon;
@@ -88,15 +92,20 @@ pub fn log_toggle_name(text: &str, open: bool) -> String {
     format!("{} log of {text}", if open { "Hide" } else { "Show" })
 }
 
-/// What Details shows for the state: nothing selected, a test, or a group.
+/// What Details shows for the state: a call of the HTTP tab, nothing selected, a test, or a group.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Shown {
+    Call,
     Nothing,
     Test(String),
     Group(String),
 }
 
 pub fn shown(state: &AppState) -> Shown {
+    // the call replaces the node while the HTTP tab is up; it is gone once its calls are
+    if state.panel == Panel::Http && find_call(state).is_some() {
+        return Shown::Call;
+    }
     let node = state
         .selected
         .as_ref()
@@ -109,12 +118,25 @@ pub fn shown(state: &AppState) -> Shown {
     }
 }
 
+/// What `call_text` was worked out from.
+struct CallShown {
+    at: CallRef,
+    calls: u64,
+    trees: u64,
+    text: Rc<CallText>,
+}
+
 pub struct Details {
     grace: Entity<Grace>,
     /// The steps whose log shows, by index, for the test shown; a new selection closes them, as Electron Grace's
     /// rows were made afresh.
     open_logs: HashSet<usize>,
     for_key: Option<String>,
+    /// A call's text, worked out once while the call, its calls and its tree stay the same.
+    call: Option<CallShown>,
+    /// The call Copy as cURL was pressed on in the last two seconds, and the timer that ends it.
+    copied: Option<CallRef>,
+    copy_timer: Option<Task<()>>,
     /// It showed that nothing is selected: drawn again only once something is.
     nothing: bool,
     _subscriptions: Vec<Subscription>,
@@ -128,6 +150,11 @@ impl Details {
                 this.for_key = state.selected.clone();
                 this.open_logs.clear();
             }
+            // "Copied" belongs to the call it was pressed on
+            if this.copied.is_some() && state.selected_call != this.copied {
+                this.copied = None;
+                this.copy_timer = None;
+            }
             // #320: with nothing selected the pane says so whatever else changes, so a run's results do not draw it
             let nothing = shown(&state) == Shown::Nothing;
             if !std::mem::replace(&mut this.nothing, nothing) || !nothing {
@@ -139,8 +166,57 @@ impl Details {
             grace,
             open_logs: HashSet::new(),
             for_key: state.selected.clone(),
+            call: None,
+            copied: None,
+            copy_timer: None,
             nothing: shown(&state) == Shown::Nothing,
             _subscriptions: subscriptions,
+        }
+    }
+
+    /// The text of the call shown, if one is.
+    pub fn call_text(&self) -> Option<Rc<CallText>> {
+        self.call.as_ref().map(|c| Rc::clone(&c.text))
+    }
+
+    /// Copy as cURL was pressed on the call shown, and says "Copied" for two seconds.
+    pub fn copied(&self) -> bool {
+        self.copied.is_some()
+    }
+
+    /// Copy as cURL (HI-08): the command goes to the clipboard, and the button says so for two seconds.
+    pub fn copy(&mut self, at: CallRef, command: String, cx: &mut Context<Self>) {
+        self.grace.update(cx, |g, cx| g.copy(&command, cx));
+        self.copied = Some(at);
+        // a new press replaces the timer, so the last press has its two seconds
+        self.copy_timer = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            let _ = this.update(cx, |d, cx| {
+                d.copied = None;
+                d.copy_timer = None;
+                cx.notify();
+            });
+        }));
+        cx.notify();
+    }
+
+    /// The shown call's text, again only when what it was worked out from changed.
+    fn refresh_call(&mut self, state: &AppState) {
+        let Some(l) = find_call(state) else {
+            self.call = None;
+            return;
+        };
+        let fresh = self
+            .call
+            .as_ref()
+            .is_some_and(|c| c.at == l.at && c.calls == state.calls_changes && c.trees == state.trees);
+        if !fresh {
+            self.call = Some(CallShown {
+                at: l.at.clone(),
+                calls: state.calls_changes,
+                trees: state.trees,
+                text: Rc::new(call_text(l.call, l.test)),
+            });
         }
     }
 
@@ -513,8 +589,25 @@ impl Render for Details {
         let grace = self.grace.clone();
         // borrowed, never copied: the state holds every test's results, steps and the whole tree
         let state = &grace.read(cx).state;
+        let shown = shown(state);
+        if shown == Shown::Call {
+            self.refresh_call(state);
+        } else {
+            self.call = None;
+        }
         let node = |key: &str| state.tree.as_ref().and_then(|tr| find_node(tr, key));
-        let content: Vec<gpui::AnyElement> = match shown(state) {
+        let content: Vec<gpui::AnyElement> = match shown {
+            Shown::Call => match (find_call(state), &self.call) {
+                (Some(l), Some(c)) => vec![crate::http::call_details::view(
+                    &this,
+                    &l.at,
+                    l.call,
+                    &c.text,
+                    self.copied.is_some(),
+                    cx,
+                )],
+                _ => Vec::new(),
+            },
             Shown::Nothing => vec![
                 crate::ui::empty_state("details-empty", Icon::MousePointerClick, NOTHING_SELECTED, None, cx)
                     .into_any_element(),
