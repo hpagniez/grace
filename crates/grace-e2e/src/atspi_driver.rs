@@ -125,7 +125,8 @@ impl AtspiDriver {
                 focusable: state.contains(State::Focusable),
                 focused: state.contains(State::Focused),
                 selected: state.contains(State::Selected),
-                checked: state.contains(State::Checked),
+                // AccessKit makes a toggled button a toggle button, whose on is pressed, not checked
+                checked: state.contains(State::Checked) || state.contains(State::Pressed),
                 expanded: state
                     .contains(State::Expandable)
                     .then(|| state.contains(State::Expanded)),

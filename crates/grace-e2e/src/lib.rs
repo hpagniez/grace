@@ -76,7 +76,7 @@ pub struct States {
     pub focusable: bool,
     pub focused: bool,
     pub selected: bool,
-    /// A check box or a radio button that is on.
+    /// A check box, a radio button or a toggled button (a pressed chip) that is on.
     pub checked: bool,
     pub expanded: Option<bool>,
 }
