@@ -170,6 +170,15 @@ fn now_ms() -> f64 {
 pub const SLIDE: Duration = Duration::from_millis(1400);
 pub const SLIDE_STEPS: u32 = 28;
 
+/// Where the stripe is at `phase` of its slide, as its left edge and its width in fractions of the track: `slide`
+/// takes it from one stripe's width before the track to 340 % of it along. Only its part on the track is drawn:
+/// GPUI clips to the track's box, not to its rounded ends, so a stripe past an end would be cut square there (#379).
+pub fn stripe_span(phase: f32) -> (f32, f32) {
+    let left = -0.3 + ease_in_out(phase) * 1.32;
+    let (from, to) = (left.clamp(0., 1.), (left + 0.3).clamp(0., 1.));
+    (from, to - from)
+}
+
 /// The bar's springs.
 const SPRING: SpringConfig = SpringConfig::new(170., 26., 1.);
 /// How near its end a segment rests, in percent of the track.
@@ -358,17 +367,15 @@ impl Render for Progress {
                 .absolute()
                 .top_0()
                 .bottom_0()
-                .w(relative(0.3))
                 .rounded_full()
                 .bg(Theme::color(t.running));
             bar = if still {
-                bar.child(stripe.left_0())
+                bar.child(stripe.left_0().w(relative(0.3)))
             } else {
-                // `slide`: from one stripe's width before the track to 340 % of it along, in 1.4 s, a step of the
-                // marks' clock at a time (#320)
-                let (delta, ask) = crate::spin::stepped(SLIDE_STEPS, SLIDE);
-                bar.child(stripe.left(relative(-0.3 + ease_in_out(delta) * 1.32)))
-                    .child(ask)
+                // `slide`, in 1.4 s, a step of the marks' clock at a time (#320)
+                let (phase, ask) = crate::spin::stepped(SLIDE_STEPS, SLIDE);
+                let (left, width) = stripe_span(phase);
+                bar.child(stripe.left(relative(left)).w(relative(width))).child(ask)
             };
         }
 

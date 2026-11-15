@@ -423,6 +423,26 @@ mod the_bar_r14_1 {
         cx.run_until_parked();
         assert_eq!(cx.debug_bounds("progress-stripe").unwrap().left(), bar.left());
     }
+
+    /// #379: GPUI clips to the track's box, not to its rounded ends, so a stripe that slid past an end was cut
+    /// square there. It stays on the track, where its own round ends show.
+    #[test]
+    fn the_stripe_never_leaves_the_track_and_crosses_all_of_it() {
+        let spans: Vec<_> = (0..=SLIDE_STEPS)
+            .map(|i| stripe_span(i as f32 / SLIDE_STEPS as f32))
+            .collect();
+        for (left, width) in &spans {
+            assert!(
+                *left >= 0. && *width >= 0. && left + width <= 1.0001,
+                "{left} + {width}"
+            );
+        }
+        // it comes in at the left end, is whole in between and goes out at the right end
+        assert_eq!(spans[0], (0., 0.));
+        assert!(spans.iter().any(|(_, w)| (w - 0.3).abs() < 1e-6));
+        let (left, width) = spans[SLIDE_STEPS as usize];
+        assert!((left - 1.).abs() < 1e-6 && width.abs() < 1e-6, "{left} + {width}");
+    }
 }
 
 mod the_clock {
