@@ -366,8 +366,13 @@ fn re_run_switches_back_to_the_runs_environment_and_filter() {
     app.key(Key::Enter).unwrap();
     app.wait_until("none saved", WAIT, || saved_env(&app).is_null())
         .unwrap();
-    app.press_named(Role::Button, "Clear").unwrap();
+    // the switch to no environment puts the filter it started with back when its discovery ends, which can come after a
+    // Clear pressed at once: press Clear until the filter stays clear
     app.wait_for("the filter clear", WAIT, |t| {
+        if t.find(&Role::Button, "@smoke, included").is_some() {
+            let _ = app.press_named(Role::Button, "Clear");
+            return false;
+        }
         t.find(&Role::Button, "@smoke, not filtered").is_some()
     })
     .unwrap();
