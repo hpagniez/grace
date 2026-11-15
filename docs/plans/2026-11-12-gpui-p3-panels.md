@@ -200,7 +200,7 @@ What slice 5 built: `grace_core::history_list` (`History.tsx`'s rules: a row's t
 | 5. shows each run's thread count, or a dash | ported | `history_list::tests::row_text::shows_each_runs_thread_count_or_a_dash`; the header's words by eye |
 | 6. What ran: puts where the node sits in a tooltip, not in a title | ported | `history_list::tests::selection_path::says_where_the_node_sits`; `grace::history::tests::puts_where_the_node_sits_in_a_tooltip_over_its_row` (over its row, as `side="over"`) |
 | 7. says nothing for a run that has no path (All, Failed tests) | ported | `selection_path::says_nothing_for_a_run_that_has_no_path`; the same view test |
-| 8. cuts a long label at 14 rem, inside a wrapper that can shrink | by eye | Tailwind classes. `WHAT_MAX` is 224 px and the cell shrinks (`min_w_0`, `truncate`) |
+| 8. cuts a long label at 14 rem, inside a wrapper that can shrink | by eye | Tailwind classes. `WHAT` is a fixed 168 px column that cuts its text (`truncate`); Electron Grace's grew to 224 px at most (Redesigns, `history` (rows)) |
 | 9. shows a status mark before the words of the result, and the mark is hidden | ported | `result_mark::a_failure_beats_a_cancel`; the mark is `status_mark(.., decorative)`, which has no node: `grace-e2e/tests/history.rs::a_run_appears_in_the_history` (no image in the row) |
 | 10. draws a tag by its shape: included with a check, excluded with a minus and a strike | ported | `row_text::lists_runs_with_labels` (the tags and their order), `grace::history::tests::draws_a_tag_by_its_shape_and_a_run_with_no_filter_says_a_dash`; the check, minus and strike are `tag_chip`'s, by eye |
 | 11. right-aligns Threads and Duration in tabular figures | by eye | Tailwind classes; `text_right`, the mono face |

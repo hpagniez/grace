@@ -37,15 +37,15 @@ pub const ROW_HEIGHT: f32 = 28.;
 /// The dialog's width: Tailwind's `w-[28rem]`.
 pub const DIALOG_WIDTH: f32 = 448.;
 
-/// The columns' widths in px; "Tags" and "What ran" share what the others leave and are cut when it is short.
+/// The columns' widths in px; "Tags" takes what the others leave and is cut when it is short.
 const WHEN: f32 = 112.;
 const ENV: f32 = 64.;
 const THREADS: f32 = 56.;
 const RESULT: f32 = 224.;
 const DURATION: f32 = 64.;
 const ACTIONS: f32 = 272.;
-/// `max-w-56` of "What ran".
-const WHAT_MAX: f32 = 224.;
+/// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path.
+const WHAT: f32 = 168.;
 
 fn clock() -> f64 {
     std::time::SystemTime::now()
@@ -125,7 +125,7 @@ impl History {
             .child(head("Env", Some(ENV), false))
             .child(head("Threads", Some(THREADS), true))
             .child(head("Tags", None, false))
-            .child(head("What ran", None, false))
+            .child(head("What ran", Some(WHAT), false))
             .child(head("Result", Some(RESULT), false))
             .child(head("Duration", Some(DURATION), true))
             .child(div().w(px(ACTIONS)).flex_none())
@@ -156,7 +156,7 @@ impl History {
                 .children(text.tags.iter().enumerate().map(|(k, tag)| tag_chip(&rid, k, tag, cx)))
                 .into_any_element()
         };
-        let what = div().flex_1().min_w_0().max_w(px(WHAT_MAX)).overflow_hidden().child(
+        let what = div().flex_none().w(px(WHAT)).overflow_hidden().child(
             tooltip(
                 SharedString::from(format!("history-what-tip-{rid}")),
                 text.path.clone().map(SharedString::from),
