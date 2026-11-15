@@ -647,7 +647,13 @@ impl App {
             match tried {
                 Ok(()) => return Ok(()),
                 Err(e) if start.elapsed() > Duration::from_secs(5) => return Err(e),
-                Err(_) => std::thread::sleep(Duration::from_millis(50)),
+                Err(e) => {
+                    // in the test's output, so a CI log shows a press the tree moved under
+                    if e.contains(" moved: ") {
+                        eprintln!("press_named {role:?} {name:?} retried: {e}");
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
             }
         }
     }

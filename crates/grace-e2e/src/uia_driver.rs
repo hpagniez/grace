@@ -165,11 +165,7 @@ impl UiaDriver {
             height: r.get_height(),
         });
         Ok(Node {
-            // AccessKit gives a dialog UI Automation's Window type, as Chromium does: one inside the window is a dialog
-            role: match role(e.get_control_type().map_err(err)?) {
-                Role::Window if !path.is_empty() => Role::Dialog,
-                r => r,
-            },
+            role: node_role(e, !path.is_empty())?,
             name: e.get_name().unwrap_or_default(),
             description,
             value,
@@ -204,6 +200,11 @@ impl Driver for UiaDriver {
                 .nth(i)
                 .ok_or_else(|| format!("{:?} is gone", node.path))?;
         }
+        // the tree may have changed since the read, and the path then leads to another element
+        node.check_found(
+            &node_role(&at, !node.path.is_empty())?,
+            &at.get_name().unwrap_or_default(),
+        )?;
         // a click brings its window to the foreground first: a dialog opened in a window that is not active never
         // gets the focus, and the keys after it went nowhere (#301)
         self.to_foreground()?;
@@ -481,6 +482,15 @@ fn screen_colour(at: POINT) -> Result<u32> {
     }
     // COLORREF is 0x00bbggrr
     Ok(((colour & 0xff) << 16) | (colour & 0xff00) | ((colour >> 16) & 0xff))
+}
+
+/// An element's role. AccessKit gives a dialog UI Automation's Window type, as Chromium does: one inside the window
+/// (`inside`) is a dialog.
+fn node_role(e: &UIElement, inside: bool) -> Result<Role> {
+    Ok(match role(e.get_control_type().map_err(err)?) {
+        Role::Window if inside => Role::Dialog,
+        r => r,
+    })
 }
 
 /// UI Automation's control types to the driver's roles.

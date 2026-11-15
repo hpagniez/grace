@@ -169,6 +169,8 @@ impl Driver for AtspiDriver {
                 at = p.get_child_at_index(i as i32).await.map_err(err)?;
             }
             let p = self.proxy(&at).await?;
+            // the tree may have changed since the read, and the path then leads to another element
+            node.check_found(&role(p.get_role().await.map_err(err)?), &p.name().await.map_err(err)?)?;
             let action = ActionProxy::builder(self.conn.connection())
                 .destination(p.inner().destination().to_owned())
                 .map_err(err)?
