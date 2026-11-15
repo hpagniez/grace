@@ -111,9 +111,35 @@ fn wait_for_tests(app: &App) {
     .unwrap();
 }
 
+/// The tree, read again until a read goes through.
+fn read_tree(app: &App) -> Node {
+    app.wait_for("a tree read", WAIT, |_| true).unwrap()
+}
+
+/// Presses a button of the newest run's row, reading the tree again when a press meets one that changed.
+fn press_in_top_row(app: &App, name: &str) {
+    for _ in 0..5 {
+        let t = read_tree(app);
+        if rows(&t).first().is_some_and(|r| app.press(button(r, name)).is_ok()) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    panic!("{name} could not be pressed in the top row");
+}
+
 fn show_history(app: &App) {
-    let t = app.tree().unwrap();
-    app.press(tab(&t).unwrap()).unwrap();
+    // a tree read or a press can meet a tree that changed under it (AT-SPI: UnknownObject): read again and press again
+    let mut pressed = false;
+    for _ in 0..5 {
+        let t = read_tree(app);
+        if tab(&t).is_some_and(|n| app.press(n).is_ok()) {
+            pressed = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(pressed, "the History tab could not be pressed");
     app.wait_for("the History tab", WAIT, |t| tab(t).is_some_and(|n| n.states.selected))
         .unwrap();
 }
@@ -204,9 +230,9 @@ fn history_survives_a_restart() {
     app.wait_for("History (2) again", WAIT, |t| tab_is(t, "History (2)"))
         .unwrap();
     show_history(&app);
-    let t = app.wait_for("the rows", WAIT, |t| rows(t).len() == 2).unwrap();
+    app.wait_for("the rows", WAIT, |t| rows(t).len() == 2).unwrap();
     // newest first: the Report of the top row opens the newest run's report
-    app.press(button(rows(&t)[0], "Report")).unwrap();
+    press_in_top_row(&app, "Report");
     app.wait_until("the report opened", WAIT, || !app.opened_paths().is_empty())
         .unwrap();
     let opened = PathBuf::from(&app.opened_paths()[0]);
@@ -295,8 +321,8 @@ fn a_failed_dynamic_row_is_skipped() {
     let app = open(&dir);
     run_all(&app, 1);
     show_history(&app);
-    let t = app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
-    app.press(button(rows(&t)[0], "Re-run failed")).unwrap();
+    app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
+    press_in_top_row(&app, "Re-run failed");
     app.wait_for("the notice", RUN, |t| {
         notice(
             t,
@@ -346,7 +372,7 @@ fn re_run_switches_back_to_the_runs_environment_and_filter() {
     })
     .unwrap();
 
-    app.press(button(rows(&app.tree().unwrap())[0], "Re-run")).unwrap();
+    press_in_top_row(&app, "Re-run");
     app.wait_for("History (2)", RUN, |t| tab_is(t, "History (2)")).unwrap();
     assert_eq!(saved_env(&app), json!("qa"));
     // the Env box says it too; a text box's text reaches the tree on Windows only (guide R8.4)
@@ -381,7 +407,7 @@ fn cancelling_the_environment_switch_of_a_re_run_runs_nothing() {
     show_history(&app);
     let t = app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
     let cancel = t.find(&Role::Button, "Cancel").unwrap().clone();
-    app.press(button(rows(&t)[0], "Re-run")).unwrap();
+    press_in_top_row(&app, "Re-run");
     // Cancel kills only a process that exists, and the discovery of "qa" lasts a second or two: press it quickly, without
     // reading the tree between presses (a read is slower than the discovery), until the discovery is cancelled
     // shortcut: a timed loop, not a wait: the discovery lasts a second or two and no state of the tree says "now", so the
@@ -405,7 +431,7 @@ fn cancelling_the_environment_switch_of_a_re_run_runs_nothing() {
     #[cfg(windows)]
     app.wait_for_text(Role::ComboBox, "Env", "").unwrap();
     app.wait_until("no Java", WAIT, || app.java_pids().is_empty()).unwrap();
-    let t = app.tree().unwrap();
+    let t = read_tree(&app);
     assert!(tab_is(&t, "History (1)"), "{}", t.dump());
     assert!(starting(&t, "Finished").is_none() && starting(&t, "Running").is_none());
     assert_eq!(runs_in(app.data_dir(), &dir).len(), 1);
@@ -436,14 +462,14 @@ Scenario: failing match",
     std::fs::write(&file, format!("{}{}", &before[..from], &before[to..])).unwrap();
 
     show_history(&app);
-    let t = app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
-    app.press(button(rows(&t)[0], "Re-run")).unwrap();
+    app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
+    press_in_top_row(&app, "Re-run");
     app.wait_for("the notice", WAIT, |t| {
         notice(t, "The tests of this run no longer exist")
     })
     .unwrap();
     app.wait_until("no Java", WAIT, || app.java_pids().is_empty()).unwrap();
-    let t = app.tree().unwrap();
+    let t = read_tree(&app);
     assert!(tab_is(&t, "History (1)"), "{}", t.dump());
     assert!(starting(&t, "Finished").is_none());
 }
@@ -543,7 +569,7 @@ fn clear_history_keeps_its_button_order_and_closes_on_escape() {
     show_history(&app);
     // a real click, as a person opens it: it makes the window the active one, and a dialog in a window that is not
     // active never takes the focus (#301)
-    let t = app.tree().unwrap();
+    let t = read_tree(&app);
     app.click(t.find(&Role::Button, "Clear history").unwrap()).unwrap();
     let t = app
         .wait_for("the dialog", WAIT, |t| {
@@ -569,7 +595,7 @@ fn clear_history_keeps_its_button_order_and_closes_on_escape() {
     })
     .unwrap();
     assert_eq!(runs_in(app.data_dir(), &dir).len(), 2);
-    assert!(tab_is(&app.tree().unwrap(), "History (2)"));
+    assert!(tab_is(&read_tree(&app), "History (2)"));
 }
 
 /// E-history-11, RH-11
