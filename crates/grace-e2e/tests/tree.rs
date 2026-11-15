@@ -185,6 +185,25 @@ fn many_features(features: usize) -> PathBuf {
     dir
 }
 
+/// The driver finds a node again by its path, so a press of a node read before the tree changed must fail, not land
+/// on the element that took its place: opening basic.feature moves outline.feature down by its tests.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_press_of_a_node_the_tree_moved_fails() {
+    let app = open_clean();
+    let before = app.tree().unwrap();
+    let basic = row(&before, "basic.feature").unwrap().clone();
+    let outline = row(&before, "outline.feature").unwrap().clone();
+    app.press(&basic).unwrap();
+    app.wait_for("basic.feature open", WAIT, |t| row(t, "passing hello").is_some())
+        .unwrap();
+    let err = app.press(&outline).unwrap_err();
+    assert!(err.contains("moved"), "{err}");
+    // read afresh, the same press works
+    let now = app.tree().unwrap();
+    app.press(row(&now, "outline.feature").unwrap()).unwrap();
+}
+
 /// VL-01, VL-14: of 300 rows, only those in view are drawn, and End brings the last into view.
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
