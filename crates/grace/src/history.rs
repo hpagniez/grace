@@ -38,14 +38,14 @@ pub const ROW_HEIGHT: f32 = 28.;
 pub const DIALOG_WIDTH: f32 = 448.;
 
 /// The columns' widths in px; "Tags" takes what the others leave and is cut when it is short.
-const WHEN: f32 = 112.;
-const ENV: f32 = 64.;
+const WHEN: f32 = 104.;
+const ENV: f32 = 56.;
 const THREADS: f32 = 56.;
-const RESULT: f32 = 224.;
+const RESULT: f32 = 208.;
 const DURATION: f32 = 64.;
-const ACTIONS: f32 = 272.;
+const ACTIONS: f32 = 256.;
 /// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path.
-const WHAT: f32 = 168.;
+const WHAT: f32 = 136.;
 
 fn clock() -> f64 {
     std::time::SystemTime::now()
