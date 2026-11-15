@@ -165,6 +165,19 @@ impl Node {
         self.all().into_iter().find(|n| &n.role == role && n.name == name)
     }
 
+    /// Whether the element a path led to, with this role and name, is this node. A press finds its node again by its
+    /// path, and a tree that changed since the read leads the path to another element; the press then fails here
+    /// instead of landing on that one.
+    pub fn check_found(&self, role: &Role, name: &str) -> Result<()> {
+        if &self.role == role && self.name == name {
+            return Ok(());
+        }
+        Err(format!(
+            "{:?} moved: read {:?} {:?}, found {role:?} {name:?}",
+            self.path, self.role, self.name
+        ))
+    }
+
     /// Every interactive node without a name, as `role at path`: what the tree check fails on (guide R8.2).
     pub fn unnamed_controls(&self) -> Vec<String> {
         self.all()
@@ -634,7 +647,13 @@ impl App {
             match tried {
                 Ok(()) => return Ok(()),
                 Err(e) if start.elapsed() > Duration::from_secs(5) => return Err(e),
-                Err(_) => std::thread::sleep(Duration::from_millis(50)),
+                Err(e) => {
+                    // in the test's output, so a CI log shows a press the tree moved under
+                    if e.contains(" moved: ") {
+                        eprintln!("press_named {role:?} {name:?} retried: {e}");
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
             }
         }
     }
@@ -815,6 +834,16 @@ mod tests {
         assert!(tree.find(&Role::Button, "Run all").is_some());
         assert!(tree.find(&Role::Button, "Cancel").is_none());
         assert!(tree.find(&Role::Status, "Run all").is_none());
+    }
+
+    #[test]
+    fn a_node_is_found_only_where_its_role_and_name_are_the_same() {
+        let mut read = node(Role::Button, "Clear", vec![]);
+        read.path = vec![1, 5];
+        assert!(read.check_found(&Role::Button, "Clear").is_ok());
+        let moved = read.check_found(&Role::Button, "Run all").unwrap_err();
+        assert_eq!(moved, r#"[1, 5] moved: read Button "Clear", found Button "Run all""#);
+        assert!(read.check_found(&Role::TreeItem, "Clear").is_err());
     }
 
     #[test]
