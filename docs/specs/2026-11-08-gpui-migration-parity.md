@@ -108,19 +108,19 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| RH-01 | A run appears in the history | | ☐ |
-| RH-02 | History survives a restart | | ☐ |
-| RH-03 | A cancelled run is listed without a report | | ☐ |
-| RH-04 | Re-run failed runs only the failed tests | | ☐ |
-| RH-05 | A failed dynamic row is skipped | | ☐ |
-| RH-06 | Re-run switches back to the run's environment and filter | | ☐ |
-| RH-07 | Cancelling the environment switch of a re-run runs nothing | | ☐ |
-| RH-08 | A re-run of a test that no longer exists | | ☐ |
-| RH-09 | Only the 20 newest runs are kept | | ☐ |
-| RH-10 | Clear history | | ☐ |
-| RH-11 | A damaged run file does not hide the others | | ☐ |
-| RH-12 | A secret never reaches the history files | | ☐ |
-| RH-13 | History actions wait for the runner | | ☐ |
+| RH-01 | A run appears in the history | `grace-e2e/tests/history.rs::a_run_appears_in_the_history` (Run all of the clean project: "Today …", "All", "8 passed, 1 failed of 9", a duration, Report, Re-run and Re-run failed on); `grace_core::history_list::tests::row_text::lists_runs_with_labels`; `grace::history::tests::lists_a_row_per_run_with_its_labels` | ☑ |
+| RH-02 | History survives a restart | `grace-e2e/tests/history.rs::history_survives_a_restart` (two seeded runs after a restart, newest first: the top row's Report opens the newest run's `karate-summary.html`); `grace_core::history::tests::list_history` | ☑ |
+| RH-03 | A cancelled run is listed without a report | `grace-e2e/tests/history.rs::a_cancelled_run_is_listed_without_a_report` ("Cancelled, 0 passed, 0 failed of 1", Report off, Re-run on; the checks of a button's state on Windows); `grace_core::runner::tests::history::a_cancelled_run_is_recorded_as_cancelled_with_not_run_for_tests_that_never_started` | ☑ |
+| RH-04 | Re-run failed runs only the failed tests | `grace-e2e/tests/history.rs::re_run_failed_runs_only_the_failed_tests` (the toolbar's Re-run failed after `flag.json` is fixed: "Failed tests of Today …", "1 passed, 1 failed of 2", so two tests were selected, and "fixable" passes); `grace_core::runner::tests::rerun::rerun_failed_runs_only_the_failed_tests_that_can_run` (which tests go pending) | ☑ |
+| RH-05 | A failed dynamic row is skipped | `grace-e2e/tests/history.rs::a_failed_dynamic_row_is_skipped` (the notice "1 failed row of a dynamic Examples table can't be run alone. Run its outline.", "0 passed, 2 failed of 2"); `grace_core::runner::tests::rerun::rerun_failed_runs_only_the_failed_tests_that_can_run` | ☑ |
+| RH-06 | Re-run switches back to the run's environment and filter | `grace-e2e/tests/history.rs::re_run_switches_back_to_the_runs_environment_and_filter` (Env "qa" and "@smoke" back after "(none)" and a cleared filter, one test run); `grace_core::runner::tests::rerun::rerun_switches_environment_and_filter_back`. The plan's "confirmation" is the switch itself: no dialog asks (plan, slice 5) | ☑ |
+| RH-07 | Cancelling the environment switch of a re-run runs nothing | `grace-e2e/tests/history.rs::cancelling_the_environment_switch_of_a_re_run_runs_nothing` (Env still empty, no Java, one run folder); `grace_core::runner::tests::rerun::cancel_during_a_re_runs_environment_switch_runs_nothing` | ☑ |
+| RH-08 | A re-run of a test that no longer exists | `grace-e2e/tests/history.rs::a_re_run_of_a_test_that_no_longer_exists` ("The tests of this run no longer exist", nothing runs); `grace_core::runner::tests::rerun::rerun_of_a_deleted_test_says_the_tests_of_this_run_no_longer_exist` | ☑ |
+| RH-09 | Only the 20 newest runs are kept | `grace-e2e/tests/history.rs::only_the_20_newest_runs_are_kept` (20 seeded, one more run: 20 rows, the oldest folder gone); `grace_core::runner::tests::history::retention_keeps_20`, `grace_core::history::tests::prune_history::keeps_the_20_newest_names_invalid_ones_included` | ☑ |
+| RH-10 | Clear history | `grace-e2e/tests/history.rs::clear_history` (the dialog's words with the count, Delete: "No runs yet…", "History (0)", no run folder, the toolbar Report and Re-run failed off); `grace::history::tests::clear::*`; `grace_core::runner::tests::history::clear_history_deletes_the_runs_and_emits_an_empty_history` | ☑ |
+| RH-11 | A damaged run file does not hide the others | `grace-e2e/tests/history.rs::a_damaged_run_file_does_not_hide_the_others` ("History (2)" after a restart, 2 rows); `grace_core::history::tests::list_history::skips_invalid_and_unknown_version_files` | ☑ |
+| RH-12 | A secret never reaches the history files | `grace-e2e/tests/history.rs::a_secret_never_reaches_the_history_files` (Windows only, which has the secret storage, guide R5.3: `run.json` holds `"env":"qa"` and not the secret); `grace_core::runner::tests::history::run_json_holds_no_secret` | ☑ |
+| RH-13 | History actions wait for the runner | `grace-e2e/tests/history.rs::history_actions_wait_for_the_runner` (every row button, Clear history and the toolbar's Re-run failed off during a run on the History tab, on again after it; Windows for the state); `grace::history::tests::every_action_is_off_while_the_runner_is_busy_or_a_run_is_active`, `grace_core::history_list::tests::actions` | ☑ |
 
 ### FL · Flaky tests
 
@@ -391,8 +391,8 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-28 | A project with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` ("No feature files found" and where Grace looks, both in the tree) | ☑ |
 | PU-29 | Before any run the progress line says so | `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`; through the tree, `grace-e2e/tests/details.rs::failure_details` ("9 tests · Not run yet") | ☑ |
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
-| PU-31 | Empty history and HTTP tabs | The HTTP half: `grace::http::tests::shows_the_three_empty_states`, `grace_core::http_list::tests::added::the_empty_text_says_why_the_list_is_empty`. The History half waits for the History tab, phase P3 slice 5 | ☐ |
-| PU-32 | Dialogs keep their order and keyboard behaviour | Waits for Clear history, phase P3 | ☐ |
+| PU-31 | Empty history and HTTP tabs | The HTTP half: `grace::http::tests::shows_the_three_empty_states`, `grace_core::http_list::tests::added::the_empty_text_says_why_the_list_is_empty`; the History half: `grace::history::tests::says_no_runs_yet_in_an_empty_state_with_the_history_icon`, `grace-e2e/tests/history.rs::before_any_run_the_history_and_http_tabs_say_so` | ☑ |
+| PU-32 | Dialogs keep their order and keyboard behaviour | Clear history: `grace::history::tests::clear::puts_delete_first_then_cancel_which_has_the_focus`, `cancel_has_the_focus_when_the_dialog_opens`, `clear::escape_closes_it_and_deletes_nothing`; `grace-e2e/tests/history.rs::clear_history_keeps_its_button_order_and_closes_on_escape` (Delete before Cancel, Cancel focused, Escape closes it and deletes nothing). The Properties dialog's Escape: `grace-e2e/tests/properties.rs` | ☑ |
 | PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
 
 ### VL · Big projects: virtual lists and keyboard navigation
@@ -1061,19 +1061,19 @@ Phase P3 · 14 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-history-01 | A run appears in the history | | ☐ |
-| E-history-02 | History survives a restart | | ☐ |
-| E-history-03 | A cancelled run is listed without a report | | ☐ |
-| E-history-04 | Re-run failed runs only the failed tests | | ☐ |
-| E-history-05 | A failed dynamic row is skipped | | ☐ |
-| E-history-06 | Re-run switches back to the run's environment and filter | | ☐ |
-| E-history-07 | Cancelling the environment switch of a re-run runs nothing | | ☐ |
-| E-history-08 | A re-run of a test that no longer exists | | ☐ |
-| E-history-09 | Only the 20 newest runs are kept | | ☐ |
-| E-history-10 | Clear history | | ☐ |
-| E-history-11 | A damaged run file does not hide the others | | ☐ |
-| E-history-12 | A secret never reaches the history files | | ☐ |
-| E-history-13 | History actions wait for the runner | | ☐ |
+| E-history-01 | A run appears in the history | `grace-e2e/tests/history.rs::a_run_appears_in_the_history` | ☑ |
+| E-history-02 | History survives a restart | `grace-e2e/tests/history.rs::history_survives_a_restart` | ☑ |
+| E-history-03 | A cancelled run is listed without a report | `grace-e2e/tests/history.rs::a_cancelled_run_is_listed_without_a_report` | ☑ |
+| E-history-04 | Re-run failed runs only the failed tests | `grace-e2e/tests/history.rs::re_run_failed_runs_only_the_failed_tests` (which tests were selected is read from the new run's total, "of 2", not from pending marks: plan, Redesigns, `grace-e2e` (history)) | ☑ |
+| E-history-05 | A failed dynamic row is skipped | `grace-e2e/tests/history.rs::a_failed_dynamic_row_is_skipped` (as E-history-04) | ☑ |
+| E-history-06 | Re-run switches back to the run's environment and filter | `grace-e2e/tests/history.rs::re_run_switches_back_to_the_runs_environment_and_filter` | ☑ |
+| E-history-07 | Cancelling the environment switch of a re-run runs nothing | `grace-e2e/tests/history.rs::cancelling_the_environment_switch_of_a_re_run_runs_nothing` | ☑ |
+| E-history-08 | A re-run of a test that no longer exists | `grace-e2e/tests/history.rs::a_re_run_of_a_test_that_no_longer_exists` | ☑ |
+| E-history-09 | Only the 20 newest runs are kept | `grace-e2e/tests/history.rs::only_the_20_newest_runs_are_kept` | ☑ |
+| E-history-10 | Clear history | `grace-e2e/tests/history.rs::clear_history` | ☑ |
+| E-history-11 | A damaged run file does not hide the others | `grace-e2e/tests/history.rs::a_damaged_run_file_does_not_hide_the_others` | ☑ |
+| E-history-12 | A secret never reaches the history files | `grace-e2e/tests/history.rs::a_secret_never_reaches_the_history_files` (Windows only, as `properties.rs`'s secret tests) | ☑ |
+| E-history-13 | History actions wait for the runner | `grace-e2e/tests/history.rs::history_actions_wait_for_the_runner` | ☑ |
 | E-history-14 | Export a run's report | | ☐ |
 
 ### e2e/home.spec.ts
@@ -1129,8 +1129,8 @@ Phase P0 · 17 tests
 | E-look-13 | A first start shows the first-run home screen | `grace-e2e/tests/home.rs::a_first_start_shows_the_home_screen` (PU-26) | ☑ |
 | E-look-14 | A missing recent folder says so in words | `grace::home::tests::says_not_found_in_a_cancelled_badge_with_the_warning_icon_and_the_row_is_disabled` (PU-27) | ☑ |
 | E-look-15 | A folder with no feature files shows an empty state | `grace-e2e/tests/run.rs::nothing_to_run` (PU-28) | ☑ |
-| E-look-16 | Before any run the progress line, the details and the tabs say so | The progress line and the details: `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`, `grace-e2e/tests/details.rs::failure_details` (PU-29, PU-30); the History and HTTP tabs with phase P3 | ☐ |
-| E-look-17 | Clear history keeps its button order and closes on Escape | Waits for Clear history, phase P3 | ☐ |
+| E-look-16 | Before any run the progress line, the details and the tabs say so | The progress line and the details: `grace::progress::tests::before_any_run_r14_3::counts_the_projects_tests_and_says_not_run_yet_with_no_zero_counts`, `grace-e2e/tests/details.rs::failure_details` (PU-29, PU-30); the History and HTTP tabs: `grace-e2e/tests/history.rs::before_any_run_the_history_and_http_tabs_say_so` | ☑ |
+| E-look-17 | Clear history keeps its button order and closes on Escape | `grace-e2e/tests/history.rs::clear_history_keeps_its_button_order_and_closes_on_escape` | ☑ |
 
 ### e2e/open.spec.ts
 
@@ -1404,7 +1404,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/FieldMessage.test.tsx` | 2 | `grace::ui::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (5 runs with the `it.each` cases, all ported) | ☑ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
-| `src/renderer/History.test.tsx` | 30 | view `History` (`grace::ui`), headless | ☐ |
+| `src/renderer/History.test.tsx` | 30 | `grace_core::history_list::tests` (15) and `grace::history::tests` (15), test for test in [P3 plan, slice 5](../plans/2026-11-12-gpui-p3-panels.md#historytesttsx-30-tests-in-grace_corehistory_listtests-and-gracehistorytests); 3 by eye (Tailwind classes); Export's half of tests 16 and 18 waits for slice 6 (ER-05) | ☑ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests`, `grace::window::tests`, `grace::toolbar::tests`, `grace_core::state::tests` and `grace-e2e/tests/home.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (all 26 ported) | ☑ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | `grace::http::tests` (23 tests: 20 for 21 Vitest tests, and 3 added), test for test in [P3 plan, slice 3](../plans/2026-11-12-gpui-p3-panels.md#httpcallstesttsx-26-in-gracehttptests); the list box and its options in `grace-e2e/tests/http.rs`; 3 by eye (Tailwind classes) | ☑ |
 | `src/renderer/Icon.test.tsx` | 3 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes`, `grace::assets::tests` ("one child per node" is `n/a`: GPUI draws the Lucide file); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |

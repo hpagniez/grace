@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+pub mod history;
 pub mod properties;
 
 #[cfg(target_os = "linux")]
@@ -398,6 +399,12 @@ impl App {
         let data = self.data.clone();
         drop(self);
         Self::launch_in(data, env)
+    }
+
+    /// Ends this Grace, keeping its data folder, for a test that changes it before the next start (`launch_in`).
+    pub fn stop(mut self) -> PathBuf {
+        self.keep = true;
+        self.data.clone()
     }
 
     /// `settings.json` as Grace wrote it, or `null` when there is none.

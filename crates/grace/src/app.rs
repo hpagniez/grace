@@ -36,8 +36,12 @@ pub trait Backend: Send + Sync + 'static {
     fn refresh(&self) -> std::io::Result<()>;
     /// Runs the tests under a node: the tree's root for Run all.
     fn run(&self, key: &str) -> std::io::Result<()>;
+    /// Runs a listed run again on its environment and filter (RH-06).
+    fn rerun(&self, id: &str) -> std::io::Result<()>;
     /// Runs again the tests that failed in a listed run.
     fn rerun_failed(&self, id: &str) -> std::io::Result<()>;
+    /// Deletes the open project's run folders; the runner sends the empty history back.
+    fn clear_history(&self);
     fn cancel(&self);
     /// Sets the open project's tag filter; the runner sends it back as an event.
     fn set_filter(&self, filter: FilterState);
@@ -49,6 +53,8 @@ pub trait Backend: Send + Sync + 'static {
     fn save_properties(&self, edit: &PropertiesEdit) -> bool;
     /// The last run's HTML report, if it is there.
     fn report_path(&self) -> Option<PathBuf>;
+    /// The HTML report of a listed run, if it has one. Never takes a path (history R4).
+    fn run_report_path(&self, id: &str) -> Option<PathBuf>;
     /// A tree path or an absolute path as a file of the open project that Open in VS Code may open (OE-05, OE-06).
     fn editor_file(&self, file: &str) -> Option<PathBuf>;
 }
@@ -81,8 +87,14 @@ impl Backend for Runner {
     fn run(&self, key: &str) -> std::io::Result<()> {
         Runner::run(self, key)
     }
+    fn rerun(&self, id: &str) -> std::io::Result<()> {
+        Runner::rerun(self, id)
+    }
     fn rerun_failed(&self, id: &str) -> std::io::Result<()> {
         Runner::rerun_failed(self, id)
+    }
+    fn clear_history(&self) {
+        Runner::clear_history(self)
     }
     fn cancel(&self) {
         Runner::cancel(self)
@@ -101,6 +113,9 @@ impl Backend for Runner {
     }
     fn report_path(&self) -> Option<PathBuf> {
         Runner::report_path(self)
+    }
+    fn run_report_path(&self, id: &str) -> Option<PathBuf> {
+        Runner::run_report_path(self, id)
     }
     fn editor_file(&self, file: &str) -> Option<PathBuf> {
         Runner::editor_file(self, file)
@@ -333,7 +348,25 @@ impl Grace {
         let Some(id) = self.state.history.first().map(|h| h.id.clone()) else {
             return;
         };
+        self.rerun_failed_of(id, cx);
+    }
+
+    /// Re-run failed on a row of the History tab: that run's failed tests (RH-04).
+    pub fn rerun_failed_of(&mut self, id: String, cx: &mut Context<Self>) {
         self.background(cx, Order::Start, move |b| b.rerun_failed(&id));
+    }
+
+    /// Re-run on a row of the History tab: that run's node, or tests, on its environment and filter (RH-06).
+    pub fn rerun(&mut self, id: String, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, move |b| b.rerun(&id));
+    }
+
+    /// Clear history, once the person confirmed it (RH-10). The runner refuses while it is busy.
+    pub fn clear_history(&mut self, cx: &mut Context<Self>) {
+        self.background(cx, Order::End, |b| {
+            b.clear_history();
+            Ok(())
+        });
     }
 
     /// Runs the tests under a row of the tree.
@@ -422,6 +455,19 @@ impl Grace {
         let backend = Arc::clone(&self.backend);
         let seams = Arc::clone(&self.seams);
         let path = cx.background_spawn(async move { backend.report_path() });
+        cx.spawn(async move |_, cx| {
+            if let Some(path) = path.await {
+                cx.update(|cx| seams.open_path(&path, cx));
+            }
+        })
+        .detach();
+    }
+
+    /// Report on a row of the History tab: that run's HTML report in the default browser (RH-02).
+    pub fn open_run_report(&mut self, id: String, cx: &mut Context<Self>) {
+        let backend = Arc::clone(&self.backend);
+        let seams = Arc::clone(&self.seams);
+        let path = cx.background_spawn(async move { backend.run_report_path(&id) });
         cx.spawn(async move |_, cx| {
             if let Some(path) = path.await {
                 cx.update(|cx| seams.open_path(&path, cx));
@@ -555,9 +601,16 @@ pub mod fake {
             self.record(format!("run {key}"));
             Ok(())
         }
+        fn rerun(&self, id: &str) -> std::io::Result<()> {
+            self.record(format!("rerun {id}"));
+            Ok(())
+        }
         fn rerun_failed(&self, id: &str) -> std::io::Result<()> {
             self.record(format!("rerun_failed {id}"));
             Ok(())
+        }
+        fn clear_history(&self) {
+            self.record("clear_history".into());
         }
         fn cancel(&self) {
             self.record("cancel".into());
@@ -580,6 +633,10 @@ pub mod fake {
         fn report_path(&self) -> Option<PathBuf> {
             self.record("report_path".into());
             Some(PathBuf::from("/out/karate-summary.html"))
+        }
+        fn run_report_path(&self, id: &str) -> Option<PathBuf> {
+            self.record(format!("run_report_path {id}"));
+            Some(PathBuf::from(format!("/runs/{id}/karate-summary.html")))
         }
         fn editor_file(&self, file: &str) -> Option<PathBuf> {
             self.record(format!("editor_file {file}"));

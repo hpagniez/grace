@@ -97,6 +97,29 @@ mod tabs {
         assert_eq!(tab_name(TabId::Http, &state), "HTTP (0)");
     }
 
+    /// `History.test.tsx` 2: Console has no Clear history; the History tab shows its runs and the button beside its tab list.
+    #[gpui::test]
+    fn the_history_tab_shows_its_runs_and_clear_history_beside_the_tab_list(cx: &mut TestAppContext) {
+        let (h, mut cx, _p) = setup(cx, data_dir("history-tab"));
+        h.update(&mut cx, |s| s.history = vec![testing::run("a", 1, 0)]);
+        assert!(cx.debug_bounds("clear-history").is_none());
+        assert!(cx.debug_bounds("history").is_none());
+        let at = centre(&mut cx, "tab-history");
+        cx.simulate_click(at, Modifiers::none());
+        cx.run_until_parked();
+        let (button, tabs) = (
+            cx.debug_bounds("clear-history").unwrap(),
+            cx.debug_bounds("tab-history").unwrap(),
+        );
+        assert!(cx.debug_bounds("history-row:1").is_some());
+        assert!(button.left() > tabs.right(), "beside the tab list, not in it");
+        let at = centre(&mut cx, "tab-console");
+        cx.simulate_click(at, Modifiers::none());
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("clear-history").is_none());
+        assert!(cx.debug_bounds("history-row:1").is_none());
+    }
+
     #[gpui::test]
     fn a_click_shows_a_tab(cx: &mut TestAppContext) {
         let (h, mut cx, _p) = setup(cx, data_dir("click"));

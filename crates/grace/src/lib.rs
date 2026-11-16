@@ -12,6 +12,7 @@ pub mod e2e;
 pub mod elements;
 pub mod env_picker;
 pub mod filter_bar;
+pub mod history;
 pub mod home;
 pub mod http;
 pub mod instance;

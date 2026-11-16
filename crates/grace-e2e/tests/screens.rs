@@ -569,3 +569,69 @@ fn screens_open_in_vs_code() {
     });
     shot(&app, "tree-row-menu");
 }
+
+/// The History tab with runs of every kind: a failed one, a cancelled one on an environment with tags, a scenario's, a
+/// re-run of failed tests and one from yesterday; then Clear history's dialog.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_history() {
+    use grace_e2e::history::{Seed, seed_runs};
+    let dir = project("clean").unwrap();
+    let data = grace_e2e::fresh_data_dir().unwrap();
+    let seed = |ago, record| {
+        seed_runs(
+            &data,
+            &dir,
+            1,
+            &Seed {
+                ago,
+                record,
+                report: true,
+            },
+        )
+    };
+    let scenario = json!({ "kind": "scenario", "file": "tests/basic.feature", "name": "failing match", "line": 15, "key": "s:tests/basic.feature#2" });
+    seed(1500, json!({ "exitCode": 0, "durationMillis": 83_000 }));
+    seed(40, json!({ "selection": scenario, "durationMillis": 400 }));
+    seed(
+        30,
+        json!({ "selection": null, "failedOf": 1_700_000_000_000_i64, "durationMillis": 1500 }),
+    );
+    seed(
+        6,
+        json!({ "env": "qa", "outcome": "cancelled", "exitCode": null, "durationMillis": 18_000,
+                "filter": { "include": ["smoke"], "exclude": ["slow"], "hideNonMatching": false } }),
+    );
+    seed(0, json!({}));
+    std::fs::write(
+        data.join("settings.json"),
+        json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 340 }).to_string(),
+    )
+    .unwrap();
+    let app = App::launch_in(data, &[]).unwrap();
+    app.wait_for("the runs", WAIT, |t| {
+        t.all()
+            .into_iter()
+            .any(|n| n.role == Role::Tab && n.name == "History (5)")
+    })
+    .unwrap();
+    let t = app.tree().unwrap();
+    app.press(
+        t.all()
+            .into_iter()
+            .find(|n| n.role == Role::Tab && n.name.starts_with("History"))
+            .unwrap(),
+    )
+    .unwrap();
+    app.wait_for("the rows", WAIT, |t| {
+        t.find(&Role::List, "Run history")
+            .is_some_and(|l| l.all().iter().filter(|n| n.role == Role::ListItem).count() == 5)
+    })
+    .unwrap();
+    shot(&app, "history-tab");
+    let t = app.tree().unwrap();
+    app.click(t.find(&Role::Button, "Clear history").unwrap()).unwrap();
+    app.wait_for("the dialog", WAIT, |t| t.all().iter().any(|n| n.role == Role::Dialog))
+        .unwrap();
+    shot(&app, "history-clear-dialog");
+}
