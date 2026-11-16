@@ -20,6 +20,7 @@ pub mod paths;
 pub mod properties_draft;
 pub mod properties_file;
 pub mod recent;
+pub mod report_zip;
 pub mod rows;
 pub mod runner;
 pub mod secrets;
