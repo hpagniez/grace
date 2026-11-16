@@ -204,7 +204,8 @@ mod windows_dialog {
                     let item: windows::core::Result<IShellItem> = SHCreateItemFromParsingName(downloads, None);
                     windows::Win32::System::Com::CoTaskMemFree(Some(downloads.0 as _));
                     if let Ok(item) = item {
-                        dialog.SetFolder(&item)?;
+                        // only a place to start in: a refusal must not hide the dialog
+                        let _ = dialog.SetFolder(&item);
                     }
                 }
                 let owner = (!owner.0.is_null()).then_some(owner);

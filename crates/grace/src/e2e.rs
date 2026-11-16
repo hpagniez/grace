@@ -170,7 +170,7 @@ impl Render for Gallery {
 }
 
 /// The seams' answers for an end-to-end test (migration guide, Architecture). `GRACE_E2E_SEAMS` names a JSON file the
-/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null, "save": "<path>" | null, "vscode": false}| null, "file": "<path>" | null, "vscode": false}`. Each ask
+/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null, "save": "<path>" | null, "vscode": false}`. Each ask
 /// is appended to `<data folder>/e2e-seams.jsonl`, `{"seam": "folder", "start": "<path>" | null}`, as the Playwright
 /// tests recorded `dialog.showOpenDialog`'s options.
 pub struct E2eSeams {
