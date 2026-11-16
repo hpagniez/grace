@@ -41,9 +41,17 @@ fn state(runs: Vec<HistoryEntry>) -> AppState {
 }
 
 fn setup(cx: &mut TestAppContext, runs: Vec<HistoryEntry>) -> (Harness, VisualTestContext, Entity<History>) {
+    setup_at(cx, 1200., runs)
+}
+
+fn setup_at(
+    cx: &mut TestAppContext,
+    width: f32,
+    runs: Vec<HistoryEntry>,
+) -> (Harness, VisualTestContext, Entity<History>) {
     let slot: Rc<RefCell<Option<Entity<History>>>> = Rc::default();
     let s = Rc::clone(&slot);
-    let (h, mut vcx) = testing::open_rooted(cx, 1200., state(runs), move |grace, _, cx| {
+    let (h, mut vcx) = testing::open_rooted(cx, width, state(runs), move |grace, _, cx| {
         let list = s
             .borrow_mut()
             .get_or_insert_with(|| {
@@ -546,5 +554,37 @@ mod export {
         let x = |cx: &mut VisualTestContext, what: &str| bounds(cx, format!("history-{what}:1")).origin.x;
         let (report, export, rerun) = (x(&mut cx, "report"), x(&mut cx, "export"), x(&mut cx, "rerun"));
         assert!(report < export && export < rerun);
+    }
+}
+
+/// A run's tags are drawn whole in a window of 1200 px, whose History table is 1160 px wide (the frame's margins and the
+/// panel's borders, as measured on the screenshots): no chip is cut by the cell that holds them. Slice 5 fixed the same cut
+/// once; the fourth button, Export, took room from the cell until the other columns were cut to what they need.
+#[gpui::test]
+fn draws_the_tags_whole_at_1200_px(cx: &mut TestAppContext) {
+    let tagged = HistoryEntry {
+        started_at: at(24, 17, 20),
+        env: Some("staging".into()),
+        outcome: RunOutcome::Cancelled,
+        exit_code: None,
+        passed: 1,
+        failed: 1,
+        total: 2,
+        duration_millis: 83_000.,
+        filter: FilterState {
+            include: vec!["smoke".into()],
+            exclude: vec!["slow".into()],
+            hide_non_matching: false,
+        },
+        ..entry("a")
+    };
+    let (_h, mut cx, _list) = setup_at(cx, 1160., vec![tagged]);
+    let cell = bounds(&mut cx, "history-tags-cell:1".into());
+    for k in 0..2 {
+        let chip = bounds(&mut cx, format!("history-tag:1:{k}"));
+        assert!(
+            chip.right() <= cell.right(),
+            "chip {k} {chip:?} runs past its cell {cell:?}"
+        );
     }
 }
