@@ -4,8 +4,7 @@
 //!
 //! The runs arrive with the project and after each run (the runner sends the list); the rows are worked out when the list
 //! changes and read their clock once, as Electron Grace's rows did, so an idle History tab costs nothing. At most 20
-//! runs are listed, so the rows are plain elements, not a virtual list. Export and the trends strip come with slices 6
-//! and 7 (P3 plan).
+//! runs are listed, so the rows are plain elements, not a virtual list. The trends strip comes with slice 7 (P3 plan).
 use std::rc::Rc;
 
 use gpui::accesskit::Role;
@@ -43,7 +42,7 @@ const ENV: f32 = 56.;
 const THREADS: f32 = 56.;
 const RESULT: f32 = 208.;
 const DURATION: f32 = 64.;
-const ACTIONS: f32 = 256.;
+const ACTIONS: f32 = 332.;
 /// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path.
 const WHAT: f32 = 136.;
 
@@ -226,8 +225,13 @@ impl History {
 
     fn buttons(&self, i: usize, id: String, a: Actions) -> impl IntoElement {
         let key = id.clone();
-        let (report, rerun, failed) = (id.clone(), id.clone(), id);
-        let (g1, g2, g3) = (self.grace.clone(), self.grace.clone(), self.grace.clone());
+        let (report, export, rerun, failed) = (id.clone(), id.clone(), id.clone(), id);
+        let (g1, g2, g3, g4) = (
+            self.grace.clone(),
+            self.grace.clone(),
+            self.grace.clone(),
+            self.grace.clone(),
+        );
         // each button in a frame that names it, for the tests' clicks
         let frame = |what: &'static str, button: gpui_component::button::Button| {
             div()
@@ -251,6 +255,18 @@ impl History {
                 )
                 .off(!a.report)
                 .on_click(move |_, _, cx| g1.update(cx, |g, cx| g.open_run_report(report.clone(), cx))),
+            ))
+            .child(frame(
+                "export",
+                icon_text_button(
+                    SharedString::from(format!("history-export-{key}")),
+                    Icon::Download,
+                    "Export",
+                    ButtonKind::Ghost,
+                    ButtonSize::Small,
+                )
+                .off(!a.export)
+                .on_click(move |_, _, cx| g4.update(cx, |g, cx| g.export_report(export.clone(), cx))),
             ))
             .child(frame(
                 "rerun",

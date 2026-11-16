@@ -25,6 +25,9 @@ pub trait Seams: 'static {
     fn open_url(&self, url: &str, cx: &mut gpui::App) -> bool;
     /// Puts `text` on the clipboard, as Electron's `navigator.clipboard.writeText` (Copy as cURL, HI-08).
     fn copy(&self, text: &str, cx: &mut gpui::App);
+    /// Asks where to save a report's zip (Export, ER-07): the Shell's "Export report" dialog, in the person's Downloads
+    /// folder, proposing `name`, for zip archives. `None` when the person closes it.
+    fn pick_save(&self, name: &str, cx: &mut AsyncApp) -> Answer<Option<PathBuf>>;
 }
 
 /// The platform's own dialogs.
@@ -47,6 +50,20 @@ impl Seams for Platform {
 
     fn copy(&self, text: &str, cx: &mut gpui::App) {
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
+    }
+
+    #[cfg(windows)]
+    fn pick_save(&self, name: &str, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+        windows_dialog::pick_save(name.to_owned())
+    }
+
+    // GPUI's portal dialog, which has no filter by type: on Linux, which is not released (guide R5), it starts in
+    // ~/Downloads and every file shows.
+    #[cfg(not(windows))]
+    fn pick_save(&self, name: &str, cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+        let downloads = std::env::var_os("HOME").map_or_else(PathBuf::new, |h| PathBuf::from(h).join("Downloads"));
+        let picked = cx.update(|cx| cx.prompt_for_new_path(&downloads, Some(name)));
+        Box::pin(async move { picked.await.ok()?.ok()? })
     }
 
     #[cfg(windows)]
@@ -119,7 +136,7 @@ mod windows_url {
 #[cfg(windows)]
 mod windows_dialog {
     //! The Shell's folder dialog with a starting folder, which GPUI's `prompt_for_paths` cannot give (#82, HS-12), and
-    //! its file dialog with Electron Grace's title and filters. Each runs on a thread of its own, owned by Grace's
+    //! its file dialog and its save dialog with Electron Grace's titles and filters. Each runs on a thread of its own, owned by Grace's
     //! window, so the window stays drawn while it is open.
     use super::Answer;
     use std::path::PathBuf;
@@ -130,8 +147,9 @@ mod windows_dialog {
     };
     use windows::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
     use windows::Win32::UI::Shell::{
-        Common::COMDLG_FILTERSPEC, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, FileOpenDialog,
-        IFileOpenDialog, IShellItem, SHCreateItemFromParsingName, SIGDN_FILESYSPATH,
+        Common::COMDLG_FILTERSPEC, FOLDERID_Downloads, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
+        FileOpenDialog, FileSaveDialog, IFileOpenDialog, IFileSaveDialog, IShellItem, KF_FLAG_DEFAULT,
+        SHCreateItemFromParsingName, SHGetKnownFolderPath, SIGDN_FILESYSPATH,
     };
     use windows::core::{HRESULT, HSTRING, w};
 
@@ -144,21 +162,66 @@ mod windows_dialog {
     }
 
     pub fn pick_folder(start: Option<PathBuf>) -> Answer<Option<PathBuf>> {
-        on_a_thread(Pick::Folder(start))
+        on_a_thread(move |owner| show(Pick::Folder(start), owner))
     }
 
     pub fn pick_file() -> Answer<Option<PathBuf>> {
-        on_a_thread(Pick::PropertiesFile)
+        on_a_thread(|owner| show(Pick::PropertiesFile, owner))
     }
 
-    fn on_a_thread(pick: Pick) -> Answer<Option<PathBuf>> {
+    /// Export's dialog (`showSaveDialog` of `main.ts`): "Export report", zip archives, `name` proposed in Downloads.
+    pub fn pick_save(name: String) -> Answer<Option<PathBuf>> {
+        on_a_thread(move |owner| show_save(&name, owner))
+    }
+
+    fn on_a_thread(show: impl FnOnce(HWND) -> Option<PathBuf> + Send + 'static) -> Answer<Option<PathBuf>> {
         // Called on the UI thread: its active window is Grace's, the dialog's owner.
         let owner = unsafe { GetActiveWindow() }.0 as isize;
         let (tx, rx) = async_channel::bounded(1);
         std::thread::spawn(move || {
-            let _ = tx.send_blocking(show(pick, HWND(owner as _)));
+            let _ = tx.send_blocking(show(HWND(owner as _)));
         });
         Box::pin(async move { rx.recv().await.ok().flatten() })
+    }
+
+    fn show_save(name: &str, owner: HWND) -> Option<PathBuf> {
+        unsafe {
+            CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
+                .ok()
+                .ok()?;
+            let picked = (|| -> windows::core::Result<Option<PathBuf>> {
+                let dialog: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_INPROC_SERVER)?;
+                dialog.SetOptions(dialog.GetOptions()? | FOS_FORCEFILESYSTEM)?;
+                dialog.SetTitle(w!("Export report"))?;
+                dialog.SetFileTypes(&[COMDLG_FILTERSPEC {
+                    pszName: w!("Zip archive"),
+                    pszSpec: w!("*.zip"),
+                }])?;
+                dialog.SetDefaultExtension(w!("zip"))?;
+                dialog.SetFileName(&HSTRING::from(name))?;
+                // the person's Downloads folder, as `app.getPath("downloads")`
+                if let Ok(downloads) = SHGetKnownFolderPath(&FOLDERID_Downloads, KF_FLAG_DEFAULT, None) {
+                    let item: windows::core::Result<IShellItem> = SHCreateItemFromParsingName(downloads, None);
+                    windows::Win32::System::Com::CoTaskMemFree(Some(downloads.0 as _));
+                    if let Ok(item) = item {
+                        dialog.SetFolder(&item)?;
+                    }
+                }
+                let owner = (!owner.0.is_null()).then_some(owner);
+                if let Err(e) = dialog.Show(owner) {
+                    if e.code() == HRESULT::from_win32(ERROR_CANCELLED.0) {
+                        return Ok(None);
+                    }
+                    return Err(e);
+                }
+                let path = dialog.GetResult()?.GetDisplayName(SIGDN_FILESYSPATH)?;
+                let text = path.to_string();
+                windows::Win32::System::Com::CoTaskMemFree(Some(path.0 as _));
+                Ok(text.ok().map(PathBuf::from))
+            })();
+            CoUninitialize();
+            picked.ok().flatten()
+        }
     }
 
     fn show(pick: Pick, owner: HWND) -> Option<PathBuf> {
@@ -223,6 +286,9 @@ pub mod fake {
         answer: Option<PathBuf>,
         /// The file Import from file… picks.
         pub file: Mutex<Option<PathBuf>>,
+        /// The place Export's dialog picks; none is closing it.
+        pub save: Mutex<Option<PathBuf>>,
+        saves: Mutex<Vec<String>>,
         asked: Mutex<Vec<Option<PathBuf>>>,
         opened: Mutex<Vec<PathBuf>>,
         urls: Mutex<Vec<String>>,
@@ -236,6 +302,8 @@ pub mod fake {
             Self {
                 answer: folder.map(PathBuf::from),
                 file: Mutex::default(),
+                save: Mutex::default(),
+                saves: Mutex::default(),
                 asked: Mutex::default(),
                 opened: Mutex::default(),
                 urls: Mutex::default(),
@@ -252,6 +320,10 @@ pub mod fake {
         /// Each link handed on, in order.
         pub fn urls(&self) -> Vec<String> {
             self.urls.lock().unwrap().clone()
+        }
+        /// The name each save dialog proposed, in order.
+        pub fn saves(&self) -> Vec<String> {
+            self.saves.lock().unwrap().clone()
         }
         /// Each text put on the clipboard, in order.
         pub fn copies(&self) -> Vec<String> {
@@ -281,6 +353,11 @@ pub mod fake {
         }
         fn copy(&self, text: &str, _cx: &mut gpui::App) {
             self.copies.lock().unwrap().push(text.to_string());
+        }
+        fn pick_save(&self, name: &str, _cx: &mut AsyncApp) -> Answer<Option<PathBuf>> {
+            self.saves.lock().unwrap().push(name.to_string());
+            let answer = self.save.lock().unwrap().clone();
+            Box::pin(async move { answer })
         }
     }
 }

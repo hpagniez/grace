@@ -245,7 +245,7 @@ fn says_no_runs_yet_in_an_empty_state_with_the_history_icon(cx: &mut TestAppCont
 }
 
 /// 16, 17, 18: a row's buttons call the runner with its id; Report and Re-run failed are off where they have nothing to
-/// do. Export is slice 6's.
+/// do.
 #[gpui::test]
 fn the_buttons_of_a_row_call_the_runner_with_its_id(cx: &mut TestAppContext) {
     let runs = vec![entry("20261025-143200-000"), entry("20261024-172000-000")];
@@ -437,4 +437,114 @@ fn cancel_has_the_focus_when_the_dialog_opens(cx: &mut TestAppContext) {
         cx.update(|window, _| cancel.is_focused(window)),
         "Cancel holds the focus"
     );
+}
+
+/// 16, 18 (Export's half), ER-05, ER-07, ER-08, ER-10: Export asks the runner where the run's report is, asks where to
+/// save it, writes the zip there and says so; closing the dialog does nothing.
+mod export {
+    use super::*;
+
+    fn notice(h: &Harness, cx: &mut VisualTestContext) -> Option<String> {
+        cx.update(|_, cx| h.grace.read(cx).state.notice.as_ref().map(|n| n.text.clone()))
+    }
+
+    /// A run folder with its report, and a folder to save into; both are removed with the test.
+    fn folders() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+        let t = tempfile::tempdir().unwrap();
+        let run = t.path().join("run");
+        std::fs::create_dir_all(run.join("feature-html")).unwrap();
+        std::fs::write(run.join("karate-summary.html"), "<html>").unwrap();
+        std::fs::write(run.join("feature-html/a.html"), "<html>").unwrap();
+        std::fs::write(run.join("run.json"), "{}").unwrap();
+        let out = t.path().join("out");
+        std::fs::create_dir(&out).unwrap();
+        (t, run, out)
+    }
+
+    fn zipped(zip: &std::path::Path) -> Vec<String> {
+        let mut names: Vec<_> = grace_core::report_zip::read_zip(&std::fs::read(zip).unwrap())
+            .unwrap()
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// 18: the row's id goes to the runner, the dialog proposes the project's name for the zip, the zip is written where the
+    /// person chose and the notice says where.
+    #[gpui::test]
+    fn saves_the_zip_where_the_dialog_says_and_says_so(cx: &mut TestAppContext) {
+        let (_t, run, out) = folders();
+        let (h, mut cx, _list) = setup(cx, vec![entry("20261025-143200-000"), entry("20261024-172000-000")]);
+        let zip = out.join("r.zip");
+        *h.backend.export_dir.lock().unwrap() = Some(run);
+        *h.seams.save.lock().unwrap() = Some(zip.clone());
+        click(&mut cx, "history-export:2".into());
+        assert_eq!(h.backend.calls(), ["export_source 20261024-172000-000"]);
+        assert_eq!(h.seams.saves(), ["p-report-20261024-172000-000.zip"]);
+        assert_eq!(zipped(&zip), ["feature-html/a.html", "karate-summary.html"]);
+        assert_eq!(
+            notice(&h, &mut cx).as_deref(),
+            Some(format!("Report saved to {}", zip.display()).as_str())
+        );
+    }
+
+    /// ER-07: closing the dialog without saving writes nothing and says nothing.
+    #[gpui::test]
+    fn closing_the_dialog_does_nothing(cx: &mut TestAppContext) {
+        let (_t, run, out) = folders();
+        let (h, mut cx, _list) = setup(cx, vec![entry("a")]);
+        *h.backend.export_dir.lock().unwrap() = Some(run);
+        click(&mut cx, "history-export:1".into());
+        assert_eq!(h.seams.saves().len(), 1, "the dialog was shown");
+        assert_eq!(std::fs::read_dir(out).unwrap().count(), 0);
+        assert_eq!(notice(&h, &mut cx), None);
+    }
+
+    /// ER-10: a zip that cannot be written says why and leaves nothing.
+    #[gpui::test]
+    fn says_why_when_the_zip_cannot_be_written_and_leaves_nothing(cx: &mut TestAppContext) {
+        let (t, _run, out) = folders();
+        let (h, mut cx, _list) = setup(cx, vec![entry("a")]);
+        *h.backend.export_dir.lock().unwrap() = Some(t.path().join("gone"));
+        *h.seams.save.lock().unwrap() = Some(out.join("r.zip"));
+        click(&mut cx, "history-export:1".into());
+        let said = notice(&h, &mut cx).unwrap();
+        assert!(said.starts_with("The report could not be saved: "), "{said}");
+        assert_eq!(std::fs::read_dir(out).unwrap().count(), 0);
+    }
+
+    /// 16 (Export's half), ER-05: where Report is off, Export is off and a press shows no dialog; and while the runner is
+    /// busy or a run is active, every Export is.
+    #[gpui::test]
+    fn follows_report_off_without_a_report_and_while_busy(cx: &mut TestAppContext) {
+        let runs = vec![
+            HistoryEntry {
+                report_available: false,
+                ..entry("a")
+            },
+            entry("b"),
+        ];
+        let (h, mut cx, _list) = setup(cx, runs);
+        click(&mut cx, "history-export:1".into());
+        assert!(h.backend.calls().is_empty() && h.seams.saves().is_empty());
+        for lock in [|s: &mut AppState| s.busy = true, |s: &mut AppState| s.run.active = true] {
+            h.update(&mut cx, lock);
+            click(&mut cx, "history-export:2".into());
+            assert!(h.backend.calls().is_empty() && h.seams.saves().is_empty());
+            h.update(&mut cx, |s| (s.busy, s.run.active) = (false, false));
+        }
+        click(&mut cx, "history-export:2".into());
+        assert_eq!(h.seams.saves(), ["p-report-b.zip"], "on again once the runner is quiet");
+    }
+
+    /// Between Report and Re-run, as the spec has it (R2.1).
+    #[gpui::test]
+    fn sits_between_report_and_re_run(cx: &mut TestAppContext) {
+        let (_h, mut cx, _list) = setup(cx, vec![entry("a")]);
+        let x = |cx: &mut VisualTestContext, what: &str| bounds(cx, format!("history-{what}:1")).origin.x;
+        let (report, export, rerun) = (x(&mut cx, "report"), x(&mut cx, "export"), x(&mut cx, "rerun"));
+        assert!(report < export && export < rerun);
+    }
 }
