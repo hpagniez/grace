@@ -643,13 +643,13 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | ER-02 | The project does not ask for JUnit XML | `grace-core::runner::tests::runs::a_project_that_asks_for_junit_xml_gets_it_in_runs_and_not_in_the_dry_run` (its `false` case) | ☑ |
 | ER-03 | A wrong value makes the file unreadable | `grace-core::karate::command::tests::detect_layout::karate_pom_json::a_wrong_junit_xml_makes_the_file_unreadable_and_says_so`; `grace-core::karate::pom::tests::read_pom::refuses_a_junit_xml_that_is_not_true_or_false` | ☑ |
 | ER-04 | The other output keys are listed as unused | `grace-core::karate::command::tests::detect_layout::karate_pom_json::lists_the_other_output_keys_as_unused` | ☑ |
-| ER-05 | Export follows Report | | ☐ |
-| ER-06 | Main refuses a malformed id | | ☐ |
-| ER-07 | Closing the dialog does nothing | | ☐ |
-| ER-08 | The zip holds the report | | ☐ |
-| ER-09 | Any characters in the chosen path | | ☐ |
-| ER-10 | A zip that cannot be written leaves nothing | | ☐ |
-| ER-11 | Export a run's report (e2e) | | ☐ |
+| ER-05 | Export follows Report | `grace_core::history_list::tests::actions::export_follows_report`; `grace::history::tests::export::follows_report_off_without_a_report_and_while_busy` (off with no report, while a run is active and while the runner is busy), `sits_between_report_and_re_run` | ☑ |
+| ER-06 | Main refuses a malformed id | n/a by type: no IPC to send a malformed id through, and the row's id is a listed run's (plan P3, Redesigns, `app`). The runner's own refusal keeps its tests: `grace_core::model::history::tests::run_id::accepts_ids_and_rejects_traversal`, `grace_core::runner::tests::history::no_report_path_or_export_source_for_a_cancelled_run_or_an_unknown_id` | ☑ |
+| ER-07 | Closing the dialog does nothing | `grace::history::tests::export::closing_the_dialog_does_nothing` (the dialog was asked, nothing written, no notice); `grace-e2e/tests/history.rs::export_a_runs_report` | ☑ |
+| ER-08 | The zip holds the report | `grace_core::report_zip::tests::holds_the_report_and_leaves_out_run_json_and_karate_json`, `a_secret_in_the_files_left_out_never_reaches_the_zip`, `holds_a_big_report_whole`, `windows_own_tar_unpacks_it` | ☑ |
+| ER-09 | Any characters in the chosen path | `grace_core::report_zip::tests::writes_to_the_chosen_path_whatever_its_characters` | ☑ |
+| ER-10 | A zip that cannot be written leaves nothing | `grace_core::report_zip::tests::leaves_nothing_when_the_folder_is_gone`, `keeps_the_file_it_would_replace_when_it_fails`, `leaves_nothing_when_the_destination_cannot_be_written`; `grace::history::tests::export::says_why_when_the_zip_cannot_be_written_and_leaves_nothing` (the notice) | ☑ |
+| ER-11 | Export a run's report (e2e) | `grace-e2e/tests/history.rs::export_a_runs_report` (the success notice, and the zip holds `karate-summary.html` and the run's JUnit files); `grace::history::tests::export::saves_the_zip_where_the_dialog_says_and_says_so` | ☑ |
 
 ### FB · Find Maven and Gradle when they are not on PATH
 
@@ -1074,7 +1074,7 @@ Phase P3 · 14 tests
 | E-history-11 | A damaged run file does not hide the others | `grace-e2e/tests/history.rs::a_damaged_run_file_does_not_hide_the_others` | ☑ |
 | E-history-12 | A secret never reaches the history files | `grace-e2e/tests/history.rs::a_secret_never_reaches_the_history_files` (Windows only, as `properties.rs`'s secret tests) | ☑ |
 | E-history-13 | History actions wait for the runner | `grace-e2e/tests/history.rs::history_actions_wait_for_the_runner` | ☑ |
-| E-history-14 | Export a run's report | | ☐ |
+| E-history-14 | Export a run's report | `grace-e2e/tests/history.rs::export_a_runs_report` | ☑ |
 
 ### e2e/home.spec.ts
 
@@ -1360,7 +1360,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/mask.test.ts` | 15 | `grace-core::mask::tests` (26 tests; two gaps of Electron Grace fixed, #293) | ☑ |
 | `src/main/propertiesFile.test.ts` | 12 | `grace-core::properties_file::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/recent.test.ts` | 6 | `grace-core::recent::tests` (7 tests) | ☑ |
-| `src/main/report-zip.test.ts` | 6 | `grace-core::report-zip` | ☐ |
+| `src/main/report-zip.test.ts` | 6 | `grace_core::report_zip::tests` (10 tests: the 6 of the Vitest file, test for test, and 4 added: the destination that cannot be written, a secret in the files left out, a big report whole, Windows' own tar unpacking it) | ☑ |
 | `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
 | `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner::tests::discovery` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.editor.test.ts` | 2 | `grace_core::runner::tests::editor` (3 tests, real Java and Karate) | ☑ |
@@ -1404,7 +1404,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/FieldMessage.test.tsx` | 2 | `grace::ui::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (5 runs with the `it.each` cases, all ported) | ☑ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
-| `src/renderer/History.test.tsx` | 30 | `grace_core::history_list::tests` (15) and `grace::history::tests` (15), test for test in [P3 plan, slice 5](../plans/2026-11-12-gpui-p3-panels.md#historytesttsx-30-tests-in-grace_corehistory_listtests-and-gracehistorytests); 3 by eye (Tailwind classes); Export's half of tests 16 and 18 waits for slice 6 (ER-05) | ☑ |
+| `src/renderer/History.test.tsx` | 30 | `grace_core::history_list::tests` (15) and `grace::history::tests` (15), test for test in [P3 plan, slice 5](../plans/2026-11-12-gpui-p3-panels.md#historytesttsx-30-tests-in-grace_corehistory_listtests-and-gracehistorytests); 3 by eye (Tailwind classes); Export's half of tests 16 and 18: `grace::history::tests::export` (slice 6) | ☑ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests`, `grace::window::tests`, `grace::toolbar::tests`, `grace_core::state::tests` and `grace-e2e/tests/home.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (all 26 ported) | ☑ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | `grace::http::tests` (23 tests: 20 for 21 Vitest tests, and 3 added), test for test in [P3 plan, slice 3](../plans/2026-11-12-gpui-p3-panels.md#httpcallstesttsx-26-in-gracehttptests); the list box and its options in `grace-e2e/tests/http.rs`; 3 by eye (Tailwind classes) | ☑ |
 | `src/renderer/Icon.test.tsx` | 3 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes`, `grace::assets::tests` ("one child per node" is `n/a`: GPUI draws the Lucide file); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
