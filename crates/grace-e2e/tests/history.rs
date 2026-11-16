@@ -100,15 +100,33 @@ fn open(dir: &Path) -> App {
     open_with_runs(dir, 0, &Seed::default()).0
 }
 
+/// Waits until the project is ready: its tests found and the window no longer busy. The toolbar and the History tab are
+/// in the tree from the first read, and every control is off (a press of one returns Ok and does nothing) while the
+/// opening discovery or an environment switch lasts; "Ready." shows only when it is over and Run all can be pressed
+/// (`banner_state`), on both systems and before the first run writes to the console.
 fn wait_for_tests(app: &App) {
-    app.wait_for("the tests found", WAIT, |t| {
-        starting(t, "tests ").is_some() || starting(t, "6 tests").is_some() || tab(t).is_some()
+    wait_ready(app);
+    app.wait_for("the History tab", WAIT, |t| tab(t).is_some()).unwrap();
+}
+
+fn wait_ready(app: &App) {
+    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
+        .unwrap();
+}
+
+/// Waits until the window is no longer busy, after something that made it busy (an environment switch): Run all can be
+/// pressed again. The console holds output after a run and "Ready." is gone, so this reads the button, on Windows only
+/// (the pinned AT-SPI adapter drops a disabled state).
+// shortcut: no wait on Linux, so a press right after the switch can be lost there; no Linux run has lost one, and the
+// loop that presses Clear again stays; replace it if one does
+fn wait_idle(app: &App) {
+    #[cfg(windows)]
+    app.wait_for("Run all on", WAIT, |t| {
+        t.find(&Role::Button, "Run all").is_some_and(|b| b.states.enabled)
     })
     .unwrap();
-    app.wait_for("the project", WAIT, |t| {
-        t.find(&Role::Button, "Run all").is_some() && tab(t).is_some()
-    })
-    .unwrap();
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 /// The tree, read again until a read goes through.
@@ -347,6 +365,8 @@ fn re_run_switches_back_to_the_runs_environment_and_filter() {
     app.key(Key::Enter).unwrap();
     app.wait_until("qa saved", WAIT, || saved_env(&app) == json!("qa"))
         .unwrap();
+    // the filter is refused while the switch lasts
+    wait_idle(&app);
     app.press_named(Role::Button, "@smoke, not filtered").unwrap();
     app.wait_for("@smoke included", WAIT, |t| {
         t.find(&Role::Button, "@smoke, included").is_some()
@@ -366,8 +386,9 @@ fn re_run_switches_back_to_the_runs_environment_and_filter() {
     app.key(Key::Enter).unwrap();
     app.wait_until("none saved", WAIT, || saved_env(&app).is_null())
         .unwrap();
-    // The press of Clear can be lost right after the switch: the driver presses by place in the tree and does not check
-    // what it pressed. Press again while the filter still shows.
+    // Clear is off while the switch lasts: wait for its end. The loop that presses again while the filter still shows
+    // stays from before that wait; it is not shown to be needless.
+    wait_idle(&app);
     app.wait_for("the filter clear", WAIT, |t| {
         if t.find(&Role::Button, "@smoke, included").is_some() {
             let _ = app.press_named(Role::Button, "Clear");
