@@ -6,9 +6,10 @@
 //! borrowed triples, not `JSON.stringify` strings.
 use crate::history::ListedRun;
 use crate::karate::tree::{NodeRef, find_node, leaf_keys};
-use crate::model::history::{StoredTest, TestStatusFinal};
+use crate::model::history::{StoredTest, TestStatusFinal, when_label};
 use crate::model::node::{NodeKind, TestNode};
 use crate::model::trends::TrendPoint;
+use crate::rows::{format_millis, label_of};
 use std::collections::{HashMap, HashSet};
 
 /// What a test is called across runs: its file, kind and name.
@@ -113,6 +114,117 @@ pub fn find_trend(
     }
     points.reverse();
     points
+}
+
+/// What the strip says when no stored run ran the selection.
+pub const NONE: &str = "No stored run ran these tests";
+/// What the strip covers with nothing selected.
+const ALL: &str = "All tests";
+/// px, the height of each of a strip's two rows (`h-6`).
+pub const ROW: f32 = 24.;
+/// px, the gap between the passed and the failed part of a pass bar (`gap-0.5`).
+pub const GAP: f32 = 2.;
+/// px, the least a non-zero time bar is (`min-h-0.5`).
+pub const MIN_TIME: f32 = 2.;
+
+/// "92%", rounded down so one failure never reads 100%; "Passed" or "Failed" for one test.
+pub fn pass_rate_label(p: &TrendPoint) -> String {
+    if p.total == 1 {
+        return if p.passed > 0 { "Passed" } else { "Failed" }.into();
+    }
+    format!("{}%", p.passed * 100 / (p.passed + p.failed))
+}
+
+/// "Today 14:32: 12 passed, 3 failed, 15 of 412 tests, 1.40 s per test"; for one test "Today 14:32: passed, 1.40 s".
+pub fn trend_tip(p: &TrendPoint, now: f64) -> String {
+    let one = p.total == 1;
+    let mut parts = if one {
+        vec![if p.passed > 0 { "passed" } else { "failed" }.to_owned()]
+    } else {
+        vec![
+            format!("{} passed", p.passed),
+            format!("{} failed", p.failed),
+            format!("{} of {} tests", p.passed + p.failed, p.total),
+        ]
+    };
+    if let Some(ms) = p.mean_millis {
+        parts.push(if one {
+            format_millis(ms)
+        } else {
+            format!("{} per test", format_millis(ms))
+        });
+    }
+    format!("{}: {}", when_label(p.started_at, now), parts.join(", "))
+}
+
+/// What the strip covers: "All tests" for the whole tree, else the selected node's tree label.
+pub fn trend_caption(tree: Option<&TestNode>, selected: Option<&str>) -> String {
+    match (tree, selected) {
+        (Some(tree), Some(key)) => find_node(tree, key)
+            .filter(|n| n.key != tree.key)
+            .map_or_else(|| ALL.into(), label_of),
+        _ => ALL.into(),
+    }
+}
+
+/// One run's column: the heights in px of its bars, what it is called and which run it is.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Column {
+    /// The run folder's name.
+    pub id: String,
+    /// Also its accessible name.
+    pub tip: String,
+    /// The failed part of the pass bar, above; 0 draws nothing.
+    pub failed: f32,
+    /// The passed part, below.
+    pub passed: f32,
+    /// The time bar; `None` for a run whose counted tests have no time.
+    pub time: Option<f32>,
+}
+
+/// The strip, worked out: the columns oldest to newest and the words beside them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Strip {
+    pub columns: Vec<Column>,
+    /// The newest column's pass rate, "" with none.
+    pub pass: String,
+    /// The newest column's time per test.
+    pub time: String,
+    /// The top of the time rows' scale: the tallest column's time, "" when there is none above 0.
+    pub max: String,
+}
+
+/// The columns of `points` (oldest first, as `find_trend` gives them), each part of a bar its share of the row.
+pub fn strip(points: &[TrendPoint], now: f64) -> Strip {
+    let max = points.iter().filter_map(|p| p.mean_millis).fold(0., f64::max);
+    let columns = points
+        .iter()
+        .map(|p| {
+            let counted = p.passed + p.failed;
+            let room = if p.passed > 0 && p.failed > 0 { ROW - GAP } else { ROW };
+            let failed = room * p.failed as f32 / counted as f32;
+            Column {
+                id: p.id.clone(),
+                tip: trend_tip(p, now),
+                failed,
+                passed: room - failed,
+                time: p.mean_millis.map(|ms| match ms {
+                    ms if ms > 0. => (ROW * (ms / max) as f32).max(MIN_TIME),
+                    _ => 0.,
+                }),
+            }
+        })
+        .collect();
+    let newest = points.last();
+    Strip {
+        columns,
+        pass: newest.map(pass_rate_label).unwrap_or_default(),
+        time: newest
+            .and_then(|p| p.mean_millis)
+            .map(format_millis)
+            .unwrap_or_default(),
+        max: if max > 0. { format_millis(max) } else { String::new() },
+    }
 }
 
 #[cfg(test)]
@@ -278,6 +390,189 @@ mod tests {
                     assert_eq!(by_index, by_walk, "{} {} in {:?}", t.key, t.name, tree.children.len());
                 }
             }
+        }
+    }
+
+    /// `trendLabels.test.ts`, test for test (7), and the columns `Trends.tsx` made of boxes, worked out.
+    mod labels {
+        use super::*;
+        use crate::history::fixtures::node;
+        use chrono::{Local, TimeZone as _};
+
+        fn local(h: u32, m: u32) -> f64 {
+            Local.with_ymd_and_hms(2026, 11, 4, h, m, 0).unwrap().timestamp_millis() as f64
+        }
+
+        fn at() -> f64 {
+            local(14, 32)
+        }
+
+        fn now() -> f64 {
+            local(18, 0)
+        }
+
+        fn p(passed: u32, failed: u32, total: u32, mean_millis: Option<f64>) -> TrendPoint {
+            TrendPoint {
+                id: "20261104-143200-000".into(),
+                started_at: at(),
+                passed,
+                failed,
+                total,
+                mean_millis,
+            }
+        }
+
+        fn base() -> TrendPoint {
+            p(12, 3, 412, Some(1400.))
+        }
+
+        #[test]
+        fn pass_rate_gives_a_percentage_rounded_down() {
+            assert_eq!(pass_rate_label(&base()), "80%");
+            assert_eq!(pass_rate_label(&p(299, 1, 412, None)), "99%");
+            assert_eq!(pass_rate_label(&p(4, 0, 412, None)), "100%");
+        }
+
+        #[test]
+        fn pass_rate_words_one_test_as_passed_or_failed() {
+            assert_eq!(pass_rate_label(&p(1, 0, 1, None)), "Passed");
+            assert_eq!(pass_rate_label(&p(0, 1, 1, None)), "Failed");
+        }
+
+        #[test]
+        fn tip_names_the_run_its_counts_and_its_time_per_test() {
+            assert_eq!(
+                trend_tip(&base(), now()),
+                "Today 14:32: 12 passed, 3 failed, 15 of 412 tests, 1.40 s per test"
+            );
+            assert!(trend_tip(&p(12, 3, 412, Some(120.)), now()).ends_with(", 120 ms per test"));
+        }
+
+        #[test]
+        fn tip_words_one_test_by_its_status_and_time() {
+            assert_eq!(
+                trend_tip(&p(1, 0, 1, Some(1400.)), now()),
+                "Today 14:32: passed, 1.40 s"
+            );
+        }
+
+        #[test]
+        fn tip_leaves_out_a_time_it_does_not_have() {
+            assert_eq!(
+                trend_tip(&p(12, 3, 412, None), now()),
+                "Today 14:32: 12 passed, 3 failed, 15 of 412 tests"
+            );
+        }
+
+        fn users_tree() -> TestNode {
+            let with_file = |n: TestNode| TestNode {
+                file: "tests/users.feature".into(),
+                ..n
+            };
+            let scenario = with_file(node(
+                NodeKind::Scenario,
+                "s:tests/users.feature#1",
+                "creates a user",
+                Vec::new(),
+            ));
+            let feature = with_file(node(
+                NodeKind::Feature,
+                "f:tests/users.feature",
+                "Users",
+                vec![scenario],
+            ));
+            TestNode {
+                file: String::new(),
+                ..node(NodeKind::Folder, "d:", "project", vec![feature])
+            }
+        }
+
+        #[test]
+        fn caption_says_all_tests_for_the_whole_tree() {
+            let tree = users_tree();
+            assert_eq!(trend_caption(Some(&tree), None), "All tests");
+            assert_eq!(trend_caption(Some(&tree), Some("d:")), "All tests");
+            assert_eq!(trend_caption(Some(&tree), Some("s:gone#1")), "All tests");
+            assert_eq!(trend_caption(None, None), "All tests");
+        }
+
+        #[test]
+        fn caption_names_a_node_as_the_tree_does() {
+            let tree = users_tree();
+            assert_eq!(
+                trend_caption(Some(&tree), Some("f:tests/users.feature")),
+                "users.feature"
+            );
+            assert_eq!(
+                trend_caption(Some(&tree), Some("s:tests/users.feature#1")),
+                "creates a user"
+            );
+        }
+
+        /// TR-10: passed below, failed above, a 2 px gap between them in a bar 24 px tall.
+        #[test]
+        fn the_pass_bar_splits_passed_below_and_failed_above_with_a_gap() {
+            let s = strip(&[p(3, 1, 4, None)], now());
+            let c = &s.columns[0];
+            assert_eq!((c.passed, c.failed), (16.5, 5.5));
+            assert_eq!(c.passed + c.failed + GAP, ROW, "the gap makes up the rest of the row");
+        }
+
+        /// A share of 0 draws nothing (R3.1), and TR-11: a single test is all passed or all failed.
+        #[test]
+        fn a_share_of_nothing_draws_nothing_and_one_test_fills_the_bar() {
+            let s = strip(&[p(1, 0, 1, None), p(0, 1, 1, None)], now());
+            assert_eq!((s.columns[0].passed, s.columns[0].failed), (ROW, 0.));
+            assert_eq!((s.columns[1].passed, s.columns[1].failed), (0., ROW));
+        }
+
+        /// TR-13: the tallest column fills its row, the others scale to it, a run with no time has no bar, and a
+        /// non-zero time is at least 2 px.
+        #[test]
+        fn the_time_bars_scale_to_the_tallest_and_the_top_of_the_scale_is_said() {
+            let s = strip(
+                &[
+                    p(3, 1, 4, Some(500.)),
+                    p(4, 0, 4, Some(2000.)),
+                    p(4, 0, 4, None),
+                    p(4, 0, 4, Some(1.)),
+                    p(4, 0, 4, Some(0.)),
+                ],
+                now(),
+            );
+            let times: Vec<_> = s.columns.iter().map(|c| c.time).collect();
+            assert_eq!(times, [Some(6.), Some(ROW), None, Some(MIN_TIME), Some(0.)]);
+            assert_eq!(s.max, "2.00 s");
+        }
+
+        #[test]
+        fn a_strip_of_zero_times_has_no_top_of_scale() {
+            let s = strip(&[p(1, 0, 1, Some(0.))], now());
+            assert_eq!((s.columns[0].time, s.max.as_str()), (Some(0.), ""));
+        }
+
+        /// TR-12, TR-13: the labels are the newest column's.
+        #[test]
+        fn the_labels_are_the_newest_columns() {
+            let s = strip(&[p(12, 3, 412, Some(1000.)), p(299, 1, 412, Some(1500.))], now());
+            assert_eq!((s.pass.as_str(), s.time.as_str()), ("99%", "1.50 s"));
+            let none = strip(&[], now());
+            assert_eq!(
+                (none.pass.as_str(), none.time.as_str(), none.max.as_str()),
+                ("", "", "")
+            );
+            assert!(none.columns.is_empty());
+        }
+
+        /// TR-14: a column's name is its tooltip, and it keeps its run.
+        #[test]
+        fn a_column_is_named_by_its_run() {
+            let s = strip(&[base()], now());
+            assert_eq!(s.columns[0].id, "20261104-143200-000");
+            assert_eq!(
+                s.columns[0].tip,
+                "Today 14:32: 12 passed, 3 failed, 15 of 412 tests, 1.40 s per test"
+            );
         }
     }
 }

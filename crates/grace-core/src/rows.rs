@@ -269,5 +269,14 @@ pub fn survivor(key: &str, before: &[String], after: &[String]) -> Option<String
         .cloned()
 }
 
+/// `formatMillis`: under a second in whole ms, else seconds with two decimals.
+pub fn format_millis(ms: f64) -> String {
+    if ms < 1000. {
+        format!("{} ms", ms.round())
+    } else {
+        format!("{:.2} s", ms / 1000.)
+    }
+}
+
 #[cfg(test)]
 mod tests;
