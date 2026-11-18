@@ -41,9 +41,17 @@ fn state(runs: Vec<HistoryEntry>) -> AppState {
 }
 
 fn setup(cx: &mut TestAppContext, runs: Vec<HistoryEntry>) -> (Harness, VisualTestContext, Entity<History>) {
+    setup_at(cx, 1200., runs)
+}
+
+fn setup_at(
+    cx: &mut TestAppContext,
+    width: f32,
+    runs: Vec<HistoryEntry>,
+) -> (Harness, VisualTestContext, Entity<History>) {
     let slot: Rc<RefCell<Option<Entity<History>>>> = Rc::default();
     let s = Rc::clone(&slot);
-    let (h, mut vcx) = testing::open_rooted(cx, 1200., state(runs), move |grace, _, cx| {
+    let (h, mut vcx) = testing::open_rooted(cx, width, state(runs), move |grace, _, cx| {
         let list = s
             .borrow_mut()
             .get_or_insert_with(|| {
@@ -437,4 +445,35 @@ fn cancel_has_the_focus_when_the_dialog_opens(cx: &mut TestAppContext) {
         cx.update(|window, _| cancel.is_focused(window)),
         "Cancel holds the focus"
     );
+}
+
+/// Every button of a row lies inside the window and its Actions column, from the window's least width up: below the
+/// width where the labelled buttons fit, they show their icon only (Redesigns, `history` (narrow rows)). A press
+/// clicks a button's centre, so a button past the window's edge took no press (#384).
+#[gpui::test]
+fn every_button_of_a_row_fits_the_window_at_any_width(cx: &mut TestAppContext) {
+    for width in [crate::window::MIN_SIZE.0, 1200.] {
+        let (h, mut cx, _list) = setup_at(cx, width, vec![entry("a")]);
+        let viewport = cx.update(|window, _| window.viewport_size().width);
+        let column = bounds(&mut cx, "history-actions:1".into());
+        assert!(
+            column.right() <= viewport,
+            "at {width} px the column {column:?} is in the window"
+        );
+        for button in ["report", "rerun", "rerun-failed"] {
+            let b = bounds(&mut cx, format!("history-{button}:1"));
+            assert!(
+                b.left() >= column.left() && b.right() <= column.right() + px(0.5),
+                "at {width} px {button} {b:?} lies inside its column {column:?}"
+            );
+        }
+        let report = bounds(&mut cx, "history-report:1".into()).size.width;
+        assert_eq!(
+            report == px(24.),
+            width < 1000.,
+            "at {width} px Report shows its icon only below the row's width"
+        );
+        click(&mut cx, "history-rerun-failed:1".into());
+        assert_eq!(h.backend.calls(), ["rerun_failed a"], "at {width} px");
+    }
 }
