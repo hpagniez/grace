@@ -42,11 +42,15 @@ const SECOND: &str = "s:a.feature#1";
 
 /// The History tab on a project of two scenarios (`s0`, `s1`), with no run yet.
 fn setup(cx: &mut TestAppContext) -> (Harness, VisualTestContext, Entity<History>) {
+    setup_at(cx, 1200.)
+}
+
+fn setup_at(cx: &mut TestAppContext, width: f32) -> (Harness, VisualTestContext, Entity<History>) {
     let slot: Rc<std::cell::RefCell<Option<Entity<History>>>> = Rc::default();
     let s = Rc::clone(&slot);
     let mut state = testing::project("D:/p", grace_core::model::node::Layout::Standalone, 2);
     state.panel = Panel::History;
-    let (h, cx) = testing::open_rooted(cx, 1200., state, move |grace, _, cx| {
+    let (h, cx) = testing::open_rooted(cx, width, state, move |grace, _, cx| {
         let list = s
             .borrow_mut()
             .get_or_insert_with(|| {
@@ -536,4 +540,20 @@ fn a_tooltip_names_the_run_a_column_stands_for(cx: &mut TestAppContext) {
         h.tip_bounds(&mut cx).unwrap().origin.y >= column.bottom(),
         "below the column"
     );
+}
+
+/// A press is a click at the centre of the node, and CI's screen makes the window 1008 px wide: all 20 columns of a full
+/// history are inside it, centre and edge.
+#[gpui::test]
+fn the_20_columns_are_inside_a_1008_px_window(cx: &mut TestAppContext) {
+    let (h, mut cx, _list) = setup_at(cx, 1008.);
+    let names: Vec<String> = (0..20).map(|i| format!("run-{i:02}")).collect();
+    answer(&h, None, names.iter().map(|id| trend(id, 1, 1, Some(1.))).collect());
+    h.update(&mut cx, |s| {
+        s.history = ids(&names.iter().rev().map(String::as_str).collect::<Vec<_>>())
+    });
+    for id in [&names[0], &names[19]] {
+        let b = bounds(&mut cx, format!("trend-run:{id}"));
+        assert!(b.right() <= px(1008.), "{id} ends at {:?}", b.right());
+    }
 }

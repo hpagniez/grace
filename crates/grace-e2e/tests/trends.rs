@@ -70,6 +70,13 @@ fn wait_ready(app: &App) {
     app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
         .unwrap();
     app.wait_for("the History tab", WAIT, |t| tab(t).is_some()).unwrap();
+    // "Ready." can show a moment before every control is on again, and a press of an off control does nothing; the
+    // button is read on Windows only (the pinned AT-SPI adapter drops a disabled state)
+    #[cfg(windows)]
+    app.wait_for("Run all on", WAIT, |t| {
+        t.find(&Role::Button, "Run all").is_some_and(|b| b.states.enabled)
+    })
+    .unwrap();
 }
 
 /// Shows the History tab, and waits until it does.
@@ -146,14 +153,13 @@ fn a_column_finds_its_run_in_the_table() {
             strip(t, "All tests").is_some_and(|s| columns(s).len() == 20) && rows(t).len() == 20
         })
         .unwrap();
-    // the panel holds from its tab bar to the status bar: the oldest run's row is below it at the default height
+    // the panel holds from its tab bar to the status bar, whose Settings button is as tall as the bar: the oldest run's
+    // row is below it at the default height
     let bottom = |t: &Node| {
-        t.all()
-            .into_iter()
-            .filter(|n| n.role == Role::Landmark)
-            .filter_map(|n| n.rect.map(|r| r.y))
-            .max()
-            .expect("the status bar")
+        t.find(&Role::Button, "Settings")
+            .and_then(|n| n.rect)
+            .map(|r| r.y)
+            .expect("the status bar's Settings button")
     };
     let top = |t: &Node| {
         tab(t)
