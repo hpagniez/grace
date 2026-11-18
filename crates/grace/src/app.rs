@@ -55,6 +55,8 @@ pub trait Backend: Send + Sync + 'static {
     fn report_path(&self) -> Option<PathBuf>;
     /// The HTML report of a listed run, if it has one. Never takes a path (history R4).
     fn run_report_path(&self, id: &str) -> Option<PathBuf>;
+    /// The folder and proposed zip name of a listed run's report, if it has one (export spec R2).
+    fn export_source(&self, id: &str) -> Option<grace_core::runner::ExportSource>;
     /// A tree path or an absolute path as a file of the open project that Open in VS Code may open (OE-05, OE-06).
     fn editor_file(&self, file: &str) -> Option<PathBuf>;
 }
@@ -116,6 +118,9 @@ impl Backend for Runner {
     }
     fn run_report_path(&self, id: &str) -> Option<PathBuf> {
         Runner::run_report_path(self, id)
+    }
+    fn export_source(&self, id: &str) -> Option<grace_core::runner::ExportSource> {
+        Runner::export_source(self, id)
     }
     fn editor_file(&self, file: &str) -> Option<PathBuf> {
         Runner::editor_file(self, file)
@@ -476,6 +481,35 @@ impl Grace {
         .detach();
     }
 
+    /// Export on a row of the History tab: asks where to save the run's report, writes it there as a zip off the UI
+    /// thread and says where it went, or why it could not be written. Closing the dialog does nothing (ER-07).
+    pub fn export_report(&mut self, id: String, cx: &mut Context<Self>) {
+        let backend = Arc::clone(&self.backend);
+        let seams = Arc::clone(&self.seams);
+        let source = cx.background_spawn(async move { backend.export_source(&id) });
+        cx.spawn(async move |this, cx| {
+            let Some(source) = source.await else {
+                return;
+            };
+            let Some(dest) = seams.pick_save(&source.name, cx).await else {
+                return;
+            };
+            let to = dest.clone();
+            let written = cx
+                .background_spawn(async move { grace_core::report_zip::zip_report(&source.dir, &to) })
+                .await;
+            let text = match written {
+                Ok(()) => format!("Report saved to {}", dest.display()),
+                Err(e) => format!("The report could not be saved: {e}"),
+            };
+            let _ = this.update(cx, |grace, cx| {
+                grace.state_mut().reduce(&AppEvent::notice(text));
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     /// Open in VS Code (OE-01 to OE-06): `file`, a tree path or the place Karate wrote, at `line`. The runner checks it is
     /// a file of the open project; a refusal and a machine without VS Code each say so in a notice.
     pub fn open_in_editor(&mut self, file: String, line: u32, cx: &mut Context<Self>) {
@@ -557,6 +591,8 @@ pub mod fake {
         pub refuse_save: std::sync::atomic::AtomicBool,
         /// Answers every file with "not a file of the open project".
         pub refuse_editor: std::sync::atomic::AtomicBool,
+        /// The run folder Export zips, for a test that writes a real zip; none is a folder that is not there.
+        pub export_dir: Mutex<Option<PathBuf>>,
     }
 
     impl FakeBackend {
@@ -637,6 +673,18 @@ pub mod fake {
         fn run_report_path(&self, id: &str) -> Option<PathBuf> {
             self.record(format!("run_report_path {id}"));
             Some(PathBuf::from(format!("/runs/{id}/karate-summary.html")))
+        }
+        fn export_source(&self, id: &str) -> Option<grace_core::runner::ExportSource> {
+            self.record(format!("export_source {id}"));
+            Some(grace_core::runner::ExportSource {
+                dir: self
+                    .export_dir
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from(format!("/runs/{id}"))),
+                name: format!("p-report-{id}.zip"),
+            })
         }
         fn editor_file(&self, file: &str) -> Option<PathBuf> {
             self.record(format!("editor_file {file}"));

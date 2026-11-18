@@ -107,6 +107,8 @@ pub fn locked(state: &AppState) -> bool {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Actions {
     pub report: bool,
+    /// Export follows Report (ER-05).
+    pub export: bool,
     pub rerun: bool,
     pub rerun_failed: bool,
 }
@@ -114,6 +116,7 @@ pub struct Actions {
 pub fn actions(e: &HistoryEntry, locked: bool) -> Actions {
     Actions {
         report: !locked && e.report_available,
+        export: !locked && e.report_available,
         rerun: !locked,
         rerun_failed: !locked && e.failed > 0,
     }
