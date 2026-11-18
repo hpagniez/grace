@@ -40,11 +40,12 @@ jobs:
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
       - run: npm run typecheck
         if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
-      - run: npm audit --audit-level=high
-        if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
       # GPUI Grace's Rust format (ADR 0031); clippy needs a full build, so it runs in test.yml
       - run: rustup show active-toolchain || rustup toolchain install
         if: ${{ !cancelled() }}
+      # npm audit at level high, less the advisories crates/xtask/src/audit.rs lists with their reason
+      - run: cargo xtask audit
+        if: ${{ !cancelled() && steps.ci.outcome == 'success' }}
       - run: cargo fmt --all --check
         if: ${{ !cancelled() }}
       # The agent rules files stay within their limits (docs/specs/2026-11-12-way-of-working.md)

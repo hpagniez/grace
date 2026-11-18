@@ -2,6 +2,7 @@
 //! Each command is a module of pure functions with unit tests; `main` reads the arguments and sets the exit code.
 #![forbid(unsafe_code)]
 
+mod audit;
 mod docs;
 mod pr;
 mod rules;
@@ -13,6 +14,7 @@ use std::process::ExitCode;
 const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
+  audit        npm audit at level high, less the advisories listed in crates/xtask/src/audit.rs, each with its reason
   check-rules  the agent rules files stay within their limits, and the docs keep their frontmatter and indexes
   check-pr     the pull request follows the way of working; in CI it reads HEAD_REF, BASE_REF, BASE_SHA, HEAD_SHA,
                EVENT_NAME and PR_BODY, without them it checks the branch in hand against origin/develop
@@ -25,6 +27,7 @@ commands:
 
 fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
+        Some("audit") => ExitCode::from(audit::run()),
         Some("check-rules") => ExitCode::from(rules::run()),
         Some("check-pr") => ExitCode::from(pr::run()),
         Some("docs") => ExitCode::from(docs::run()),
