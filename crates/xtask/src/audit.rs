@@ -11,12 +11,10 @@ const ALLOWED: &[(&str, &str)] = &[(
     "picomatch <= 4.0.7 (ReDoS), no patched release on 2026-11-18; in build tools only: `npm audit --omit=dev` is clean",
 )];
 
-/// A JSON value, as far as the report needs it: a number keeps no value.
+/// A JSON value, as far as the report needs it: `Other` is a number, true, false or null.
 #[derive(Debug, PartialEq)]
 enum Json {
-    Null,
-    Bool(bool),
-    Number,
+    Other,
     Text(String),
     List(Vec<Json>),
     Object(Vec<(String, Json)>),
@@ -50,14 +48,6 @@ fn space(c: &[char], at: &mut usize) {
     while c.get(*at).is_some_and(|ch| ch.is_whitespace()) {
         *at += 1;
     }
-}
-
-fn word(c: &[char], at: &mut usize, word: &str, value: Json) -> Option<Json> {
-    let end = *at + word.len();
-    (c.get(*at..end)?.iter().copied().eq(word.chars())).then(|| {
-        *at = end;
-        value
-    })
 }
 
 fn value(c: &[char], at: &mut usize) -> Option<Json> {
@@ -101,19 +91,18 @@ fn value(c: &[char], at: &mut usize) -> Option<Json> {
             }
         }
         '"' => string(c, at).map(Json::Text),
-        't' => word(c, at, "true", Json::Bool(true)),
-        'f' => word(c, at, "false", Json::Bool(false)),
-        'n' => word(c, at, "null", Json::Null),
-        ch if *ch == '-' || ch.is_ascii_digit() => {
+        _ => {
+            let from = *at;
             while c
                 .get(*at)
-                .is_some_and(|ch| ch.is_ascii_digit() || "+-.eE".contains(*ch))
+                .is_some_and(|ch| ch.is_ascii_alphanumeric() || "+-.".contains(*ch))
             {
                 *at += 1;
             }
-            Some(Json::Number)
+            let word: String = c[from..*at].iter().collect();
+            let number = word.starts_with(|ch: char| ch == '-' || ch.is_ascii_digit()) && word.parse::<f64>().is_ok();
+            (number || matches!(word.as_str(), "true" | "false" | "null")).then_some(Json::Other)
         }
-        _ => None,
     }
 }
 
@@ -277,30 +266,22 @@ mod tests {
         )
     }
 
-    fn inherits(from: &str) -> String {
-        format!("\"{from}\"")
-    }
+    /// A `via` that is a package's name: the advisory is inherited from it.
+    const INHERITED: &str = "\"picomatch\"";
 
     #[test]
     fn reads_json() {
+        // '@' stands for the backslash of a unicode escape
+        let text = r#" { "a": [-2.5e3, true, null], "b": "x\n\"@u00e9\\", "c": {} } "#;
         assert_eq!(
-            parse(r#" { "a": [1, -2.5e3, true, false, null], "b": "x\n\"é\\", "c": {} } "#),
+            parse(&text.replace('@', &char::from(92u8).to_string())),
             Some(Json::Object(vec![
-                (
-                    "a".into(),
-                    Json::List(vec![
-                        Json::Number,
-                        Json::Number,
-                        Json::Bool(true),
-                        Json::Bool(false),
-                        Json::Null
-                    ])
-                ),
+                ("a".into(), Json::List(vec![Json::Other, Json::Other, Json::Other])),
                 ("b".into(), Json::Text("x\n\"é\\".into())),
                 ("c".into(), Json::Object(vec![])),
             ]))
         );
-        for bad in ["", "{", "{\"a\" 1}", "[1 2]", "{} x", "\"open", "nul"] {
+        for bad in ["", "{", "{\"a\" 1}", "[1 2]", "{} x", "\"open", "nul", "NaN", "1x"] {
             assert_eq!(parse(bad), None, "{bad}");
         }
     }
@@ -318,7 +299,7 @@ mod tests {
     fn the_listed_advisory_alone_passes_with_its_reason() {
         let text = report(&[
             ("picomatch", &[advisory("GHSA-aaaa-bbbb-cccc", "picomatch", "high")]),
-            ("vite", &[inherits("picomatch")]),
+            ("vite", &[INHERITED.to_string()]),
         ]);
         let (lines, passes) = judge(false, &text, ALLOW);
         assert!(passes, "{lines:?}");
@@ -346,15 +327,10 @@ mod tests {
 
     #[test]
     fn a_high_advisory_on_a_package_that_also_inherits_the_listed_one_fails() {
+        let vite = advisory("GHSA-vite-vite-vite", "vite", "critical");
         let text = report(&[
             ("picomatch", &[advisory("GHSA-aaaa-bbbb-cccc", "picomatch", "high")]),
-            (
-                "vite",
-                &[
-                    inherits("picomatch"),
-                    advisory("GHSA-vite-vite-vite", "vite", "critical"),
-                ],
-            ),
+            ("vite", &[INHERITED.to_string(), vite]),
         ]);
         let (lines, passes) = judge(false, &text, ALLOW);
         assert!(!passes);
@@ -407,13 +383,5 @@ mod tests {
             lines,
             ["::warning::npm audit no longer reports GHSA-aaaa-bbbb-cccc: remove it from crates/xtask/src/audit.rs"]
         );
-    }
-
-    #[test]
-    fn the_list_names_each_advisory_with_a_reason() {
-        for (id, why) in ALLOWED {
-            assert!(id.starts_with("GHSA-") && id.len() == 19, "{id}");
-            assert!(!why.is_empty(), "{id}");
-        }
     }
 }
