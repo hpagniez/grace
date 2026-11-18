@@ -4,13 +4,15 @@
 //!
 //! The runs arrive with the project and after each run (the runner sends the list); the rows are worked out when the list
 //! changes and read their clock once, as Electron Grace's rows did, so an idle History tab costs nothing. At most 20
-//! runs are listed, so the rows are plain elements, not a virtual list. The trends strip comes with slice 7 (P3 plan).
+//! runs are listed, so the rows are plain elements, not a virtual list. Above them, in the same scroll, is the trends
+//! strip (`trends`); the column titles stay at the top once the strip has scrolled away.
 use std::rc::Rc;
 
 use gpui::accesskit::Role;
 use gpui::{
-    AnyElement, App, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, ParentElement, Render,
-    SharedString, StatefulInteractiveElement as _, Styled, Window, div, prelude::FluentBuilder as _, px,
+    AnyElement, App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
+    ParentElement, Render, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled, Subscription, Window,
+    div, point, prelude::FluentBuilder as _, px,
 };
 use gpui_component::WindowExt as _;
 use gpui_component::dialog::DialogFooter;
@@ -25,6 +27,7 @@ use crate::assets::Icon;
 use crate::elements::{ButtonKind, ButtonSize, MarkStatus, Off as _, button, icon, icon_text_button, status_mark};
 use crate::theme::{METRICS, MONO, Theme};
 use crate::tooltip::{Side, tooltip};
+use crate::trends::{Picked, STRIP_HEIGHT, Trends};
 
 /// The list's accessible name.
 pub const LIST: &str = "Run history";
@@ -33,6 +36,10 @@ pub const DELETE: &str = "Delete";
 pub const CANCEL: &str = "Cancel";
 /// px, a row (`h-7`).
 pub const ROW_HEIGHT: f32 = 28.;
+/// px, the column titles (a row's height).
+const HEADER_HEIGHT: f32 = ROW_HEIGHT;
+/// px, the scrollbar the titles kept at the top leave room for.
+const SCROLLBAR: f32 = 12.;
 /// The dialog's width: Tailwind's `w-[28rem]`.
 pub const DIALOG_WIDTH: f32 = 448.;
 
@@ -70,6 +77,11 @@ pub struct History {
     pub builds: u64,
     /// "Now" for a row's labels, read once as the row is made.
     pub clock: Rc<dyn Fn() -> f64>,
+    /// The trends strip, there only while the tab shows (`close`).
+    trends: Option<Entity<Trends>>,
+    /// The scroll of the strip, the titles and the runs, which a click on the strip moves.
+    scroll: ScrollHandle,
+    _picked: Option<Subscription>,
 }
 
 impl History {
@@ -80,7 +92,41 @@ impl History {
             rows: Rc::default(),
             builds: 0,
             clock: Rc::new(clock),
+            trends: None,
+            scroll: ScrollHandle::new(),
+            _picked: None,
         }
+    }
+
+    /// The strip, once the tab has shown it.
+    pub fn trends(&self) -> Option<Entity<Trends>> {
+        self.trends.clone()
+    }
+
+    pub fn scroll(&self) -> &ScrollHandle {
+        &self.scroll
+    }
+
+    /// The tab is not shown: the strip goes, with its answer (trends R5.3), and asks again when the tab shows.
+    pub fn close(&mut self) {
+        self.trends = None;
+        self._picked = None;
+    }
+
+    /// A click on a column of the strip: the run's row, with the least scroll that shows it (R4.2) under the titles
+    /// the list keeps at the top.
+    fn show_run(&self, id: &str, window: &mut Window) {
+        let Some(i) = self.built.iter().position(|e| e.id == id) else {
+            return;
+        };
+        // the row and the titles above it, so a run scrolled to from below is not hidden by them
+        let top = STRIP_HEIGHT + i as f32 * ROW_HEIGHT;
+        let at = -f32::from(self.scroll.offset().y);
+        let view = f32::from(self.scroll.bounds().size.height);
+        let to = grace_core::trends::scroll_to_show(at, view, top, HEADER_HEIGHT + ROW_HEIGHT)
+            .clamp(0., f32::from(self.scroll.max_offset().y));
+        self.scroll.set_offset(point(px(0.), px(-to)));
+        window.refresh();
     }
 
     pub fn rows(&self) -> Rc<Vec<RowText>> {
@@ -96,6 +142,20 @@ impl History {
         let now = (self.clock)();
         self.rows = Rc::new(history.iter().map(|e| row_text(e, now)).collect());
         self.builds += 1;
+    }
+
+    /// The trends strip, made once the tab shows it; a click on a column shows its run.
+    fn strip(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<Trends> {
+        if let Some(t) = &self.trends {
+            return t.clone();
+        }
+        let (grace, now) = (self.grace.clone(), Rc::clone(&self.clock));
+        let strip = cx.new(|_| Trends::new(grace, now));
+        self._picked = Some(cx.subscribe_in(&strip, window, |this, _, Picked(id), window, _| {
+            this.show_run(id, window);
+        }));
+        self.trends = Some(strip.clone());
+        strip
     }
 
     fn header(&self, cx: &App) -> impl IntoElement {
@@ -342,11 +402,13 @@ fn tag_chip(rid: &str, row: usize, k: usize, tag: &Tag, cx: &App) -> AnyElement 
 }
 
 impl Render for History {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.grace.read(cx).state.clone();
         self.build(&state.history);
         let locked = locked(&state);
         let body: AnyElement = if state.history.is_empty() {
+            // no strip with no run: the next run makes it anew
+            self.close();
             div()
                 .id("history-scroll")
                 .flex_1()
@@ -361,25 +423,50 @@ impl Render for History {
                 .enumerate()
                 .map(|(i, e)| self.row(i, e, locked, cx))
                 .collect();
+            let trends = self.strip(window, cx);
+            // the titles stay at the top once the strip has scrolled away, as `sticky` kept them
+            let stuck = -f32::from(self.scroll.offset().y) > STRIP_HEIGHT;
             div()
+                .relative()
                 .flex()
                 .flex_col()
                 .flex_1()
                 .min_h_0()
-                .child(self.header(cx))
                 .child(
                     div()
-                        .id("history-list")
-                        .debug_selector(|| "history-list".into())
-                        .role(Role::List)
-                        .aria_label(LIST)
+                        .id("history-scroll")
+                        .debug_selector(|| "history-scroll".into())
                         .flex()
                         .flex_col()
                         .flex_1()
                         .min_h_0()
-                        .overflow_y_scrollbar()
-                        .children(rows),
+                        .overflow_y_scroll()
+                        .track_scroll(&self.scroll)
+                        .child(trends)
+                        .child(self.header(cx))
+                        .child(
+                            div()
+                                .id("history-list")
+                                .debug_selector(|| "history-list".into())
+                                .role(Role::List)
+                                .aria_label(LIST)
+                                .flex()
+                                .flex_col()
+                                .children(rows),
+                        ),
                 )
+                .when(stuck, |d| {
+                    d.child(
+                        div()
+                            .debug_selector(|| "history-header-stuck".into())
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .right(px(SCROLLBAR))
+                            .child(self.header(cx)),
+                    )
+                })
+                .vertical_scrollbar(&self.scroll)
                 .into_any_element()
         };
         div()

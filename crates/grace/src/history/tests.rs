@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Bounds, Entity, Modifiers, Pixels, TestAppContext, VisualTestContext, div, point, px};
+use gpui::{Bounds, Entity, Modifiers, Pixels, TestAppContext, VisualTestContext, div, point, px};
 use grace_core::model::events::RunOutcome;
 use grace_core::model::history::{HistoryEntry, StoredSelection};
 use grace_core::model::node::{Layout, NodeKind};

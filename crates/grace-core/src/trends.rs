@@ -227,6 +227,19 @@ pub fn strip(points: &[TrendPoint], now: f64) -> Strip {
     }
 }
 
+/// The scroll top that shows the box `top` px down and `height` tall with the least scroll in a view `view` tall
+/// scrolled to `scroll_top` (`scrollIntoView({ block: "nearest" })`, R4.2): the same when it is in view, its top when it
+/// is above, its bottom at the view's when it is below.
+pub fn scroll_to_show(scroll_top: f32, view: f32, top: f32, height: f32) -> f32 {
+    if top < scroll_top {
+        top
+    } else if top + height > scroll_top + view {
+        (top + height - view).min(top)
+    } else {
+        scroll_top
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -573,6 +586,27 @@ mod tests {
                 s.columns[0].tip,
                 "Today 14:32: 12 passed, 3 failed, 15 of 412 tests, 1.40 s per test"
             );
+        }
+    }
+
+    /// R4.2: a click on a column shows its run's row with the least scroll.
+    mod scroll {
+        use super::*;
+
+        #[test]
+        fn leaves_a_box_in_view_where_it_is() {
+            assert_eq!(scroll_to_show(10., 100., 40., 28.), 10.);
+        }
+
+        #[test]
+        fn scrolls_up_to_a_box_above_and_down_to_one_below() {
+            assert_eq!(scroll_to_show(100., 60., 40., 28.), 40.);
+            assert_eq!(scroll_to_show(0., 60., 116., 28.), 84.);
+        }
+
+        #[test]
+        fn shows_the_top_of_a_box_taller_than_the_view() {
+            assert_eq!(scroll_to_show(0., 20., 50., 28.), 50.);
         }
     }
 }

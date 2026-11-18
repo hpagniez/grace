@@ -59,6 +59,8 @@ pub trait Backend: Send + Sync + 'static {
     fn export_source(&self, id: &str) -> Option<grace_core::runner::ExportSource>;
     /// A tree path or an absolute path as a file of the open project that Open in VS Code may open (OE-05, OE-06).
     fn editor_file(&self, file: &str) -> Option<PathBuf>;
+    /// The trend of the node `key` (the whole tree when None) over the stored runs of the environment picked now.
+    fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint>;
 }
 
 impl Backend for Runner {
@@ -124,6 +126,9 @@ impl Backend for Runner {
     }
     fn editor_file(&self, file: &str) -> Option<PathBuf> {
         Runner::editor_file(self, file)
+    }
+    fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint> {
+        Runner::trend(self, key)
     }
 }
 
@@ -481,6 +486,17 @@ impl Grace {
         .detach();
     }
 
+    /// The trend of the node `key` (the whole tree when None) over the stored runs, read from disk off the UI thread
+    /// (trends R5.4): the strip of the History tab asks it.
+    pub fn trend(
+        &self,
+        key: Option<String>,
+        cx: &mut Context<Self>,
+    ) -> gpui::Task<Vec<grace_core::model::trends::TrendPoint>> {
+        let backend = Arc::clone(&self.backend);
+        cx.background_spawn(async move { backend.trend(key.as_deref()) })
+    }
+
     /// Export on a row of the History tab: asks where to save the run's report, writes it there as a zip off the UI
     /// thread and says where it went, or why it could not be written. Closing the dialog does nothing (ER-07).
     pub fn export_report(&mut self, id: String, cx: &mut Context<Self>) {
@@ -585,6 +601,8 @@ pub mod fake {
     #[derive(Default)]
     pub struct FakeBackend {
         pub calls: Mutex<Vec<String>>,
+        /// The trends asked for, apart from `calls`: the History tab asks one whenever it shows.
+        pub asked: Mutex<Vec<String>>,
         /// Each edit Save sent.
         pub edits: Mutex<Vec<PropertiesEdit>>,
         /// Answers Save with false, as the runner does after a notice.
@@ -593,11 +611,16 @@ pub mod fake {
         pub refuse_editor: std::sync::atomic::AtomicBool,
         /// The run folder Export zips, for a test that writes a real zip; none is a folder that is not there.
         pub export_dir: Mutex<Option<PathBuf>>,
+        /// What `trend` answers for a key, the whole tree being `None`; an empty trend for a key not set.
+        pub trends: Mutex<std::collections::HashMap<Option<String>, Vec<grace_core::model::trends::TrendPoint>>>,
     }
 
     impl FakeBackend {
         pub fn calls(&self) -> Vec<String> {
             self.calls.lock().unwrap().clone()
+        }
+        pub fn trends_asked(&self) -> Vec<String> {
+            self.asked.lock().unwrap().clone()
         }
         fn record(&self, call: String) {
             self.calls.lock().unwrap().push(call);
@@ -689,6 +712,14 @@ pub mod fake {
         fn editor_file(&self, file: &str) -> Option<PathBuf> {
             self.record(format!("editor_file {file}"));
             (!self.refuse_editor.load(std::sync::atomic::Ordering::SeqCst)).then(|| PathBuf::from(file))
+        }
+        fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint> {
+            self.asked
+                .lock()
+                .unwrap()
+                .push(format!("trend {}", key.unwrap_or("null")));
+            let answers = self.trends.lock().unwrap();
+            answers.get(&key.map(str::to_owned)).cloned().unwrap_or_default()
         }
     }
 }
