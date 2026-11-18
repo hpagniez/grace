@@ -515,3 +515,25 @@ fn the_titles_stay_at_the_top_once_the_strip_has_scrolled_away(cx: &mut TestAppC
     let stuck = bounds(&mut cx, "history-header-stuck".into());
     assert_eq!(stuck.origin.y, view.origin.y, "at the top of the list");
 }
+
+/// 14; TR-14: a pointer at rest on a column shows its name as a tooltip, below it (`Tooltip` has no "above").
+#[gpui::test]
+fn a_tooltip_names_the_run_a_column_stands_for(cx: &mut TestAppContext) {
+    let (h, mut cx, list) = setup(cx);
+    answer(&h, None, vec![trend("a", 12, 3, Some(1400.))]);
+    h.update(&mut cx, |s| s.history = ids(&["a"]));
+    let column = bounds(&mut cx, "trend-run:a".into());
+    cx.simulate_mouse_move(column.center(), None, Modifiers::none());
+    cx.executor().advance_clock(crate::tooltip::DELAY);
+    cx.run_until_parked();
+    let name = cx.update(|_, cx| {
+        list.read(cx).trends().unwrap().read(cx).shown().unwrap().strip.columns[0]
+            .tip
+            .clone()
+    });
+    assert_eq!(h.tip(&mut cx).map(|t| t.to_string()), Some(name));
+    assert!(
+        h.tip_bounds(&mut cx).unwrap().origin.y >= column.bottom(),
+        "below the column"
+    );
+}
