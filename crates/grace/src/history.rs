@@ -38,8 +38,6 @@ pub const CANCEL: &str = "Cancel";
 pub const ROW_HEIGHT: f32 = 28.;
 /// px, the column titles (a row's height).
 const HEADER_HEIGHT: f32 = ROW_HEIGHT;
-/// px, the scrollbar the titles kept at the top leave room for.
-const SCROLLBAR: f32 = 12.;
 /// The dialog's width: Tailwind's `w-[28rem]`.
 pub const DIALOG_WIDTH: f32 = 448.;
 
@@ -458,11 +456,14 @@ impl Render for History {
                 .when(stuck, |d| {
                     d.child(
                         div()
+                            .id("history-header-stuck")
                             .debug_selector(|| "history-header-stuck".into())
                             .absolute()
                             .top_0()
                             .left_0()
-                            .right(px(SCROLLBAR))
+                            .right_0()
+                            // over the rows, not through them: a press or a tooltip does not reach one under it
+                            .block_mouse_except_scroll()
                             .child(self.header(cx)),
                     )
                 })

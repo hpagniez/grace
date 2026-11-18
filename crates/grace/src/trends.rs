@@ -233,16 +233,11 @@ impl Trends {
 impl Render for Trends {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.grace.read(cx).state.clone();
-        if state.history.is_empty() {
-            // no strip with no run: the tab says so, and the next run asks anew
-            self.shown = None;
-            self.wanted = None;
-        } else {
-            let wanted = Wanted::of(&state);
-            if self.wanted.as_ref() != Some(&wanted) {
-                self.wanted = Some(wanted);
-                self.ask(cx);
-            }
+        // `History` drops the strip with the last run, so there is always a run here
+        let wanted = Wanted::of(&state);
+        if self.wanted.as_ref() != Some(&wanted) {
+            self.wanted = Some(wanted);
+            self.ask(cx);
         }
         let t = Theme::global(cx).tokens;
         let Some(shown) = self.shown.as_ref() else {
@@ -271,15 +266,18 @@ impl Render for Trends {
             .gap(px(4.))
             .text_color(Theme::color(t.muted))
             .child(div().h(px(ROW)))
-            .child(
-                div()
-                    .id("trends-time-max")
-                    .debug_selector(|| "trends-time-max".into())
-                    .role(Role::Label)
-                    .aria_value(shown.strip.max.clone())
-                    .h(px(ROW))
-                    .child(shown.strip.max.clone()),
-            );
+            // a node only where there is a value to read
+            .when(!shown.strip.max.is_empty(), |d| {
+                d.child(
+                    div()
+                        .id("trends-time-max")
+                        .debug_selector(|| "trends-time-max".into())
+                        .role(Role::Label)
+                        .aria_value(shown.strip.max.clone())
+                        .h(px(ROW))
+                        .child(shown.strip.max.clone()),
+                )
+            });
         div()
             .id("trends")
             .debug_selector(|| "trends".into())

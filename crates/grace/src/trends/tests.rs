@@ -557,3 +557,48 @@ fn the_20_columns_are_inside_a_1008_px_window(cx: &mut TestAppContext) {
         assert!(b.right() <= px(1008.), "{id} ends at {:?}", b.right());
     }
 }
+
+/// What the titles that stuck stand over: 20 runs in a window 300 px tall, scrolled 200 px.
+fn stuck(cx: &mut TestAppContext) -> (Harness, VisualTestContext, Entity<History>) {
+    let (h, mut cx, list) = setup(cx);
+    let many: Vec<String> = (0..20).map(|i| format!("run-{i:02}")).collect();
+    answer(&h, None, many.iter().map(|id| trend(id, 1, 1, Some(1.))).collect());
+    cx.simulate_resize(gpui::size(px(1200.), px(300.)));
+    let newest_first: Vec<&str> = many.iter().rev().map(String::as_str).collect();
+    h.update(&mut cx, |s| s.history = ids(&newest_first));
+    let scroll = cx.update(|_, cx| list.read(cx).scroll().clone());
+    scroll.set_offset(point(px(0.), px(-200.)));
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    (h, cx, list)
+}
+
+/// The titles that stuck are over the rows, not through them: a press on them reaches no button of the row below.
+#[gpui::test]
+fn a_press_on_the_titles_that_stuck_reaches_no_row_under_them(cx: &mut TestAppContext) {
+    let (h, mut cx, _list) = stuck(cx);
+    let titles = bounds(&mut cx, "history-header-stuck".into());
+    let under = (1..=20)
+        .map(|i| bounds(&mut cx, format!("history-rerun:{i}")))
+        .find(|b| b.contains(&titles.center()) || (b.top() < titles.bottom() && b.bottom() > titles.top()))
+        .expect("a row's Re-run is under the titles");
+    let at = point(under.center().x, titles.center().y);
+    cx.simulate_click(at, Modifiers::none());
+    cx.run_until_parked();
+    assert!(
+        h.backend.calls().iter().all(|c| !c.starts_with("rerun")),
+        "{:?}",
+        h.backend.calls()
+    );
+}
+
+/// The titles keep the columns they have in the flow: as wide as the list, so no column moves when they stick.
+#[gpui::test]
+fn the_titles_that_stuck_are_as_wide_as_the_list(cx: &mut TestAppContext) {
+    let (_h, mut cx, _list) = stuck(cx);
+    let (titles, view) = (
+        bounds(&mut cx, "history-header-stuck".into()),
+        bounds(&mut cx, "history-scroll".into()),
+    );
+    assert_eq!((titles.left(), titles.right()), (view.left(), view.right()));
+}
