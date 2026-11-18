@@ -170,7 +170,7 @@ impl Render for Gallery {
 }
 
 /// The seams' answers for an end-to-end test (migration guide, Architecture). `GRACE_E2E_SEAMS` names a JSON file the
-/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null, "vscode": false}`. Each ask
+/// test writes, read at each ask so a test can change the answer between two: `{"folder": "<path>" | null, "file": "<path>" | null, "save": "<path>" | null, "vscode": false}`. Each ask
 /// is appended to `<data folder>/e2e-seams.jsonl`, `{"seam": "folder", "start": "<path>" | null}`, as the Playwright
 /// tests recorded `dialog.showOpenDialog`'s options.
 pub struct E2eSeams {
@@ -234,6 +234,17 @@ impl crate::seams::Seams for E2eSeams {
     /// Records the text instead of putting it on the clipboard of the machine the test runs on.
     fn copy(&self, text: &str, _cx: &mut gpui::App) {
         self.record(serde_json::json!({ "seam": "copy", "text": text }));
+    }
+
+    /// `{"save": "<path>" | null}`: where Export's dialog saves; closing the dialog when none. The proposed name is
+    /// recorded, as `showSaveDialog`'s options were.
+    fn pick_save(&self, name: &str, _cx: &mut gpui::AsyncApp) -> crate::seams::Answer<Option<std::path::PathBuf>> {
+        self.record(serde_json::json!({ "seam": "save", "name": name }));
+        let answer = std::fs::read_to_string(&self.answers)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("save")?.as_str().map(std::path::PathBuf::from));
+        Box::pin(async move { answer })
     }
 
     /// Records the path instead of opening a browser on the test machine.

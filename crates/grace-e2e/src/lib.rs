@@ -425,6 +425,11 @@ impl App {
         self.answer("file", file)
     }
 
+    /// Answers the next save dialogs, Export's, with `file` as the place chosen; `None` closes them.
+    pub fn answer_save(&self, file: Option<&Path>) -> Result<()> {
+        self.answer("save", file)
+    }
+
     /// Answers whether a program is registered for a link, as a machine with or without VS Code (OE-11): the app's
     /// `e2e` seams then record the link or refuse it.
     pub fn answer_vscode_installed(&self, installed: bool) -> Result<()> {
@@ -446,6 +451,17 @@ impl App {
             .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
             .filter(|v| v["seam"] == "url")
             .filter_map(|v| v["url"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    /// The names the save dialogs proposed, in order (`e2e-seams.jsonl`): Export's.
+    pub fn save_dialogs(&self) -> Vec<String> {
+        std::fs::read_to_string(self.data.join("e2e-seams.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter(|v| v["seam"] == "save")
+            .filter_map(|v| v["name"].as_str().map(str::to_string))
             .collect()
     }
 

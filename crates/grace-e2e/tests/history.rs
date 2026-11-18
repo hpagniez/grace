@@ -1,7 +1,7 @@
-//! `e2e/history.spec.ts` (E-history-01 to E-history-13) through the accessibility tree: a run listed in the History tab,
+//! `e2e/history.spec.ts` (E-history-01 to E-history-14) through the accessibility tree: a run listed in the History tab,
 //! kept over a restart, cancelled, re-run and re-run failed, cleared, and every action waiting for the runner; and
 //! E-look-16's tab half (what the History and HTTP tabs say before any run) and E-look-17 (Clear history's button
-//! order and Escape). Export (E-history-14) is slice 6's.
+//! order and Escape), and E-history-14, Export a run's report.
 //!
 //! A row is a list item of the list "Run history" named "<when>, <what ran>, <result>"; each cell a label inside it, whose
 //! name is its text, and each button a button inside it. A button's disabled state reaches UI Automation only (the pinned
@@ -773,4 +773,59 @@ fn before_any_run_the_history_and_http_tabs_say_so() {
         })
         .unwrap();
     assert!(t.find(&Role::Tab, "HTTP (0)").is_some(), "{}", t.dump());
+}
+
+/// E-history-14, ER-07, ER-08, ER-11: a project that asks for JUnit XML runs; Export on the top row asks where to save
+/// (the seams propose the project's name and answer a place in a temporary folder); closing the dialog saves nothing and
+/// says nothing; then the zip holds `karate-summary.html` and one JUnit file per feature, and neither `run.json` nor
+/// anything of `karate-json`. ER-06 (a malformed id) cannot be sent: `n/a` by type (P3 plan, Redesigns, `app`).
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn export_a_runs_report() {
+    let dir = project("clean").unwrap();
+    std::fs::write(dir.join("karate-pom.json"), r#"{"output":{"junitXml":true}}"#).unwrap();
+    let app = open(&dir);
+    expand(&app, "basic.feature");
+    run_all(&app, 1);
+    show_history(&app);
+    app.wait_for("the row", WAIT, |t| rows(t).len() == 1).unwrap();
+    wait_idle(&app);
+    let id = runs_in(app.data_dir(), &dir).remove(0);
+    let out = std::env::temp_dir().join(format!("grace-e2e-export-{}-{id}", std::process::id()));
+    std::fs::create_dir_all(&out).unwrap();
+
+    // closing the dialog saves nothing and says nothing
+    app.answer_save(None).unwrap();
+    press_in_top_row(&app, "Export");
+    app.wait_until("the dialog", WAIT, || !app.save_dialogs().is_empty())
+        .unwrap();
+    let name = format!("{}-report-{id}.zip", dir.file_name().unwrap().to_string_lossy());
+    assert_eq!(app.save_dialogs(), [name]);
+    let t = read_tree(&app);
+    assert!(starting(&t, "Report saved to").is_none() && starting(&t, "The report could not").is_none());
+    assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0);
+
+    let zip = out.join("r.zip");
+    app.answer_save(Some(&zip)).unwrap();
+    press_in_top_row(&app, "Export");
+    let said = format!("Report saved to {}", zip.display());
+    app.wait_for("the success notice", WAIT, |t| notice(t, &said)).unwrap();
+    let files: Vec<String> = grace_core::report_zip::read_zip(&std::fs::read(&zip).unwrap())
+        .unwrap()
+        .into_iter()
+        .map(|(n, _)| n)
+        .collect();
+    let junit: Vec<_> = std::fs::read_dir(runs_dir(app.data_dir(), &dir).join(&id).join("junit-xml"))
+        .unwrap()
+        .map(|e| format!("junit-xml/{}", e.unwrap().file_name().to_string_lossy()))
+        .collect();
+    assert!(!junit.is_empty(), "Karate wrote JUnit XML");
+    for wanted in junit.iter().map(String::as_str).chain(["karate-summary.html"]) {
+        assert!(files.iter().any(|f| f == wanted), "{wanted} in {files:?}");
+    }
+    assert!(
+        files.iter().all(|f| f != "run.json" && !f.starts_with("karate-json/")),
+        "{files:?}"
+    );
+    let _ = std::fs::remove_dir_all(&out);
 }

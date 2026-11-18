@@ -4,8 +4,7 @@
 //!
 //! The runs arrive with the project and after each run (the runner sends the list); the rows are worked out when the list
 //! changes and read their clock once, as Electron Grace's rows did, so an idle History tab costs nothing. At most 20
-//! runs are listed, so the rows are plain elements, not a virtual list. Export and the trends strip come with slices 6
-//! and 7 (P3 plan).
+//! runs are listed, so the rows are plain elements, not a virtual list. The trends strip comes with slice 7 (P3 plan).
 use std::rc::Rc;
 
 use gpui::accesskit::Role;
@@ -40,12 +39,12 @@ pub const DIALOG_WIDTH: f32 = 448.;
 /// The columns' widths in px; "Tags" takes what the others leave and is cut when it is short.
 const WHEN: f32 = 104.;
 const ENV: f32 = 56.;
-const THREADS: f32 = 56.;
+const THREADS: f32 = 48.;
 const RESULT: f32 = 208.;
-const DURATION: f32 = 64.;
-const ACTIONS: f32 = 256.;
+const DURATION: f32 = 56.;
+const ACTIONS: f32 = 332.;
 /// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path.
-const WHAT: f32 = 136.;
+const WHAT: f32 = 100.;
 
 fn clock() -> f64 {
     std::time::SystemTime::now()
@@ -153,7 +152,12 @@ impl History {
                 .debug_selector(move || format!("history-tags:{}", i + 1))
                 .flex()
                 .gap_1()
-                .children(text.tags.iter().enumerate().map(|(k, tag)| tag_chip(&rid, k, tag, cx)))
+                .children(
+                    text.tags
+                        .iter()
+                        .enumerate()
+                        .map(|(k, tag)| tag_chip(&rid, i, k, tag, cx)),
+                )
                 .into_any_element()
         };
         let what = div().flex_none().w(px(WHAT)).overflow_hidden().child(
@@ -210,7 +214,14 @@ impl History {
                     .w(px(THREADS))
                     .text_right(),
             )
-            .child(div().flex_1().min_w_0().overflow_hidden().child(tags))
+            .child(
+                div()
+                    .debug_selector(move || format!("history-tags-cell:{}", i + 1))
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .child(tags),
+            )
             .child(what)
             .child(result)
             .child(
@@ -226,8 +237,13 @@ impl History {
 
     fn buttons(&self, i: usize, id: String, a: Actions) -> impl IntoElement {
         let key = id.clone();
-        let (report, rerun, failed) = (id.clone(), id.clone(), id);
-        let (g1, g2, g3) = (self.grace.clone(), self.grace.clone(), self.grace.clone());
+        let (report, export, rerun, failed) = (id.clone(), id.clone(), id.clone(), id);
+        let (g1, g2, g3, g4) = (
+            self.grace.clone(),
+            self.grace.clone(),
+            self.grace.clone(),
+            self.grace.clone(),
+        );
         // each button in a frame that names it, for the tests' clicks
         let frame = |what: &'static str, button: gpui_component::button::Button| {
             div()
@@ -251,6 +267,18 @@ impl History {
                 )
                 .off(!a.report)
                 .on_click(move |_, _, cx| g1.update(cx, |g, cx| g.open_run_report(report.clone(), cx))),
+            ))
+            .child(frame(
+                "export",
+                icon_text_button(
+                    SharedString::from(format!("history-export-{key}")),
+                    Icon::Download,
+                    "Export",
+                    ButtonKind::Ghost,
+                    ButtonSize::Small,
+                )
+                .off(!a.export)
+                .on_click(move |_, _, cx| g4.update(cx, |g, cx| g.export_report(export.clone(), cx))),
             ))
             .child(frame(
                 "rerun",
@@ -281,7 +309,7 @@ impl History {
 
 /// A tag of the run's filter, drawn by its shape: included with a check on the accent, excluded with a minus and a
 /// strike on the surface (`chipIncluded`, `chipExcluded`).
-fn tag_chip(rid: &str, k: usize, tag: &Tag, cx: &App) -> AnyElement {
+fn tag_chip(rid: &str, row: usize, k: usize, tag: &Tag, cx: &App) -> AnyElement {
     let t = Theme::global(cx).tokens;
     let (border, bg, fg, glyph) = if tag.excluded {
         (t.control, t.surface, t.ink, Icon::Minus)
@@ -290,6 +318,7 @@ fn tag_chip(rid: &str, k: usize, tag: &Tag, cx: &App) -> AnyElement {
     };
     div()
         .id(SharedString::from(format!("history-tag-{rid}-{k}")))
+        .debug_selector(move || format!("history-tag:{}:{k}", row + 1))
         .role(Role::Label)
         .aria_value(SharedString::from(tag.text.clone()))
         .flex()

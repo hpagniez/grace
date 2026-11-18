@@ -276,6 +276,28 @@ mod actions {
         assert!(actions(&entry("b"), false).report);
     }
 
+    /// ER-05: Export is on exactly when Report is: a finished run with a report, and the runner quiet.
+    #[test]
+    fn export_follows_report() {
+        let finished = entry("a");
+        let cancelled = HistoryEntry {
+            outcome: RunOutcome::Cancelled,
+            report_available: false,
+            ..entry("b")
+        };
+        for (e, locked) in [
+            (&finished, false),
+            (&finished, true),
+            (&cancelled, false),
+            (&cancelled, true),
+        ] {
+            let a = actions(e, locked);
+            assert_eq!(a.export, a.report, "{} locked {locked}", e.id);
+        }
+        assert!(actions(&finished, false).export);
+        assert!(!actions(&cancelled, false).export);
+    }
+
     #[test]
     fn re_run_failed_is_off_with_no_failure() {
         let a = actions(
@@ -295,7 +317,10 @@ mod actions {
     #[test]
     fn every_action_is_off_while_the_runner_is_busy() {
         let a = actions(&entry("a"), true);
-        assert_eq!((a.report, a.rerun, a.rerun_failed), (false, false, false));
+        assert_eq!(
+            (a.report, a.export, a.rerun, a.rerun_failed),
+            (false, false, false, false)
+        );
     }
 
     #[test]
