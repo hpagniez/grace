@@ -179,6 +179,23 @@ impl Node {
         ))
     }
 
+    /// Fails a press of a node whose centre (`at`) lies outside its window's client area (`window`), both in the
+    /// backend's coordinates: GPUI answers an accessibility press with a click at that centre, uncut by any box, and
+    /// a click outside the window lands on nothing, so the press did nothing.
+    // shortcut: a centre clipped by a scroll area or covered by an overlay inside the window still passes; check the
+    // hit-tested element if a press is lost that way
+    pub fn check_in_window(&self, at: Rect, window: Rect) -> Result<()> {
+        let (x, y) = at.centre();
+        if (window.x..window.x + window.width).contains(&x) && (window.y..window.y + window.height).contains(&y) {
+            return Ok(());
+        }
+        Err(format!(
+            "{:?} {:?} {:?} lies outside the window: its centre ({x}, {y}) is not in {window:?}, and a press there \
+             clicks nothing",
+            self.path, self.role, self.name
+        ))
+    }
+
     /// Every interactive node without a name, as `role at path`: what the tree check fails on (guide R8.2).
     pub fn unnamed_controls(&self) -> Vec<String> {
         self.all()
@@ -851,6 +868,37 @@ mod tests {
         let moved = read.check_found(&Role::Button, "Run all").unwrap_err();
         assert_eq!(moved, r#"[1, 5] moved: read Button "Clear", found Button "Run all""#);
         assert!(read.check_found(&Role::TreeItem, "Clear").is_err());
+    }
+
+    #[test]
+    fn a_press_whose_centre_is_outside_the_window_fails() {
+        let mut read = node(Role::Button, "Re-run failed", vec![]);
+        read.path = vec![1, 9];
+        let window = Rect {
+            x: 8,
+            y: 31,
+            width: 1008,
+            height: 700,
+        };
+        // the History row's last button on a 1024 px screen: 949 to 1079 in the window, its centre past the edge
+        let past = Rect {
+            x: 8 + 949,
+            y: 31 + 500,
+            width: 130,
+            height: 24,
+        };
+        assert_eq!(
+            read.check_in_window(past, window).unwrap_err(),
+            r#"[1, 9] Button "Re-run failed" lies outside the window: its centre (1022, 543) is not in Rect { x: 8, y: 31, width: 1008, height: 700 }, and a press there clicks nothing"#
+        );
+        let cut = Rect { x: 8 + 908, ..past };
+        assert!(read.check_in_window(cut, window).is_ok());
+        let below = Rect {
+            x: 100,
+            y: 31 + 700,
+            ..past
+        };
+        assert!(read.check_in_window(below, window).is_err());
     }
 
     #[test]

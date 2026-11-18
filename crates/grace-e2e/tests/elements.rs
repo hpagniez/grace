@@ -48,6 +48,18 @@ fn names_each_status_mark() {
     }
 }
 
+/// A press of a button whose centre lies outside the window fails, rather than returning Ok: GPUI turns it into a
+/// click there, which lands on nothing (a History row's last button on CI's 1024 px screen).
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_press_outside_the_window_fails() {
+    let app = gallery();
+    let outside = app.wait_for_node(Role::Button, "Outside the window").unwrap();
+    let e = app.press(&outside).unwrap_err();
+    assert!(e.contains("lies outside the window"), "{e}");
+    app.wait_for_node(Role::Button, "Pressed 0 times").unwrap();
+}
+
 /// An icon-only button is named by its label, as `btnIcon`'s aria-label does.
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
