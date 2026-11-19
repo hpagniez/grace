@@ -603,7 +603,7 @@ fn every_button_of_a_row_fits_the_window_at_any_width(cx: &mut TestAppContext) {
             column.right() <= viewport,
             "at {width} px the column {column:?} is in the window"
         );
-        for button in ["report", "rerun", "rerun-failed"] {
+        for button in ["report", "export", "rerun", "rerun-failed"] {
             let b = bounds(&mut cx, format!("history-{button}:1"));
             assert!(
                 b.left() >= column.left() && b.right() <= column.right() + px(0.5),
