@@ -7,6 +7,7 @@ pub mod console_find;
 pub mod editor;
 pub mod fingerprint;
 pub mod flaky;
+pub mod flaky_proof;
 pub mod history;
 pub mod history_list;
 pub mod http_list;
