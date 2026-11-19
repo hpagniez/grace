@@ -542,28 +542,39 @@ fn a_tooltip_names_the_run_a_column_stands_for(cx: &mut TestAppContext) {
     );
 }
 
-/// A press is a click at the centre of the node, and CI's screen makes the window 1008 px wide: all 20 columns of a full
-/// history are inside it, centre and edge.
+/// A press is a click at the centre of the node: CI's screen makes the window 1008 px wide and the window's least is
+/// 760 (the History row's buttons turn to icons below 1200). All 20 columns of a full history are inside either, centre
+/// and edge, and so is the strip's label.
 #[gpui::test]
-fn the_20_columns_are_inside_a_1008_px_window(cx: &mut TestAppContext) {
-    let (h, mut cx, _list) = setup_at(cx, 1008.);
-    let names: Vec<String> = (0..20).map(|i| format!("run-{i:02}")).collect();
-    answer(&h, None, names.iter().map(|id| trend(id, 1, 1, Some(1.))).collect());
-    h.update(&mut cx, |s| {
-        s.history = ids(&names.iter().rev().map(String::as_str).collect::<Vec<_>>())
-    });
-    for id in [&names[0], &names[19]] {
-        let b = bounds(&mut cx, format!("trend-run:{id}"));
-        assert!(b.right() <= px(1008.), "{id} ends at {:?}", b.right());
+fn the_20_columns_are_inside_a_1008_px_and_a_760_px_window(cx: &mut TestAppContext) {
+    for width in [1008., 760.] {
+        let (h, mut cx, _list) = setup_at(cx, width);
+        let names: Vec<String> = (0..20).map(|i| format!("run-{i:02}")).collect();
+        answer(&h, None, names.iter().map(|id| trend(id, 1, 1, Some(1.))).collect());
+        h.update(&mut cx, |s| {
+            s.history = ids(&names.iter().rev().map(String::as_str).collect::<Vec<_>>())
+        });
+        for id in [&names[0], &names[19]] {
+            let b = bounds(&mut cx, format!("trend-run:{id}"));
+            assert!(b.right() <= px(width), "{id} ends at {:?} in {width} px", b.right());
+        }
+        assert!(
+            bounds(&mut cx, "trends-time-max".into()).right() <= px(width),
+            "{width} px"
+        );
     }
 }
 
 /// What the titles that stuck stand over: 20 runs in a window 300 px tall, scrolled 200 px.
 fn stuck(cx: &mut TestAppContext) -> (Harness, VisualTestContext, Entity<History>) {
-    let (h, mut cx, list) = setup(cx);
+    stuck_at(cx, 1200.)
+}
+
+fn stuck_at(cx: &mut TestAppContext, width: f32) -> (Harness, VisualTestContext, Entity<History>) {
+    let (h, mut cx, list) = setup_at(cx, width);
     let many: Vec<String> = (0..20).map(|i| format!("run-{i:02}")).collect();
     answer(&h, None, many.iter().map(|id| trend(id, 1, 1, Some(1.))).collect());
-    cx.simulate_resize(gpui::size(px(1200.), px(300.)));
+    cx.simulate_resize(gpui::size(px(width), px(300.)));
     let newest_first: Vec<&str> = many.iter().rev().map(String::as_str).collect();
     h.update(&mut cx, |s| s.history = ids(&newest_first));
     let scroll = cx.update(|_, cx| list.read(cx).scroll().clone());
@@ -601,4 +612,28 @@ fn the_titles_that_stuck_are_as_wide_as_the_list(cx: &mut TestAppContext) {
         bounds(&mut cx, "history-scroll".into()),
     );
     assert_eq!((titles.left(), titles.right()), (view.left(), view.right()));
+}
+
+/// The titles that stuck have the columns the rows have, in both looks of the row (words at 1200 px, icons at 760 and
+/// 1008): as wide as the list, and the first row's last button ends where the titles' last column does.
+#[gpui::test]
+fn the_titles_that_stuck_line_up_with_the_rows_in_both_looks(cx: &mut TestAppContext) {
+    for width in [1200., 1008., 760.] {
+        let (_h, mut cx, _list) = stuck_at(cx, width);
+        let (titles, view) = (
+            bounds(&mut cx, "history-header-stuck".into()),
+            bounds(&mut cx, "history-scroll".into()),
+        );
+        assert_eq!(
+            (titles.left(), titles.right()),
+            (view.left(), view.right()),
+            "{width} px"
+        );
+        // each row's buttons end inside the window, as far right as the header's own last column
+        let actions = bounds(&mut cx, "history-actions:20".into());
+        assert!(
+            actions.right() <= titles.right(),
+            "{width} px: {actions:?} in {titles:?}"
+        );
+    }
 }
