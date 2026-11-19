@@ -456,6 +456,10 @@ impl Render for BottomPanel {
             _ => None,
         };
         let _ = window;
+        if state.panel != Panel::History {
+            // nothing is asked or held for a closed tab (trends R5.3)
+            self.history.update(cx, |h, _| h.close());
+        }
         div()
             .id("bottom-panel")
             .debug_selector(|| "bottom-panel".into())

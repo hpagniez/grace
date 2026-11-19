@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Bounds, Entity, Modifiers, Pixels, TestAppContext, VisualTestContext, div, point, px};
+use gpui::{Bounds, Entity, Modifiers, Pixels, TestAppContext, VisualTestContext, div, point, px};
 use grace_core::model::events::RunOutcome;
 use grace_core::model::history::{HistoryEntry, StoredSelection};
 use grace_core::model::node::{Layout, NodeKind};
@@ -217,7 +217,8 @@ fn puts_where_the_node_sits_in_a_tooltip_over_its_row(cx: &mut TestAppContext) {
     assert_eq!(rest(&mut cx, 3).1, None, "Failed tests has no path");
 }
 
-/// 12: 28 px rows under a header that stays above the list, which scrolls.
+/// 12: 28 px rows under a header; the strip, the header and the rows scroll as one, and the header sticks (the trends'
+/// `the_titles_stay_at_the_top_once_the_strip_has_scrolled_away`).
 #[gpui::test]
 fn makes_a_row_28_px_under_a_header_that_stays_above_the_rows(cx: &mut TestAppContext) {
     let (_h, mut cx, _list) = setup(cx, vec![entry("a"), entry("b")]);

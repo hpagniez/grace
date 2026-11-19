@@ -34,14 +34,8 @@ pub const ERROR: &str = "Error";
 pub const STEPS: &str = "Steps";
 pub const OPEN_IN_EDITOR: &str = "Open in VS Code";
 
-/// `formatMillis`: under a second in whole ms, else seconds with two decimals.
-pub fn format_millis(ms: f64) -> String {
-    if ms < 1000. {
-        format!("{} ms", ms.round())
-    } else {
-        format!("{:.2} s", ms / 1000.)
-    }
-}
+/// `formatMillis`, in `grace-core` since the trends' tooltips say times too.
+pub use grace_core::rows::format_millis;
 
 /// The tint a status takes in its badge: not run and pending take a skipped step's grey.
 fn badge_tint(s: Status, t: &crate::theme::Tokens) -> (u32, u32) {

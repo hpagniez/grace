@@ -904,24 +904,24 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| TR-01 | No runs, no strip | | ☐ |
-| TR-02 | The strip covers every test with nothing selected | | ☐ |
-| TR-03 | The strip follows the tree selection | | ☐ |
-| TR-04 | A run that did not run the selection has no column | | ☐ |
-| TR-05 | A Re-run failed counts only the tests it ran | | ☐ |
-| TR-06 | Only runs of the picked environment count | | ☐ |
-| TR-07 | A debug run has no column | | ☐ |
-| TR-08 | A selection no stored run ran | | ☐ |
-| TR-09 | Columns run oldest to newest | | ☐ |
-| TR-10 | Pass rate splits passed below and failed above | | ☐ |
-| TR-11 | One selected test is all passed or all failed | | ☐ |
-| TR-12 | The newest value is rounded down | | ☐ |
-| TR-13 | Time per test is the mean of the counted tests | | ☐ |
-| TR-14 | A column's tooltip names the run | | ☐ |
-| TR-15 | A click on a column finds its run in the table | | ☐ |
-| TR-16 | A finished run updates the strip | | ☐ |
-| TR-17 | Nothing is worked out while History is closed | | ☐ |
-| TR-18 | Selecting fast asks once at a time | | ☐ |
+| TR-01 | No runs, no strip | `grace::trends::tests::shows_no_strip_and_asks_nothing_with_no_run` (the tab says "No runs yet", no strip, nothing asked); `grace::trends::tests::leaves_with_the_history_and_asks_nothing_more` (the strip leaves with the last run) | ☑ |
+| TR-02 | The strip covers every test with nothing selected | `grace::trends::tests::asks_for_the_whole_tree_and_draws_a_column_per_point` (caption "All tests", a column per point); `grace_core::trends::tests::find_trend::covers_the_whole_tree_oldest_first` | ☑ |
+| TR-03 | The strip follows the tree selection | `grace::trends::tests::follows_the_tree_selection` (the runner is asked for the selected key, the caption is its tree label); `grace_core::trends::tests::labels::caption_names_a_node_as_the_tree_does`, `grace_core::trends::tests::labels::caption_says_all_tests_for_the_whole_tree`; `grace_core::trends::tests::find_trend::counts_only_the_tests_of_the_selection`; `grace-e2e/tests/trends.rs::the_strip_follows_the_tree_selection` | ☑ |
+| TR-04 | A run that did not run the selection has no column | `grace_core::trends::tests::find_trend::gives_no_point_to_a_run_with_no_counted_test` | ☑ |
+| TR-05 | A Re-run failed counts only the tests it ran | `grace_core::trends::tests::find_trend::covers_the_whole_tree_oldest_first` (a run that stored two of the tree's four tests is "2 of 4"); `grace_core::trends::tests::labels::tip_names_the_run_its_counts_and_its_time_per_test` ("15 of 412 tests") | ☑ |
+| TR-06 | Only runs of the picked environment count | `grace_core::trends::tests::find_trend::counts_only_the_runs_of_the_environment`; `grace::trends::tests::asks_again_when_the_environment_changes` (the strip asks again for the picked environment); `grace-e2e/tests/trends.rs::a_run_on_another_environment_has_no_column` | ☑ |
+| TR-07 | A debug run has no column | `grace_core::trends::tests::find_trend::leaves_out_a_debug_run` | ☑ |
+| TR-08 | A selection no stored run ran | `grace::trends::tests::says_so_when_no_stored_run_ran_the_selection` (the words, the strip's height kept); `grace::trends::tests::drops_the_old_columns_when_main_gives_no_answer`; `grace_core::trends::tests::find_trend::gives_no_point_to_a_run_with_no_counted_test` | ☑ |
+| TR-09 | Columns run oldest to newest | `grace::trends::tests::asks_for_the_whole_tree_and_draws_a_column_per_point` (oldest left, 12 px bars 16 px apart); `grace_core::trends::tests::find_trend::covers_the_whole_tree_oldest_first` | ☑ |
+| TR-10 | Pass rate splits passed below and failed above | `grace_core::trends::tests::labels::the_pass_bar_splits_passed_below_and_failed_above_with_a_gap`; `grace::trends::tests::splits_the_pass_bar_and_scales_the_time_bar` (drawn: failed above, a 2 px gap, passed on the baseline) | ☑ |
+| TR-11 | One selected test is all passed or all failed | `grace_core::trends::tests::labels::a_share_of_nothing_draws_nothing_and_one_test_fills_the_bar`, `grace_core::trends::tests::labels::pass_rate_words_one_test_as_passed_or_failed`; `grace::trends::tests::follows_the_tree_selection` ("Passed") | ☑ |
+| TR-12 | The newest value is rounded down | `grace_core::trends::tests::labels::pass_rate_gives_a_percentage_rounded_down` (299 of 300 is 99%); `grace_core::trends::tests::labels::the_labels_are_the_newest_columns`; `grace::trends::tests::labels_the_newest_point` | ☑ |
+| TR-13 | Time per test is the mean of the counted tests | `grace_core::trends::tests::labels::the_time_bars_scale_to_the_tallest_and_the_top_of_the_scale_is_said`; `grace_core::trends::tests::find_trend::gives_the_mean_time_of_the_counted_tests_that_have_one` (the mean of the counted tests); `grace::trends::tests::splits_the_pass_bar_and_scales_the_time_bar`; `grace-e2e/tests/trends.rs::the_strip_follows_the_tree_selection` ("Time per test 350 ms") | ☑ |
+| TR-14 | A column's tooltip names the run | `grace::trends::tests::a_tooltip_names_the_run_a_column_stands_for` (a pointer at rest shows it below the column); `grace::trends::tests::names_each_column_by_its_run`; `grace_core::trends::tests::labels::tip_names_the_run_its_counts_and_its_time_per_test`, `grace_core::trends::tests::labels::tip_words_one_test_by_its_status_and_time`, `grace_core::trends::tests::labels::tip_leaves_out_a_time_it_does_not_have` | ☑ |
+| TR-15 | A click on a column finds its run in the table | `grace::trends::tests::a_click_shows_the_runs_row` (a click, then Enter on the column that kept the focus, scroll the oldest run's row into view); `grace_core::trends::tests::scroll::*`; `grace-e2e/tests/trends.rs::a_column_finds_its_run_in_the_table` | ☑ |
+| TR-16 | A finished run updates the strip | `grace::trends::tests::asks_again_when_the_history_changes` (the runner sends the list again as a run ends, and the strip asks again) | ☑ |
+| TR-17 | Nothing is worked out while History is closed | `grace::trends::tests::asks_nothing_while_history_is_hidden` (the Console tab shows: nothing is asked; shown again, it asks again, and the strip is dropped with the tab) | ☑ |
+| TR-18 | Selecting fast asks once at a time | `grace::trends::tests::asks_one_at_a_time_and_draws_only_the_newest_answer` (three selections before an answer: one question out, then one for the last; the answer to the first is not drawn) | ☑ |
 
 ## End-to-end tests
 
@@ -1261,9 +1261,9 @@ Phase P3 · 3 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-trends-01 | the strip follows the tree selection | | ☐ |
-| E-trends-02 | a column finds its run in the table | | ☐ |
-| E-trends-03 | a run on another environment has no column | | ☐ |
+| E-trends-01 | the strip follows the tree selection | `grace-e2e/tests/trends.rs::the_strip_follows_the_tree_selection` | ☑ |
+| E-trends-02 | a column finds its run in the table | `grace-e2e/tests/trends.rs::a_column_finds_its_run_in_the_table` | ☑ |
+| E-trends-03 | a run on another environment has no column | `grace-e2e/tests/trends.rs::a_run_on_another_environment_has_no_column` | ☑ |
 
 ### e2e/updates.spec.ts
 
@@ -1419,7 +1419,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
 | `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 79 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 9 wait: test 28 for P3, the flaky mark's name, and 8 for P4, the debugger, Build and sub-folders) | ☑ |
-| `src/renderer/Trends.test.tsx` | 15 | view `Trends` (`grace::ui`), headless | ☐ |
+| `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
@@ -1440,7 +1440,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/store.test.tsx` | 8 | `grace-core::state::tests::create_app_store`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (8 ported, `toggleGroup` with the HTTP tab in P3) | ☑ |
 | `src/renderer/tokens.test.ts` | 19 | `crates/grace::theme::tests`: every token in both themes and equal to `src/index.css` until the cut-over, the contrast rules, the primary's green, the focus ring, the sheet and the shadow's geometry. The CSS-only checks (the `::highlight` rules, `color-scheme`, Tailwind's palette reset) have no GPUI counterpart; the console's highlights port with the console (CS-*) | ☑ |
 | `src/renderer/treeRows.test.ts` | 5 | `grace_core::rows::tests::tree_rows`, `row_name_…` (all 5) | ☑ |
-| `src/renderer/trendLabels.test.ts` | 7 | `grace::ui::trendLabels` | ☐ |
+| `src/renderer/trendLabels.test.ts` | 7 | `grace_core::trends::tests::labels` (7), test for test; the strip's column geometry and `scroll_to_show` are there too | ☑ |
 | `src/renderer/ui.test.ts` | 1 | `n/a`: a closed GPUI dialog is not drawn, so it takes no pointer events | n/a |
 | `src/renderer/virtual.test.ts` | 15 | `grace_core::rows::tests` (10; `drawnRange`'s 5 are `uniform_list`'s) | ☑ |
 | `src/shared/env.test.ts` | 29 | `grace-core::model::env::tests` (54 tests, every Vitest test and the added ones) | ☑ |
