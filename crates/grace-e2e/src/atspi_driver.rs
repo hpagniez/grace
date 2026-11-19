@@ -151,6 +151,26 @@ impl AtspiDriver {
             .map(str::to_owned)
             .ok_or_else(|| format!("process {} shows no X window", self.pid))
     }
+
+    /// The app's X window, in its own coordinates (a node's place is read in them): where a press can land.
+    fn window_size(&self) -> Result<Rect> {
+        let out = std::process::Command::new("xdotool")
+            .args(["getwindowgeometry", "--shell", &self.x_window()?])
+            .output()
+            .map_err(|e| format!("cannot run xdotool (apt install xdotool): {e}"))?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let n = |key: &str| {
+            text.lines()
+                .find_map(|l| l.strip_prefix(key)?.strip_prefix('=')?.trim().parse::<i32>().ok())
+                .ok_or_else(|| format!("xdotool getwindowgeometry gave no {key}: {text:?}"))
+        };
+        Ok(Rect {
+            x: 0,
+            y: 0,
+            width: n("WIDTH")?,
+            height: n("HEIGHT")?,
+        })
+    }
 }
 
 impl Driver for AtspiDriver {
@@ -171,6 +191,20 @@ impl Driver for AtspiDriver {
             let p = self.proxy(&at).await?;
             // the tree may have changed since the read, and the path then leads to another element
             node.check_found(&role(p.get_role().await.map_err(err)?), &p.name().await.map_err(err)?)?;
+            if p.get_interfaces().await.map_err(err)?.contains(Interface::Component) {
+                let (x, y, width, height) = ComponentProxy::builder(self.conn.connection())
+                    .destination(p.inner().destination().to_owned())
+                    .map_err(err)?
+                    .path(p.inner().path().to_owned())
+                    .map_err(err)?
+                    .build()
+                    .await
+                    .map_err(err)?
+                    .get_extents(CoordType::Window)
+                    .await
+                    .map_err(err)?;
+                node.check_in_window(Rect { x, y, width, height }, self.window_size()?)?;
+            }
             let action = ActionProxy::builder(self.conn.connection())
                 .destination(p.inner().destination().to_owned())
                 .map_err(err)?

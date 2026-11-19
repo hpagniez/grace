@@ -629,6 +629,31 @@ fn screens_history() {
     })
     .unwrap();
     shot(&app, "history-tab");
+    // the window at its least width (a smaller size is refused): the row's buttons as icons, a name in a tooltip
+    // (#385). The build before that change has no icons: the waits may fail, and the shots show the rows as they are
+    let row_button = |t: &Node| {
+        t.find(&Role::List, "Run history")
+            .and_then(|l| l.find(&Role::Button, "Re-run failed"))
+            .cloned()
+    };
+    let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
+        x: 0,
+        y: 0,
+        width: 1200,
+        height: 800,
+    });
+    app.set_window_rect(at.x, at.y, 400, at.height).unwrap();
+    let narrow = Duration::from_secs(3);
+    let _ = app.wait_for("the narrow rows", narrow, |t| {
+        row_button(t).and_then(|b| b.rect).is_some_and(|r| r.width < 40)
+    });
+    shot(&app, "history-narrow");
+    app.hover(&row_button(&app.tree().unwrap()).unwrap()).unwrap();
+    let _ = app.wait_for("the tooltip", narrow, |t| {
+        t.all().iter().any(|n| n.role == Role::Tooltip)
+    });
+    shot(&app, "history-narrow-tooltip");
+    app.set_window_rect(at.x, at.y, at.width, at.height).unwrap();
     let t = app.tree().unwrap();
     app.click(t.find(&Role::Button, "Clear history").unwrap()).unwrap();
     app.wait_for("the dialog", WAIT, |t| t.all().iter().any(|n| n.role == Role::Dialog))
