@@ -22,8 +22,10 @@ use grace_core::model::history::HistoryEntry;
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{ButtonKind, ButtonSize, MarkStatus, Off as _, button, icon, icon_text_button, status_mark};
-use crate::theme::{METRICS, MONO, Theme};
+use crate::elements::{
+    ButtonKind, ButtonSize, MarkStatus, Off as _, button, icon, icon_button, icon_text_button, status_mark,
+};
+use crate::theme::{METRICS, MONO, SANS, Theme};
 use crate::tooltip::{Side, tooltip};
 
 /// The list's accessible name.
@@ -42,9 +44,24 @@ const ENV: f32 = 56.;
 const THREADS: f32 = 48.;
 const RESULT: f32 = 208.;
 const DURATION: f32 = 56.;
-const ACTIONS: f32 = 332.;
-/// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path.
+/// "What ran" (`max-w-56` in Electron Grace, which grew to its text): cut here, its tooltip says the path. It gives up
+/// width when the row is short of it, after Tags.
 const WHAT: f32 = 100.;
+/// What a row needs beside Tags and its buttons: its padding (`px-3`), its seven gaps (`gap-3`) and the fixed columns.
+const BESIDE: f32 = 24. + 7. * 12. + WHEN + ENV + THREADS + WHAT + RESULT + DURATION;
+/// px, between the buttons (`gap-1`).
+const BUTTON_GAP: f32 = 4.;
+/// px, a labelled small button around its text: `px-2`, the 14 px icon and the 6 px before the text.
+const BUTTON_FRAME: f32 = 8. + 14. + 6. + 8.;
+/// What a press of a row's button asks of the app, with the run's id.
+type Press = fn(&mut Grace, String, &mut Context<Grace>);
+/// A row's buttons, in their order: what the tests call each, its icon, its words and what it does.
+const BUTTONS: [(&str, Icon, &str, Press); 4] = [
+    ("report", Icon::FileText, "Report", Grace::open_run_report),
+    ("export", Icon::Download, "Export", Grace::export_report),
+    ("rerun", Icon::Play, "Re-run", Grace::rerun),
+    ("rerun-failed", Icon::RotateCcw, "Re-run failed", Grace::rerun_failed_of),
+];
 
 fn clock() -> f64 {
     std::time::SystemTime::now()
@@ -98,7 +115,7 @@ impl History {
         self.builds += 1;
     }
 
-    fn header(&self, cx: &App) -> impl IntoElement {
+    fn header(&self, actions: f32, cx: &App) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         let head = |text: &'static str, w: Option<f32>, right: bool| {
             div()
@@ -124,13 +141,13 @@ impl History {
             .child(head("Env", Some(ENV), false))
             .child(head("Threads", Some(THREADS), true))
             .child(head("Tags", None, false))
-            .child(head("What ran", Some(WHAT), false))
+            .child(head("What ran", Some(WHAT), false).flex_shrink(1.).min_w_0().truncate())
             .child(head("Result", Some(RESULT), false))
             .child(head("Duration", Some(DURATION), true))
-            .child(div().w(px(ACTIONS)).flex_none())
+            .child(div().w(px(actions)).flex_none())
     }
 
-    fn row(&self, i: usize, e: &HistoryEntry, locked: bool, cx: &mut Context<Self>) -> AnyElement {
+    fn row(&self, i: usize, e: &HistoryEntry, locked: bool, look: Look, cx: &mut Context<Self>) -> AnyElement {
         let t = Theme::global(cx).tokens;
         let text = &self.rows[i];
         let a = actions(e, locked);
@@ -160,7 +177,7 @@ impl History {
                 )
                 .into_any_element()
         };
-        let what = div().flex_none().w(px(WHAT)).overflow_hidden().child(
+        let what = div().w(px(WHAT)).min_w_0().overflow_hidden().child(
             tooltip(
                 SharedString::from(format!("history-what-tip-{rid}")),
                 text.path.clone().map(SharedString::from),
@@ -231,79 +248,90 @@ impl History {
                     .text_right()
                     .font_family(MONO),
             )
-            .child(self.buttons(i, id, a))
+            .child(self.buttons(i, id, a, look))
             .into_any_element()
     }
 
-    fn buttons(&self, i: usize, id: String, a: Actions) -> impl IntoElement {
-        let key = id.clone();
-        let (report, export, rerun, failed) = (id.clone(), id.clone(), id.clone(), id);
-        let (g1, g2, g3, g4) = (
-            self.grace.clone(),
-            self.grace.clone(),
-            self.grace.clone(),
-            self.grace.clone(),
-        );
-        // each button in a frame that names it, for the tests' clicks
-        let frame = |what: &'static str, button: gpui_component::button::Button| {
-            div()
-                .debug_selector(move || format!("history-{what}:{}", i + 1))
-                .child(button)
-        };
+    fn buttons(&self, i: usize, id: String, a: Actions, look: Look) -> impl IntoElement {
+        let on = [a.report, a.export, a.rerun, a.rerun_failed];
         div()
             .debug_selector(move || format!("history-actions:{}", i + 1))
             .flex()
             .flex_none()
-            .w(px(ACTIONS))
-            .gap_1()
-            .child(frame(
-                "report",
-                icon_text_button(
-                    SharedString::from(format!("history-report-{key}")),
-                    Icon::FileText,
-                    "Report",
-                    ButtonKind::Ghost,
-                    ButtonSize::Small,
-                )
-                .off(!a.report)
-                .on_click(move |_, _, cx| g1.update(cx, |g, cx| g.open_run_report(report.clone(), cx))),
-            ))
-            .child(frame(
-                "export",
-                icon_text_button(
-                    SharedString::from(format!("history-export-{key}")),
-                    Icon::Download,
-                    "Export",
-                    ButtonKind::Ghost,
-                    ButtonSize::Small,
-                )
-                .off(!a.export)
-                .on_click(move |_, _, cx| g4.update(cx, |g, cx| g.export_report(export.clone(), cx))),
-            ))
-            .child(frame(
-                "rerun",
-                icon_text_button(
-                    SharedString::from(format!("history-rerun-{key}")),
-                    Icon::Play,
-                    "Re-run",
-                    ButtonKind::Ghost,
-                    ButtonSize::Small,
-                )
-                .off(!a.rerun)
-                .on_click(move |_, _, cx| g2.update(cx, |g, cx| g.rerun(rerun.clone(), cx))),
-            ))
-            .child(frame(
-                "rerun-failed",
-                icon_text_button(
-                    SharedString::from(format!("history-rerun-failed-{key}")),
-                    Icon::RotateCcw,
-                    "Re-run failed",
-                    ButtonKind::Ghost,
-                    ButtonSize::Small,
-                )
-                .off(!a.rerun_failed)
-                .on_click(move |_, _, cx| g3.update(cx, |g, cx| g.rerun_failed_of(failed.clone(), cx))),
-            ))
+            .w(px(look.width))
+            .gap(px(BUTTON_GAP))
+            .children(BUTTONS.iter().zip(on).map(|(&(what, icon, label, press), on)| {
+                let (g, run) = (self.grace.clone(), id.clone());
+                let click = move |_: &gpui::ClickEvent, _: &mut Window, cx: &mut App| {
+                    g.update(cx, |g, cx| press(g, run.clone(), cx));
+                };
+                let bid = SharedString::from(format!("history-{what}-{id}"));
+                let button = if look.icons {
+                    tooltip(
+                        SharedString::from(format!("history-{what}-tip-{id}")),
+                        Some(label.into()),
+                    )
+                    .side(Side::Left)
+                    .focusable(move |f| {
+                        icon_button(bid, icon, 14., label, true)
+                            .track_focus(f)
+                            .off(!on)
+                            .on_click(click)
+                    })
+                    .into_any_element()
+                } else {
+                    icon_text_button(bid, icon, label, ButtonKind::Ghost, ButtonSize::Small)
+                        .off(!on)
+                        .on_click(click)
+                        .into_any_element()
+                };
+                // each button in a frame that names it, for the tests' clicks
+                div()
+                    .debug_selector(move || format!("history-{what}:{}", i + 1))
+                    .child(button)
+            }))
+    }
+}
+
+/// How a row's buttons are drawn: with their words while the row fits the window, their icons only below that, so
+/// every button stays inside the window down to its least width (a press clicks a button's centre).
+#[derive(Clone, Copy)]
+struct Look {
+    /// The Actions column's width, the header's included: what its buttons take.
+    width: f32,
+    icons: bool,
+}
+
+impl Look {
+    fn of(window: &Window) -> Self {
+        let mut style = window.text_style();
+        style.font_family = SANS.into();
+        let words: f32 = BUTTONS
+            .iter()
+            .map(|(_, _, label, _)| {
+                let line = window.text_system().shape_line(
+                    SharedString::new_static(label),
+                    px(METRICS.text_xs.size),
+                    &[style.to_run(label.len())],
+                    None,
+                );
+                f32::from(line.width).ceil() + BUTTON_FRAME
+            })
+            .sum();
+        let gaps = BUTTON_GAP * (BUTTONS.len() - 1) as f32;
+        // the tab spans the sheet, inside its inset and side on both edges
+        let room = f32::from(window.viewport_size().width) - 2. * (METRICS.sheet_inset + METRICS.sheet_side);
+        if BESIDE + words + gaps <= room {
+            Self {
+                width: words + gaps,
+                icons: false,
+            }
+        } else {
+            Self {
+                width: METRICS.control_height_small * BUTTONS.len() as f32 + gaps,
+                icons: true,
+            }
+        }
     }
 }
 
@@ -342,10 +370,11 @@ fn tag_chip(rid: &str, row: usize, k: usize, tag: &Tag, cx: &App) -> AnyElement 
 }
 
 impl Render for History {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.grace.read(cx).state.clone();
         self.build(&state.history);
         let locked = locked(&state);
+        let look = Look::of(window);
         let body: AnyElement = if state.history.is_empty() {
             div()
                 .id("history-scroll")
@@ -359,14 +388,14 @@ impl Render for History {
                 .history
                 .iter()
                 .enumerate()
-                .map(|(i, e)| self.row(i, e, locked, cx))
+                .map(|(i, e)| self.row(i, e, locked, look, cx))
                 .collect();
             div()
                 .flex()
                 .flex_col()
                 .flex_1()
                 .min_h_0()
-                .child(self.header(cx))
+                .child(self.header(look.width, cx))
                 .child(
                     div()
                         .id("history-list")

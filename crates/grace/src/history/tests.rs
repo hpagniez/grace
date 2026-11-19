@@ -302,7 +302,7 @@ fn every_action_is_off_while_the_runner_is_busy_or_a_run_is_active(cx: &mut Test
     for lock in [|s: &mut AppState| s.busy = true, |s: &mut AppState| s.run.active = true] {
         h.update(&mut cx, lock);
         for row in 1..=2 {
-            for button in ["report", "rerun", "rerun-failed"] {
+            for button in ["report", "export", "rerun", "rerun-failed"] {
                 click(&mut cx, format!("history-{button}:{row}"));
             }
         }
@@ -578,7 +578,8 @@ fn draws_the_tags_whole_at_1200_px(cx: &mut TestAppContext) {
         },
         ..entry("a")
     };
-    let (_h, mut cx, _list) = setup_at(cx, 1160., vec![tagged]);
+    // a 1160 px table in IBM Plex: the test fonts' measured buttons are 56 px wider (382 against 326)
+    let (_h, mut cx, _list) = setup_at(cx, 1216., vec![tagged]);
     let cell = bounds(&mut cx, "history-tags-cell:1".into());
     for k in 0..2 {
         let chip = bounds(&mut cx, format!("history-tag:1:{k}"));
@@ -586,5 +587,36 @@ fn draws_the_tags_whole_at_1200_px(cx: &mut TestAppContext) {
             chip.right() <= cell.right(),
             "chip {k} {chip:?} runs past its cell {cell:?}"
         );
+    }
+}
+
+/// Every button of a row lies inside the window and its Actions column, from the window's least width up: below the
+/// width where the labelled buttons fit, they show their icon only (Redesigns, `history` (narrow rows)). A press
+/// clicks a button's centre, so a button past the window's edge took no press (#384).
+#[gpui::test]
+fn every_button_of_a_row_fits_the_window_at_any_width(cx: &mut TestAppContext) {
+    for width in [crate::window::MIN_SIZE.0, 1200.] {
+        let (h, mut cx, _list) = setup_at(cx, width, vec![entry("a")]);
+        let viewport = cx.update(|window, _| window.viewport_size().width);
+        let column = bounds(&mut cx, "history-actions:1".into());
+        assert!(
+            column.right() <= viewport,
+            "at {width} px the column {column:?} is in the window"
+        );
+        for button in ["report", "export", "rerun", "rerun-failed"] {
+            let b = bounds(&mut cx, format!("history-{button}:1"));
+            assert!(
+                b.left() >= column.left() && b.right() <= column.right() + px(0.5),
+                "at {width} px {button} {b:?} lies inside its column {column:?}"
+            );
+        }
+        let report = bounds(&mut cx, "history-report:1".into()).size.width;
+        assert_eq!(
+            report == px(24.),
+            width < 1000.,
+            "at {width} px Report shows its icon only below the row's width"
+        );
+        click(&mut cx, "history-rerun-failed:1".into());
+        assert_eq!(h.backend.calls(), ["rerun_failed a"], "at {width} px");
     }
 }
