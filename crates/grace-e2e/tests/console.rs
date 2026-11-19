@@ -132,9 +132,10 @@ fn the_console_is_on_the_sunken_colour_in_both_themes() {
 fn open_run_and_run_again() {
     let (dir, app) = open("clean");
     let (karate, java) = versions();
-    // through wait_for, which retries a read torn by an update
+    // "Ready." is the last line to come: the tree lands first, the runner's busy flag clears in a later event. Read the
+    // others from the tree that holds it, through wait_for, which retries a read torn by an update
     let tree = app
-        .wait_for("the versions line", WAIT, |t| starting(t, "Grace ").is_some())
+        .wait_for("the banner ready", WAIT, |t| starting(t, "Ready.").is_some())
         .unwrap();
     let banner = starting(&tree, "Grace ").expect("the versions line").name.clone();
     assert!(banner.contains(&format!("Karate {karate}")), "{banner}");
