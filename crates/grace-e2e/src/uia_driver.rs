@@ -12,10 +12,11 @@ use windows::Win32::Graphics::Dwm::{
     DWMWA_EXTENDED_FRAME_BOUNDS, DWMWA_USE_IMMERSIVE_DARK_MODE, DwmGetWindowAttribute,
 };
 use windows::Win32::Graphics::Gdi::{
-    CLR_INVALID, GetDC, GetMonitorInfoW, GetPixel, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, ReleaseDC,
+    CLR_INVALID, ClientToScreen, GetDC, GetMonitorInfoW, GetPixel, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+    MonitorFromWindow, ReleaseDC,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GA_ROOT, GCLP_HICON, GetAncestor, GetClassLongPtrW, GetForegroundWindow, WindowFromPoint,
+    GA_ROOT, GCLP_HICON, GetAncestor, GetClassLongPtrW, GetClientRect, GetForegroundWindow, WindowFromPoint,
 };
 use windows::core::BOOL;
 
@@ -193,6 +194,7 @@ impl Driver for UiaDriver {
 
     fn press(&self, node: &Node) -> Result<()> {
         let mut at = self.window()?;
+        let hwnd: HWND = at.get_native_window_handle().map_err(err)?.into();
         for &i in &node.path {
             at = self
                 .children(&at)
@@ -211,9 +213,11 @@ impl Driver for UiaDriver {
         // as a click would: AccessKit gives Invoke to a button, Toggle to a check box, and neither to a button that
         // opens something (ExpandCollapse) or to a tree item; a tree item takes a click of the pointer on its centre
         if let Ok(invoke) = at.get_pattern::<UIInvokePattern>() {
+            self.check_in_window(node, &at, hwnd)?;
             return invoke.invoke().map_err(err);
         }
         if let Ok(toggle) = at.get_pattern::<UITogglePattern>() {
+            self.check_in_window(node, &at, hwnd)?;
             return toggle.toggle().map_err(err);
         }
         // a button that opens something takes the focus and Space, as from the keyboard: its centre can be under
@@ -222,11 +226,8 @@ impl Driver for UiaDriver {
             at.set_focus().map_err(err)?;
             return Keyboard::new().send_keys("{space}").map_err(err);
         }
-        let r = at
-            .get_bounding_rectangle()
-            .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
-        let centre = Point::new(r.get_left() + r.get_width() / 2, r.get_top() + r.get_height() / 2);
-        Mouse::new().click(&centre).map_err(err)
+        let (x, y) = self.check_in_window(node, &at, hwnd)?.centre();
+        Mouse::new().click(&Point::new(x, y)).map_err(err)
     }
 
     fn hover(&self, node: &Node) -> Result<()> {
@@ -434,6 +435,38 @@ impl Driver for UiaDriver {
 impl UiaDriver {
     fn hwnd(&self) -> Result<HWND> {
         Ok(self.window()?.get_native_window_handle().map_err(err)?.into())
+    }
+
+    /// The element's place on the screen, once `Node::check_in_window` has found its centre in the window's client
+    /// area, where a press reaches the app.
+    fn check_in_window(&self, node: &Node, at: &UIElement, hwnd: HWND) -> Result<Rect> {
+        let r = at
+            .get_bounding_rectangle()
+            .map_err(|e| format!("{:?} {:?}: {e}", node.role, node.name))?;
+        let rect = Rect {
+            x: r.get_left(),
+            y: r.get_top(),
+            width: r.get_width(),
+            height: r.get_height(),
+        };
+        let mut client = RECT::default();
+        let mut origin = POINT::default();
+        // SAFETY: each call writes to the one struct it is given, which lives across it
+        let mapped = unsafe {
+            GetClientRect(hwnd, &mut client).map_err(err)?;
+            ClientToScreen(hwnd, &mut origin).as_bool()
+        };
+        if !mapped {
+            return Err("the window's client area has no place on the screen".into());
+        }
+        let window = Rect {
+            x: origin.x,
+            y: origin.y,
+            width: client.right - client.left,
+            height: client.bottom - client.top,
+        };
+        node.check_in_window(rect, window)?;
+        Ok(rect)
     }
 }
 

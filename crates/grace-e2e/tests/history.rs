@@ -136,14 +136,17 @@ fn read_tree(app: &App) -> Node {
 
 /// Presses a button of the newest run's row, reading the tree again when a press meets one that changed.
 fn press_in_top_row(app: &App, name: &str) {
+    let mut last = String::from("no row");
     for _ in 0..5 {
         let t = read_tree(app);
-        if rows(&t).first().is_some_and(|r| app.press(button(r, name)).is_ok()) {
-            return;
+        match rows(&t).first().map(|r| app.press(button(r, name))) {
+            Some(Ok(())) => return,
+            Some(Err(e)) => last = e,
+            None => {}
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    panic!("{name} could not be pressed in the top row");
+    panic!("{name} could not be pressed in the top row: {last}");
 }
 
 fn show_history(app: &App) {

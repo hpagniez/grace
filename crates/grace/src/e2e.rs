@@ -165,6 +165,15 @@ impl Render for Gallery {
                     },
                 )),
             )
+            // past the window's right edge, where a press clicks nothing: the driver's press of it fails
+            .child(div().absolute().top_4().left(gpui::relative(1.)).child(
+                button("outside", "Outside the window", ButtonKind::Plain, ButtonSize::Medium).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.presses += 1;
+                        cx.notify();
+                    },
+                )),
+            ))
             .child(tips)
     }
 }
