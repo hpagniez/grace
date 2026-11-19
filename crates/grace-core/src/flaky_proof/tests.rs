@@ -48,12 +48,18 @@ fn orders_the_boxes_and_words_them() {
     assert_eq!(
         view,
         [
-            ("Flaky on qa", "Passed 1 time, failed 2 times with the same project files"),
+            (
+                "Flaky on qa",
+                "Passed 1 time, failed 2 times with the same project files"
+            ),
             (
                 "Flaky with no environment",
                 "Passed 3 times, failed 2 times with the same project files"
             ),
-            ("Flaky on dev", "Passed 1 time, failed 1 time with the same project files"),
+            (
+                "Flaky on dev",
+                "Passed 1 time, failed 1 time with the same project files"
+            ),
         ]
     );
 }

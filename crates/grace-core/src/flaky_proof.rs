@@ -20,6 +20,8 @@ pub struct ProofRun {
 /// One environment's box.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProofBox {
+    /// The environment it is about, None for none.
+    pub env: Option<String>,
     pub heading: String,
     pub counts: String,
     pub runs: Vec<ProofRun>,
@@ -31,6 +33,7 @@ pub fn proof_boxes(envs: &[FlakyEnv], current: Option<&str>, now: f64, locked: b
     order_envs(envs, current)
         .into_iter()
         .map(|e| ProofBox {
+            env: e.env.clone(),
             heading: flaky_heading(e.env.as_deref()),
             counts: flaky_counts(e.passed, e.failed),
             runs: e

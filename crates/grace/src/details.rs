@@ -1,6 +1,6 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
-//! (#229), the flaky proof and the Examples table come with P3; the
+//! (#229) and the Examples table come with P3; the
 //! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases). A call selected in the
 //! HTTP tab takes the pane from the node (`http::call_details`).
 use gpui_component::scroll::ScrollableElement as _;
@@ -14,6 +14,8 @@ use gpui::{
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, Window, div, prelude::FluentBuilder as _, px,
 };
 use grace_core::editor::failed_at;
+use grace_core::flaky_proof::proof_boxes;
+use grace_core::history_list::locked;
 use grace_core::http_list::{CallText, call_text, find_call};
 use grace_core::karate::tree::find_node;
 use grace_core::model::events::Step;
@@ -120,6 +122,12 @@ struct CallShown {
     text: Rc<CallText>,
 }
 
+fn clock() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0., |d| d.as_millis() as f64)
+}
+
 pub struct Details {
     grace: Entity<Grace>,
     /// The steps whose log shows, by index, for the test shown; a new selection closes them, as Electron Grace's
@@ -131,6 +139,8 @@ pub struct Details {
     /// The call Copy as cURL was pressed on in the last two seconds, and the timer that ends it.
     copied: Option<CallRef>,
     copy_timer: Option<Task<()>>,
+    /// "Now" for the proof runs' times, read as the pane is drawn.
+    pub clock: Rc<dyn Fn() -> f64>,
     /// It showed that nothing is selected: drawn again only once something is.
     nothing: bool,
     _subscriptions: Vec<Subscription>,
@@ -163,6 +173,7 @@ impl Details {
             call: None,
             copied: None,
             copy_timer: None,
+            clock: Rc::new(clock),
             nothing: shown(&state) == Shown::Nothing,
             _subscriptions: subscriptions,
         }
@@ -389,12 +400,19 @@ impl Details {
                     .into_any_element()
             }
         };
+        // R5.1: a flaky test's proof, one box per environment, after the meta line and before the error
+        let proof = state.flaky.get(&node.key).map(|envs| {
+            let current = state.env.as_ref().and_then(|e| e.env.as_deref());
+            let boxes = proof_boxes(envs, current, (self.clock)(), locked(state));
+            crate::flaky_proof::view(&self.grace, &boxes, cx)
+        });
         vec![
             Self::heading(node_name(node)).into_any_element(),
             Self::badge(status, cx).into_any_element(),
             meta.into_any_element(),
         ]
         .into_iter()
+        .chain(proof.into_iter().flatten())
         .chain(error.map(|e| e.into_any_element()))
         .chain(std::iter::once(steps))
         .collect()
