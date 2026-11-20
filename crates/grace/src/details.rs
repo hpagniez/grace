@@ -3,6 +3,7 @@
 //! (#229) and the Examples table come with P3; the
 //! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases). A call selected in the
 //! HTTP tab takes the pane from the node (`http::call_details`).
+use gpui::AppContext as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -139,6 +140,8 @@ pub struct Details {
     /// The call Copy as cURL was pressed on in the last two seconds, and the timer that ends it.
     copied: Option<CallRef>,
     copy_timer: Option<Task<()>>,
+    /// An outline's Examples table, kept so its focus and scroll outlive a redraw of the pane.
+    examples: Entity<crate::examples::Examples>,
     /// "Now" for the proof runs' times, read as the pane is drawn.
     pub clock: Rc<dyn Fn() -> f64>,
     /// It showed that nothing is selected: drawn again only once something is.
@@ -166,7 +169,9 @@ impl Details {
             }
         })];
         let state = grace.read(cx).state.clone();
+        let examples = cx.new(|cx| crate::examples::Examples::new(grace.clone(), cx));
         Self {
+            examples,
             grace,
             open_logs: HashSet::new(),
             for_key: state.selected.clone(),
@@ -591,6 +596,10 @@ impl Details {
                 .into_any_element(),
             counts.into_any_element(),
         ]
+        .into_iter()
+        // R2.1: an outline's rows as a table under its counts
+        .chain((node.kind == NodeKind::Outline).then(|| self.examples.clone().into_any_element()))
+        .collect()
     }
 }
 

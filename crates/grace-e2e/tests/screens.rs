@@ -711,3 +711,32 @@ fn screens_flaky() {
     });
     shot(&app, "flaky");
 }
+
+/// An outline selected after a run: Details shows its Examples as a table (slice 9 of P3). The build before it shows
+/// the outline's counts and nothing under them.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_examples() {
+    let app = App::launch_with_settings(
+        &json!({ "lastProject": project("clean").unwrap().to_string_lossy() }),
+        &[],
+    )
+    .unwrap();
+    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Expand outline.feature").unwrap();
+    let t = app
+        .wait_for("the outline", WAIT, |t| starting(t, "add <a> and <b>, ").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Run all").unwrap();
+    app.wait_for("the run finished", RUN, |t| {
+        starting(t, "add <a> and <b>, passed").is_some()
+    })
+    .unwrap();
+    app.click(starting(&t, "add <a> and <b>, ").unwrap()).unwrap();
+    // the build before the table has no list: the wait is allowed to fail
+    let _ = app.wait_for("the table", Duration::from_secs(5), |t| {
+        t.all().iter().any(|n| n.name.starts_with("Row 1: "))
+    });
+    shot(&app, "examples");
+}
