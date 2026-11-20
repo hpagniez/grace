@@ -625,13 +625,13 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| DD-01 | An outline's Examples before a run | | ☐ |
-| DD-02 | Per-row results after a run | | ☐ |
-| DD-03 | A click opens a row | | ☐ |
-| DD-04 | The keyboard moves without opening | | ☐ |
-| DD-05 | A dynamic Examples table | | ☐ |
-| DD-06 | Examples tables with different columns | | ☐ |
-| DD-07 | A big outline | | ☐ |
+| DD-01 | An outline's Examples before a run | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table`, `grace::examples::tests::draws_a_line_per_row_with_a_cell_per_column` | ☑ |
+| DD-02 | Per-row results after a run | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table`, `grace::examples::tests::takes_a_lines_result_from_the_state_without_making_the_table_again` | ☑ |
+| DD-03 | A click opens a row | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table`, `grace::examples::tests::a_click_opens_the_row` | ☑ |
+| DD-04 | The keyboard moves without opening | `grace::examples::tests::the_arrow_keys_move_without_opening_and_enter_opens` (the driver cannot focus a list without opening a row: plan, Redesigns) | ☑ |
+| DD-05 | A dynamic Examples table | `grace-e2e/tests/examples.rs::a_dynamic_examples_table` | ☑ |
+| DD-06 | Examples tables with different columns | `grace::examples::tests::gives_the_other_rows_an_empty_cell_under_a_column_only_some_have`, `grace_core::examples::tests::gives_the_columns_of_all_rows_in_the_order_first_met` | ☑ |
+| DD-07 | A big outline | `grace::examples::tests::draws_only_the_lines_in_view_of_a_big_outline` | ☑ |
 
 ### ER · Export a run's report
 
@@ -1400,7 +1400,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 wait for P3, the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
-| `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
+| `src/renderer/Examples.test.tsx` | 10 | `grace::examples::tests` and `grace_core::examples::tests`, test for test in [P3 plan, Slice 9](../plans/2026-11-12-gpui-p3-panels.md#slice-9-the-data-driven-view) | ☑ |
 | `src/renderer/FieldMessage.test.tsx` | 2 | `grace::ui::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (5 runs with the `it.each` cases, all ported) | ☑ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
 | `src/renderer/FlakyProof.test.tsx` | 8 | `grace::flaky_proof::tests` (8 headless Details checks) and `grace_core::flaky_proof::tests` | ☑ |
@@ -1423,7 +1423,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
 | `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
-| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 1 waits for P3's data-driven view; test 23 is the HTTP tab's | ☑ |
+| `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 1 (test 9, the table's arrow keys) is `grace::examples::tests::the_arrow_keys_move_without_opening_and_enter_opens`; test 23 is the HTTP tab's | ☑ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
