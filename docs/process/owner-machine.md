@@ -6,3 +6,7 @@ The reference machine of `bench/limits.json` is the owner's own PC, and he works
 - Work in separate worktrees under one temp folder, never in his working copy, and with a fresh data folder (`GRACE_USER_DATA`), never his settings. Copy `vendor/` into a worktree, never link it: a recursive delete through a junction empties the checkout's own `vendor/`.
 - Right after the work, before anything else, remove everything it made: worktrees, temp folders, build outputs, logs, local branches, toolchains it installed. Delete only what the work made. Then check `git worktree list`, `vendor/` and the process list, and tell him what was removed.
 - A check record says what ran there and with whose go. Keep his user name, his paths and captures of his desktop out of it.
+
+## Run e2e on CI first
+
+The owner does not want e2e on his machine when CI can run it. Push the branch as a draft PR: the Linux job runs GPUI Grace's e2e headless under Xvfb on every PR, and `gh workflow run test.yml --ref <branch>` runs the whole suite on a GitHub Windows VM. Read the results with `gh run view`. Ask for a run here only for what CI cannot give: the release bench, a measure, a by-hand check of the real desktop.
