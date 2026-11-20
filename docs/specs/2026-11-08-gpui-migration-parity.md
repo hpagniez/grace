@@ -128,13 +128,13 @@ Every `Scenario` of every spec in `docs/specs/` on `develop` at the go decision,
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| FL-01 | A test that flips with no change is marked flaky | | ☐ |
-| FL-02 | A fix in the project is not flaky | | ☐ |
-| FL-03 | Different environments are not compared | | ☐ |
-| FL-04 | The proof opens a run's report | | ☐ |
-| FL-05 | The mark stays on its test when the tree changes | | ☐ |
-| FL-06 | Marks survive a restart | | ☐ |
-| FL-07 | Clear history removes the marks | | ☐ |
+| FL-01 | A test that flips with no change is marked flaky | `grace-e2e/tests/flaky.rs::a_test_that_flips_with_no_change_is_marked_flaky` | ☑ |
+| FL-02 | A fix in the project is not flaky | `grace-e2e/tests/flaky.rs::a_fix_in_the_project_is_not_flaky` | ☑ |
+| FL-03 | Different environments are not compared | `grace-e2e/tests/flaky.rs::different_environments_are_not_compared`; `grace::flaky_proof::tests::puts_a_box_per_environment_the_one_in_force_first` | ☑ |
+| FL-04 | The proof opens a run's report | `grace-e2e/tests/flaky.rs::the_proof_opens_a_runs_report`; `grace::flaky_proof::tests::opens_a_runs_report_only_when_it_has_one_and_the_runner_is_idle` | ☑ |
+| FL-05 | The mark stays on its test when the tree changes | `grace-e2e/tests/flaky.rs::the_mark_stays_on_its_test_when_the_tree_changes` | ☑ |
+| FL-06 | Marks survive a restart | `grace-e2e/tests/flaky.rs::marks_survive_a_restart` | ☑ |
+| FL-07 | Clear history removes the marks | `grace-e2e/tests/flaky.rs::clear_history_removes_the_marks` | ☑ |
 | FL-08 | A file saved during a run does not count (unit) | `grace-core::runner::tests::fingerprint::a_file_saved_during_a_run_stores_no_fingerprint`, `different_walks_store_no_fingerprint` | ☑ |
 | FL-09 | Runs without a fingerprint prove nothing (unit) | `grace-core::flaky::tests::find_flaky::a_null_fingerprint_proves_nothing` | ☑ |
 
@@ -1403,7 +1403,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Examples.test.tsx` | 10 | view `Examples` (`grace::ui`), headless | ☐ |
 | `src/renderer/FieldMessage.test.tsx` | 2 | `grace::ui::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (5 runs with the `it.each` cases, all ported) | ☑ |
 | `src/renderer/FilterBar.test.tsx` | 21 | `grace::filter_bar::tests` (20; the dimming and hiding of rows are `grace_core::rows`' and `grace::tree`'s tests, the plain-data test has no IPC to cross) | ☑ |
-| `src/renderer/FlakyProof.test.tsx` | 8 | view `FlakyProof` (`grace::ui`), headless | ☐ |
+| `src/renderer/FlakyProof.test.tsx` | 8 | `grace::flaky_proof::tests` (8 headless Details checks) and `grace_core::flaky_proof::tests` | ☑ |
 | `src/renderer/History.test.tsx` | 30 | `grace_core::history_list::tests` (15) and `grace::history::tests` (15), test for test in [P3 plan, slice 5](../plans/2026-11-12-gpui-p3-panels.md#historytesttsx-30-tests-in-grace_corehistory_listtests-and-gracehistorytests); 3 by eye (Tailwind classes); Export's half of tests 16 and 18: `grace::history::tests::export` (slice 6) | ☑ |
 | `src/renderer/Home.test.tsx` | 26 | `grace::home::tests`, `grace::window::tests`, `grace::toolbar::tests`, `grace_core::state::tests` and `grace-e2e/tests/home.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (all 26 ported) | ☑ |
 | `src/renderer/HttpCalls.test.tsx` | 26 | `grace::http::tests` (23 tests: 20 for 21 Vitest tests, and 3 added), test for test in [P3 plan, slice 3](../plans/2026-11-12-gpui-p3-panels.md#httpcallstesttsx-26-in-gracehttptests); the list box and its options in `grace-e2e/tests/http.rs`; 3 by eye (Tailwind classes) | ☑ |

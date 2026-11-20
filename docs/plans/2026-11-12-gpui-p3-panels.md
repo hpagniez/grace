@@ -290,6 +290,8 @@ Spec: [flaky tests](../specs/2026-10-26-flaky-tests.md).
 1. `grace::flaky_proof` from `FlakyProof.tsx`, in Details: the runs that prove the mark, per environment, each opening its run's report through `run_report_path` and `open_path` (FL-04).
 2. `flaky.rs` in `grace-e2e/tests`: the seven tests on real runs, the mark's name read through the accessibility tree (`Tree.test.tsx` 28), marks after a restart (FL-06) and after Clear history (FL-07).
 
+What slice 8 built: `grace_core::flaky_proof` (`proof_boxes`: one box per environment, the one in force first, each run with its time, result, threads and whether its Report takes a press), `grace::flaky_proof` (the boxes, drawn by `Details` between the tags and the error, each run with a Report button that opens that run's report through `run_report_path` and `open_path`), and `flaky.rs` in `grace-e2e/tests` (seven tests, FL-01 to FL-07). FL-01 to FL-07 and the 8 tests of `FlakyProof.test.tsx` are ticked in the parity checklist with their proofs. No Redesigns row.
+
 ### Slice 9: the data-driven view
 
 Spec: [data-driven view](../specs/2026-11-03-data-driven-view.md).

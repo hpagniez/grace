@@ -1,0 +1,60 @@
+# Before and after screenshots of GPUI Grace for a pull request (docs/process/owner-machine.md: CI before the owner's
+# machine). Add the `screens` label to the PR: Linux under Xvfb runs the screens test named in each step of crates/grace-e2e/tests/screens.rs
+# on the PR's head and, with that same file, on its base. The PNGs are the run's artifact `screens`.
+name: screens
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  screens:
+    if: ${{ github.event.label.name == 'screens' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: after
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: before
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-x11-dev libxcb1-dev libfontconfig-dev libfreetype-dev xvfb at-spi2-core dbus mesa-vulkan-drivers xdotool imagemagick
+      - run: cd after && (rustup show active-toolchain || rustup toolchain install)
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: screens-${{ hashFiles('after/rust-toolchain.toml', 'after/Cargo.lock') }}
+          restore-keys: screens-
+      - run: |
+          cd after && node scripts/fetch-vendor.mjs --jar
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          # the base builds with the PR's screens.rs and the same vendor folder
+          cp -r vendor ../before/vendor
+          cp crates/grace-e2e/tests/screens.rs ../before/crates/grace-e2e/tests/screens.rs
+      - name: after
+        run: cd after && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/after" sh scripts/e2e-gpui.sh screens_flaky
+      - name: before
+        run: cd before && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/before" sh scripts/e2e-gpui.sh screens_flaky
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: screens
+          path: screens

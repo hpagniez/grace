@@ -660,3 +660,54 @@ fn screens_history() {
         .unwrap();
     shot(&app, "history-clear-dialog");
 }
+
+/// A flaky test selected: Details shows the proof (slice 8 of P3). The build before it shows the mark and no proof.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_flaky() {
+    use grace_e2e::history::{Seed, seed_runs};
+    let dir = project("flaky").unwrap();
+    let data = grace_e2e::fresh_data_dir().unwrap();
+    let tests = |coin: &str| {
+        json!([
+            { "kind": "scenario", "file": "tests/coin.feature", "refId": "[1:3]", "name": "coin", "line": 3,
+              "key": "s:tests/coin.feature#1", "status": coin },
+            { "kind": "scenario", "file": "tests/coin.feature", "refId": "[2:7]", "name": "steady", "line": 7,
+              "key": "s:tests/coin.feature#2", "status": "passed" },
+        ])
+    };
+    for (ago, coin, threads) in [(1, "failed", 2), (0, "passed", 1)] {
+        let record = json!({
+            "threads": threads, "fingerprint": "f".repeat(64),
+            "exitCode": if coin == "failed" { 1 } else { 0 }, "tests": tests(coin),
+        });
+        seed_runs(
+            &data,
+            &dir,
+            1,
+            &Seed {
+                report: true,
+                ago,
+                record,
+            },
+        );
+    }
+    std::fs::write(
+        data.join("settings.json"),
+        json!({ "lastProject": dir.to_string_lossy() }).to_string(),
+    )
+    .unwrap();
+    let app = App::launch_in(data, &[]).unwrap();
+    app.wait_for("the history", WAIT, |t| starting(t, "History (2)").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Expand coin.feature").unwrap();
+    let t = app.wait_for("coin", WAIT, |t| starting(t, "coin, ").is_some()).unwrap();
+    app.click(starting(&t, "coin, ").unwrap()).unwrap();
+    // the build before the proof has no group: the wait is allowed to fail
+    let _ = app.wait_for("the proof", Duration::from_secs(5), |t| {
+        t.all()
+            .iter()
+            .any(|n| n.name.starts_with("Flaky on") || n.name.starts_with("Flaky with"))
+    });
+    shot(&app, "flaky");
+}
