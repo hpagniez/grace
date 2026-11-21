@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use grace_e2e::{App, Node, Role, fresh_data_dir};
+use grace_e2e::{App, Key, Node, Role, fresh_data_dir};
 use serde_json::json;
 
 const WAIT: Duration = Duration::from_secs(30);
@@ -98,9 +98,30 @@ fn a_broken_karate_config_says_so_once_and_the_failures_step() {
         named(t, "1 of 3 tests failed with this error").is_some()
     })
     .unwrap();
-    app.press_named(Role::Button, "Previous test with this error").unwrap();
+    // the keyboard, which needs no button in view: Tab from the tree to Previous, then Enter. The focus stays on the
+    // button as the pane is drawn for the new test (R4.4), so a second Enter steps again
+    tab_to(&app, "Previous test with this error");
+    app.key(Key::Enter).unwrap();
     app.wait_for("the last test selected and shown", WAIT, |t| {
         row(t, "three").is_some_and(|r| r.states.selected) && named(t, "3 of 3 tests failed with this error").is_some()
     })
     .unwrap_or_else(|e| panic!("{e}: {}", app.tree().unwrap().dump()));
+    app.key(Key::Enter).unwrap();
+    app.wait_for("the one before it", WAIT, |t| {
+        row(t, "two").is_some_and(|r| r.states.selected) && named(t, "2 of 3 tests failed with this error").is_some()
+    })
+    .unwrap_or_else(|e| panic!("{e}: {}", app.tree().unwrap().dump()));
+}
+
+/// Tabs until the button named `name` has the focus, as a keyboard user reaches it.
+fn tab_to(app: &App, name: &str) {
+    for _ in 0..40 {
+        // the tree answers once its nodes settle after a key
+        let tree = app.wait_for("the tree", WAIT, |_| true).unwrap();
+        if tree.find(&Role::Button, name).is_some_and(|n| n.states.focused) {
+            return;
+        }
+        app.key(Key::Tab).unwrap();
+    }
+    panic!("{name:?} never had the focus:\n{}", app.focus_report());
 }
