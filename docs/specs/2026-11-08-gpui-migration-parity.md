@@ -820,23 +820,23 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | GF-03 | Karate's synthetic step shows without "undefined" | `grace-core::karate::steps::tests::extract_steps::shows_a_step_with_no_keyword_by_its_text_alone_229_r1_3` | ☑ |
 | GF-04 | Karate's synthetic step has no breakpoint dot | Waits for the step debugger, phase P4: the breakpoint dots are its | ☐ |
 | GF-05 | The reason is Karate's errorReason | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::sends_where_karates_reason_starts`; `grace-core::state::tests::reduce_karates_reason_229_r2_1::keeps_where_the_reason_starts_until_the_test_runs_again` | ☑ |
-| GF-06 | Two karate.fail calls at different lines share an error | Waits for the failure groups, slice 10 of the P3 plan (`grace-core::failures`) | ☐ |
-| GF-07 | A thrown string's position is left out | Waits for the failure groups, slice 10 of the P3 plan (`grace-core::failures`) | ☐ |
+| GF-06 | Two karate.fail calls at different lines share an error | `grace_core::failures::tests::failure_groups::groups_karate_fail_at_different_lines` | ☑ |
+| GF-07 | A thrown string's position is left out | `grace_core::failures::tests::failure_groups::groups_a_thrown_string_at_different_positions` | ☑ |
 | GF-08 | A config failure's reason is its whole error | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::fails_the_tests_whose_config_failed` (its reason starts at 0, the whole error) | ☑ |
-| GF-09 | Failures at different places with one message form a group | | ☐ |
-| GF-10 | A test hidden by the tag filter is left out | | ☐ |
-| GF-11 | No group while a run goes on | | ☐ |
-| GF-12 | Step through a group | | ☐ |
-| GF-13 | Stepping wraps round | | ☐ |
-| GF-14 | A lone failure has no stepping | | ☐ |
-| GF-15 | A folder lists its failures by error, largest first | | ☐ |
-| GF-16 | Go to first | | ☐ |
-| GF-17 | A folder without a group shows no list | | ☐ |
-| GF-18 | The banner names the config file and its line | | ☐ |
-| GF-19 | A config message with no line opens line 1 | | ☐ |
-| GF-20 | The banner goes when the next run starts | | ☐ |
-| GF-21 | No banner for ordinary failures | | ☐ |
-| GF-22 | A broken karate-config.js, end to end (e2e) | | ☐ |
+| GF-09 | Failures at different places with one message form a group | `grace_core::failures::tests::failure_groups::groups_failures_at_different_places_with_one_message` | ☑ |
+| GF-10 | A test hidden by the tag filter is left out | `grace_core::failures::tests::shown_leaves::keeps_only_the_matching_tests_under_hide_non_matching`; `grace::details::tests::failure_groups::leaves_out_a_test_the_tag_filter_hides` | ☑ |
+| GF-11 | No group while a run goes on | `grace::details::tests::failure_groups::shows_no_group_while_a_run_goes_on` (and the folder's list in `a_folder_lists_its_failures_by_error_largest_first`); the banner's in `grace::failures::tests::goes_while_a_run_goes_on` | ☑ |
+| GF-12 | Step through a group | `grace::details::tests::failure_groups::steps_through_a_group_and_keeps_the_focus_on_the_button`, `keeps_the_focus_on_the_pressed_button`; `grace-e2e/tests/failures.rs` | ☑ |
+| GF-13 | Stepping wraps round | `grace::details::tests::failure_groups::wraps_round_both_ways`; `grace_core::failures::tests::stepping::wraps_round_both_ways` | ☑ |
+| GF-14 | A lone failure has no stepping | `grace::details::tests::failure_groups::a_lone_failure_has_no_stepping` | ☑ |
+| GF-15 | A folder lists its failures by error, largest first | `grace::details::tests::failure_groups::a_folder_lists_its_failures_by_error_largest_first`; `grace_core::failures::tests::stepping::lists_the_largest_group_first_and_keeps_tree_order_among_equals` | ☑ |
+| GF-16 | Go to first | `grace::details::tests::failure_groups::go_to_first_selects_the_first_test_of_a_group_in_tree_order` (the focus does not go on to the test's heading, see Redesigns) | ☑ |
+| GF-17 | A folder without a group shows no list | `grace::details::tests::failure_groups::a_folder_without_a_group_shows_no_list` | ☑ |
+| GF-18 | The banner names the config file and its line | `grace::failures::tests::names_the_config_file_and_opens_it_at_its_line` | ☑ |
+| GF-19 | A config message with no line opens line 1 | `grace::failures::tests::opens_line_1_when_the_message_has_none`; `grace_core::failures::tests::config_failure::drops_classpath_and_opens_line_1_when_the_message_has_none` | ☑ |
+| GF-20 | The banner goes when the next run starts | `grace::failures::tests::goes_while_a_run_goes_on`, `counts_only_the_last_runs_failures` (a run's start empties `failed_keys`: `grace_core::state::tests`) | ☑ |
+| GF-21 | No banner for ordinary failures | `grace::failures::tests::shows_nothing_for_ordinary_failures` | ☑ |
+| GF-22 | A broken karate-config.js, end to end (e2e) | `grace-e2e/tests/failures.rs::a_broken_karate_config_says_so_once_and_the_failures_step` | ☑ |
 
 ### PD · Start from the project's pom
 
@@ -1039,7 +1039,7 @@ Phase P3 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-failures-01 | A broken karate-config.js, end to end (#229) | | ☐ |
+| E-failures-01 | A broken karate-config.js, end to end (#229) | `grace-e2e/tests/failures.rs::a_broken_karate_config_says_so_once_and_the_failures_step` | ☑ |
 
 ### e2e/flaky.spec.ts
 
@@ -1395,9 +1395,9 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
 | `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
 | `src/renderer/CallDetails.test.tsx` | 16 | `grace::http::call_details::tests` (12 tests: 10 for 12 Vitest tests, 2 added) and `grace_core::http_list::tests::call_text` (7 tests, the rules the view only draws), test for test in [P3 plan, slice 4](../plans/2026-11-12-gpui-p3-panels.md#calldetailstesttsx-16-in-gracehttpcall_detailstests); 2 `n/a` (a clipboard write that fails), 2 by eye (Tailwind classes) | ☑ |
-| `src/renderer/ConfigBanner.test.tsx` | 6 | view `ConfigBanner` (`grace::ui`), headless | ☐ |
+| `src/renderer/ConfigBanner.test.tsx` | 6 | `grace::failures::tests` (6 tests, one added) and `grace::window::tests::the_config_banner_sits_on_the_sheet_under_the_notice`, test for test in [P3 plan, slice 10](../plans/2026-11-12-gpui-p3-panels.md#configbannertesttsx-6-tests-in-gracefailurestests) | ☑ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 wait for P3, the failure groups, and 5 for P4, the steps before a run and breakpoints) | ☑ |
+| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 were the failure groups, ported in [P3 slice 10](../plans/2026-11-12-gpui-p3-panels.md#detailstesttsx-23-to-34-the-failure-groups-p2-left-for-this-slice-in-gracedetailstestsfailure_groups) (10 ported, 1 `n/a` for the focus), and 5 wait for P4, the steps before a run and breakpoints) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | `grace::examples::tests` and `grace_core::examples::tests`, test for test in [P3 plan, Slice 9](../plans/2026-11-12-gpui-p3-panels.md#slice-9-the-data-driven-view) | ☑ |
@@ -1427,7 +1427,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
 | `src/renderer/consoleFind.test.ts` | 9 | `grace::ui::consoleFind`: `grace-core::console_find::tests` | ☑ |
-| `src/renderer/failures.test.ts` | 10 | `grace::ui::failures` | ☐ |
+| `src/renderer/failures.test.ts` | 10 | `grace_core::failures::tests` (15 tests: the 10 Vitest tests and 5 added), test for test in [P3 plan, slice 10](../plans/2026-11-12-gpui-p3-panels.md#failurestestts-10-tests-in-grace_corefailurestests) | ☑ |
 | `src/renderer/http.test.ts` | 9 | `grace_core::http_list::tests` (12 tests: 8 Vitest tests and 4 added); 1 `n/a` (a `WeakMap`'s object identity), its intent in `grace::http::tests::rows_are_built_again_only_when_what_they_show_changes` | ☑ |
 | `src/renderer/importPlan.test.ts` | 6 | `grace-core::import_plan::tests` (6 tests) | ☑ |
 | `src/renderer/lastChecked.test.ts` | 4 | `grace::ui::lastChecked` | ☐ |
