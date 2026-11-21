@@ -272,7 +272,15 @@ impl Render for GraceWindow {
                 .map(|b| b.into_any_element())
                 .collect();
                 let toolbar = crate::toolbar::render(&grace, &state, boxes, window, cx).into_any_element();
-                project_view(self, toolbar, shown, window, cx).into_any_element()
+                project_view(
+                    self,
+                    toolbar,
+                    shown,
+                    crate::failures::banner(&grace, &state, cx),
+                    window,
+                    cx,
+                )
+                .into_any_element()
             };
             // the view cuts off at the status bar, so a short window never hides the bar
             div()
@@ -331,6 +339,7 @@ fn project_view(
     window: &GraceWindow,
     toolbar: gpui::AnyElement,
     shown: Option<gpui::AnyElement>,
+    config_failed: Option<gpui::AnyElement>,
     gpui_window: &Window,
     cx: &App,
 ) -> impl IntoElement {
@@ -373,6 +382,8 @@ fn project_view(
                 .bg(Theme::color(t.surface))
                 .children(progress)
                 .children(shown.map(|n| div().px_3().py_2().child(n)))
+                // #229 R6: under the notice
+                .children(config_failed.map(|n| div().px_3().py_2().child(n)))
                 // its chips change only with the tree, the filter or a run's start and end (#320); the bar is one
                 // line high, or nothing without tags
                 .children(filter_bar.map(|v| {
@@ -791,6 +802,42 @@ mod tests {
             );
         }
         assert!(vcx.debug_bounds("toolbar").unwrap().bottom() <= sheet.top());
+    }
+
+    /// `ConfigBanner.test.tsx` "sits under the notice" (#229 R6.1): the banner is on the sheet, under the notice.
+    #[gpui::test]
+    fn the_config_banner_sits_on_the_sheet_under_the_notice(cx: &mut TestAppContext) {
+        use grace_core::model::node::{Layout, Status};
+        let mut state = crate::testing::project("D:\\api", Layout::Maven, 2);
+        state.notice = Some(grace_core::state::NoticeView {
+            text: "Something to say".into(),
+            success: false,
+            build: false,
+        });
+        let key = "s:a.feature#1";
+        let key = state
+            .tree
+            .as_ref()
+            .and_then(|t| grace_core::rows::leaves(t).first().map(|l| l.key.clone()))
+            .unwrap_or_else(|| key.into());
+        state.statuses.insert(key.clone(), Status::Failed);
+        state.results.insert(
+            key.clone(),
+            grace_core::state::TestResult {
+                duration_millis: None,
+                error: Some("Config evaluation failed: karate-config.js - boom".into()),
+                reason_at: Some(0),
+            },
+        );
+        state.run.failed_keys.push(key);
+        let mut vcx = whole_window(cx, state);
+        let (notice, banner, sheet) = (
+            vcx.debug_bounds("notice").unwrap(),
+            vcx.debug_bounds("config-failure").expect("the banner"),
+            vcx.debug_bounds("sheet").unwrap(),
+        );
+        assert!(notice.bottom() <= banner.top(), "{notice:?} then {banner:?}");
+        assert!(sheet.contains(&banner.origin) && banner.bottom() <= sheet.bottom());
     }
 
     /// #320: the tree, the details and the console are cached views, laid out from their own root, as a window with

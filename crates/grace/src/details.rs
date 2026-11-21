@@ -376,6 +376,8 @@ impl Details {
                             .text_color(Theme::color(t.ink))
                             .children(self.error_text(&e)),
                     )
+                    // R4: where the test sits among those that failed with this error
+                    .children(crate::failures::stepper_for(&self.grace, state, &node.key, cx))
             });
         let steps = match state.steps.get(&node.key) {
             Some(steps) => self.steps(this, steps, cx).into_any_element(),
@@ -599,6 +601,8 @@ impl Details {
         .into_iter()
         // R2.1: an outline's rows as a table under its counts
         .chain((node.kind == NodeKind::Outline).then(|| self.examples.clone().into_any_element()))
+        // #229 R5: its failures that share an error
+        .chain(crate::failures::folder_list(&self.grace, state, node, cx))
         .collect()
     }
 }
