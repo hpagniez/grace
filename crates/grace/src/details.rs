@@ -533,7 +533,11 @@ impl Details {
                                     .flex_1()
                                     .min_w_0()
                                     .font_family(MONO)
-                                    .child(cut(("step-text", i), whole).side(crate::tooltip::Side::Over)),
+                                    // one line, as a browser showed a newline (R1.3): `cut` shapes a single line
+                                    .child(
+                                        cut(("step-text", i), whole.replace(char::is_control, " "))
+                                            .side(crate::tooltip::Side::Over),
+                                    ),
                             )
                             .child(
                                 div()

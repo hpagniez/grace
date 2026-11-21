@@ -222,6 +222,26 @@ fn cuts_a_reason_after_4_lines(cx: &mut TestAppContext) {
     assert!(height > px(3. * 19.5 + 18.), "{height:?}: 4 lines");
 }
 
+// R1.3: Karate's synthetic step for a failed config reads "Scenario execution failed: Config evaluation failed: <file> -
+// js failed:" and the lines of the JS failure under it. The step's line is one line, as a browser showed it: a
+// newline in it panicked the real window (`shape_line`), found by the e2e test
+#[gpui::test]
+fn shows_a_config_failures_multi_line_step_on_one_line(cx: &mut TestAppContext) {
+    let mut state = all_failed([SAME; 3]);
+    state.steps.insert(
+        OK.into(),
+        vec![step(
+            "Scenario execution failed: Config evaluation failed: karate-config.js - js failed:\n==========\n  Line: 2, Col: 2\n==========",
+            "failed",
+        )],
+    );
+    let (h, mut cx, _) = setup(cx, 800., state);
+    select(&h, &mut cx, OK);
+    cx.run_until_parked();
+    assert!(drawn(&mut cx, "step-text-0"));
+    assert!(at(&mut cx, "step-text-0").size.height < px(40.), "one line");
+}
+
 // GF-17
 #[gpui::test]
 fn a_folder_without_a_group_shows_no_list(cx: &mut TestAppContext) {
