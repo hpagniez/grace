@@ -23,6 +23,9 @@ pub const OPEN_IN_EDITOR: &str = "Open in VS Code";
 pub const PREVIOUS: &str = "Previous test with this error";
 pub const NEXT: &str = "Next test with this error";
 pub const SAME_ERROR: &str = "Failed with the same error";
+/// The lines of a group's reason the folder's list shows (R5.2), each 19.5 px in the mono face at 12 px.
+const REASON_LINES: usize = 4;
+const MONO_LINE: f32 = 19.5;
 
 /// The failures the tree shows, grouped by error, once a run has ended (R3.2): none while a run goes on, so nothing is
 /// worked out then.
@@ -193,7 +196,19 @@ pub fn folder_list(grace: &Entity<Grace>, state: &AppState, node: &TestNode, cx:
                     .bg(Theme::color(t.sunken))
                     .font_family(MONO)
                     .text_size(px(METRICS.text_xs.size))
-                    .child(div().text_ellipsis().line_clamp(4).child(reason)),
+                    .child(
+                        // `line_clamp` panics on text with a newline in a real window (GPUI shapes a clipped line
+                        // as one line), so the first 4 lines are a div each and the box cuts what wraps past 4
+                        div()
+                            .max_h(px(REASON_LINES as f32 * MONO_LINE))
+                            .overflow_hidden()
+                            .children(
+                                reason
+                                    .lines()
+                                    .take(REASON_LINES)
+                                    .map(|l| div().min_h(px(MONO_LINE)).child(l.to_string())),
+                            ),
+                    ),
             )
     });
     Some(
