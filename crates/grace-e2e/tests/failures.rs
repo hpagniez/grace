@@ -65,7 +65,10 @@ fn says(tree: &Node, text: &str) -> bool {
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn a_broken_karate_config_says_so_once_and_the_failures_step() {
     let dir = broken_config_project();
-    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    // the least bottom panel: the banner takes a third of the pane, and a press clicks the centre of a button, which
+    // the Details pane must show (plan P3, Redesigns, `grace-e2e` (failures))
+    let app =
+        App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 96 }), &[]).unwrap();
     app.wait_for("the tests found", WAIT, |t| named(t, "3 tests · Not run yet").is_some())
         .unwrap();
     app.press_named(Role::Button, "Run all").unwrap();
