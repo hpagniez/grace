@@ -740,3 +740,34 @@ fn screens_examples() {
     });
     shot(&app, "examples");
 }
+
+/// A run that failed on a broken `karate-config.js`, with the first failed test selected: the banner that says so once
+/// and the stepper under the test's error (slice 10 of P3). The build before shows each test's error and nothing more.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_failures() {
+    let dir = grace_e2e::fresh_data_dir().unwrap();
+    let write = |file: &str, text: &str| std::fs::write(dir.join(file), text).unwrap();
+    write(
+        "karate-config.js",
+        "function fn() {\n  karate.fail('no vpn');\n  return {};\n}\n",
+    );
+    write(
+        "a.feature",
+        "Feature: a\n\nScenario: one\n* print 'x'\n\nScenario: two\n* print 'x'\n",
+    );
+    write("b.feature", "Feature: b\n\nScenario: three\n* print 'x'\n");
+    let app = open(&dir, false);
+    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
+        .unwrap();
+    app.press_named(Role::Button, "Run all").unwrap();
+    let t = app
+        .wait_for("the run finished", RUN, |t| starting(t, "one, failed").is_some())
+        .unwrap();
+    app.click(starting(&t, "one, failed").unwrap()).unwrap();
+    // the build before has no banner and no stepper: the wait is allowed to fail
+    let _ = app.wait_for("the banner", Duration::from_secs(5), |t| {
+        t.all().iter().any(|n| n.name == "karate-config.js failed for 3 tests")
+    });
+    shot(&app, "failures");
+}
