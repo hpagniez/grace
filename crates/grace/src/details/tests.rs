@@ -144,6 +144,8 @@ fn hover(h: &Harness, cx: &mut VisualTestContext, id: &str) -> Option<SharedStri
     tip
 }
 
+mod failure_groups;
+
 mod a_test {
     use super::*;
 

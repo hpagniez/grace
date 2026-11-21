@@ -390,6 +390,12 @@ impl Grace {
         cx.notify();
     }
 
+    /// Selects a test the tree may not show: the tree opens the rows above it and scrolls to it (#229 R4.3).
+    pub fn reveal(&mut self, key: &str, cx: &mut Context<Self>) {
+        self.state_mut().reveal(key);
+        cx.notify();
+    }
+
     /// The bottom panel's tab.
     pub fn show_panel(&mut self, panel: grace_core::state::Panel, cx: &mut Context<Self>) {
         if self.state.panel != panel {

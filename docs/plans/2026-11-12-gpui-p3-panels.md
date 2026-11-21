@@ -328,6 +328,56 @@ Spec: [group failures](../specs/2026-11-04-group-failures.md).
 3. `grace::failures`' banner from `ConfigBanner.tsx`: the config file and its line, opened through slice 2's editor call, line 1 when the message has none (GF-18, GF-19); gone when the next run starts (GF-20); none for ordinary failures (GF-21).
 4. `failures.rs` in `grace-e2e/tests` (GF-22).
 
+What slice 10 built: `grace_core::failures` (`reason_of`, `same_error`, `shown_leaves`, `failure_groups`, `largest_first`, `group_of`, `step`, `config_failure`), `grace::failures` (the banner, the stepper and the folder's list, which only draw what the core worked out), `Grace::reveal` (the store's `reveal`, which the tree already scrolls to), the banner's place under the notice in `window::project_view`, `failures.rs` in `grace-e2e/tests` (E-failures-01, GF-22) and `screens_failures`. GF-06 to GF-22 and the 16 tests of `failures.test.ts` and `ConfigBanner.test.tsx` are ticked in the parity checklist with their proofs. `regex`, which `grace-core` already has, finds a JS failure's position. A config failure's synthetic step has newlines in its text (R1.3), which `cut` could not shape and panicked the window on: a step's line is one line (`shows_a_config_failures_multi_line_step_on_one_line`). The tests, test for test:
+
+#### `failures.test.ts` (10 tests) in `grace_core::failures::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. reasonOf: the error from where Karate's reason starts, or the whole error | ported | `reason_of::is_the_error_from_where_karates_reason_starts_or_the_whole_error` |
+| 2. groups failures at different places with one message | ported | `failure_groups::groups_failures_at_different_places_with_one_message` |
+| 3. leaves out a failed test with no error, and a test that did not fail | ported | `failure_groups::leaves_out_a_failed_test_with_no_error_and_a_test_that_did_not_fail` |
+| 4. groups karate.fail at different lines | ported | `failure_groups::groups_karate_fail_at_different_lines` |
+| 5. groups a thrown string at different positions | ported | `failure_groups::groups_a_thrown_string_at_different_positions` |
+| 6. orders groups by their first test, each in tree order | ported | `failure_groups::orders_groups_by_their_first_test_each_in_tree_order` |
+| 7. shownLeaves keeps only the matching tests under Hide non-matching | ported | `shown_leaves::keeps_only_the_matching_tests_under_hide_non_matching` |
+| 8. configFailure names the file, its line, the first reason and the count | ported | `config_failure::names_the_file_its_line_the_first_reason_and_the_count` |
+| 9. drops classpath: and opens line 1 when the message has none | ported | `config_failure::drops_classpath_and_opens_line_1_when_the_message_has_none` |
+| 10. counts only the given failed keys, and is null without a config reason | ported | `config_failure::counts_only_the_given_failed_keys_and_is_none_without_a_config_reason` |
+
+Added: `reason_of::counts_utf16_units_as_javascript_does` (`reason_at` is a count of UTF-16 units, as the runner sends it), `failure_groups::does_not_merge_errors_that_differ_in_a_value`, and `stepping::*` (`group_of`, `step` wrapping round, `largest_first` keeping tree order among equals), which Electron Grace had in `Details.tsx`.
+
+#### `ConfigBanner.test.tsx` (6 tests) in `grace::failures::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. names the file and its line | ported | `names_the_config_file_and_opens_it_at_its_line` |
+| 2. opens line 1 when the message has none | ported | `opens_line_1_when_the_message_has_none` |
+| 3. goes when the next run starts | ported | `goes_while_a_run_goes_on` (a run's start empties the last run's failed tests, `grace_core::state::tests`) |
+| 4. counts only the last run's failures | ported | `counts_only_the_last_runs_failures` |
+| 5. shows nothing for ordinary failures | ported | `shows_nothing_for_ordinary_failures` |
+| 6. sits under the notice | ported | `grace::window::tests::the_config_banner_sits_on_the_sheet_under_the_notice` |
+
+Added: `says_the_count_in_the_singular_and_the_plural`.
+
+#### `Details.test.tsx` 23 to 34, the failure groups P2 left for this slice, in `grace::details::tests::failure_groups`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 23. says where the test sits in its group | ported | `steps_through_a_group_and_keeps_the_focus_on_the_button` (the count is drawn; its words are `grace-e2e/tests/failures.rs`'s) |
+| 24. Next selects the next test, keeps the focus | ported | `steps_through_a_group_and_keeps_the_focus_on_the_button`, `keeps_the_focus_on_the_pressed_button` (the focus moved with the keyboard, which presses a Kit button with a key down and up) |
+| 25. announces where the selected test sits | ported | The count is a `Status` node in a polite live region (`a11y::live`); `grace-e2e/tests/failures.rs` reads its words. The announcement itself by ear, in slice 11 |
+| 26. Previous wraps round | ported | `wraps_round_both_ways`, `grace_core::failures::tests::stepping::wraps_round_both_ways` |
+| 27. a lone failure has no stepping | ported | `a_lone_failure_has_no_stepping` |
+| 28. no stepping while a run goes on | ported | `shows_no_group_while_a_run_goes_on` |
+| 30. lists the folder's groups, largest first | ported | `a_folder_lists_its_failures_by_error_largest_first` |
+| 31. Go to first selects the group's first test | ported | `go_to_first_selects_the_first_test_of_a_group_in_tree_order` |
+| 32. Go to first moves the focus to the test's heading | `n/a` for the focus | The heading takes no focus, as in slice 9 (Redesigns, `examples` (focus)): the test is selected and shown, and the tree scrolls to it |
+| 33. cuts a reason after 4 lines | ported | `cuts_a_reason_after_4_lines` (the first 4 lines in a box of 4 lines) |
+| 34. no list without a group | ported | `a_folder_without_a_group_shows_no_list` |
+
+Added: `leaves_out_a_test_the_tag_filter_hides` (GF-10, R3.1).
+
 ### Slice 11: the exit check
 
 1. The regressions of P3, each with its test:
@@ -375,6 +425,10 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 | `trends` (columns) | A column is a button made of a `div` with its own focus handle, kept by the run's id, and the focus ring of `elements::ring`; Enter and Space press it as a click does. Its tooltip is `grace::tooltip`'s, below the column, shown too while the keyboard stands on it. The sizes are in px, not Tailwind's `rem`: 12 px bars, 4 px of air, rows of 24 px. The numbers in the labels are in the sans face, not tabular (a fixed 144 px column keeps them from moving anything) | `Tooltip` has no "above"; a `Button` of GPUI Kit pads and sizes its content, which a 12 px bar cannot take | `grace::trends::tests::a_click_shows_the_runs_row`, `a_tooltip_names_the_run_a_column_stands_for`, `is_88_px_tall` |
 | `examples` (focus) | After Enter on a line the focus is not moved to the opened row's heading, which Electron Grace did (`Examples.test.tsx` 5): the heading is not focusable in `Details`, and the window's root takes the focus. The table is one tab stop and its arrow keys move without opening, as in Electron Grace | A `div` heading takes no focus; making it one is a change to Details for every test, not this slice's. For the owner to accept or ask for in a later slice | `grace::examples::tests::the_arrow_keys_move_without_opening_and_enter_opens` |
 | `grace-e2e` (examples) | E-examples-01's click is on the second line's option, which a UI Automation press clicks at its centre. DD-04's keys are the headless view test: the driver can only focus a list by clicking a row, which opens it. DD-06 and DD-07 are headless (a project of 10,000 rows runs Karate thousands of times, which the e2e rules forbid) | The driver has no focus call; AGENTS.md's Karate-during-e2e rule | `grace::examples::tests` |
+| `failures` (focus) | After Go to first the focus is not moved to the opened test's heading, which Electron Grace did (`Details.test.tsx` 32): the heading is not focusable in `Details`. Next and Previous keep the focus on the pressed button, as asked (R4.4); a click on a Kit button does not focus it, so a mouse press leaves the focus where it was and the keyboard's Enter steps again | A `div` heading takes no focus (the `examples` (focus) row); Kit's `Button` stops the mouse down's default | `grace::details::tests::failure_groups::keeps_the_focus_on_the_pressed_button`, `go_to_first_selects_the_first_test_of_a_group_in_tree_order` |
+| `failures` (reasons) | A reason shows its first 4 lines, one div each in an unpadded box of 4 lines inside the padded one, with no ellipsis after the 4th (GPUI's `line_clamp` panics on text with a newline in a real window, found by the screenshots run), and the banner's reason scrolls past 240 px, as Electron Grace's `max-h-60` did (R6.3 says 15 lines of 16 px); a line of GPUI's mono face is 19.5 px, so that is 12 lines and a cut reason is 4 of them | `line_clamp` cuts nothing alone and panics on a newline with `text_ellipsis`; the 240 px is what Electron Grace drew | `grace::details::tests::failure_groups::cuts_a_reason_after_4_lines` |
+| `failures` (groups) | The groups are worked out each time the pane is drawn while no run goes on, from the tree, the filter and the results: no memo, as the P2 Redesigns `details` row. An idle window draws nothing, so none runs then (a `shortcut:` comment) | GPUI draws the view again on a change; Solid needed a memo | `grace::details::tests::failure_groups::shows_no_group_while_a_run_goes_on` |
+| `grace-e2e` (failures) | E-failures-01 starts with the bottom panel at its least height (96 px): the banner and a config error of six lines leave the Details pane too short for a press at the centre of Previous, which a pane that has scrolled it out of view does not take | The driver has no scroll; the banner is as Electron Grace drew it (R6) | `grace-e2e/tests/failures.rs` |
 | `grace-e2e` (trends) | `trends.rs` keeps its own few helpers (`wait_ready`, `show_history`, `open`) where `history.rs` has its copies: a test file cannot reach another's, and moving them would change `history.rs`, which draft PR #386 also edits. E-trends-02 reads where the oldest run's row sits against the tab bar and the status bar, since the tree has no viewport of its own | The tests are separate binaries | `grace-e2e/tests/trends.rs` |
 
 ## Traps
