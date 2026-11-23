@@ -115,13 +115,21 @@ fn a_broken_karate_config_says_so_once_and_the_failures_step() {
 
 /// Tabs until the button named `name` has the focus, as a keyboard user reaches it.
 fn tab_to(app: &App, name: &str) {
+    let focus = |t: &Node| {
+        t.all()
+            .into_iter()
+            .find(|n| n.states.focused)
+            .map(|n| format!("{:?} {}", n.role, n.name))
+    };
     for _ in 0..40 {
-        // the tree answers once its nodes settle after a key
-        let tree = app.wait_for("the tree", WAIT, |_| true).unwrap();
+        let tree = app.tree().unwrap();
         if tree.find(&Role::Button, name).is_some_and(|n| n.states.focused) {
             return;
         }
+        let was = focus(&tree);
         app.key(Key::Tab).unwrap();
+        // a read right after the key can still show the old focus, and a second Tab would then pass the button
+        let _ = app.wait_for("the focus to move", Duration::from_secs(2), |t| focus(t) != was);
     }
     panic!("{name:?} never had the focus:\n{}", app.focus_report());
 }
