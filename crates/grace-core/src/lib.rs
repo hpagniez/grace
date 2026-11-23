@@ -6,6 +6,7 @@ pub mod batch;
 pub mod console_find;
 pub mod editor;
 pub mod examples;
+pub mod failures;
 pub mod fingerprint;
 pub mod flaky;
 pub mod flaky_proof;

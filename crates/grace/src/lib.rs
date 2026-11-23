@@ -12,6 +12,7 @@ pub mod e2e;
 pub mod elements;
 pub mod env_picker;
 pub mod examples;
+pub mod failures;
 pub mod filter_bar;
 pub mod flaky_proof;
 pub mod history;
