@@ -21,6 +21,7 @@
     "bench:gpui": "node scripts/package-gpui.mjs --no-zip && node --no-warnings bench/bench.mjs --b out/gpui/Grace-win32-x64/Grace.exe",
     "e2e": "npm run package && npx electron --version && playwright test",
     "screens": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts screens.shots",
+    "screens:p3": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts p3.shots",
     "screens:readme": "npm run package && npx electron --version && playwright test --config playwright.screens.config.ts readme.shots",
     "vendor": "node scripts/fetch-vendor.mjs",
     "vendor:bump": "node scripts/bump-vendor.mjs",

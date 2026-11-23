@@ -1031,7 +1031,7 @@ Phase P3 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-examples-01 | An outline's Examples as a table | | ☐ |
+| E-examples-01 | An outline's Examples as a table | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table` | ☑ |
 
 ### e2e/failures.spec.ts
 
@@ -1047,13 +1047,13 @@ Phase P3 · 7 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-flaky-01 | A test that flips with no change is marked flaky | | ☐ |
-| E-flaky-02 | A fix in the project is not flaky | | ☐ |
-| E-flaky-03 | Different environments are not compared | | ☐ |
-| E-flaky-04 | The proof opens a run's report | | ☐ |
-| E-flaky-05 | The mark stays on its test when the tree changes | | ☐ |
-| E-flaky-06 | Marks survive a restart | | ☐ |
-| E-flaky-07 | Clear history removes the marks | | ☐ |
+| E-flaky-01 | A test that flips with no change is marked flaky | `grace-e2e/tests/flaky.rs::a_test_that_flips_with_no_change_is_marked_flaky` | ☑ |
+| E-flaky-02 | A fix in the project is not flaky | `grace-e2e/tests/flaky.rs::a_fix_in_the_project_is_not_flaky` | ☑ |
+| E-flaky-03 | Different environments are not compared | `grace-e2e/tests/flaky.rs::different_environments_are_not_compared` | ☑ |
+| E-flaky-04 | The proof opens a run's report | `grace-e2e/tests/flaky.rs::the_proof_opens_a_runs_report` | ☑ |
+| E-flaky-05 | The mark stays on its test when the tree changes | `grace-e2e/tests/flaky.rs::the_mark_stays_on_its_test_when_the_tree_changes` | ☑ |
+| E-flaky-06 | Marks survive a restart | `grace-e2e/tests/flaky.rs::marks_survive_a_restart` | ☑ |
+| E-flaky-07 | Clear history removes the marks | `grace-e2e/tests/flaky.rs::clear_history_removes_the_marks` | ☑ |
 
 ### e2e/history.spec.ts
 
