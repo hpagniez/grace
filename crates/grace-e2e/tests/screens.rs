@@ -80,6 +80,19 @@ $bmp.Save($args[0], [System.Drawing.Imaging.ImageFormat]::Png)
     assert!(ok.success());
 }
 
+/// `name`, or `name-dark` for the dark look.
+fn themed(name: &str, dark: bool) -> String {
+    if dark { format!("{name}-dark") } else { name.to_string() }
+}
+
+/// `settings` with the dark look in it when `dark`.
+fn look(mut settings: serde_json::Value, dark: bool) -> serde_json::Value {
+    if dark {
+        settings["appearance"] = json!({ "theme": "dark" });
+    }
+    settings
+}
+
 fn starting<'a>(tree: &'a Node, start: &str) -> Option<&'a Node> {
     tree.all().into_iter().find(|n| n.name.starts_with(start))
 }
@@ -200,8 +213,17 @@ fn screens_panel_resized() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_http() {
+    for dark in [false, true] {
+        http(dark);
+    }
+}
+
+fn http(dark: bool) {
     let dir = project("http").unwrap();
-    let settings = json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 400 });
+    let settings = look(
+        json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 400 }),
+        dark,
+    );
     let app = App::launch_with_settings(&settings, &[]).unwrap();
     app.wait_for("the tests found", WAIT, |t| starting(t, "tests ").is_some())
         .unwrap();
@@ -216,7 +238,7 @@ fn screens_http() {
     app.press(&tab(&t).unwrap()).unwrap();
     app.wait_for("the HTTP tab", WAIT, |t| tab(t).is_some_and(|n| n.states.selected))
         .unwrap();
-    shot(&app, "http-after-a-run");
+    shot(&app, &themed("http-after-a-run", dark));
     let t = app.tree().unwrap();
     let retry = t
         .all()
@@ -231,7 +253,7 @@ fn screens_http() {
             .any(|n| n.role == Role::TreeItem && n.name.starts_with("retry, ") && n.states.selected)
     })
     .unwrap();
-    shot(&app, "http-narrowed");
+    shot(&app, &themed("http-narrowed", dark));
     app.click(
         &t.all()
             .into_iter()
@@ -245,7 +267,7 @@ fn screens_http() {
     }
     app.wait_for("six calls", WAIT, |t| tab(t).is_some_and(|n| n.name == "HTTP (6)"))
         .unwrap();
-    shot(&app, "http-went-wrong");
+    shot(&app, &themed("http-went-wrong", dark));
     // a call opened: its details in place of the test's (before this slice the pane keeps the test)
     let t = app.tree().unwrap();
     let call = t
@@ -261,7 +283,7 @@ fn screens_http() {
             .any(|n| n.role == Role::ListItem && n.name.starts_with("500, ") && n.states.selected)
     })
     .unwrap();
-    shot(&app, "http-call-selected");
+    shot(&app, &themed("http-call-selected", dark));
 }
 
 #[test]
@@ -552,8 +574,14 @@ fn screens_narrow_toolbar() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_open_in_vs_code() {
+    for dark in [false, true] {
+        open_in_vs_code(dark);
+    }
+}
+
+fn open_in_vs_code(dark: bool) {
     let dir = project("clean").unwrap();
-    let app = open(&dir, false);
+    let app = open(&dir, dark);
     app.press_named(Role::Button, "Expand basic.feature").unwrap();
     run_all(&app);
     let tree = app.tree().unwrap();
@@ -561,13 +589,13 @@ fn screens_open_in_vs_code() {
     app.click(&row).unwrap();
     app.wait_for("the details", WAIT, |t| starting(t, "tests/basic.feature:15").is_some())
         .unwrap();
-    shot(&app, "details-open-in-vs-code");
+    shot(&app, &themed("details-open-in-vs-code", dark));
     // the build before this change has no menu: the wait is allowed to fail, and the shot shows the tree as it is
     app.right_click(&row).unwrap();
     let _ = app.wait_for("the menu", Duration::from_secs(3), |t| {
         t.all().into_iter().any(|n| n.role == Role::MenuItem)
     });
-    shot(&app, "tree-row-menu");
+    shot(&app, &themed("tree-row-menu", dark));
 }
 
 /// The History tab with runs of every kind: a failed one, a cancelled one on an environment with tags, a scenario's, a
@@ -575,6 +603,12 @@ fn screens_open_in_vs_code() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_history() {
+    for dark in [false, true] {
+        history(dark);
+    }
+}
+
+fn history(dark: bool) {
     use grace_e2e::history::{Seed, seed_runs};
     let dir = project("clean").unwrap();
     let data = grace_e2e::fresh_data_dir().unwrap();
@@ -605,7 +639,11 @@ fn screens_history() {
     seed(0, json!({}));
     std::fs::write(
         data.join("settings.json"),
-        json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 340 }).to_string(),
+        look(
+            json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 340 }),
+            dark,
+        )
+        .to_string(),
     )
     .unwrap();
     let app = App::launch_in(data, &[]).unwrap();
@@ -628,7 +666,7 @@ fn screens_history() {
             .is_some_and(|l| l.all().iter().filter(|n| n.role == Role::ListItem).count() == 5)
     })
     .unwrap();
-    shot(&app, "history-tab");
+    shot(&app, &themed("history-tab", dark));
     // the window at its least width (a smaller size is refused): the row's buttons as icons, a name in a tooltip
     // (#385). The build before that change has no icons: the waits may fail, and the shots show the rows as they are
     let row_button = |t: &Node| {
@@ -647,24 +685,30 @@ fn screens_history() {
     let _ = app.wait_for("the narrow rows", narrow, |t| {
         row_button(t).and_then(|b| b.rect).is_some_and(|r| r.width < 40)
     });
-    shot(&app, "history-narrow");
+    shot(&app, &themed("history-narrow", dark));
     app.hover(&row_button(&app.tree().unwrap()).unwrap()).unwrap();
     let _ = app.wait_for("the tooltip", narrow, |t| {
         t.all().iter().any(|n| n.role == Role::Tooltip)
     });
-    shot(&app, "history-narrow-tooltip");
+    shot(&app, &themed("history-narrow-tooltip", dark));
     app.set_window_rect(at.x, at.y, at.width, at.height).unwrap();
     let t = app.tree().unwrap();
     app.click(t.find(&Role::Button, "Clear history").unwrap()).unwrap();
     app.wait_for("the dialog", WAIT, |t| t.all().iter().any(|n| n.role == Role::Dialog))
         .unwrap();
-    shot(&app, "history-clear-dialog");
+    shot(&app, &themed("history-clear-dialog", dark));
 }
 
 /// A flaky test selected: Details shows the proof (slice 8 of P3). The build before it shows the mark and no proof.
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_flaky() {
+    for dark in [false, true] {
+        flaky(dark);
+    }
+}
+
+fn flaky(dark: bool) {
     use grace_e2e::history::{Seed, seed_runs};
     let dir = project("flaky").unwrap();
     let data = grace_e2e::fresh_data_dir().unwrap();
@@ -694,7 +738,7 @@ fn screens_flaky() {
     }
     std::fs::write(
         data.join("settings.json"),
-        json!({ "lastProject": dir.to_string_lossy() }).to_string(),
+        look(json!({ "lastProject": dir.to_string_lossy() }), dark).to_string(),
     )
     .unwrap();
     let app = App::launch_in(data, &[]).unwrap();
@@ -709,7 +753,7 @@ fn screens_flaky() {
             .iter()
             .any(|n| n.name.starts_with("Flaky on") || n.name.starts_with("Flaky with"))
     });
-    shot(&app, "flaky");
+    shot(&app, &themed("flaky", dark));
 }
 
 /// An outline selected after a run: Details shows its Examples as a table (slice 9 of P3). The build before it shows
@@ -717,8 +761,17 @@ fn screens_flaky() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_examples() {
+    for dark in [false, true] {
+        examples(dark);
+    }
+}
+
+fn examples(dark: bool) {
     let app = App::launch_with_settings(
-        &json!({ "lastProject": project("clean").unwrap().to_string_lossy() }),
+        &look(
+            json!({ "lastProject": project("clean").unwrap().to_string_lossy() }),
+            dark,
+        ),
         &[],
     )
     .unwrap();
@@ -738,7 +791,7 @@ fn screens_examples() {
     let _ = app.wait_for("the table", Duration::from_secs(5), |t| {
         t.all().iter().any(|n| n.name.starts_with("Row 1: "))
     });
-    shot(&app, "examples");
+    shot(&app, &themed("examples", dark));
 }
 
 /// A run that failed on a broken `karate-config.js`, with the first failed test selected: the banner that says so once
@@ -746,18 +799,51 @@ fn screens_examples() {
 #[test]
 #[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
 fn screens_failures() {
+    for dark in [false, true] {
+        failures(dark);
+    }
+}
+
+fn failures(dark: bool) {
     let dir = grace_e2e::fresh_data_dir().unwrap();
     let write = |file: &str, text: &str| std::fs::write(dir.join(file), text).unwrap();
     write(
         "karate-config.js",
-        "function fn() {\n  karate.fail('no vpn');\n  return {};\n}\n",
+        "function fn() {
+  karate.fail('no vpn');
+  return {};
+}
+",
     );
     write(
         "a.feature",
-        "Feature: a\n\nScenario: one\n* print 'x'\n\nScenario: two\n* print 'x'\n",
+        "Feature: a
+
+Scenario: one
+* print 'x'
+
+Scenario: two
+* print 'x'
+",
     );
-    write("b.feature", "Feature: b\n\nScenario: three\n* print 'x'\n");
-    let app = open(&dir, false);
+    std::fs::create_dir(dir.join("suite")).unwrap();
+    write(
+        "suite/b.feature",
+        "Feature: b
+
+Scenario: three
+* print 'x'
+
+Scenario: four
+* print 'x'
+",
+    );
+    // a tall panel: the banner, the error and the stepper show whole, which the window of slice 10's shot cut off
+    let settings = look(
+        json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 560 }),
+        dark,
+    );
+    let app = App::launch_with_settings(&settings, &[]).unwrap();
     app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
         .unwrap();
     app.press_named(Role::Button, "Run all").unwrap();
@@ -767,7 +853,16 @@ fn screens_failures() {
     app.click(starting(&t, "one, failed").unwrap()).unwrap();
     // the build before has no banner and no stepper: the wait is allowed to fail
     let _ = app.wait_for("the banner", Duration::from_secs(5), |t| {
-        t.all().iter().any(|n| n.name == "karate-config.js failed for 3 tests")
+        t.all().iter().any(|n| n.name == "karate-config.js failed for 4 tests")
     });
-    shot(&app, "failures");
+    shot(&app, &themed("failures", dark));
+    // a folder: its failures grouped by error, with the reason and the tests that share it
+    let t = app.tree().unwrap();
+    if let Some(folder) = starting(&t, "suite, ") {
+        app.click(folder).unwrap();
+        let _ = app.wait_for("the folder's list", Duration::from_secs(5), |t| {
+            t.all().iter().any(|n| n.name == "Failed with the same error")
+        });
+    }
+    shot(&app, &themed("failures-folder", dark));
 }
