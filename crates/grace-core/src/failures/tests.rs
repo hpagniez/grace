@@ -298,6 +298,13 @@ mod config_failure {
         );
     }
 
+    // as `/Line: (\d+)/` reads it in failures.ts
+    #[test]
+    fn reads_the_first_line_that_is_a_number() {
+        let reason = "Config evaluation failed: karate-config.js - Line: n/a\n  Line: 4, Col: 2";
+        assert_eq!(run(&["a"], &[("a", reason, None)]).unwrap().line, 4);
+    }
+
     #[test]
     fn counts_only_the_given_failed_keys_and_is_none_without_a_config_reason() {
         let results = [("a", REASON, None), ("b", REASON, None), ("c", "boom", None)];

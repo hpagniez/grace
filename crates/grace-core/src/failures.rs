@@ -1,6 +1,6 @@
 //! `failures.ts`: failed tests that share an error, and a failed karate-config.js (docs/specs/
 //! 2026-11-04-group-failures.md R2, R3, R6). `grace::failures` and `grace::details` only draw them.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 use regex::Regex;
@@ -122,10 +122,12 @@ pub fn config_failure(
     failed_keys: &[String],
     results: &HashMap<String, TestResult>,
 ) -> Option<ConfigFailure> {
+    // a set: a run of 10,000 failed tests is looked up for each of them, at every draw of the window
+    let failed: HashSet<&str> = failed_keys.iter().map(String::as_str).collect();
     let mut first: Option<&str> = None;
     let mut count = 0;
     for t in tests {
-        if !failed_keys.contains(&t.key) {
+        if !failed.contains(t.key.as_str()) {
             continue;
         }
         let Some(reason) = reason_of(results.get(&t.key)).filter(|r| r.starts_with(CONFIG)) else {
@@ -137,10 +139,11 @@ pub fn config_failure(
     let first = first?;
     let head = first[CONFIG.len()..].lines().next().unwrap_or_default();
     let file = head.split_once(" - ").map_or(head, |(file, _)| file);
-    let line = first
-        .split_once("Line: ")
-        .map(|(_, rest)| rest.chars().take_while(char::is_ascii_digit).collect::<String>())
-        .and_then(|n| n.parse().ok())
+    static LINE: OnceLock<Regex> = OnceLock::new();
+    let line = LINE
+        .get_or_init(|| Regex::new("Line: ([0-9]+)").unwrap())
+        .captures(first)
+        .and_then(|c| c[1].parse().ok())
         .unwrap_or(1);
     Some(ConfigFailure {
         file: file.strip_prefix("classpath:").unwrap_or(file).to_string(),
