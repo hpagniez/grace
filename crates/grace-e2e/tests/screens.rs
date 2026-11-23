@@ -848,9 +848,9 @@ Scenario: four
         .unwrap();
     app.press_named(Role::Button, "Run all").unwrap();
     let t = app
-        .wait_for("the run finished", RUN, |t| starting(t, "one, failed").is_some())
+        .wait_for("the run finished", RUN, |t| starting(t, "three, failed").is_some())
         .unwrap();
-    app.click(starting(&t, "one, failed").unwrap()).unwrap();
+    app.click(starting(&t, "three, failed").unwrap()).unwrap();
     // the build before has no banner and no stepper: the wait is allowed to fail
     let _ = app.wait_for("the banner", Duration::from_secs(5), |t| {
         t.all().iter().any(|n| n.name == "karate-config.js failed for 4 tests")
