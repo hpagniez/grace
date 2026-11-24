@@ -1,8 +1,8 @@
 diff --git a/src/events.rs b/src/events.rs
-index 4dd0c38..e00720b 100644
+index d308bfa..9f30675 100644
 --- a/src/events.rs
 +++ b/src/events.rs
-@@ -1285,6 +1285,9 @@ impl WindowsWindowInner {
+@@ -1293,6 +1293,9 @@ impl WindowsWindowInner {
      // update completes, as activation does. The state is read at delivery so
      // a burst of messages collapses to the final value.
      fn report_visibility(self: &Rc<Self>) {
@@ -13,7 +13,7 @@ index 4dd0c38..e00720b 100644
              return;
          }
 diff --git a/src/platform.rs b/src/platform.rs
-index 4cf4b6b..03c39e7 100644
+index b03e414..bacfc00 100644
 --- a/src/platform.rs
 +++ b/src/platform.rs
 @@ -422,6 +422,7 @@ impl WindowsPlatform {
@@ -80,7 +80,7 @@ index 4cf4b6b..03c39e7 100644
  
          Ok(Box::new(window))
      }
-@@ -1455,6 +1474,7 @@ impl Drop for WindowsPlatform {
+@@ -1456,6 +1475,7 @@ impl Drop for WindowsPlatform {
      fn drop(&mut self) {
          if let Some(stop) = self.vsync_stop.borrow_mut().take() {
              stop.store(true, Ordering::Release);
