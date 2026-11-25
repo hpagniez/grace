@@ -4,11 +4,8 @@
 
 ## Approved
 
-- 2026-11-12 [Plan: GPUI migration, phase P3 panels](2026-11-12-gpui-p3-panels.md) #282: GPUI phase 3: the History and HTTP tabs and detail views in GPUI: HTTP inspector, run history, trends, flaky proof, report export, grouped failures
-
-## Draft
-
 - 2026-11-25 [Plan: GPUI migration, phase P4 project setup, watch and the step debugger](2026-11-25-gpui-p4-setup-watch-debugger.md) #283: GPUI phase 4 in eleven slices: pom defaults, libraries, Build, the sub-folder offer, watch mode and the step debugger on the unchanged listener jar
+- 2026-11-12 [Plan: GPUI migration, phase P3 panels](2026-11-12-gpui-p3-panels.md) #282: GPUI phase 3: the History and HTTP tabs and detail views in GPUI: HTTP inspector, run history, trends, flaky proof, report export, grouped failures
 
 ## Built
 

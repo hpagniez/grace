@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 issue: 283
 summary: "GPUI phase 4 in eleven slices: pom defaults, libraries, Build, the sub-folder offer, watch mode and the step debugger on the unchanged listener jar"
 ---
