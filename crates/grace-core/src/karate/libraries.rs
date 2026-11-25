@@ -810,6 +810,9 @@ mod tests {
             let classpath = [d.path().to_path_buf()];
             let upper = text(d.path().to_path_buf()).to_uppercase();
             assert_eq!(parse(&format!("{a}{s}{upper}"), &classpath), std::slice::from_ref(&a));
+            // on Linux the upper-case folder does not exist: only the folder as written shows it is left out there
+            let same = text(d.path().to_path_buf());
+            assert_eq!(parse(&format!("{same}{s}{a}"), &classpath), std::slice::from_ref(&a));
             assert!(parse("", &[]).is_empty());
         }
     }

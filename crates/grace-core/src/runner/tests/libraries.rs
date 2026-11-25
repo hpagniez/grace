@@ -170,7 +170,7 @@ fn touch(root: &str, build: &str) {
     fs::write(file, format!("{text} ")).unwrap();
 }
 
-const NO_MAVEN: &str = if cfg!(windows) {
+pub(super) const NO_MAVEN: &str = if cfg!(windows) {
     "Grace could not list the project's libraries with Maven: the project has no mvnw.cmd, and mvn is not on PATH, \
      in MAVEN_HOME, in M2_HOME or in IntelliJ IDEA. Tests that use them will fail. Install Maven, or add the Maven \
      wrapper to the project."
@@ -302,6 +302,24 @@ fn ends_the_notice_with_one_full_stop() {
         "Grace could not list the project's libraries with Maven: Could not resolve dependencies. \
          Tests that use them will fail."
     );
+}
+
+/// R6.1: exiting with 0 without writing the list is a failure too (beyond the Vitest file).
+#[test]
+fn says_when_the_tool_succeeds_without_writing_a_list() {
+    let t = setup();
+    let (dir, root) = maven();
+    stub_tool(
+        dir.path(),
+        "mvnw",
+        Script::new("echo BUILD SUCCESS", "echo 'BUILD SUCCESS'"),
+    );
+    t.runner.open(&root).unwrap();
+    assert_eq!(
+        t.last_notice(),
+        "Grace could not list the project's libraries with Maven: BUILD SUCCESS. Tests that use them will fail."
+    );
+    assert_eq!(read_kept(&project_dir(&t.data_dir, &root)), None);
 }
 
 /// R5.1: the project's folders, the home `.karate/ext`, the project's `.karate/ext`, then the build's libraries.
