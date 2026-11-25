@@ -6,8 +6,7 @@ use std::panic::Location;
 
 use gpui::accesskit::{Live, Node, Role};
 use gpui::{
-    A11ySubtreeBuilder, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement, LayoutId,
-    Pixels, Window,
+    A11ySubtreeBuilder, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, LayoutId, Pixels, Window,
 };
 
 pub struct Announcer<E> {
@@ -18,14 +17,6 @@ pub struct Announcer<E> {
 /// Wraps an element that has an id, a role and a label: each new label is announced.
 pub fn live<E: Element>(inner: E, live: Live) -> Announcer<E> {
     Announcer { inner, live }
-}
-
-impl<E: Element> IntoElement for Announcer<E> {
-    type Element = Self;
-
-    fn into_element(self) -> Self {
-        self
-    }
 }
 
 impl<E: Element> Element for Announcer<E> {
