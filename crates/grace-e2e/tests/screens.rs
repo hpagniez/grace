@@ -842,6 +842,8 @@ Scenario: four
     // shot cut off
     let settings = look(json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 96 }), dark);
     let app = App::launch_with_settings(&settings, &[]).unwrap();
+    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
+        .unwrap();
     let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
         x: 0,
         y: 0,
@@ -849,8 +851,6 @@ Scenario: four
         height: 800,
     });
     app.set_window_rect(at.x, 0, at.width, 1050).unwrap();
-    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
-        .unwrap();
     app.press_named(Role::Button, "Run all").unwrap();
     let t = app
         .wait_for("the run finished", RUN, |t| starting(t, "three, failed").is_some())
