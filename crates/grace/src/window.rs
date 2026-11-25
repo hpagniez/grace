@@ -18,9 +18,12 @@ use grace_core::window::{Rectangle, place_window};
 
 use crate::a11y;
 use crate::app::Grace;
+use crate::elements::{ButtonKind, ButtonSize, Off as _, button};
 use crate::probe;
 use crate::theme::Theme;
 use crate::ui::{NoticeKind, notice};
+
+pub const BUILD: &str = "Build";
 
 /// The window's smallest size: the toolbar fits down to 760 px wide, and 480 px leaves room for the bars,
 /// 120 px of tests and 96 px of bottom panel (`src/main.ts`).
@@ -245,6 +248,9 @@ impl Render for GraceWindow {
                 return div().into_any_element();
             }
             let shown = state.shown_notice().map(|n| {
+                let build = n
+                    .build
+                    .then(|| build_button(grace.clone(), state.busy || state.run.active));
                 notice(
                     "notice",
                     if n.success {
@@ -253,7 +259,7 @@ impl Render for GraceWindow {
                         NoticeKind::Warning
                     },
                     n.text,
-                    vec![],
+                    build.into_iter().collect(),
                     cx,
                 )
                 .into_any_element()
@@ -330,6 +336,19 @@ impl Render for GraceWindow {
             .children(view)
             .child(tips)
     }
+}
+
+/// The notice's Build button (build from the notice R1): Grace builds the project's Java code only on this click. Off
+/// while Grace is busy.
+fn build_button(grace: Entity<Grace>, busy: bool) -> gpui::AnyElement {
+    let build = button("notice-build", BUILD, ButtonKind::Plain, ButtonSize::Small)
+        .off(busy)
+        .on_click(move |_, _, cx| grace.update(cx, |g, cx| g.build(cx)));
+    div()
+        .debug_selector(|| "build-button".into())
+        .flex_none()
+        .child(build)
+        .into_any_element()
 }
 
 /// The project view: the toolbar, then the sheet (spec R3.3) with the progress section, the notice, the filter bar,
@@ -721,13 +740,21 @@ mod tests {
 
     /// The whole window drawn on `state`, 1200 × 700.
     fn whole_window(cx: &mut TestAppContext, state: grace_core::state::AppState) -> gpui::VisualTestContext {
+        window_on(cx, state).1
+    }
+
+    /// As [`whole_window`], with the harness that holds the runner's calls.
+    fn window_on(
+        cx: &mut TestAppContext,
+        state: grace_core::state::AppState,
+    ) -> (crate::testing::Harness, gpui::VisualTestContext) {
         let (h, _) = crate::testing::open(cx, 1200., state, |_, _, _| div().into_any_element());
         let grace = h.grace.clone();
         let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
         let vcx = gpui::VisualTestContext::from_window(window.into(), cx);
         vcx.simulate_resize(size(px(1200.), px(700.)));
         vcx.run_until_parked();
-        vcx
+        (h, vcx)
     }
 
     /// PU-12, E-look-05: with reduced motion nothing in the window moves during a run. The running marks, the
@@ -802,6 +829,57 @@ mod tests {
             );
         }
         assert!(vcx.debug_bounds("toolbar").unwrap().bottom() <= sheet.top());
+    }
+
+    /// `Tree.test.tsx` "offers Build in a notice that asks for it, disabled while busy" (BN-01, BN-09): the button
+    /// follows the text, builds on a click, does nothing while Grace is busy and goes with its notice.
+    #[gpui::test]
+    fn offers_build_in_a_notice_that_asks_for_it_off_while_busy(cx: &mut TestAppContext) {
+        use grace_core::model::node::Layout;
+        let mut state = crate::testing::project("D:\\api", Layout::Maven, 2);
+        state.notice = Some(grace_core::state::NoticeView {
+            text: "Not built.".into(),
+            success: false,
+            build: true,
+        });
+        let (h, mut vcx) = window_on(cx, state);
+        let (notice, button) = (
+            vcx.debug_bounds("notice").unwrap(),
+            vcx.debug_bounds("build-button").expect("the Build button"),
+        );
+        assert!(notice.contains(&button.origin), "{notice:?} {button:?}");
+        assert!(
+            button.right() < notice.center().x,
+            "after the short text: {button:?} in {notice:?}"
+        );
+        let click = |vcx: &mut gpui::VisualTestContext| {
+            vcx.simulate_click(button.center(), gpui::Modifiers::none());
+            vcx.run_until_parked();
+        };
+        let builds = || h.backend.calls().iter().filter(|c| *c == "build").count();
+        click(&mut vcx);
+        assert_eq!(builds(), 1);
+
+        // a discovery, a listing or a build, then a run
+        for (busy, run) in [(true, false), (false, true)] {
+            h.grace.update(&mut vcx, |g, cx| {
+                g.state_mut().busy = busy;
+                g.state_mut().run.active = run;
+                cx.notify();
+            });
+            vcx.run_until_parked();
+            click(&mut vcx);
+            assert_eq!(builds(), 1, "busy {busy}, run {run}");
+        }
+
+        h.grace.update(&mut vcx, |g, cx| {
+            g.state_mut()
+                .reduce(&grace_core::model::events::AppEvent::notice("Other"));
+            cx.notify();
+        });
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("notice").is_some());
+        assert!(vcx.debug_bounds("build-button").is_none());
     }
 
     /// `ConfigBanner.test.tsx` "sits under the notice" (#229 R6.1): the banner is on the sheet, under the notice.

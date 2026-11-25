@@ -34,6 +34,8 @@ pub trait Backend: Send + Sync + 'static {
     fn replay(&self) -> Vec<AppEvent>;
     /// Lists the open project's tests again.
     fn refresh(&self) -> std::io::Result<()>;
+    /// Builds the open project's Java code with its own build tool, then lists the tests again.
+    fn build(&self) -> std::io::Result<()>;
     /// Runs the tests under a node: the tree's root for Run all.
     fn run(&self, key: &str) -> std::io::Result<()>;
     /// Runs a listed run again on its environment and filter (RH-06).
@@ -87,6 +89,9 @@ impl Backend for Runner {
     }
     fn refresh(&self) -> std::io::Result<()> {
         Runner::refresh(self)
+    }
+    fn build(&self) -> std::io::Result<()> {
+        Runner::build(self)
     }
     fn run(&self, key: &str) -> std::io::Result<()> {
         Runner::run(self, key)
@@ -343,6 +348,11 @@ impl Grace {
     /// Refresh: lists the tests again.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         self.background(cx, Order::Start, |b| b.refresh());
+    }
+
+    /// The notice's Build button: builds the project's Java code (build from the notice R1).
+    pub fn build(&mut self, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, |b| b.build());
     }
 
     /// Run all: every test of the tree, whatever the filter hides (the runner applies the filter).
@@ -663,6 +673,10 @@ pub mod fake {
         }
         fn refresh(&self) -> std::io::Result<()> {
             self.record("refresh".into());
+            Ok(())
+        }
+        fn build(&self) -> std::io::Result<()> {
+            self.record("build".into());
             Ok(())
         }
         fn run(&self, key: &str) -> std::io::Result<()> {

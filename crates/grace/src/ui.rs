@@ -63,7 +63,7 @@ pub fn notice(
             .text_size(px(METRICS.text_sm.size))
             .bg(Theme::color(tint))
             .child(div().mt(px(2.)).child(icon(mark, 16., Theme::color(tone))))
-            .child(div().min_w_0().flex_1().text_color(Theme::color(t.ink)).child(text))
+            .child(div().min_w_0().text_color(Theme::color(t.ink)).child(text))
             .children(children),
         if kind == NoticeKind::Error {
             Live::Assertive
