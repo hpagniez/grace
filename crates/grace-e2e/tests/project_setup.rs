@@ -1,5 +1,5 @@
 //! `e2e/project-setup.spec.ts`, through the accessibility tree: how a project's own setup shapes the tests Grace finds
-//! and runs. The libraries, the sub-folder offer and Build come with phase P4's later slices.
+//! and runs. The sub-folder offer comes with phase P4's slice 5.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -293,6 +293,51 @@ fn jars_in_karate_ext_are_on_the_classpath() {
 
     let app = open(&dir);
     run_scenario(&app, "lib.feature", "reads a library");
+    drop(app);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// E-project-setup-08
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn the_not_built_notice_builds_the_projects_java_code() {
+    let dir = project("maven").unwrap();
+    write(&dir, &[("src/test/java/common/Helper.java", "class Helper {}")]);
+    // a stand-in for Maven: it lists no library, and test-compile writes the helper's class
+    #[cfg(windows)]
+    write(
+        &dir,
+        &[(
+            "mvnw.cmd",
+            "@echo off\r\nif defined GRACE_CLASSPATH_FILE (type nul>\"%GRACE_CLASSPATH_FILE%\" & exit /b 0)\r\n\
+             mkdir \"%~dp0target\\test-classes\" 2>nul\r\ntype nul>\"%~dp0target\\test-classes\\Helper.class\"\r\n",
+        )],
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let wrapper = dir.join("mvnw");
+        let script = "#!/bin/sh\n\
+             if [ -n \"$GRACE_CLASSPATH_FILE\" ]; then : > \"$GRACE_CLASSPATH_FILE\"; exit 0; fi\n\
+             classes=\"$(dirname \"$0\")/target/test-classes\"\nmkdir -p \"$classes\"\n: > \"$classes/Helper.class\"\n";
+        std::fs::write(&wrapper, script).unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let class = dir.join("target").join("test-classes").join("Helper.class");
+    let app = open(&dir);
+    let notice = "The project's Java code in src/test/java is not built: build it (mvn test-compile) before running.";
+    // "Ready." shows once the open is over: before that the button is off, and a press of it does nothing
+    app.wait_for("the notice, its Build button and the open over", WAIT, |t| {
+        let said = |start: &str| t.all().iter().any(|n| n.name.starts_with(start));
+        said(notice) && said("Ready.") && t.find(&Role::Button, "Build").is_some()
+    })
+    .unwrap();
+    assert!(!class.exists());
+    app.press_named(Role::Button, "Build").unwrap();
+    app.wait_for("the class built and the notice gone", WAIT, |t| {
+        class.exists() && t.all().iter().all(|n| n.name != notice) && t.find(&Role::Button, "Build").is_none()
+    })
+    .unwrap();
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
 }
