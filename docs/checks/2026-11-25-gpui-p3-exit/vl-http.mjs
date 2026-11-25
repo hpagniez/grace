@@ -6,14 +6,12 @@
 //   node --no-warnings docs/checks/2026-11-25-gpui-p3-exit/vl-http.mjs <uiprobe.exe> <Grace.exe> <project> <rounds>
 //
 // <project> is a folder this script fills with writeBigProject (25 features per module). Prints the rounds as JSON.
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { killTree } from "../../../bench/app.mjs";
 import { median } from "../../../bench/stats.mjs";
 import { placeWindow } from "../../../bench/system.mjs";
 import { writeBigProject } from "../../../e2e/big-project.ts";
@@ -27,6 +25,11 @@ async function p(...args) {
   return stdout.trim() === "null" ? null : stdout.startsWith("{") ? JSON.parse(stdout) : stdout;
 }
 
+/** Stops the run rather than click into another program's window. */
+async function inFront(pid) {
+  if (!(await p("state", pid)).front) throw new Error("Grace is not the window in front");
+}
+
 const sizes = writeBigProject(project, 25);
 console.error(JSON.stringify(sizes));
 
@@ -36,7 +39,6 @@ async function round() {
     path.join(data, "settings.json"),
     JSON.stringify({ lastProject: project, updates: { checkAtStartup: false }, window: { ...AT, maximized: false } }),
   );
-  const t0 = Date.now();
   const child = spawn(exe, [], { env: { ...process.env, GRACE_USER_DATA: data }, stdio: "ignore" });
   const pid = child.pid;
   try {
@@ -47,6 +49,7 @@ async function round() {
     await sleep(1000);
     await p("front", pid);
     const runAll = await p("rect", pid, "Run all");
+    await inFront(pid);
     await p("click", runAll.x + (runAll.w >> 1), runAll.y + (runAll.h >> 1));
     const fin = await p("waitname", pid, "Finished", 15 * 60000);
     if (!fin?.at) throw new Error("no Finished");
@@ -54,16 +57,19 @@ async function round() {
     const win = await p("winrect", pid);
     const out = { httpTab: [], console: [] };
     for (let i = 0; i < 3; i++) {
-      for (const [name, key] of [["HTTP", "httpTab"], ["Console", "console"]]) {
-        const tab = await p("rect", pid, name, "contains");
+      // "HTTP (" is the tab's alone (the tab list is "Console, run history and HTTP calls"); "Console" is found
+      // exactly, the tab before the log of the same name
+      for (const [name, key, how] of [["HTTP (", "httpTab", ["contains"]], ["Console", "console", []]]) {
+        const tab = await p("rect", pid, name, ...how);
         const region = [win.x, tab.y + tab.h, win.w, 250];
+        await inFront(pid);
         out[key].push((await p("clickpaint", tab.x + (tab.w >> 1), tab.y + (tab.h >> 1), ...region)).ms);
         await sleep(500);
       }
     }
     return out;
   } finally {
-    await killTree(pid, t0).catch((e) => console.error(e.message));
+    await run("taskkill", ["/pid", String(pid), "/t", "/f"]).catch((e) => console.error(e.message));
     rmSync(data, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 }

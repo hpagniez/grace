@@ -1,0 +1,1 @@
+{"project":{"tests":10000,"calls":3000,"rows":1049},"rounds":[{"httpTab":[42,33,34],"console":[33,41,33]},{"httpTab":[42,32,33],"console":[41,33,32]},{"httpTab":[42,33,33],"console":[41,32,33]}],"medians":{"httpTab":33,"console":33}}
