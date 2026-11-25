@@ -1,27 +1,13 @@
-//! The starting values a project's pom files give (`pom_start`), and the parts of opening a project that phase P4 has
-//! still to port: the test code notice and Build (`karate/compiled.ts`), and the sub-folder offer
-//! (`karate/subfolders.ts`). The runner calls them where `runner.ts` does, through `ProjectSetup`; until each is
-//! ported, `NoSetup` has nothing to say.
+//! The starting values a project's pom files give (`pom_start`), and the part of opening a project that phase P4 has
+//! still to port: the sub-folder offer (`karate/subfolders.ts`). The runner calls it where `runner.ts` does, through
+//! `ProjectSetup`; until it is ported, `NoSetup` has nothing to say.
 use crate::karate::maven::maven_env;
 use crate::karate::pom::{PomEnv, read_pom};
-use crate::model::Layout;
 use crate::model::tags::FilterState;
 use std::path::Path;
 
-/// `javaCode`'s answer: the test code notice (build from the notice R8), and whether it offers Build (R1.1–R1.2).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct JavaCode {
-    pub said: Option<String>,
-    pub build: bool,
-}
-
 /// What phase P4 plugs into the runner. Every method has the answer of a project that needs none of it.
 pub trait ProjectSetup: Send + Sync {
-    /// `javaCode`: the notice about test code that is not compiled, with the last Build's time.
-    fn java_code(&self, _root: &Path, _layout: Layout, _project_dir: &Path) -> JavaCode {
-        JavaCode::default()
-    }
-
     /// `karateFolders`: folders below the project that look like a Karate project, offered when the tree has no test
     /// (sub-folder offer R4).
     fn karate_folders(&self, _root: &Path) -> Vec<String> {
@@ -29,7 +15,7 @@ pub trait ProjectSetup: Send + Sync {
     }
 }
 
-/// Phase P1's setup: no notice about the test code, no sub-folder offer.
+/// Phase P1's setup: no sub-folder offer.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NoSetup;
 

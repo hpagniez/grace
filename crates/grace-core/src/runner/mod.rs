@@ -4,8 +4,8 @@
 //!
 //! # Threads
 //!
-//! A `Runner` is a cheap handle (`Clone`, `Send`, `Sync`). Its methods block: `open`, `refresh`, `set_env`, `run`,
-//! `rerun` and `rerun_failed` for as long as their dry run and run take, on the thread that calls them, which is never
+//! A `Runner` is a cheap handle (`Clone`, `Send`, `Sync`). Its methods block: `open`, `refresh`, `build`, `set_env`,
+//! `run`, `rerun` and `rerun_failed` for as long as their build tool, dry run and run take, on the thread that calls them, which is never
 //! GPUI's main thread (P2 calls them from a background task or a thread of its own). While one of them works, the
 //! runner is busy: any other of them, and every change that a run would see, is refused with "A run is already in
 //! progress", as in Electron Grace; `cancel`, `replay`, `current` and the other reads answer at once from any thread.
@@ -26,16 +26,15 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's parts still to port are seams or left out: the test code notice and the sub-folder offer are
-//!   `ProjectSetup`'s methods (`NoSetup` until then); watch mode, the step debugger, Build and the editor's files are
-//!   left out, each place they act marked `P4`. The events stay those of a project that has none of them: `watch` (as
-//!   saved) and `breakpoints` (empty).
+//! - Phase P4's parts still to port are a seam or left out: the sub-folder offer is `ProjectSetup`'s method
+//!   (`NoSetup` until then); watch mode and the step debugger are left out, each place they act marked `P4`. The events
+//!   stay those of a project that has neither: `watch` (as saved) and `breakpoints` (empty).
 mod run;
 mod setup;
 #[cfg(test)]
 mod tests;
 
-pub use setup::{JavaCode, NoSetup, PomStart, ProjectSetup, pom_start};
+pub use setup::{NoSetup, PomStart, ProjectSetup, pom_start};
 
 use crate::flaky::find_flaky;
 use crate::history::{self, ListedRun, clear_history, list_runs, read_run_record};
@@ -43,6 +42,7 @@ use crate::karate::command::{
     BuildArgs, Env, OUT_OF_MEMORY, ProjectLayout, absolute, build_args, child_env, detect_layout, extension_jars,
     locate, out_of_memory, tag_args,
 };
+use crate::karate::compiled;
 use crate::karate::environments::{feature_tag_envs, overlay_envs};
 use crate::karate::events::read_all_events;
 use crate::karate::libraries::{self, Goal, KeptLibraries, ToolEnv, ToolStart};
@@ -128,6 +128,14 @@ fn join_notices<S: AsRef<str>>(said: &[S]) -> String {
         .join(" ")
 }
 
+/// The `listing` event of a build tool running for `goal`; `None` once it is done.
+fn listing_event(tool: Option<BuildTool>, goal: Goal) -> AppEvent {
+    AppEvent::Listing {
+        tool,
+        build: tool.is_some() && goal == Goal::Build,
+    }
+}
+
 /// The text of a path, as Grace keeps project folders: a JSON string.
 fn text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
@@ -180,8 +188,8 @@ struct State {
     overlays: Vec<String>,
     tag_envs: Vec<String>,
     phase: Phase,
-    /// The build tool running to list the project's libraries.
-    listing: Option<BuildTool>,
+    /// The build tool running, and whether it lists the project's libraries or builds its Java code.
+    listing: Option<(BuildTool, Goal)>,
     report: Option<PathBuf>,
     /// The open project's breakpoints, in memory only (step debugger R3.1); always empty until P4 ports the debugger.
     breakpoints: Vec<Breakpoint>,
@@ -404,6 +412,12 @@ impl Runner {
     /// busy.
     pub fn close(&self) {
         self.0.close();
+    }
+
+    /// Build from the notice: compiles the project's test code with its own build tool, then refreshes
+    /// (docs/specs/2026-11-04-build-from-notice.md R2–R5). Nothing with no project or a standalone one.
+    pub fn build(&self) -> io::Result<()> {
+        self.0.build()
     }
 
     /// Discovers the open project again; nothing with no project.
@@ -697,9 +711,7 @@ impl Inner {
         self.state().watching = watching;
         // arm(): watch mode, P4
         self.send_watch();
-        let code = self
-            .setup
-            .java_code(Path::new(root), layout, &self.project_dir_of(root));
+        let (code, build) = self.java_code(root, layout);
         let mut notice = Vec::new();
         if !skipped.is_empty() {
             notice.push(format!(
@@ -709,9 +721,9 @@ impl Inner {
         }
         notice.extend(detect_layout(Path::new(root)).pom_notice);
         notice.extend(libraries);
-        notice.extend(code.said);
+        notice.extend(code);
         if !notice.is_empty() {
-            self.say(&notice, code.build);
+            self.say(&notice, build);
         }
         if let Err(e) = save_opened_project(&self.data_dir, root) {
             self.recent_notice(&e);
@@ -825,18 +837,73 @@ impl Inner {
             return Ok(());
         }
         // arm(): karate-pom.json may have changed the feature roots (watch mode R2.4), P4
-        let code = self
-            .setup
-            .java_code(Path::new(&root), layout, &self.project_dir_of(&root));
-        let said: Vec<String> = libraries.into_iter().chain(code.said).collect();
+        let (code, build) = self.java_code(&root, layout);
+        let said: Vec<String> = libraries.into_iter().chain(code).collect();
         if !said.is_empty() {
-            self.say(&said, code.build);
+            self.say(&said, build);
         }
         Ok(())
     }
 
+    fn build(&self) -> io::Result<()> {
+        let Some(project) = self.state().project.clone() else {
+            return Ok(());
+        };
+        let Some(tool) = BuildTool::of(project.layout) else {
+            return Ok(());
+        };
+        self.guarded(|| self.build_body(project, tool)).map(|_| ())
+    }
+
+    fn build_body(&self, project: Project, tool: BuildTool) -> io::Result<()> {
+        let folder = Path::new(&project.root);
+        let lookup = self.lookup();
+        let Some(launcher) = libraries::find_tool(folder, tool, &lookup) else {
+            let why = libraries::no_tool_reason(tool);
+            self.notice(format!(
+                "Grace could not build the project's Java code with {tool:?}: {why}."
+            ));
+            return Ok(());
+        };
+        let started = SystemTime::now();
+        // the person's environment as is: Grace's Java cannot compile (build from the notice R2.2)
+        let mut env: Env = std::env::vars_os().collect();
+        env.push(("GRACE_TOOL".into(), launcher.clone().into())); // the last of a name wins
+        let none = Path::new(""); // a build writes no classpath file and takes no init script
+        let start = libraries::tool_start(tool, Goal::Build, &launcher, none, none);
+        let (code, lines) = self.run_tool(folder, tool, Goal::Build, start, env);
+        if self.cancelled() {
+            self.say(&["Build cancelled."], true);
+            return Ok(());
+        }
+        if code != Some(0) {
+            let why = libraries::build_failure(tool, &lines, libraries::has_jdk(&lookup));
+            self.say(&[why], true);
+            return Ok(());
+        }
+        // shortcut: without the time, a Gradle build that rewrote no class shows the notice again (R4.3)
+        let _ = compiled::write_built(&self.project_dir_of(&project.root), started);
+        self.refresh_body(project)
+    }
+
+    /// The test code notice with the last Build's time (project libraries R8), and whether it offers Build: only when a
+    /// build tool is found (build from the notice R1.1–R1.2).
+    fn java_code(&self, root: &str, layout: Layout) -> (Option<String>, bool) {
+        let folder = Path::new(root);
+        let built = compiled::read_built(&self.project_dir_of(root));
+        let said = compiled::test_code_notice(folder, layout, built);
+        let build = said.is_some()
+            && BuildTool::of(layout).is_some_and(|tool| libraries::find_tool(folder, tool, &self.lookup()).is_some());
+        (said, build)
+    }
+
+    /// The variables Maven and Gradle are looked for with.
+    fn lookup(&self) -> Env {
+        self.lookup_env.clone().unwrap_or_else(|| std::env::vars_os().collect())
+    }
+
     /// One notice of `said`, with the Build button when `build`.
-    fn say(&self, said: &[String], build: bool) {
+    fn say<S: AsRef<str>>(&self, said: &[S], build: bool) {
         self.emit(AppEvent::Notice {
             message: join_notices(said),
             success: None,
@@ -1112,10 +1179,7 @@ impl Inner {
         let opening = AppEvent::Opening { root: opening };
         let busy = AppEvent::Busy { busy };
         // only while it runs: a window that just loaded starts with none
-        let listing = listing.map(|tool| AppEvent::Listing {
-            tool: Some(tool),
-            build: false,
-        });
+        let listing = listing.map(|(tool, goal)| listing_event(Some(tool), goal));
         let tail = [opening, busy].into_iter().chain(listing);
         let Some(head) = head else {
             return tail.collect();
@@ -1440,7 +1504,7 @@ impl Inner {
             };
             format!("Grace could not list the project's libraries with {tool:?}: {reason}. {rest}")
         };
-        let lookup = self.lookup_env.clone().unwrap_or_else(|| std::env::vars_os().collect());
+        let lookup = self.lookup();
         let Some(launcher) = libraries::find_tool(folder, tool, &lookup) else {
             let why = said(libraries::no_tool_reason(tool));
             return Ok(Some(format!(
@@ -1471,7 +1535,7 @@ impl Inner {
             },
         );
         let start = libraries::tool_start(tool, Goal::List, &launcher, &file, &init_script);
-        let (code, lines) = self.run_tool(folder, tool, start, env);
+        let (code, lines) = self.run_tool(folder, tool, Goal::List, start, env);
         if self.cancelled() {
             return Ok(None);
         }
@@ -1491,8 +1555,9 @@ impl Inner {
     }
 
     /// Runs the project's build tool (project libraries R3) as the runner's one process, so Cancel stops it, and says
-    /// so with `listing` events. Its exit code and output; starts nothing once cancelled.
-    fn run_tool(&self, root: &Path, tool: BuildTool, start: ToolStart, env: Env) -> (Exit, Vec<String>) {
+    /// so with `listing` events: listing the libraries or building the Java code, as `goal` says. Its exit code and
+    /// output; starts nothing once cancelled.
+    fn run_tool(&self, root: &Path, tool: BuildTool, goal: Goal, start: ToolStart, env: Env) -> (Exit, Vec<String>) {
         let lines = Arc::new(Mutex::new(Vec::new()));
         let proc = {
             let mut c = self.ctl();
@@ -1511,18 +1576,12 @@ impl Inner {
             proc
         };
         // after the spawn: a Cancel prompted by this event finds the process to kill
-        self.state().listing = Some(tool);
-        self.emit(AppEvent::Listing {
-            tool: Some(tool),
-            build: false,
-        });
+        self.state().listing = Some((tool, goal));
+        self.emit(listing_event(Some(tool), goal));
         let code = proc.wait();
         self.clear_proc();
         self.state().listing = None;
-        self.emit(AppEvent::Listing {
-            tool: None,
-            build: false,
-        });
+        self.emit(listing_event(None, goal));
         let lines = std::mem::take(&mut *lock(&lines));
         (code, lines)
     }
