@@ -54,6 +54,12 @@ const DURATION: f32 = 56.;
 const WHAT: f32 = 100.;
 /// What a row needs beside Tags and its buttons: its padding (`px-3`), its seven gaps (`gap-3`) and the fixed columns.
 const BESIDE: f32 = 24. + 7. * 12. + WHEN + ENV + THREADS + WHAT + RESULT + DURATION;
+/// px, the least room of "Tags": the edge of its first chip, to point at for the tooltip that names the tags it cuts.
+const TAGS_LEAST: f32 = 24.;
+/// px, a tag chip around its text: its border, `px` of 7 on each side, its 14 px icon and the gap after it.
+const CHIP_FRAME: f32 = 2. + 2. * 7. + 14. + 4.;
+/// px, between the chips (`gap-1`).
+const CHIP_GAP: f32 = 4.;
 /// px, between the buttons (`gap-1`).
 const BUTTON_GAP: f32 = 4.;
 /// px, a labelled small button around its text: `px-2`, the 14 px icon and the 6 px before the text.
@@ -177,8 +183,10 @@ impl History {
         let t = Theme::global(cx).tokens;
         let head = |text: &'static str, w: Option<f32>, right: bool| {
             div()
+                .debug_selector(move || format!("history-head:{text}"))
                 .when_some(w, |d, w| d.w(px(w)).flex_none())
-                .when(w.is_none(), |d| d.flex_1().min_w_0())
+                .when(w.is_none(), |d| d.flex_1().min_w(px(TAGS_LEAST)))
+                .truncate()
                 .when(right, |d| d.text_right())
                 .child(text)
         };
@@ -205,7 +213,15 @@ impl History {
             .child(div().w(px(actions)).flex_none())
     }
 
-    fn row(&self, i: usize, e: &HistoryEntry, locked: bool, look: Look, cx: &mut Context<Self>) -> AnyElement {
+    fn row(
+        &self,
+        i: usize,
+        e: &HistoryEntry,
+        locked: bool,
+        look: Look,
+        cut: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let t = Theme::global(cx).tokens;
         let text = &self.rows[i];
         let a = actions(e, locked);
@@ -293,9 +309,20 @@ impl History {
                 div()
                     .debug_selector(move || format!("history-tags-cell:{}", i + 1))
                     .flex_1()
-                    .min_w_0()
+                    .min_w(px(TAGS_LEAST))
                     .overflow_hidden()
-                    .child(tags),
+                    .child(
+                        tooltip(
+                            SharedString::from(format!("history-tags-tip-{rid}")),
+                            cut.then(|| {
+                                SharedString::from(
+                                    text.tags.iter().map(|t| t.text.as_str()).collect::<Vec<_>>().join(", "),
+                                )
+                            }),
+                        )
+                        .side(Side::Over)
+                        .child(tags),
+                    ),
             )
             .child(what)
             .child(result)
@@ -351,44 +378,60 @@ impl History {
     }
 }
 
-/// How a row's buttons are drawn: with their words while the row fits the window, their icons only below that, so
-/// every button stays inside the window down to its least width (a press clicks a button's centre).
+/// How a row's buttons are drawn: with their words while the row fits the window with the widest run's tags whole,
+/// their icons only otherwise, so every button stays inside the window down to its least width (a press clicks a
+/// button's centre) and two tags fit at 1200 px (#399).
 #[derive(Clone, Copy)]
 struct Look {
     /// The Actions column's width, the header's included: what its buttons take.
     width: f32,
     icons: bool,
+    /// The room "Tags" gets: a run's tags wider than this are cut.
+    tags: f32,
+}
+
+/// The width of `text` in the sans face, at `size` and `weight`, rounded up.
+fn text_width(window: &Window, text: &str, size: f32, weight: gpui::FontWeight) -> f32 {
+    let mut style = window.text_style();
+    style.font_family = SANS.into();
+    style.font_weight = weight;
+    let text = SharedString::from(text.to_string());
+    let line = window
+        .text_system()
+        .shape_line(text.clone(), px(size), &[style.to_run(text.len())], None);
+    f32::from(line.width).ceil()
+}
+
+/// The width a run's tag chips take side by side, as `tag_chip` draws them.
+fn tags_width(tags: &[Tag], window: &Window) -> f32 {
+    let chips: f32 = tags
+        .iter()
+        .map(|t| text_width(window, &t.text, METRICS.text_2xs.size, gpui::FontWeight::MEDIUM) + CHIP_FRAME)
+        .sum();
+    chips + CHIP_GAP * tags.len().saturating_sub(1) as f32
 }
 
 impl Look {
-    fn of(window: &Window) -> Self {
-        let mut style = window.text_style();
-        style.font_family = SANS.into();
+    /// `tags`: the widest listed run's tags.
+    fn of(window: &Window, tags: f32) -> Self {
         let words: f32 = BUTTONS
             .iter()
             .map(|(_, _, label, _)| {
-                let line = window.text_system().shape_line(
-                    SharedString::new_static(label),
-                    px(METRICS.text_xs.size),
-                    &[style.to_run(label.len())],
-                    None,
-                );
-                f32::from(line.width).ceil() + BUTTON_FRAME
+                text_width(window, label, METRICS.text_xs.size, window.text_style().font_weight) + BUTTON_FRAME
             })
             .sum();
         let gaps = BUTTON_GAP * (BUTTONS.len() - 1) as f32;
         // the tab spans the sheet, inside its inset and side on both edges
         let room = f32::from(window.viewport_size().width) - 2. * (METRICS.sheet_inset + METRICS.sheet_side);
-        if BESIDE + words + gaps <= room {
-            Self {
-                width: words + gaps,
-                icons: false,
-            }
+        let width = if BESIDE + tags.max(TAGS_LEAST) + words + gaps <= room {
+            words + gaps
         } else {
-            Self {
-                width: METRICS.control_height_small * BUTTONS.len() as f32 + gaps,
-                icons: true,
-            }
+            METRICS.control_height_small * BUTTONS.len() as f32 + gaps
+        };
+        Self {
+            width,
+            icons: width < words + gaps,
+            tags: (room - BESIDE - width).max(TAGS_LEAST),
         }
     }
 }
@@ -432,7 +475,8 @@ impl Render for History {
         let state = self.grace.read(cx).state.clone();
         self.build(&state.history);
         let locked = locked(&state);
-        let look = Look::of(window);
+        let needs: Vec<f32> = self.rows.iter().map(|r| tags_width(&r.tags, window)).collect();
+        let look = Look::of(window, needs.iter().copied().fold(0., f32::max));
         let body: AnyElement = if state.history.is_empty() {
             // no strip with no run: the next run makes it anew
             self.close();
@@ -448,7 +492,7 @@ impl Render for History {
                 .history
                 .iter()
                 .enumerate()
-                .map(|(i, e)| self.row(i, e, locked, look, cx))
+                .map(|(i, e)| self.row(i, e, locked, look, needs[i] > look.tags + 0.5, cx))
                 .collect();
             let trends = self.strip(window, cx);
             // the titles stay at the top once the strip has scrolled away, as `sticky` kept them
