@@ -84,13 +84,20 @@ fn open_features(app: &App, features: &[&str]) {
     }
 }
 
-/// Grace on a fixture project, its tests found. The bottom panel at its smallest, 96 px, leaves the tree room for every
-/// row of the clean project with its features open, on CI's 1024×768 screen too: the tree draws only the rows in view.
+/// Grace on a fixture project, its tests found and its open over. The count shows before the open ends, and the chips
+/// are off until then: a press of one fails on Linux (no AT-SPI action) and does nothing on Windows. "Ready." shows
+/// once it is over (`banner_state`); Run all's state, which only Windows reports, covers a read where it shows first.
+/// The bottom panel at its smallest, 96 px, leaves the tree room for every row of the clean project with its features
+/// open, on CI's 1024×768 screen too: the tree draws only the rows in view.
 fn open(dir: &Path, found: &str) -> App {
     let app =
         App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 96 }), &[]).unwrap();
-    app.wait_for("the tests found", WAIT, |t| label(t, found).is_some())
-        .unwrap();
+    app.wait_for("the tests found and the open over", WAIT, |t| {
+        label(t, found).is_some()
+            && t.all().iter().any(|n| n.name.starts_with("Ready."))
+            && t.find(&Role::Button, "Run all").is_some_and(|b| b.states.enabled)
+    })
+    .unwrap();
     app
 }
 
@@ -210,8 +217,11 @@ fn run_all_runs_only_matching_tests() {
     let (_, app) = open_clean();
     // "failing match" gets a status first, to see that a filtered run leaves it alone
     app.press_named(Role::Button, "Run failing match").unwrap();
-    app.wait_for("failing match failed", RUN, |t| {
-        label(t, "Finished").is_some() && says(t, "failing match", "failed")
+    // the runner refuses a filter change until the run is saved, after the window says "Finished"
+    app.wait_for("failing match failed, the run saved", RUN, |t| {
+        label(t, "Finished").is_some()
+            && says(t, "failing match", "failed")
+            && t.find(&Role::Tab, "History (1)").is_some()
     })
     .unwrap();
     click_chip(&app, "smoke", &["included"]);
