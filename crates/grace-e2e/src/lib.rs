@@ -629,8 +629,10 @@ impl App {
         &self.data
     }
 
+    /// The tree as it is now. A read is hundreds of calls, one per node, and a node that goes between two of them
+    /// fails the whole read: such a read is made again, for up to 2 s.
     pub fn tree(&self) -> Result<Node> {
-        self.driver.tree()
+        retried(Duration::from_secs(2), || self.driver.tree())
     }
 
     /// Where the system says the keyboard focus is (Windows only), for a failure's message.
@@ -846,9 +848,40 @@ fn area(v: &serde_json::Value) -> Option<Area> {
     })
 }
 
+/// `read` again every 50 ms until it answers, for up to `during`; then its last error.
+fn retried<T>(during: Duration, mut read: impl FnMut() -> Result<T>) -> Result<T> {
+    let start = Instant::now();
+    loop {
+        match read() {
+            Err(_) if start.elapsed() < during => std::thread::sleep(Duration::from_millis(50)),
+            answer => return answer,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_read_that_fails_once_is_tried_again() {
+        let mut reads = 0;
+        let got = retried(Duration::from_secs(2), || {
+            reads += 1;
+            if reads == 1 {
+                Err("a node went mid-read".to_string())
+            } else {
+                Ok(reads)
+            }
+        });
+        assert_eq!(got, Ok(2));
+    }
+
+    #[test]
+    fn a_read_that_keeps_failing_gives_its_last_error() {
+        let got: Result<()> = retried(Duration::ZERO, || Err("no reply".to_string()));
+        assert_eq!(got, Err("no reply".to_string()));
+    }
 
     fn node(role: Role, name: &str, children: Vec<Node>) -> Node {
         Node {
