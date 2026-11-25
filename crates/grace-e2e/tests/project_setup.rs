@@ -1,9 +1,10 @@
 //! `e2e/project-setup.spec.ts`, through the accessibility tree: how a project's own setup shapes the tests Grace finds
-//! and runs. The pom's starting values, the libraries, the sub-folder offer and Build come with phase P4's later slices.
+//! and runs. The libraries, the sub-folder offer and Build come with phase P4's later slices.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use grace_e2e::history::runs_dir;
 use grace_e2e::{App, Node, Role, project};
 use serde_json::json;
 
@@ -111,6 +112,108 @@ fn karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest() 
     .unwrap();
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// E-project-setup-02
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn karate_pom_json_starts_the_environment_filter_and_thread_count() {
+    let dir = scratch("pom-start");
+    // fast passes only in qa; the other two must not run
+    write(
+        &dir,
+        &[
+            (
+                "a.feature",
+                "Feature: a\n@smoke\nScenario: fast\n  * match cfg == 'qa'\n\
+                 @smoke @slow\nScenario: slow\n  * print 'slow'\nScenario: plain\n  * print 'plain'\n",
+            ),
+            ("karate-config.js", "function fn() { return { cfg: 'base' }; }"),
+            ("karate-config-qa.js", "function fn() { return { cfg: 'qa' }; }"),
+            (
+                "karate-pom.json",
+                r#"{"env":"qa","tags":["@smoke","~@slow"],"threads":3}"#,
+            ),
+        ],
+    );
+    let app = open(&dir);
+    app.wait_for("the feature", WAIT, |t| {
+        t.find(&Role::Button, "Expand a.feature").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Expand a.feature").unwrap();
+    let tree = app
+        .wait_for("the tests and the chips", WAIT, |t| {
+            row(t, "plain").is_some()
+                && t.find(&Role::Button, "@smoke, included").is_some()
+                && t.find(&Role::Button, "@slow, excluded").is_some()
+        })
+        .unwrap();
+    assert!(
+        tree.all().iter().all(|n| !n.name.starts_with("Grace does not use")),
+        "{}",
+        tree.dump()
+    );
+    // on Linux these find the boxes only: the run below shows what they hold
+    app.wait_for_text(Role::ComboBox, "Env", "qa").unwrap();
+    app.wait_for_text(Role::SpinButton, "Threads", "3").unwrap();
+
+    app.press_named(Role::Button, "Run all").unwrap();
+    let tree = app
+        .wait_for("fast passed and the run over", RUN, |t| {
+            passed(t, "fast") && t.all().iter().any(|n| n.name == "Finished")
+        })
+        .unwrap();
+    // the rows the filter dims: not run, and without a Run button
+    for name in ["slow", "plain"] {
+        assert!(
+            row(&tree, name).is_some_and(|r| !r.name.contains("passed") && !r.name.contains("failed"))
+                && tree.find(&Role::Button, &format!("Run {name}")).is_none(),
+            "{name}: {}",
+            tree.dump()
+        );
+    }
+    let runs: Vec<PathBuf> = std::fs::read_dir(runs_dir(app.data_dir(), &dir))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    assert_eq!(runs.len(), 1, "{runs:?}");
+    let events = std::fs::read_to_string(runs[0].join("karate-json").join("karate-events.jsonl")).unwrap();
+    let suite = events.lines().find(|l| l.contains("\"SUITE_ENTER\"")).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(suite).unwrap()["data"]["threads"],
+        3
+    );
+    drop(app);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// E-project-setup-03
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn mavens_karate_env_starts_the_environment() {
+    let dir = project("maven").unwrap();
+    write(
+        &dir,
+        &[
+            (
+                "pom.xml",
+                "<project><modelVersion>4.0.0</modelVersion><groupId>x</groupId><artifactId>x</artifactId><version>1</version>\
+                 <properties><karate.env>dev</karate.env></properties><build><plugins><plugin>\
+                 <artifactId>maven-surefire-plugin</artifactId><configuration><systemPropertyVariables>\
+                 <karate.env>${karate.env}</karate.env></systemPropertyVariables></configuration>\
+                 </plugin></plugins></build></project>",
+            ),
+            (
+                "src/test/java/examples/env.feature",
+                "Feature: env\nScenario: runs in dev\n  * match karate.env == 'dev'\n",
+            ),
+        ],
+    );
+    let app = open(&dir);
+    // on Linux this finds the box only: the run below shows what it holds
+    app.wait_for_text(Role::ComboBox, "Env", "dev").unwrap();
+    run_scenario(&app, "env.feature", "runs in dev");
 }
 
 /// E-project-setup-04
