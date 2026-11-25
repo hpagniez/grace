@@ -2,15 +2,6 @@
 use super::*;
 use crate::report_zip::zip_report;
 
-/// Writes `files` (relative path, content) under `root`.
-fn write(root: &Path, files: &[(&str, &str)]) {
-    for (rel, text) in files {
-        let path = root.join(rel);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, text).unwrap();
-    }
-}
-
 /// A fresh temporary project of `files`.
 fn project(files: &[(&str, &str)]) -> (TempDir, String) {
     let dir = temp("kk-pom-");
