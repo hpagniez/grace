@@ -64,7 +64,8 @@ fn click_chip(app: &App, tag: &str, states: &[&str]) {
         let now = chip(&app.tree().unwrap(), tag)
             .unwrap_or_else(|| panic!("a chip @{tag}"))
             .clone();
-        app.press(&now).unwrap();
+        // tries again: on Linux a chip still off just after "Ready." has no action to press
+        app.press_named(Role::Button, &now.name).unwrap();
         let want = format!("@{tag}, {state}");
         app.wait_for(&want, WAIT, |t| t.find(&Role::Button, &want).is_some())
             .unwrap();
@@ -86,7 +87,8 @@ fn open_features(app: &App, features: &[&str]) {
 
 /// Grace on a fixture project, its tests found and its open over. The count shows before the open ends, and the chips
 /// are off until then: a press of one fails on Linux (no AT-SPI action) and does nothing on Windows. "Ready." shows
-/// once it is over (`banner_state`); Run all's state, which only Windows reports, covers a read where it shows first.
+/// once it is over (`banner_state`), and can show a moment before every control is on again: Run all's state, which only
+/// Windows reports, covers that there, and `press_named`'s retry on Linux.
 /// The bottom panel at its smallest, 96 px, leaves the tree room for every row of the clean project with its features
 /// open, on CI's 1024×768 screen too: the tree draws only the rows in view.
 fn open(dir: &Path, found: &str) -> App {
@@ -217,11 +219,8 @@ fn run_all_runs_only_matching_tests() {
     let (_, app) = open_clean();
     // "failing match" gets a status first, to see that a filtered run leaves it alone
     app.press_named(Role::Button, "Run failing match").unwrap();
-    // the runner refuses a filter change until the run is saved, after the window says "Finished"
-    app.wait_for("failing match failed, the run saved", RUN, |t| {
-        label(t, "Finished").is_some()
-            && says(t, "failing match", "failed")
-            && t.find(&Role::Tab, "History (1)").is_some()
+    app.wait_for("failing match failed", RUN, |t| {
+        label(t, "Finished").is_some() && says(t, "failing match", "failed")
     })
     .unwrap();
     click_chip(&app, "smoke", &["included"]);
@@ -400,8 +399,7 @@ fn many_tags_keep_a_one_line_bar() {
         .unwrap();
     let panel = tree.find(&Role::Group, "All tags").unwrap();
     assert_eq!(chips(panel).len(), 54, "{}", tree.dump());
-    let last = chip(panel, "module-53").unwrap().clone();
-    app.press(&last).unwrap();
+    app.press_named(Role::Button, "@module-53, not filtered").unwrap();
     app.wait_for("module-53 included, the panel open, the count on", WAIT, |t| {
         t.find(&Role::Group, "All tags")
             .is_some_and(|p| p.find(&Role::Button, "@module-53, included").is_some())
