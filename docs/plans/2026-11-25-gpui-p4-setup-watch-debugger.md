@@ -77,6 +77,22 @@ No new behaviour is expected. Port `runner.setup.test.ts` test for test into `gr
 
 A row with no test gets one, written first and seen failing where the behaviour is missing. A row whose behaviour turns out not to be built goes to its feature's slice (PS-01 to PS-05 to slice 2, PS-06 to PS-09 and PL-01 to slice 3), said in the PR.
 
+What slice 1 built: no behaviour and no Redesigns row. All of its rows were built, so none goes to a later slice. `runner::tests::setup`'s 9 tests passed at once (with the extension folders taken off the classpath, its two `.karate/ext` tests fail, so the jar they zip is what Java loads); `grace-e2e/tests/project_setup.rs` holds E-project-setup-01, 04 and 06. PS-01 and PS-05 name `env` among the pom's unused settings, which the later pom defaults spec changed (PD-01, slice 2: `env` starts the Env box); their proofs use `dryRun`. PD-09 to PD-11 are ticked on `read_pom`'s tests; the values reaching the controls are slice 2's. The tests, test for test:
+
+#### `runner.setup.test.ts` (9) in `grace_core::runner::tests::setup`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes paths and configDir from karate-pom.json and names the rest | ported | `takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest` |
+| 2. writes JUnit XML when karate-pom.json asks | ported | `writes_junit_xml_when_karate_pom_json_asks` |
+| 3. says it only on open | ported | `says_it_only_on_open` |
+| 4. puts Maven's compiled output on the classpath | ported | `puts_mavens_compiled_output_on_the_classpath` |
+| 5. runs one row of a Maven outline | ported | `runs_one_row_of_a_maven_outline` |
+| 6. runs one row of an outline in the configDir | ported | `runs_one_row_of_an_outline_in_the_config_dir` |
+| 7. uses the default folders when karate-pom.json cannot be read | ported | `uses_the_default_folders_when_karate_pom_json_cannot_be_read` |
+| 8. puts the jars of the project's .karate/ext on the classpath | ported | `puts_the_jars_of_the_projects_karate_ext_on_the_classpath` |
+| 9. puts the jars of the home .karate/ext on the classpath | ported | `puts_the_jars_of_the_home_karate_ext_on_the_classpath` |
+
 ### Slice 2: pom.xml's environment and the pom's starting values
 
 Specs: [pom defaults](../specs/2026-11-04-pom-defaults.md), [project setup](../specs/2026-11-02-project-setup.md).

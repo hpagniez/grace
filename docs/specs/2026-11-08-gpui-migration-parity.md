@@ -506,7 +506,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PL-01 | A jar in the project's .karate/ext is on the classpath | | ☐ |
+| PL-01 | A jar in the project's .karate/ext is on the classpath | `grace-core::karate::command::tests::extension_jars::lists_the_home_folder_then_the_projects_as_wildcards`, `grace-core::runner::tests::setup::puts_the_jars_of_the_projects_karate_ext_on_the_classpath`, `grace-core::runner::tests::setup::puts_the_jars_of_the_home_karate_ext_on_the_classpath`, `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | PL-02 | A Maven project's libraries are on the classpath | | ☐ |
 | PL-03 | A Gradle project's libraries are on the classpath | | ☐ |
 | PL-04 | The order of the classpath | | ☐ |
@@ -526,15 +526,15 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PS-01 | The pom's run settings do not change a run | | ☐ |
-| PS-02 | The pom's paths choose the tests | | ☐ |
-| PS-03 | The pom's configDir gives the config and the environments | | ☐ |
-| PS-04 | A pom Grace cannot read | | ☐ |
-| PS-05 | The notice shows only on open | | ☐ |
-| PS-06 | Maven's compiled output is on the classpath | | ☐ |
-| PS-07 | Compiled copies stay out of the tree and the environments | | ☐ |
-| PS-08 | One row of a Maven outline runs | | ☐ |
-| PS-09 | Gradle's compiled output is on the classpath | | ☐ |
+| PS-01 | The pom's run settings do not change a run | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::build_args::builds_the_exact_command_line` (`env` now starts the Env box, the later [pom defaults](2026-11-04-pom-defaults.md) spec, PD-01: the test's pom holds `dryRun`) | ☑ |
+| PS-02 | The pom's paths choose the tests | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::keeps_the_paths_inside_the_project_and_names_the_others` | ☑ |
+| PS-03 | The pom's configDir gives the config and the environments | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::passes_config_dir_as_written_and_reads_environments_there_and_in_the_project`, `grace-e2e/tests/project_setup.rs::karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest` | ☑ |
+| PS-04 | A pom Grace cannot read | `grace-core::runner::tests::setup::uses_the_default_folders_when_karate_pom_json_cannot_be_read`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::uses_nothing_from_a_file_it_cannot_read` | ☑ |
+| PS-05 | The notice shows only on open | `grace-core::runner::tests::setup::says_it_only_on_open` | ☑ |
+| PS-06 | Maven's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder`, `grace-core::runner::tests::setup::puts_mavens_compiled_output_on_the_classpath`, `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
+| PS-07 | Compiled copies stay out of the tree and the environments | `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder` | ☑ |
+| PS-08 | One row of a Maven outline runs | `grace-e2e/tests/open.rs::running_one_test_of_a_maven_project_shows_its_result`, `grace-core::runner::tests::setup::runs_one_row_of_a_maven_outline` | ☑ |
+| PS-09 | Gradle's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::gradle_in_its_order` | ☑ |
 
 ### SD · Step debugger: breakpoints on steps, pause, step, inspect variables
 
@@ -852,9 +852,9 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PD-06 | A pom filter whose tags no test has is not saved | | ☐ |
 | PD-07 | Refresh applies an edited pom to the controls with nothing saved | | ☐ |
 | PD-08 | Refresh drops a value the pom no longer gives | | ☐ |
-| PD-09 | Tag entries the filter can show | | ☐ |
-| PD-10 | Tag entries the filter cannot show are named | | ☐ |
-| PD-11 | An env or thread count Grace cannot take is named | | ☐ |
+| PD-09 | Tag entries the filter can show | `grace-core::karate::pom::tests::read_pom::takes_env_tags_and_threads` and the four `shows_the_tag_entries_*_as_chips` beside it | ☑ |
+| PD-10 | Tag entries the filter cannot show are named | `grace-core::karate::pom::tests::read_pom::names_the_tag_entries_of_any_of_it_cannot_show` and the four `names_the_tag_entries_of_*` beside it; the notice's sentence: `grace-core::karate::command::tests::detect_layout::karate_pom_json::says_both_settings_first` | ☑ |
+| PD-11 | An env or thread count Grace cannot take is named | `grace-core::karate::pom::tests::read_pom::names_an_env_or_a_thread_count_grace_cannot_take` | ☑ |
 | PD-12 | The notice names only what Grace does not use | | ☐ |
 | PD-13 | Surefire passes the project's karate.env (e2e) | | ☐ |
 | PD-14 | Maven's karate.env | | ☐ |
@@ -1176,12 +1176,12 @@ Phase P4 · 8 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-project-setup-01 | karate-pom.json gives the tests and the config, and a notice names the rest | | ☐ |
+| E-project-setup-01 | karate-pom.json gives the tests and the config, and a notice names the rest | `grace-e2e/tests/project_setup.rs::karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest` | ☑ |
 | E-project-setup-02 | karate-pom.json starts the environment, filter and thread count | | ☐ |
 | E-project-setup-03 | Maven's karate.env starts the environment | | ☐ |
-| E-project-setup-04 | Maven's compiled output is on the classpath | | ☐ |
+| E-project-setup-04 | Maven's compiled output is on the classpath | `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
 | E-project-setup-05 | a Maven project's libraries come from its build | | ☐ |
-| E-project-setup-06 | jars in .karate/ext are on the classpath | | ☐ |
+| E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | E-project-setup-07 | an empty folder offers the Karate project below it | | ☐ |
 | E-project-setup-08 | the not-built notice builds the project's Java code | | ☐ |
 
@@ -1374,7 +1374,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.properties.test.ts` | 18 | `grace-core::runner::tests::properties` (19 tests, real Java and Karate) (one, a file another process holds, runs on Windows only) | ☑ |
 | `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.runs.test.ts` | 13 | `grace-core::runner::tests::runs` (14 tests, real Java and Karate) (and one new: a cancel just before Java starts) | ☑ |
-| `src/main/runner.setup.test.ts` | 9 | `grace-core::runner` (setup) | ☐ |
+| `src/main/runner.setup.test.ts` | 9 | `grace-core::runner::tests::setup` (9 tests, real Java and Karate) | ☑ |
 | `src/main/runner.subfolders.test.ts` | 7 | `grace-core::runner` (subfolders) | ☐ |
 | `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
