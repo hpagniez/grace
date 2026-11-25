@@ -289,7 +289,7 @@ for (const theme of ["light", "dark"] as const) {
         "karate-config.js failed for 4",
       );
       await expect(win.getByTestId("error-group")).toHaveText(
-        /^d of 4 tests failed with this error$/,
+        /^\d of 4 tests failed with this error$/,
       );
       await shoot(win, "failures");
 
