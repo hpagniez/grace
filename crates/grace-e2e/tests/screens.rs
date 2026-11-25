@@ -667,7 +667,7 @@ fn history(dark: bool) {
     })
     .unwrap();
     shot(&app, &themed("history-tab", dark));
-    // the window at its least width (a smaller size is refused): the row's buttons as icons, a name in a tooltip
+    // the window at its least width, 760 (`window::MIN_SIZE`, which Xvfb does not enforce): the row's buttons as icons, a name in a tooltip
     // (#385). The build before that change has no icons: the waits may fail, and the shots show the rows as they are
     let row_button = |t: &Node| {
         t.find(&Role::List, "Run history")
@@ -680,7 +680,7 @@ fn history(dark: bool) {
         width: 1200,
         height: 800,
     });
-    app.set_window_rect(at.x, at.y, 400, at.height).unwrap();
+    app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
     let narrow = Duration::from_secs(3);
     let _ = app.wait_for("the narrow rows", narrow, |t| {
         row_button(t).and_then(|b| b.rect).is_some_and(|r| r.width < 40)
@@ -692,7 +692,11 @@ fn history(dark: bool) {
     });
     shot(&app, &themed("history-narrow-tooltip", dark));
     app.set_window_rect(at.x, at.y, at.width, at.height).unwrap();
-    let t = app.tree().unwrap();
+    let t = app
+        .wait_for("the window wide again", WAIT, |t| {
+            t.rect.is_some_and(|r| r.width >= at.width)
+        })
+        .unwrap();
     app.click(t.find(&Role::Button, "Clear history").unwrap()).unwrap();
     app.wait_for("the dialog", WAIT, |t| t.all().iter().any(|n| n.role == Role::Dialog))
         .unwrap();
@@ -778,14 +782,11 @@ fn examples(dark: bool) {
     app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
         .unwrap();
     app.press_named(Role::Button, "Expand outline.feature").unwrap();
-    let t = app
-        .wait_for("the outline", WAIT, |t| starting(t, "add <a> and <b>, ").is_some())
+    app.wait_for("the outline", WAIT, |t| starting(t, "add <a> and <b>, ").is_some())
         .unwrap();
-    app.press_named(Role::Button, "Run all").unwrap();
-    app.wait_for("the run finished", RUN, |t| {
-        starting(t, "add <a> and <b>, passed").is_some()
-    })
-    .unwrap();
+    // the whole run: the tree moves while it goes on, so the row is found once it is over
+    run_all(&app);
+    let t = app.tree().unwrap();
     app.click(starting(&t, "add <a> and <b>, ").unwrap()).unwrap();
     // the build before the table has no list: the wait is allowed to fail
     let _ = app.wait_for("the table", Duration::from_secs(5), |t| {

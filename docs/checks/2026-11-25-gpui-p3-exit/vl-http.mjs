@@ -3,7 +3,7 @@
 // outside as docs/checks/2026-11-10-gpui-p2-exit/vl.mjs does, through that folder's uiprobe.exe (built from its
 // uiprobe.cs with the .NET Framework's csc.exe). Run from the repository root:
 //
-//   node --no-warnings docs/checks/2026-11-23-gpui-p3-exit/vl-http.mjs <uiprobe.exe> <Grace.exe> <project> <rounds>
+//   node --no-warnings docs/checks/2026-11-25-gpui-p3-exit/vl-http.mjs <uiprobe.exe> <Grace.exe> <project> <rounds>
 //
 // <project> is a folder this script fills with writeBigProject (25 features per module). Prints the rounds as JSON.
 import { spawn } from "node:child_process";

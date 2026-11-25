@@ -1,6 +1,6 @@
-// Takes the screenshots of docs/checks/2026-11-23-gpui-p3-exit (Electron's side, the twins of
+// Takes the screenshots of docs/checks/2026-11-25-gpui-p3-exit (Electron's side, the twins of
 // crates/grace-e2e/tests/screens.rs). Bash: `SHOTS_DIR=<dir> npm run screens:p3`.
-// PowerShell: `$env:SHOTS_DIR="docs/checks/2026-11-23-gpui-p3-exit/electron"; npm run screens:p3`.
+// PowerShell: `$env:SHOTS_DIR="docs/checks/2026-11-25-gpui-p3-exit/electron"; npm run screens:p3`.
 // Never run it with the unit tests: the Java leak checks of the e2e helpers see every java.exe.
 //
 // Not taken: GPUI's `tree-row-menu` (the tree's right-click menu is a native menu, which a page screenshot cannot take),
@@ -29,7 +29,7 @@ import {
 } from "./helpers";
 
 const SHOTS_DIR = path.resolve(
-  process.env.SHOTS_DIR ?? "docs/checks/2026-11-23-gpui-p3-exit/electron",
+  process.env.SHOTS_DIR ?? "docs/checks/2026-11-25-gpui-p3-exit/electron",
 );
 const WIDTH = 1280;
 const HEIGHT = 800;
