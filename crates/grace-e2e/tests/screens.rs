@@ -872,3 +872,65 @@ Scenario: four
     }
     shot(&app, &themed("failures-folder", dark));
 }
+
+/// A Maven project whose Java code is not built (slice 4 of P4): the notice with its Build button, the build going, and
+/// a failed build's long notice, also at the narrowest window. The build before shows no notice.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_build_notice() {
+    for dark in [false, true] {
+        build_notice(dark);
+    }
+}
+
+fn build_notice(dark: bool) {
+    let dir = project("maven").unwrap();
+    let helper = dir.join("src/test/java/common/Helper.java");
+    std::fs::create_dir_all(helper.parent().unwrap()).unwrap();
+    std::fs::write(helper, "class Helper {}").unwrap();
+    // a stand-in for Maven: it lists no library, and test-compile takes a while, then fails
+    #[cfg(windows)]
+    std::fs::write(
+        dir.join("mvnw.cmd"),
+        "@echo off\r\nif defined GRACE_CLASSPATH_FILE (type nul>\"%GRACE_CLASSPATH_FILE%\" & exit /b 0)\r\n\
+         ping -n 6 127.0.0.1 >nul\r\necho [ERROR] COMPILATION ERROR\r\nexit /b 1\r\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let wrapper = dir.join("mvnw");
+        let script = "#!/bin/sh\n\
+             if [ -n \"$GRACE_CLASSPATH_FILE\" ]; then : > \"$GRACE_CLASSPATH_FILE\"; exit 0; fi\n\
+             sleep 5\necho '[ERROR] COMPILATION ERROR'\nexit 1\n";
+        std::fs::write(&wrapper, script).unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let app = open(&dir, dark);
+    app.wait_for("the project ready", WAIT, |t| starting(t, "Ready.").is_some())
+        .unwrap();
+    shot(&app, &themed("build-notice", dark));
+    // the build before has no notice and no button
+    if app.tree().unwrap().find(&Role::Button, "Build").is_none() {
+        return;
+    }
+    app.press_named(Role::Button, "Build").unwrap();
+    app.wait_for("the build going", WAIT, |t| {
+        starting(t, "Building the project's Java code").is_some()
+    })
+    .unwrap();
+    shot(&app, &themed("build-running", dark));
+    app.wait_for("the failure's notice", RUN, |t| {
+        starting(t, "Grace could not build").is_some()
+    })
+    .unwrap();
+    shot(&app, &themed("build-failed", dark));
+    let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
+        x: 0,
+        y: 0,
+        width: 1200,
+        height: 800,
+    });
+    app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
+    shot(&app, &themed("build-failed-narrow", dark));
+}

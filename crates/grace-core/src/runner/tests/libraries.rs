@@ -1,4 +1,4 @@
-//! `runner.libraries.test.ts` outside "the project's Java code", which comes with Build. Every build tool here is a
+//! `runner.libraries.test.ts` outside "the project's Java code", which is `build`'s. Every build tool here is a
 //! stand-in the test writes (P4 plan, porting rule 3): batch files on Windows, `sh` scripts on Linux. The runner
 //! looks for one only where `Setup::lookup_env` says, which is nowhere unless a test says so.
 use super::*;
@@ -10,13 +10,13 @@ const FEATURE: &str = "Feature: t\nScenario: lib\n  * match read('classpath:data
 
 /// A stand-in's body in each platform's language.
 #[derive(Default)]
-struct Script {
+pub(super) struct Script {
     cmd: String,
     sh: String,
 }
 
 impl Script {
-    fn new(cmd: impl Into<String>, sh: impl Into<String>) -> Self {
+    pub(super) fn new(cmd: impl Into<String>, sh: impl Into<String>) -> Self {
         Self {
             cmd: cmd.into(),
             sh: sh.into(),
@@ -24,7 +24,7 @@ impl Script {
     }
 
     /// This, then `next`.
-    fn then(self, next: Script) -> Self {
+    pub(super) fn then(self, next: Script) -> Self {
         Self::new(
             format!("{}\r\n{}", self.cmd, next.cmd),
             format!("{}\n{}", self.sh, next.sh),
@@ -33,7 +33,7 @@ impl Script {
 }
 
 /// Writes `jar` as the whole list, where Grace asks for it.
-fn lists(jar: &Path) -> Script {
+pub(super) fn lists(jar: &Path) -> Script {
     let jar = jar.display();
     Script::new(
         format!(">\"%GRACE_CLASSPATH_FILE%\" echo {jar}"),
@@ -42,11 +42,11 @@ fn lists(jar: &Path) -> Script {
 }
 
 /// Prints `line` and fails.
-fn fails(line: &str) -> Script {
+pub(super) fn fails(line: &str) -> Script {
     Script::new(format!("echo {line}\r\nexit /b 1"), format!("echo '{line}'\nexit 1"))
 }
 
-fn sleeps(seconds: u32) -> Script {
+pub(super) fn sleeps(seconds: u32) -> Script {
     Script::new(
         format!("ping -n {} 127.0.0.1 >nul", seconds + 1),
         format!("sleep {seconds}"),
@@ -54,7 +54,7 @@ fn sleeps(seconds: u32) -> Script {
 }
 
 /// Logs `late`, which a stopped tool never does.
-fn logs_late() -> Script {
+pub(super) fn logs_late() -> Script {
     Script::new(
         "echo late>>\"%~dp0calls.log\"",
         "echo late >> \"$(dirname \"$0\")/calls.log\"",
@@ -72,7 +72,7 @@ fn tool_name(name: &str) -> String {
 
 /// Writes a stand-in build tool `name` into `dir`: it logs its arguments to `<dir>/calls.log`, then runs `body`.
 /// Returns the log's path.
-fn stub_tool(dir: &Path, name: &str, body: Script) -> PathBuf {
+pub(super) fn stub_tool(dir: &Path, name: &str, body: Script) -> PathBuf {
     fs::create_dir_all(dir).unwrap();
     let file = dir.join(tool_name(name));
     #[cfg(windows)]
@@ -103,7 +103,7 @@ fn stub_tool(dir: &Path, name: &str, body: Script) -> PathBuf {
 }
 
 /// The lines of a stand-in's log; none before its first call.
-fn calls(log: &Path) -> Vec<String> {
+pub(super) fn calls(log: &Path) -> Vec<String> {
     fs::read_to_string(log)
         .unwrap_or_default()
         .lines()
@@ -114,7 +114,7 @@ fn calls(log: &Path) -> Vec<String> {
 
 /// A project of `build` (`pom.xml` or `build.gradle`) under `parent`, whose one scenario passes only with the listed
 /// jar on the classpath.
-fn project_in(parent: &Path, build: &str) -> (TempDir, String) {
+pub(super) fn project_in(parent: &Path, build: &str) -> (TempDir, String) {
     fs::create_dir_all(parent).unwrap();
     let dir = tempfile::Builder::new().prefix("kk-libs-").tempdir_in(parent).unwrap();
     let text = if build == "pom.xml" { "<project/>" } else { "" };
@@ -123,11 +123,11 @@ fn project_in(parent: &Path, build: &str) -> (TempDir, String) {
     (dir, root)
 }
 
-fn maven() -> (TempDir, String) {
+pub(super) fn maven() -> (TempDir, String) {
     project_in(&std::env::temp_dir(), "pom.xml")
 }
 
-fn gradle() -> (TempDir, String) {
+pub(super) fn gradle() -> (TempDir, String) {
     project_in(&std::env::temp_dir(), "build.gradle")
 }
 
@@ -142,14 +142,14 @@ fn make_jar(dir: &Path, data: &str) -> PathBuf {
 }
 
 /// The scenario's jar, in a plain temporary folder: the stand-in's `echo` does not quote it.
-fn jar() -> (TempDir, PathBuf) {
+pub(super) fn jar() -> (TempDir, PathBuf) {
     let dir = temp("kk-libjar-");
     let jar = make_jar(dir.path(), r#"{ "lib": true }"#);
     (dir, jar)
 }
 
 /// A runner that looks for build tools where these variables lead.
-fn looking(vars: &[(&str, &Path)]) -> TestRunner {
+pub(super) fn looking(vars: &[(&str, &Path)]) -> TestRunner {
     setup_with(Setup {
         lookup_env: vars.iter().map(|(k, v)| (k.into(), v.into())).collect(),
         ..Setup::default()
@@ -164,7 +164,7 @@ fn assert_passed(t: &TestRunner) {
 }
 
 /// `touch`: a change of the build file.
-fn touch(root: &str, build: &str) {
+pub(super) fn touch(root: &str, build: &str) {
     let file = Path::new(root).join(build);
     let text = fs::read_to_string(&file).unwrap();
     fs::write(file, format!("{text} ")).unwrap();

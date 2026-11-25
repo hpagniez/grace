@@ -23,6 +23,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
+mod build;
 mod discovery;
 mod editor;
 mod env;

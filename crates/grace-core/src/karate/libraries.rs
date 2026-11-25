@@ -71,7 +71,7 @@ const KEPT: &str = "libraries.json";
 /// `File.pathSeparator`, which Maven and the init script join the list with.
 const LIST_SEPARATOR: char = if cfg!(windows) { ';' } else { ':' };
 const JAVA: &str = if cfg!(windows) { "java.exe" } else { "java" };
-const JAVAC: &str = if cfg!(windows) { "javac.exe" } else { "javac" };
+pub(crate) const JAVAC: &str = if cfg!(windows) { "javac.exe" } else { "javac" };
 
 static ERROR_PREFIX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^((\[ERROR\]|\[FATAL\]|ERROR:)\s*)+").expect("a valid pattern"));
