@@ -3,8 +3,8 @@
 //! `grace_core::flaky_proof`'s; a Report opens that run's report through the runner and the `open_path` seam (FL-04).
 use gpui::accesskit::Role;
 use gpui::{
-    AnyElement, App, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, div, px,
+    AnyElement, App, Div, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Svg, div, px,
 };
 use grace_core::flaky_proof::{ProofBox, ProofRun};
 use grace_core::model::flaky::FlakyStatus;
@@ -12,11 +12,23 @@ use grace_core::model::flaky::FlakyStatus;
 use crate::app::Grace;
 use crate::assets::Icon;
 use crate::elements::{ButtonKind, ButtonSize, MarkStatus, Off as _, button, icon, status_mark};
-use crate::theme::{METRICS, Theme};
+use crate::http::Tint;
+use crate::theme::{METRICS, Theme, Tokens};
 
 /// What a test names an environment by: `-` for none.
 fn name(b: &ProofBox) -> &str {
     b.env.as_deref().unwrap_or("-")
+}
+
+/// A proof's box, before its content: `TINT.cancelled`, whose colour the heading inherits (#398).
+fn tinted(t: &Tokens) -> Div {
+    let (fill, ink) = Tint::Cancelled.colours(t);
+    div().bg(Theme::color(fill)).text_color(Theme::color(ink))
+}
+
+/// The heading's shuffle icon, in the box's colour: an `svg` takes none from its parent.
+fn shuffle(t: &Tokens) -> Svg {
+    icon(Icon::Shuffle, 14., Theme::color(Tint::Cancelled.colours(t).1))
 }
 
 fn row(grace: &Entity<Grace>, env: &str, r: &ProofRun, cx: &App) -> AnyElement {
@@ -98,7 +110,7 @@ pub fn view(grace: &Entity<Grace>, boxes: &[ProofBox], cx: &App) -> Vec<AnyEleme
         .iter()
         .map(|b| {
             let env = name(b).to_string();
-            div()
+            tinted(t)
                 .id(SharedString::from(format!("flaky-proof-{env}")))
                 .debug_selector({
                     let env = env.clone();
@@ -111,7 +123,6 @@ pub fn view(grace: &Entity<Grace>, boxes: &[ProofBox], cx: &App) -> Vec<AnyEleme
                 .gap_1()
                 .p_3()
                 .rounded_lg()
-                .bg(Theme::color(t.cancelled_tint))
                 .child(
                     div()
                         .id(SharedString::from(format!("flaky-heading-{env}")))
@@ -130,7 +141,7 @@ pub fn view(grace: &Entity<Grace>, boxes: &[ProofBox], cx: &App) -> Vec<AnyEleme
                                     move || format!("flaky-proof-icon:{env}")
                                 })
                                 .flex()
-                                .child(icon(Icon::Shuffle, 14., Theme::color(t.ink))),
+                                .child(shuffle(t)),
                         )
                         .child(b.heading.clone()),
                 )
