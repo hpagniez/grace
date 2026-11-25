@@ -101,7 +101,19 @@ impl BottomPanel {
         let console = cx.new(|cx| Console::new(grace.clone(), window, cx));
         let http = cx.new(|cx| crate::http::HttpCalls::new(grace.clone(), cx));
         let history = cx.new(|_| crate::history::History::new(grace.clone()));
-        let subscriptions = vec![cx.observe(&grace, |_, _, cx| cx.notify())];
+        // GPUI has no Escape for a drag (RP-06). An interceptor, since the focus may be anywhere in the window.
+        let me = cx.weak_entity();
+        let window_id = window.window_handle().window_id();
+        let escape = cx.intercept_keystrokes(move |e, window, cx| {
+            if e.keystroke.key != "escape" || window.window_handle().window_id() != window_id {
+                return;
+            }
+            let tab_dragged = me.upgrade().is_some_and(|p| p.read(cx).from.is_some());
+            if tab_dragged && cx.stop_active_drag(window) {
+                cx.stop_propagation();
+            }
+        });
+        let subscriptions = vec![cx.observe(&grace, |_, _, cx| cx.notify()), escape];
         Self {
             grace,
             console,

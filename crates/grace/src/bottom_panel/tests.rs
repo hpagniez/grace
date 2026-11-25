@@ -289,6 +289,40 @@ mod tabs {
         }
     }
 
+    // The move after the key matters: after a key press GPUI drops nothing until the pointer moves again, so a
+    // release alone would pass whatever the key did.
+    #[gpui::test]
+    fn escape_cancels_a_tab_drag_and_saves_nothing(cx: &mut TestAppContext) {
+        let dir = data_dir("drag-escape");
+        let (h, mut cx, p) = setup(cx, dir.clone());
+        let at = drag(&mut cx, "tab-http", "tab-console");
+        keys(&mut cx, "escape");
+        let nudged = at + gpui::point(px(1.), px(0.));
+        cx.simulate_mouse_move(nudged, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+        cx.simulate_mouse_up(nudged, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+        assert_eq!(cx.update(|_, cx| h.grace.read(cx).state.panel), Panel::Console);
+    }
+
+    #[gpui::test]
+    fn another_key_leaves_a_tab_drag_going(cx: &mut TestAppContext) {
+        let dir = data_dir("drag-key");
+        let (_h, mut cx, p) = setup(cx, dir.clone());
+        let at = drag(&mut cx, "tab-http", "tab-console");
+        keys(&mut cx, "a");
+        let nudged = at + gpui::point(px(1.), px(0.));
+        cx.simulate_mouse_move(nudged, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_up(nudged, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(order(&p, &mut cx), [TabId::Http, TabId::Console, TabId::History]);
+    }
+
     #[gpui::test]
     fn a_file_dragged_in_from_outside_shows_no_bar_and_moves_no_tab(cx: &mut TestAppContext) {
         let dir = data_dir("outside-file");
