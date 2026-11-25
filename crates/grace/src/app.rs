@@ -587,7 +587,6 @@ pub fn new_app(
     cx: &mut App,
 ) -> Entity<Grace> {
     let (tx, rx) = events();
-    #[allow(unused_mut)]
     let mut options = RunnerOptions::new(
         data_dir.clone(),
         vendor,
@@ -597,10 +596,7 @@ pub fn new_app(
         }),
     );
     // an end-to-end test runs only the wrapper it wrote, never the machine's Maven or Gradle (find-build-tools, Tests)
-    #[cfg(feature = "e2e")]
-    {
-        options.lookup_env = Some(Vec::new());
-    }
+    options.lookup_env = cfg!(feature = "e2e").then(Vec::new);
     let runner = Runner::with_options(options);
     cx.new(|cx| Grace::new(Arc::new(runner), seams, data_dir, rx, cx))
 }
