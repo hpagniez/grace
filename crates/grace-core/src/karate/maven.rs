@@ -51,7 +51,7 @@ fn element(xml: &str) -> Option<El> {
             };
             if token.get(4).is_some() {
                 stack.last_mut()?.children.push(el);
-            } else if stack.len() < DEEPEST {
+            } else if stack.len() <= DEEPEST {
                 stack.push(el);
             } else {
                 return None;
