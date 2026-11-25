@@ -65,6 +65,14 @@ pub(super) fn write(root: &Path, files: &[(&str, &str)]) {
     }
 }
 
+/// A fresh temporary project of `files`.
+pub(super) fn project(files: &[(&str, &str)]) -> (TempDir, String) {
+    let dir = temp("kk-pom-");
+    write(dir.path(), files);
+    let root = dir.path().to_string_lossy().into_owned();
+    (dir, root)
+}
+
 /// `copyFixture(name)`: a fresh copy of a fixture project, removed when dropped. `broken` is `clean` plus
 /// `broken-extra`.
 pub(super) struct Fixture {

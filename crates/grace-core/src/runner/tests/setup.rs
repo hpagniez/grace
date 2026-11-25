@@ -2,14 +2,6 @@
 use super::*;
 use crate::report_zip::zip_report;
 
-/// A fresh temporary project of `files`.
-fn project(files: &[(&str, &str)]) -> (TempDir, String) {
-    let dir = temp("kk-pom-");
-    write(dir.path(), files);
-    let root = dir.path().to_string_lossy().into_owned();
-    (dir, root)
-}
-
 /// a.feature passes only when it really runs with conf/karate-config.js and no environment.
 const POM_PROJECT: &[(&str, &str)] = &[
     (

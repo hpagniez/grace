@@ -12,17 +12,11 @@ fn write_pom(dir: &Path, pom: Value) {
     write(dir, &[("a.feature", FEATURE), ("karate-pom.json", &pom.to_string())]);
 }
 
-/// A fresh temporary project of `files`.
-fn project(files: &[(&str, &str)]) -> (TempDir, String) {
-    let dir = temp("kk-pom-");
-    write(dir.path(), files);
-    let root = dir.path().to_string_lossy().into_owned();
-    (dir, root)
-}
-
 /// A standalone project whose karate-pom.json holds `pom`.
 fn with_pom(pom: Value) -> (TempDir, String) {
-    project(&[("a.feature", FEATURE), ("karate-pom.json", &pom.to_string())])
+    let (dir, root) = project(&[]);
+    write_pom(dir.path(), pom);
+    (dir, root)
 }
 
 /// A second runner on `first`'s data folder, once `first` is disposed.

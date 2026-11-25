@@ -142,18 +142,12 @@ fn karate_pom_json_starts_the_environment_filter_and_thread_count() {
     })
     .unwrap();
     app.press_named(Role::Button, "Expand a.feature").unwrap();
-    let tree = app
-        .wait_for("the tests and the chips", WAIT, |t| {
-            row(t, "plain").is_some()
-                && t.find(&Role::Button, "@smoke, included").is_some()
-                && t.find(&Role::Button, "@slow, excluded").is_some()
-        })
-        .unwrap();
-    assert!(
-        tree.all().iter().all(|n| !n.name.starts_with("Grace does not use")),
-        "{}",
-        tree.dump()
-    );
+    app.wait_for("the tests and the chips", WAIT, |t| {
+        row(t, "plain").is_some()
+            && t.find(&Role::Button, "@smoke, included").is_some()
+            && t.find(&Role::Button, "@slow, excluded").is_some()
+    })
+    .unwrap();
     // on Linux these find the boxes only: the run below shows what they hold
     app.wait_for_text(Role::ComboBox, "Env", "qa").unwrap();
     app.wait_for_text(Role::SpinButton, "Threads", "3").unwrap();
@@ -164,6 +158,12 @@ fn karate_pom_json_starts_the_environment_filter_and_thread_count() {
             passed(t, "fast") && t.all().iter().any(|n| n.name == "Finished")
         })
         .unwrap();
+    // read after the run, when a notice of the open is certainly shown
+    assert!(
+        tree.all().iter().all(|n| !n.name.starts_with("Grace does not use")),
+        "{}",
+        tree.dump()
+    );
     // the rows the filter dims: not run, and without a Run button
     for name in ["slow", "plain"] {
         assert!(
@@ -214,6 +214,8 @@ fn mavens_karate_env_starts_the_environment() {
     // on Linux this finds the box only: the run below shows what it holds
     app.wait_for_text(Role::ComboBox, "Env", "dev").unwrap();
     run_scenario(&app, "env.feature", "runs in dev");
+    drop(app);
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// E-project-setup-04
