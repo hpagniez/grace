@@ -10,6 +10,7 @@ pub mod environments;
 pub mod events;
 pub mod http;
 mod js;
+pub mod maven;
 pub mod pom;
 pub mod process;
 pub mod run_state;

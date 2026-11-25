@@ -30,6 +30,7 @@ mod fingerprint;
 mod flaky;
 mod history;
 mod home;
+mod pom;
 mod properties;
 mod rerun;
 mod runs;
@@ -53,6 +54,23 @@ pub(super) fn vendor() -> VendorPaths {
 /// A temporary folder, prefixed as the TypeScript's `mkdtempSync(path.join(tmpdir(), prefix))`.
 pub(super) fn temp(prefix: &str) -> TempDir {
     tempfile::Builder::new().prefix(prefix).tempdir().unwrap()
+}
+
+/// Writes `files` (relative path, content) under `root`.
+pub(super) fn write(root: &Path, files: &[(&str, &str)]) {
+    for (rel, text) in files {
+        let path = root.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+}
+
+/// A fresh temporary project of `files`.
+pub(super) fn project(files: &[(&str, &str)]) -> (TempDir, String) {
+    let dir = temp("kk-pom-");
+    write(dir.path(), files);
+    let root = dir.path().to_string_lossy().into_owned();
+    (dir, root)
 }
 
 /// `copyFixture(name)`: a fresh copy of a fixture project, removed when dropped. `broken` is `clean` plus

@@ -844,23 +844,23 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PD-01 | karate-pom.json starts the controls (e2e) | | ☐ |
-| PD-02 | What the person saved wins | | ☐ |
-| PD-03 | Each control on its own | | ☐ |
-| PD-04 | Picking no environment is saved | | ☐ |
-| PD-05 | Saving run properties does not save the pom's environment | | ☐ |
-| PD-06 | A pom filter whose tags no test has is not saved | | ☐ |
-| PD-07 | Refresh applies an edited pom to the controls with nothing saved | | ☐ |
-| PD-08 | Refresh drops a value the pom no longer gives | | ☐ |
+| PD-01 | karate-pom.json starts the controls (e2e) | `grace-core::runner::tests::pom::karate_pom_json_starts_the_controls_and_a_run_passes_them`; `grace-e2e/tests/project_setup.rs::karate_pom_json_starts_the_environment_filter_and_thread_count` | ☑ |
+| PD-02 | What the person saved wins | `grace-core::runner::tests::pom::what_the_person_saved_wins` | ☑ |
+| PD-03 | Each control on its own | `grace-core::runner::tests::pom::each_control_decides_on_its_own` | ☑ |
+| PD-04 | Picking no environment is saved | `grace-core::runner::tests::pom::picking_no_environment_is_saved` | ☑ |
+| PD-05 | Saving run properties does not save the pom's environment | `grace-core::runner::tests::pom::saving_run_properties_does_not_save_the_poms_environment` (the save the Properties dialog calls) | ☑ |
+| PD-06 | A pom filter whose tags no test has is not saved | `grace-core::runner::tests::pom::a_pom_filter_whose_tags_no_test_has_is_not_saved` | ☑ |
+| PD-07 | Refresh applies an edited pom to the controls with nothing saved | `grace-core::runner::tests::pom::refresh_applies_an_edited_pom_to_the_controls_with_nothing_saved` | ☑ |
+| PD-08 | Refresh drops a value the pom no longer gives | `grace-core::runner::tests::pom::refresh_drops_a_value_the_pom_no_longer_gives` | ☑ |
 | PD-09 | Tag entries the filter can show | `grace-core::runner::tests::setup::opening_shows_the_poms_tag_entries_in_the_filter_and_names_none`, `grace-core::karate::pom::tests::read_pom::takes_env_tags_and_threads` and the four `shows_the_tag_entries_*_as_chips` beside it | ☑ |
 | PD-10 | Tag entries the filter cannot show are named | `grace-core::runner::tests::setup::opening_keeps_the_tag_entry_it_can_show_and_names_the_other`, `grace-core::karate::pom::tests::read_pom::names_the_tag_entries_of_any_of_it_cannot_show` and the four `names_the_tag_entries_of_*` beside it; the notice's sentence: `grace-core::karate::command::tests::detect_layout::karate_pom_json::says_both_settings_first` | ☑ |
 | PD-11 | An env or thread count Grace cannot take is named | `grace-core::runner::tests::setup::opening_picks_no_env_and_1_thread_for_values_it_cannot_take_and_names_them`, `grace-core::karate::pom::tests::read_pom::names_an_env_or_a_thread_count_grace_cannot_take` | ☑ |
-| PD-12 | The notice names only what Grace does not use | | ☐ |
-| PD-13 | Surefire passes the project's karate.env (e2e) | | ☐ |
-| PD-14 | Maven's karate.env | | ☐ |
-| PD-15 | karate-pom.json wins over pom.xml | | ☐ |
-| PD-16 | An unused karate-pom.json env keeps pom.xml out | | ☐ |
-| PD-17 | A Gradle project gets nothing from its build file | | ☐ |
+| PD-12 | The notice names only what Grace does not use | `grace-core::runner::tests::pom::the_notice_names_only_what_grace_does_not_use` | ☑ |
+| PD-13 | Surefire passes the project's karate.env (e2e) | `grace-core::runner::tests::pom::surefire_passes_a_maven_projects_karate_env`; `grace-e2e/tests/project_setup.rs::mavens_karate_env_starts_the_environment` | ☑ |
+| PD-14 | Maven's karate.env | `grace-core::karate::maven::tests`, one test per row (`takes_the_karate_env_property_alone`, `takes_surefires_entry_as_written`, `resolves_surefires_karate_env_from_the_properties`, `resolves_one_reference_inside_other_text`, `gives_none_when_surefires_property_is_missing_without_falling_back`, `takes_failsafes_entry`, `takes_surefires_entry_in_plugin_management`, `puts_surefire_before_failsafe`, `leaves_out_an_executions_configuration`, `leaves_out_a_profiles_properties`, `leaves_out_a_comment`, `gives_none_for_a_name_grace_does_not_take`, `gives_none_when_elements_are_not_well_nested`); opening: `grace-core::runner::tests::pom::surefire_passes_a_maven_projects_karate_env` | ☑ |
+| PD-15 | karate-pom.json wins over pom.xml | `grace-core::runner::tests::pom::opening_takes_karate_pom_jsons_env_over_pom_xmls`, `grace-core::runner::setup::tests::pom_start::puts_karate_pom_jsons_env_first` | ☑ |
+| PD-16 | An unused karate-pom.json env keeps pom.xml out | `grace-core::runner::tests::pom::opening_keeps_pom_xml_out_when_karate_pom_jsons_env_is_unused_and_names_it`, `grace-core::runner::setup::tests::pom_start::keeps_pom_xml_out_when_karate_pom_jsons_env_is_unused` | ☑ |
+| PD-17 | A Gradle project gets nothing from its build file | `grace-core::runner::tests::pom::a_gradle_project_gets_nothing_from_its_build_file` | ☑ |
 
 ### RP · Reorder the bottom panel tabs
 
@@ -1177,8 +1177,8 @@ Phase P4 · 8 tests
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
 | E-project-setup-01 | karate-pom.json gives the tests and the config, and a notice names the rest | `grace-e2e/tests/project_setup.rs::karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest` | ☑ |
-| E-project-setup-02 | karate-pom.json starts the environment, filter and thread count | | ☐ |
-| E-project-setup-03 | Maven's karate.env starts the environment | | ☐ |
+| E-project-setup-02 | karate-pom.json starts the environment, filter and thread count | `grace-e2e/tests/project_setup.rs::karate_pom_json_starts_the_environment_filter_and_thread_count` | ☑ |
+| E-project-setup-03 | Maven's karate.env starts the environment | `grace-e2e/tests/project_setup.rs::mavens_karate_env_starts_the_environment` | ☑ |
 | E-project-setup-04 | Maven's compiled output is on the classpath | `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
 | E-project-setup-05 | a Maven project's libraries come from its build | | ☐ |
 | E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
@@ -1350,8 +1350,8 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries` | ☐ |
-| `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven` | ☐ |
-| `src/main/karate/pom.test.ts` | 19 | Partly, in P1: `grace-core::karate::pom::tests` (`read_pom`, 23 tests). The 5 `pomStart` tests port with `maven.rs` in P4 | ☐ |
+| `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven::tests` (20 tests: the 19 of the Vitest file, test for test, and 1 added: elements nested deeper than any pom) | ☑ |
+| `src/main/karate/pom.test.ts` | 19 | `grace-core::karate::pom::tests` (`read_pom`, 23 tests) and `grace-core::runner::setup::tests::pom_start` (the 5 `pomStart` tests, test for test) | ☑ |
 | `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process::tests` (11 tests; the job object, Windows priority and `taskkill` bodies run on Windows CI) | ☑ |
 | `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run_state::tests` (26 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps::tests` (9 tests, every Vitest test and the added ones) | ☑ |
@@ -1370,7 +1370,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.history.test.ts` | 15 | `grace-core::runner::tests::history` (16 tests, real Java and Karate) | ☑ |
 | `src/main/runner.home.test.ts` | 13 | `grace-core::runner::tests::home` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.libraries.test.ts` | 31 | `grace-core::runner` (libraries) | ☐ |
-| `src/main/runner.pom.test.ts` | 12 | `grace-core::runner` (pom) | ☐ |
+| `src/main/runner.pom.test.ts` | 12 | `grace-core::runner::tests::pom` (15 tests: the 12 of the Vitest file, test for test, real Java and Karate, and 3 for PD-15 to PD-17) | ☑ |
 | `src/main/runner.properties.test.ts` | 18 | `grace-core::runner::tests::properties` (19 tests, real Java and Karate) (one, a file another process holds, runs on Windows only) | ☑ |
 | `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.runs.test.ts` | 13 | `grace-core::runner::tests::runs` (14 tests, real Java and Karate) (and one new: a cancel just before Java starts) | ☑ |
