@@ -232,9 +232,13 @@ fn opening_keeps_pom_xml_out_when_karate_pom_jsons_env_is_unused_and_names_it() 
     ]);
     t.runner.open(&root).unwrap();
     assert_eq!(env(&t), Value::Null);
-    assert_eq!(
-        t.last_notice(),
-        r#"Grace does not use these karate-pom.json settings: env "x y"."#
+    // the notice that the libraries could not be listed follows: this Maven project has no tool
+    let said = t.last_notice();
+    assert!(
+        said.starts_with(
+            r#"Grace does not use these karate-pom.json settings: env "x y". Grace could not list the project's libraries"#
+        ),
+        "{said}"
     );
 }
 

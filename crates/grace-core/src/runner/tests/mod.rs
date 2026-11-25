@@ -30,6 +30,7 @@ mod fingerprint;
 mod flaky;
 mod history;
 mod home;
+mod libraries;
 mod pom;
 mod properties;
 mod rerun;
@@ -134,6 +135,8 @@ pub(super) struct Setup {
     pub data: Option<Arc<TempDir>>,
     pub secrets: Option<Arc<dyn SecretBox>>,
     pub fingerprint: Option<Walk>,
+    /// Where a build tool is looked for; nowhere by default.
+    pub lookup_env: Vec<(OsString, OsString)>,
 }
 
 /// `setup()`'s result. Dropping it disposes the runner and removes its folders (`cleanUp`).
@@ -152,7 +155,7 @@ pub(super) fn setup() -> TestRunner {
 
 pub(super) fn setup_with(o: Setup) -> TestRunner {
     let data = o.data.unwrap_or_else(|| Arc::new(temp("kk-data-")));
-    // never the developer's own ~/.karate/ext
+    // never the developer's own ~/.karate/ext, nor a real Maven or Gradle
     let home = temp("kk-home-");
     let sink = Arc::new(Sink::default());
     let emit = {
@@ -167,6 +170,7 @@ pub(super) fn setup_with(o: Setup) -> TestRunner {
     );
     options.fingerprint = o.fingerprint;
     options.home = Some(home.path().to_path_buf());
+    options.lookup_env = Some(o.lookup_env);
     TestRunner {
         runner: Runner::with_options(options),
         data_dir: data.path().to_path_buf(),
