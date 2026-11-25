@@ -393,7 +393,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
 | PU-31 | Empty history and HTTP tabs | The HTTP half: `grace::http::tests::shows_the_three_empty_states`, `grace_core::http_list::tests::added::the_empty_text_says_why_the_list_is_empty`; the History half: `grace::history::tests::says_no_runs_yet_in_an_empty_state_with_the_history_icon`, `grace-e2e/tests/history.rs::before_any_run_the_history_and_http_tabs_say_so` | ☑ |
 | PU-32 | Dialogs keep their order and keyboard behaviour | Clear history: `grace::history::tests::clear::puts_delete_first_then_cancel_which_has_the_focus`, `cancel_has_the_focus_when_the_dialog_opens`, `clear::escape_closes_it_and_deletes_nothing`; `grace-e2e/tests/history.rs::clear_history_keeps_its_button_order_and_closes_on_escape` (Delete before Cancel, Cancel focused, Escape closes it and deletes nothing). The Properties dialog's Escape: `grace-e2e/tests/properties.rs` | ☑ |
-| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
+| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' in [the P3 exit check](../checks/2026-11-25-gpui-p3-exit.md), light and dark | ☑ |
 
 ### VL · Big projects: virtual lists and keyboard navigation
 
@@ -427,7 +427,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
 | VL-25 | Calls are options | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (the list box "HTTP calls", 13 options, none selected, then one); each option's place and set size: `grace::http::HttpCalls::row`; its name: `grace_core::http_list::tests::added::a_call_is_named_by_status_method_url_and_test` | ☑ |
 | VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
-| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
+| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab at 3,000 calls opens in 33 ms in [the P3 exit check](../checks/2026-11-25-gpui-p3-exit.md) (aim 100) | ☑ |
 | VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
 | VL-29 | 2,000 tests are not slower (perf) | Passes in [the VL-29 check](../checks/2026-11-12-gpui-p2-vl29.md), after #351: with no UI Automation client, app CPU 1,156 ms against Electron's 4,922 ms during Run all (-77%); run time, Java's CPU and memory are as good or better (#320) | ☑ |
 
@@ -1031,7 +1031,7 @@ Phase P3 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-examples-01 | An outline's Examples as a table | | ☐ |
+| E-examples-01 | An outline's Examples as a table | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table` | ☑ |
 
 ### e2e/failures.spec.ts
 
@@ -1047,13 +1047,13 @@ Phase P3 · 7 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-flaky-01 | A test that flips with no change is marked flaky | | ☐ |
-| E-flaky-02 | A fix in the project is not flaky | | ☐ |
-| E-flaky-03 | Different environments are not compared | | ☐ |
-| E-flaky-04 | The proof opens a run's report | | ☐ |
-| E-flaky-05 | The mark stays on its test when the tree changes | | ☐ |
-| E-flaky-06 | Marks survive a restart | | ☐ |
-| E-flaky-07 | Clear history removes the marks | | ☐ |
+| E-flaky-01 | A test that flips with no change is marked flaky | `grace-e2e/tests/flaky.rs::a_test_that_flips_with_no_change_is_marked_flaky` | ☑ |
+| E-flaky-02 | A fix in the project is not flaky | `grace-e2e/tests/flaky.rs::a_fix_in_the_project_is_not_flaky` | ☑ |
+| E-flaky-03 | Different environments are not compared | `grace-e2e/tests/flaky.rs::different_environments_are_not_compared` | ☑ |
+| E-flaky-04 | The proof opens a run's report | `grace-e2e/tests/flaky.rs::the_proof_opens_a_runs_report` | ☑ |
+| E-flaky-05 | The mark stays on its test when the tree changes | `grace-e2e/tests/flaky.rs::the_mark_stays_on_its_test_when_the_tree_changes` | ☑ |
+| E-flaky-06 | Marks survive a restart | `grace-e2e/tests/flaky.rs::marks_survive_a_restart` | ☑ |
+| E-flaky-07 | Clear history removes the marks | `grace-e2e/tests/flaky.rs::clear_history_removes_the_marks` | ☑ |
 
 ### e2e/history.spec.ts
 
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 79 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 9 wait: test 28 for P3, the flaky mark's name, and 8 for P4, the debugger, Build and sub-folders) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 8 wait for P4, the debugger, Build and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |

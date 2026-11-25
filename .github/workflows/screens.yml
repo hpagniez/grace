@@ -50,9 +50,9 @@ jobs:
           cp -r vendor ../before/vendor
           cp crates/grace-e2e/tests/screens.rs ../before/crates/grace-e2e/tests/screens.rs
       - name: after
-        run: cd after && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/after" sh scripts/e2e-gpui.sh screens_failures
+        run: cd after && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/after" sh scripts/e2e-gpui.sh screens_http screens_history screens_flaky screens_examples screens_failures screens_open_in_vs_code
       - name: before
-        run: cd before && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/before" sh scripts/e2e-gpui.sh screens_failures
+        run: cd before && GRACE_SCREENS="$GITHUB_WORKSPACE/screens/before" sh scripts/e2e-gpui.sh screens_http screens_history screens_flaky screens_examples screens_failures screens_open_in_vs_code
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ always() }}
         with:
