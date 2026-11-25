@@ -208,3 +208,79 @@ fn puts_the_jars_of_the_home_karate_ext_on_the_classpath() {
     t.runner.run("d:").unwrap();
     assert_one_passed(&t);
 }
+
+// Beyond the Vitest file: parity rows whose scenario opens a project, which no ported test did.
+
+/// Scenarios carrying the tags the PD tests' poms name: the filter drops a tag no test has.
+const TAGGED: (&str, &str) = (
+    "t.feature",
+    "Feature: t\n@a @b\nScenario: one\n  * print 1\n@c @d\nScenario: two\n  * print 2\n",
+);
+
+/// PD-09
+#[test]
+fn opening_shows_the_poms_tag_entries_in_the_filter_and_names_none() {
+    let t = setup();
+    let (_dir, root) = project(&[TAGGED, ("karate-pom.json", r#"{"tags":[" @a , @b ","~@c","~@d"]}"#)]);
+    t.runner.open(&root).unwrap();
+    assert_match(
+        &t.last("filter")["filter"],
+        json!({ "include": ["a", "b"], "exclude": ["c", "d"] }),
+    );
+    assert_eq!(t.notices(), Vec::<String>::new());
+}
+
+/// PD-10
+#[test]
+fn opening_keeps_the_tag_entry_it_can_show_and_names_the_other() {
+    let t = setup();
+    let (_dir, root) = project(&[TAGGED, ("karate-pom.json", r#"{"tags":["@a","@b"]}"#)]);
+    t.runner.open(&root).unwrap();
+    assert_match(&t.last("filter")["filter"], json!({ "include": ["a"], "exclude": [] }));
+    assert_eq!(
+        t.last_notice(),
+        r#"Grace does not use these karate-pom.json settings: tags "@b"."#
+    );
+}
+
+/// PD-11
+#[test]
+fn opening_picks_no_env_and_1_thread_for_values_it_cannot_take_and_names_them() {
+    let t = setup();
+    let (_dir, root) = project(&[TAGGED, ("karate-pom.json", r#"{"env":"x y","threads":64}"#)]);
+    t.runner.open(&root).unwrap();
+    assert_eq!(t.last("environment")["view"]["env"], Value::Null);
+    assert_eq!(t.last("threads")["count"], 1);
+    assert_eq!(
+        t.last_notice(),
+        r#"Grace does not use these karate-pom.json settings: env "x y", threads 64."#
+    );
+}
+
+/// PS-07
+#[test]
+fn compiled_copies_stay_out_of_the_tree_and_the_environments() {
+    let t = setup();
+    let fx = fixture("maven");
+    write(
+        fx.path(),
+        &[
+            (
+                "target/test-classes/old.feature",
+                "Feature: old\nScenario: stale\n  * print 1\n",
+            ),
+            (
+                "target/test-classes/karate-config-stale.js",
+                "function fn() { return {}; }",
+            ),
+        ],
+    );
+    t.runner.open(&fx.root).unwrap();
+    let keys = leaf_keys(&t.tree());
+    assert!(
+        !keys.is_empty() && keys.iter().all(|k| !k.contains("old.feature")),
+        "{keys:?}"
+    );
+    let overlays = t.last("environment")["view"]["overlays"].clone();
+    assert!(!overlays.as_array().unwrap().contains(&json!("stale")), "{overlays}");
+}

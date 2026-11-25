@@ -532,7 +532,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PS-04 | A pom Grace cannot read | `grace-core::runner::tests::setup::uses_the_default_folders_when_karate_pom_json_cannot_be_read`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::uses_nothing_from_a_file_it_cannot_read` | ☑ |
 | PS-05 | The notice shows only on open | `grace-core::runner::tests::setup::says_it_only_on_open` | ☑ |
 | PS-06 | Maven's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder`, `grace-core::runner::tests::setup::puts_mavens_compiled_output_on_the_classpath`, `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
-| PS-07 | Compiled copies stay out of the tree and the environments | `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder` | ☑ |
+| PS-07 | Compiled copies stay out of the tree and the environments | `grace-core::runner::tests::setup::compiled_copies_stay_out_of_the_tree_and_the_environments`, `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder` | ☑ |
 | PS-08 | One row of a Maven outline runs | `grace-e2e/tests/open.rs::running_one_test_of_a_maven_project_shows_its_result`, `grace-core::runner::tests::setup::runs_one_row_of_a_maven_outline` | ☑ |
 | PS-09 | Gradle's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::gradle_in_its_order` | ☑ |
 
@@ -852,9 +852,9 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PD-06 | A pom filter whose tags no test has is not saved | | ☐ |
 | PD-07 | Refresh applies an edited pom to the controls with nothing saved | | ☐ |
 | PD-08 | Refresh drops a value the pom no longer gives | | ☐ |
-| PD-09 | Tag entries the filter can show | `grace-core::karate::pom::tests::read_pom::takes_env_tags_and_threads` and the four `shows_the_tag_entries_*_as_chips` beside it | ☑ |
-| PD-10 | Tag entries the filter cannot show are named | `grace-core::karate::pom::tests::read_pom::names_the_tag_entries_of_any_of_it_cannot_show` and the four `names_the_tag_entries_of_*` beside it; the notice's sentence: `grace-core::karate::command::tests::detect_layout::karate_pom_json::says_both_settings_first` | ☑ |
-| PD-11 | An env or thread count Grace cannot take is named | `grace-core::karate::pom::tests::read_pom::names_an_env_or_a_thread_count_grace_cannot_take` | ☑ |
+| PD-09 | Tag entries the filter can show | `grace-core::runner::tests::setup::opening_shows_the_poms_tag_entries_in_the_filter_and_names_none`, `grace-core::karate::pom::tests::read_pom::takes_env_tags_and_threads` and the four `shows_the_tag_entries_*_as_chips` beside it | ☑ |
+| PD-10 | Tag entries the filter cannot show are named | `grace-core::runner::tests::setup::opening_keeps_the_tag_entry_it_can_show_and_names_the_other`, `grace-core::karate::pom::tests::read_pom::names_the_tag_entries_of_any_of_it_cannot_show` and the four `names_the_tag_entries_of_*` beside it; the notice's sentence: `grace-core::karate::command::tests::detect_layout::karate_pom_json::says_both_settings_first` | ☑ |
+| PD-11 | An env or thread count Grace cannot take is named | `grace-core::runner::tests::setup::opening_picks_no_env_and_1_thread_for_values_it_cannot_take_and_names_them`, `grace-core::karate::pom::tests::read_pom::names_an_env_or_a_thread_count_grace_cannot_take` | ☑ |
 | PD-12 | The notice names only what Grace does not use | | ☐ |
 | PD-13 | Surefire passes the project's karate.env (e2e) | | ☐ |
 | PD-14 | Maven's karate.env | | ☐ |
