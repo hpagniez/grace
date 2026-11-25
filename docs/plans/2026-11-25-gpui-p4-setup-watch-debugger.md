@@ -103,6 +103,59 @@ Specs: [pom defaults](../specs/2026-11-04-pom-defaults.md), [project setup](../s
 4. `runner.pom.test.ts` test for test in `grace_core::runner::tests::pom`, real Java and Karate: PD-01 to PD-08, PD-12 to PD-17. PD-05 is the Properties dialog's save, which P2 left for this slice.
 5. `project_setup.rs`: E-project-setup-02 (karate-pom.json's environment, filter and thread count), 03 (Maven's `karate.env`). E-project-setup-02 reads the chips' states through the accessibility tree, as `tags.rs` does; the Env and Threads boxes are checked by what they did, as `threads.rs::the_box_starts_from_karate_pom_json_and_the_persons_count_wins` does, since AT-SPI cannot read an `Input`'s text.
 
+What slice 2 built: `grace-core::karate::maven`, which `runner::pom_start` calls when karate-pom.json gives no `env`, so a Maven project now starts with pom.xml's `karate.env`; `ProjectSetup::maven_env` and the P1 test with its stand-in `PomXml` are gone. One Redesigns row (`maven`). No row is handed on, and the look does not change. `runner::tests::pom` holds one test more for each of PD-15, PD-16 and PD-17, whose scenarios open a project, which no Vitest test did; PD-14's rows are `maven`'s tests, opened by "Surefire passes a Maven project's karate.env". Only that test failed before the runner called `maven_env`, the rest being P1's behaviour, so each was seen failing with its behaviour broken: the pom's values ignored, the saved values ignored, the environment saved with the properties, dropped tags saved, a filter change not saved, an unreadable `settings.json` read as nothing saved, an environment the pom no longer gives kept, a used `env` named in the notice, pom.xml read over karate-pom.json's `env`, pom.xml read for an unused `env`, an environment given without a pom.xml. E-project-setup-03 adds a scenario that passes only in `dev` (AT-SPI cannot read the Env box). For slice 3: the Maven and Gradle projects of `runner::tests::pom` and of E-project-setup-03 hold no stand-in wrapper, so listing their libraries must not reach a real tool (porting rule 3). The tests, test for test:
+
+#### `maven.test.ts` (19) in `grace_core::karate::maven::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes the karate.env property alone | ported | `takes_the_karate_env_property_alone` |
+| 2. takes Surefire's entry as written | ported | `takes_surefires_entry_as_written` |
+| 3. resolves Surefire's ${karate.env} from the properties | ported | `resolves_surefires_karate_env_from_the_properties` |
+| 4. resolves one ${…} inside other text | ported | `resolves_one_reference_inside_other_text` |
+| 5. gives none when Surefire's property is missing, without falling back | ported | `gives_none_when_surefires_property_is_missing_without_falling_back` |
+| 6. takes Failsafe's entry | ported | `takes_failsafes_entry` |
+| 7. takes Surefire's entry in pluginManagement | ported | `takes_surefires_entry_in_plugin_management` |
+| 8. puts Surefire before Failsafe | ported | `puts_surefire_before_failsafe` |
+| 9. leaves out an execution's configuration | ported | `leaves_out_an_executions_configuration` |
+| 10. leaves out a profile's properties | ported | `leaves_out_a_profiles_properties` |
+| 11. leaves out a comment | ported | `leaves_out_a_comment` |
+| 12. gives none for a name Grace does not take | ported | `gives_none_for_a_name_grace_does_not_take` |
+| 13. gives none when elements are not well nested | ported | `gives_none_when_elements_are_not_well_nested` |
+| 14. gives none for more than one ${ | ported | `gives_none_for_more_than_one_reference` |
+| 15. gives none when the resolved value still holds ${ | ported | `gives_none_when_the_resolved_value_still_holds_a_reference` |
+| 16. lets an empty Surefire entry decide | ported | `lets_an_empty_surefire_entry_decide` |
+| 17. reads a namespaced project with a BOM and Windows line ends | ported | `reads_a_namespaced_project_with_a_bom_and_windows_line_ends` |
+| 18. reads CDATA as text | ported | `reads_cdata_as_text` |
+| 19. gives none without a pom.xml | ported | `gives_none_without_a_pom_xml` |
+
+#### `pom.test.ts`'s `pomStart` (5) in `grace_core::runner::setup::tests::pom_start`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes pom.xml's karate.env without a karate-pom.json | ported | `takes_pom_xmls_karate_env_without_a_karate_pom_json` |
+| 2. puts karate-pom.json's env first | ported | `puts_karate_pom_jsons_env_first` |
+| 3. keeps pom.xml out when karate-pom.json's env is unused | ported | `keeps_pom_xml_out_when_karate_pom_jsons_env_is_unused` |
+| 4. reads a karate-pom.json that cannot be read as absent | ported | `reads_a_karate_pom_json_that_cannot_be_read_as_absent` |
+| 5. takes the filter and the thread count | ported | `takes_the_filter_and_the_thread_count` |
+
+#### `runner.pom.test.ts` (12) in `grace_core::runner::tests::pom`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. karate-pom.json starts the controls, and a run passes them | ported | `karate_pom_json_starts_the_controls_and_a_run_passes_them` (also checks Java's arguments) |
+| 2. what the person saved wins | ported | `what_the_person_saved_wins` |
+| 3. each control decides on its own | ported | `each_control_decides_on_its_own` |
+| 4. picking no environment is saved | ported | `picking_no_environment_is_saved` |
+| 5. saving run properties does not save the pom's environment | ported | `saving_run_properties_does_not_save_the_poms_environment` |
+| 6. a pom filter whose tags no test has is not saved | ported | `a_pom_filter_whose_tags_no_test_has_is_not_saved` |
+| 7. a change in the filter bar saves the whole filter shown | ported | `a_change_in_the_filter_bar_saves_the_whole_filter_shown` |
+| 8. Refresh applies an edited pom to the controls with nothing saved | ported | `refresh_applies_an_edited_pom_to_the_controls_with_nothing_saved` |
+| 9. Refresh keeps the controls in force when settings.json cannot be read | ported | `refresh_keeps_the_controls_in_force_when_settings_json_cannot_be_read` |
+| 10. Refresh drops a value the pom no longer gives | ported | `refresh_drops_a_value_the_pom_no_longer_gives` |
+| 11. the notice names only what Grace does not use | ported | `the_notice_names_only_what_grace_does_not_use` |
+| 12. Surefire passes a Maven project's karate.env | ported | `surefire_passes_a_maven_projects_karate_env` |
+
 ### Slice 3: find Maven and Gradle, list the libraries
 
 Specs: [project libraries](../specs/2026-11-02-project-libraries.md), [find build tools](../specs/2026-11-03-find-build-tools.md).
@@ -193,6 +246,7 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 | Module | Change from Electron Grace | Why | Parity kept by |
 |---|---|---|---|
 | `runner` (setup) | `ProjectSetup` and `NoSetup` (P1's seam) go, a method per slice from 2 to 5: the runner calls `karate::{maven, libraries, compiled, subfolders}` where `runner.ts` calls them. Where a tool is looked for is `RunnerOptions::lookup_env`, as Electron Grace's `lookupEnv` | The trait stood in for modules not yet ported; with them ported it is a layer with one implementation. The runner's tests steer the search as the Vitest tests did | `runner::tests::{pom, libraries, build, subfolders}` |
+| `maven` | An element nested more than 100 deep is refused, so such a pom.xml gives no environment, as one that is not well nested | Dropping a tree of elements recurses in Rust: one nested deep enough overflows the stack and ends Grace. No real pom comes near | `karate::maven::tests`, the 19 of `maven.test.ts` and `gives_none_for_elements_nested_deeper_than_any_pom` |
 | `libraries` (Linux) | Windows runs the tool as Electron Grace does: `cmd.exe /d /s /c "…"`, every path in a `GRACE_*` variable, as P1 ported it in `process` (`cmd()`, `verbatim_args`): the wrappers and `mvn.cmd` are batch files, which only `cmd.exe` runs. Linux, which Electron Grace never ran on, starts `mvnw`, `mvn`, `gradlew` or `gradle` itself with an argument list, the classpath file an argument (`-Dmdep.outputFile=<file>`) and still in `GRACE_CLASSPATH_FILE` for the init script; it looks for `java` and `javac` without `.exe`, splits PATH at `:`, has no IntelliJ search, and its no-tool notice names `mvnw` and `gradlew` | The Windows strings are pinned by the libraries spec (R3) and `libraries.test.ts`; Linux has no `cmd.exe` and needs no quoting | `libraries.test.ts`'s "the command" on the same strings; `runner.libraries.test.ts`'s "runs the tool in a folder whose path has spaces and &" and "builds in a folder whose path has spaces and &"; Linux tests beside them |
 | `watch` | Windows: `ReadDirectoryChangesW` through `windows` 0.62.2, one thread per handle. The handle is opened with `CreateFileW` (`FILE_FLAG_BACKUP_SEMANTICS`, `FILE_FLAG_OVERLAPPED`, every share mode) and read overlapped with an event; the thread waits on that event and a stop event, with no timeout. `close` sets the stop event, so a close that lands before the read is issued is not lost, then `CancelIoEx`, waits for the read to end (`GetOverlappedResult`) before the buffer is freed, and `CloseHandle`. An overflow is a read of 0 bytes or `ERROR_NOTIFY_ENUM_DIR`. The `unsafe` calls sit in one `#[cfg(windows)] mod sys` of `watch.rs`, each block with its `// SAFETY:` comment as in `process.rs`; the walk of the variable-length `FILE_NOTIFY_INFORMATION` entries is safe code over a byte slice, each offset checked against its length. Linux: `notify` 8.2.2's inotify backend, which blocks with no timeout and flags an overflow `Rescan`. Not `notify` on Windows, which the guide's feature map named: its loop waits 100 ms at a time (`WaitForSingleObjectEx(.., 100, ..)` in its `windows.rs`), 10 wake-ups a second while watch mode is on, and it reports no overflow. No new crate: `notify` is in the lock and in Grace's build through GPUI Kit, and the two `windows` features it needs (`Win32_Storage_FileSystem`, `Win32_System_IO`) are ones GPUI's Windows backend already compiles | ADR 0030 and the spec's "never a poll"; the burst test needs the overflow; an event, not a synchronous read, so a close never races the start of the call | `watch.test.ts` on both platforms; `watch::tests::windows` and the idle test (slice 6); `npm run bench:gpui -- --watch` in `gpui-idle` (slice 7) |
 | `debug` (session) | Grace listens on `127.0.0.1`, port 0, with `std::net::TcpListener`: one thread accepts, and each connection reads its first line on a thread of its own, so a connection that never sends one keeps no other out, as Node served them side by side; the first with the token is kept and the others closed, and its thread then reads the listener's pause lines; a write is a line of JSON, as `debug.ts`'s. The protocol and `listener/grace/DebugListener.java` do not change | One process, no event loop: threads blocked on the socket cost nothing while paused (R2.4) | `debug.test.ts`, `runner.debug.test.ts`, `a_silent_connection_does_not_keep_the_listener_out`, E-debug-01 on the unchanged jar |
