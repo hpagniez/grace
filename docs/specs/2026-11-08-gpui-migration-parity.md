@@ -516,8 +516,8 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PL-08 | A failed listing keeps the last list | `grace-core::runner::tests::libraries::keeps_the_last_list_when_the_tool_fails` | ☑ |
 | PL-09 | Grace says what it is doing | `grace-core::runner::tests::libraries::says_it_is_listing_also_in_a_replay`, `grace::progress::tests::after_a_run_r14_2::says_which_build_tool_lists_the_libraries_then_finding_tests` (the tree says the same line, `progress::finding_text`) | ☑ |
 | PL-10 | Cancel while listing | `grace-core::runner::tests::libraries::stops_the_tool_on_cancel` | ☑ |
-| PL-11 | The project's Java code is not built | | ☐ |
-| PL-12 | A JUnit runner needs no build | | ☐ |
+| PL-11 | The project's Java code is not built | `grace-core::runner::tests::build::says_on_open_when_it_is_not_built`, `grace-core::runner::tests::build::says_nothing_once_built_and_says_on_refresh_when_it_changed_since` | ☑ |
+| PL-12 | A JUnit runner needs no build | `grace-core::runner::tests::build::a_junit_runner_needs_no_build`, `grace-core::karate::compiled::tests::test_code_notice::still_checks_a_helper_beside_a_runner` and the three `leaves_out_*_junit_runner` | ☑ |
 | PL-13 | Standalone projects run no tool | `grace-core::runner::tests::libraries::runs_no_tool_for_a_standalone_project` | ☑ |
 
 ### PS · Project setup
@@ -765,16 +765,16 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| BN-01 | The notice offers to build | | ☐ |
-| BN-02 | No tool, no button | | ☐ |
-| BN-03 | Building, then refreshing | | ☐ |
-| BN-04 | A build that rewrites no class still counts | | ☐ |
-| BN-05 | A Gradle project | | ☐ |
-| BN-06 | The build fails | | ☐ |
-| BN-07 | No JDK | | ☐ |
-| BN-08 | Cancel while building | | ☐ |
-| BN-09 | Busy | | ☐ |
-| BN-10 | Grace builds only on a click | | ☐ |
+| BN-01 | The notice offers to build | `grace-core::runner::tests::build::offers_build_with_the_not_built_notice`, `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`, `grace-e2e/tests/project_setup.rs::the_not_built_notice_builds_the_projects_java_code` | ☑ |
+| BN-02 | No tool, no button | `grace-core::runner::tests::build::offers_no_build_without_a_tool` | ☑ |
+| BN-03 | Building, then refreshing | `grace-core::runner::tests::build::builds_with_test_compile_then_refreshes`, `grace-core::runner::tests::build::says_it_is_building_also_in_a_replay`, `grace::progress::tests::after_a_run_r14_2::says_when_the_build_tool_builds_the_projects_java_code`, `grace-e2e/tests/project_setup.rs::the_not_built_notice_builds_the_projects_java_code` | ☑ |
+| BN-04 | A build that rewrites no class still counts | `grace-core::runner::tests::build::a_gradle_build_that_rewrites_no_class_still_counts` | ☑ |
+| BN-05 | A Gradle project | `grace-core::runner::tests::build::builds_a_gradle_project_with_test_classes_without_a_daemon` | ☑ |
+| BN-06 | The build fails | `grace-core::runner::tests::build::says_the_builds_first_error_and_keeps_build` | ☑ |
+| BN-07 | No JDK | `grace-core::runner::tests::build::says_building_needs_a_jdk_after_the_compilers_question`, `grace-core::runner::tests::build::says_nothing_of_a_jdk_when_java_home_has_javac` | ☑ |
+| BN-08 | Cancel while building | `grace-core::runner::tests::build::stops_the_build_on_cancel` | ☑ |
+| BN-09 | Busy | `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`, `grace-core::runner::tests::build::refuses_a_second_build_while_one_runs` | ☑ |
+| BN-10 | Grace builds only on a click | `grace-core::runner::tests::build::builds_only_on_a_click` | ☑ |
 
 ### EP · Run properties as environment variables, imported from a secrets file
 
@@ -1183,7 +1183,7 @@ Phase P4 · 8 tests
 | E-project-setup-05 | a Maven project's libraries come from its build | `grace-e2e/tests/project_setup.rs::a_maven_projects_libraries_come_from_its_build` | ☑ |
 | E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | E-project-setup-07 | an empty folder offers the Karate project below it | | ☐ |
-| E-project-setup-08 | the not-built notice builds the project's Java code | | ☐ |
+| E-project-setup-08 | the not-built notice builds the project's Java code | `grace-e2e/tests/project_setup.rs::the_not_built_notice_builds_the_projects_java_code` | ☑ |
 
 ### e2e/report.spec.ts
 
@@ -1344,7 +1344,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/history.test.ts` | 19 | `grace-core::history::tests` (37 tests) | ☑ |
 | `src/main/karate/argfile.test.ts` | 9 | `grace-core::karate::argfile::tests` (12 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/command.test.ts` | 46 | `grace-core::karate::command::tests` (51 tests: the 46 Vitest tests on the same strings, and 5 for paths and the Linux classpath) | ☑ |
-| `src/main/karate/compiled.test.ts` | 11 | `grace-core::karate::compiled` | ☐ |
+| `src/main/karate/compiled.test.ts` | 12 | `grace-core::karate::compiled::tests` (15 tests: the 12 of the Vitest file, one with its three runners apart, and 1 for a byte order mark and a source that is not UTF-8) | ☑ |
 | `src/main/karate/debug.test.ts` | 8 | `grace-core::karate::debug` | ☐ |
 | `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments::tests` (11 tests) | ☑ |
 | `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
@@ -1369,7 +1369,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.flaky.test.ts` | 3 | `grace-core::runner::tests::flaky` (3 tests, real Java and Karate) | ☑ |
 | `src/main/runner.history.test.ts` | 15 | `grace-core::runner::tests::history` (16 tests, real Java and Karate) | ☑ |
 | `src/main/runner.home.test.ts` | 13 | `grace-core::runner::tests::home` (13 tests, real Java and Karate) | ☑ |
-| `src/main/runner.libraries.test.ts` | 31 | `grace-core::runner` (libraries) | ☐ |
+| `src/main/runner.libraries.test.ts` | 31 | `grace-core::runner::tests::libraries` (19 tests: the 14 outside "the project's Java code" and 5 for the library specs) and `grace-core::runner::tests::build` (21 tests: its 17 and 4 for PL-12, BN-05, BN-07 and BN-10), real Java and Karate | ☑ |
 | `src/main/runner.pom.test.ts` | 12 | `grace-core::runner::tests::pom` (15 tests: the 12 of the Vitest file, test for test, real Java and Karate, and 3 for PD-15 to PD-17) | ☑ |
 | `src/main/runner.properties.test.ts` | 18 | `grace-core::runner::tests::properties` (19 tests, real Java and Karate) (one, a file another process holds, runs on Windows only) | ☑ |
 | `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 8 wait for P4, the debugger, Build and sub-folders) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; 7 wait for P4, the debugger and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
