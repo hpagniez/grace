@@ -2,7 +2,8 @@
 //! argument files (`argfile`), the Java process (`process`), the environments a project names (`environments`), what
 //! Grace reads of `karate-pom.json` (`pom`), and the run's events: reading `karate-events.jsonl` (`events`), the dry
 //! run's tree (`tree`), the run's state (`run_state`), and the steps and HTTP calls of a finished feature (`steps`,
-//! `http`). `debug` holds only the listener's class name until the step debugger ports (phase P4).
+//! `http`). A Maven or Gradle project's own build gives its environment (`maven`) and its libraries (`libraries`).
+//! `debug` holds only the listener's class name until the step debugger ports (phase P4).
 pub mod argfile;
 pub mod command;
 pub mod debug;
@@ -10,6 +11,7 @@ pub mod environments;
 pub mod events;
 pub mod http;
 mod js;
+pub mod libraries;
 pub mod maven;
 pub mod pom;
 pub mod process;

@@ -507,18 +507,18 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
 | PL-01 | A jar in the project's .karate/ext is on the classpath | `grace-core::karate::command::tests::extension_jars::lists_the_home_folder_then_the_projects_as_wildcards`, `grace-core::runner::tests::setup::puts_the_jars_of_the_projects_karate_ext_on_the_classpath`, `grace-core::runner::tests::setup::puts_the_jars_of_the_home_karate_ext_on_the_classpath`, `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
-| PL-02 | A Maven project's libraries are on the classpath | | ☐ |
-| PL-03 | A Gradle project's libraries are on the classpath | | ☐ |
-| PL-04 | The order of the classpath | | ☐ |
-| PL-05 | The list is kept until a build file changes | | ☐ |
-| PL-06 | Switching the environment and running do not start the tool | | ☐ |
-| PL-07 | No tool | | ☐ |
-| PL-08 | A failed listing keeps the last list | | ☐ |
-| PL-09 | Grace says what it is doing | | ☐ |
-| PL-10 | Cancel while listing | | ☐ |
+| PL-02 | A Maven project's libraries are on the classpath | `grace-core::runner::tests::libraries::runs_mvnw_and_puts_the_listed_jar_on_the_classpath`, `grace-e2e/tests/project_setup.rs::a_maven_projects_libraries_come_from_its_build` | ☑ |
+| PL-03 | A Gradle project's libraries are on the classpath | `grace-core::runner::tests::libraries::runs_gradlew_without_a_daemon` | ☑ |
+| PL-04 | The order of the classpath | `grace-core::runner::tests::libraries::puts_the_classpath_in_its_order` | ☑ |
+| PL-05 | The list is kept until a build file changes | `grace-core::runner::tests::libraries::keeps_the_list_until_a_build_file_changes` | ☑ |
+| PL-06 | Switching the environment and running do not start the tool | `grace-core::runner::tests::libraries::never_lists_on_an_environment_switch_or_a_run` | ☑ |
+| PL-07 | No tool | `grace-core::runner::tests::libraries::says_when_there_is_no_tool` | ☑ |
+| PL-08 | A failed listing keeps the last list | `grace-core::runner::tests::libraries::keeps_the_last_list_when_the_tool_fails` | ☑ |
+| PL-09 | Grace says what it is doing | `grace-core::runner::tests::libraries::says_it_is_listing_also_in_a_replay`, `grace::progress::tests::after_a_run_r14_2::says_which_build_tool_lists_the_libraries_then_finding_tests` (the tree says the same line, `progress::finding_text`) | ☑ |
+| PL-10 | Cancel while listing | `grace-core::runner::tests::libraries::stops_the_tool_on_cancel` | ☑ |
 | PL-11 | The project's Java code is not built | | ☐ |
 | PL-12 | A JUnit runner needs no build | | ☐ |
-| PL-13 | Standalone projects run no tool | | ☐ |
+| PL-13 | Standalone projects run no tool | `grace-core::runner::tests::libraries::runs_no_tool_for_a_standalone_project` | ☑ |
 
 ### PS · Project setup
 
@@ -657,12 +657,12 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| FB-01 | Maven in MAVEN_HOME | | ☐ |
-| FB-02 | M2_HOME when MAVEN_HOME has no Maven | | ☐ |
-| FB-03 | Gradle in GRADLE_HOME | | ☐ |
-| FB-04 | PATH comes first | | ☐ |
-| FB-05 | IntelliJ IDEA's Maven, the newest first | | ☐ |
-| FB-06 | No Maven anywhere | | ☐ |
+| FB-01 | Maven in MAVEN_HOME | `grace-core::runner::tests::libraries::runs_the_maven_of_maven_home_when_the_project_has_no_wrapper` | ☑ |
+| FB-02 | M2_HOME when MAVEN_HOME has no Maven | `grace-core::runner::tests::libraries::opening_lists_with_m2_homes_maven_when_maven_home_has_none` | ☑ |
+| FB-03 | Gradle in GRADLE_HOME | `grace-core::runner::tests::libraries::opening_lists_with_gradle_homes_gradle` | ☑ |
+| FB-04 | PATH comes first | `grace-core::runner::tests::libraries::opening_lists_with_the_maven_on_path_before_maven_homes` | ☑ |
+| FB-05 | IntelliJ IDEA's Maven, the newest first | `grace-core::runner::tests::libraries::opening_lists_with_the_newest_intellij_ideas_maven`, `grace-core::karate::libraries::tests::find_tool::then_takes_intellij_ideas_maven_the_newest_build_first` (both Windows only: Grace looks for IntelliJ IDEA's Maven on Windows alone) | ☑ |
+| FB-06 | No Maven anywhere | `grace-core::runner::tests::libraries::says_when_there_is_no_tool` | ☑ |
 
 ### OT · Open in VS Code from the test tree
 
@@ -1180,7 +1180,7 @@ Phase P4 · 8 tests
 | E-project-setup-02 | karate-pom.json starts the environment, filter and thread count | `grace-e2e/tests/project_setup.rs::karate_pom_json_starts_the_environment_filter_and_thread_count` | ☑ |
 | E-project-setup-03 | Maven's karate.env starts the environment | `grace-e2e/tests/project_setup.rs::mavens_karate_env_starts_the_environment` | ☑ |
 | E-project-setup-04 | Maven's compiled output is on the classpath | `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
-| E-project-setup-05 | a Maven project's libraries come from its build | | ☐ |
+| E-project-setup-05 | a Maven project's libraries come from its build | `grace-e2e/tests/project_setup.rs::a_maven_projects_libraries_come_from_its_build` | ☑ |
 | E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | E-project-setup-07 | an empty folder offers the Karate project below it | | ☐ |
 | E-project-setup-08 | the not-built notice builds the project's Java code | | ☐ |
@@ -1349,7 +1349,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments::tests` (11 tests) | ☑ |
 | `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries` | ☐ |
+| `src/main/karate/libraries.test.ts` | 29 | `grace-core::karate::libraries::tests` (the 29 of the Vitest file, test for test, 3 of them Windows only, with 2 more for Windows and 4 for Linux) | ☑ |
 | `src/main/karate/maven.test.ts` | 19 | `grace-core::karate::maven::tests` (20 tests: the 19 of the Vitest file, test for test, and 1 added: elements nested deeper than any pom) | ☑ |
 | `src/main/karate/pom.test.ts` | 19 | `grace-core::karate::pom::tests` (`read_pom`, 23 tests) and `grace-core::runner::setup::tests::pom_start` (the 5 `pomStart` tests, test for test) | ☑ |
 | `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process::tests` (11 tests; the job object, Windows priority and `taskkill` bodies run on Windows CI) | ☑ |

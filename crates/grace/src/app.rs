@@ -13,7 +13,7 @@ use gpui::{App, AppContext as _, Context, Entity, Task};
 use grace_core::model::env::{ImportResult, PropertiesEdit};
 use grace_core::model::events::AppEvent;
 use grace_core::model::tags::FilterState;
-use grace_core::runner::Runner;
+use grace_core::runner::{Runner, RunnerOptions};
 use grace_core::state::AppState;
 
 use crate::seams::Seams;
@@ -587,14 +587,17 @@ pub fn new_app(
     cx: &mut App,
 ) -> Entity<Grace> {
     let (tx, rx) = events();
-    let runner = Runner::new(
+    let mut options = RunnerOptions::new(
         data_dir.clone(),
         vendor,
         Arc::new(grace_core::secrets::os_secret_box()),
-        move |e| {
+        Arc::new(move |e| {
             let _ = tx.try_send(e); // unbounded: fails only once the window is gone
-        },
+        }),
     );
+    // an end-to-end test runs only the wrapper it wrote, never the machine's Maven or Gradle (find-build-tools, Tests)
+    options.lookup_env = cfg!(feature = "e2e").then(Vec::new);
+    let runner = Runner::with_options(options);
     cx.new(|cx| Grace::new(Arc::new(runner), seams, data_dir, rx, cx))
 }
 

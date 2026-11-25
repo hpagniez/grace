@@ -152,6 +152,24 @@ pub enum BuildTool {
     Gradle,
 }
 
+impl BuildTool {
+    /// The tool that builds a project of `layout`; none for a standalone one.
+    pub fn of(layout: Layout) -> Option<Self> {
+        match layout {
+            Layout::Maven => Some(Self::Maven),
+            Layout::Gradle => Some(Self::Gradle),
+            Layout::Standalone => None,
+        }
+    }
+
+    pub fn layout(self) -> Layout {
+        match self {
+            Self::Maven => Layout::Maven,
+            Self::Gradle => Layout::Gradle,
+        }
+    }
+}
+
 /// What the runner reports to the window, as Electron Grace's `AppEvent` union. Written the same as its JSON
 /// (`{"type":"runFinished",...}`, camelCase fields), so a recorded event reads back unchanged.
 // `build?: true` of the union is a `bool` that is written only when true; `success?: boolean` stays an `Option`.

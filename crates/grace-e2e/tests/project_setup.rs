@@ -38,6 +38,21 @@ fn write(root: &Path, files: &[(&str, &str)]) {
     }
 }
 
+/// Passes only with a library holding data.json on the classpath.
+const LIB_FEATURE: &str =
+    "Feature: lib\nScenario: reads a library\n  * match read('classpath:data.json').lib == true\n";
+
+/// `<dir>/lib.jar` holding that data.json: a jar is a zip. `test` names the source folder, one per test.
+fn lib_jar(dir: &Path, test: &str) -> PathBuf {
+    let src = scratch(&format!("{test}-source"));
+    write(&src, &[("data.json", r#"{ "lib": true }"#)]);
+    std::fs::create_dir_all(dir).unwrap();
+    let jar = dir.join("lib.jar");
+    grace_core::report_zip::zip_report(&src, &jar).unwrap();
+    let _ = std::fs::remove_dir_all(src);
+    jar
+}
+
 /// Grace with `dir` as the last project.
 fn open(dir: &Path) -> App {
     App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap()
@@ -237,28 +252,47 @@ fn mavens_compiled_output_is_on_the_classpath() {
     run_scenario(&app, "built.feature", "reads compiled output");
 }
 
+/// E-project-setup-05
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_maven_projects_libraries_come_from_its_build() {
+    let dir = project("maven").unwrap();
+    write(&dir, &[("src/test/java/examples/lib.feature", LIB_FEATURE)]);
+    let built = scratch("maven-jar");
+    let jar = lib_jar(&built, "maven-jar");
+    // a stand-in for Maven: it lists the jar where Grace asks
+    #[cfg(windows)]
+    std::fs::write(
+        dir.join("mvnw.cmd"),
+        format!("@echo off\r\n>\"%GRACE_CLASSPATH_FILE%\" echo {}\r\n", jar.display()),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let wrapper = dir.join("mvnw");
+        let script = format!("#!/bin/sh\necho '{}' > \"$GRACE_CLASSPATH_FILE\"\n", jar.display());
+        std::fs::write(&wrapper, script).unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let app = open(&dir);
+    run_scenario(&app, "lib.feature", "reads a library");
+    drop(app);
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(built);
+}
+
 /// E-project-setup-06
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn jars_in_karate_ext_are_on_the_classpath() {
     let dir = scratch("ext");
-    write(
-        &dir,
-        &[(
-            "lib.feature",
-            "Feature: lib\nScenario: reads a library\n  * match read('classpath:data.json').lib == true\n",
-        )],
-    );
-    // a jar is a zip
-    let src = scratch("ext-jar");
-    write(&src, &[("data.json", r#"{ "lib": true }"#)]);
+    write(&dir, &[("lib.feature", LIB_FEATURE)]);
     let ext = dir.join(".karate").join("ext");
-    std::fs::create_dir_all(&ext).unwrap();
-    grace_core::report_zip::zip_report(&src, &ext.join("lib.jar")).unwrap();
+    lib_jar(&ext, "ext");
 
     let app = open(&dir);
     run_scenario(&app, "lib.feature", "reads a library");
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
-    let _ = std::fs::remove_dir_all(src);
 }

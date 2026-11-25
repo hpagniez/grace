@@ -26,10 +26,10 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's parts still to port are seams or left out: the libraries, the test code notice and the sub-folder offer
-//!   are `ProjectSetup`'s methods (`NoSetup` until then); watch mode, the step debugger, Build and the editor's files
-//!   are left out, each place they act marked `P4`. The events stay those of a project that has none of them: `watch`
-//!   (as saved), `breakpoints` (empty), no `listing`.
+//! - Phase P4's parts still to port are seams or left out: the test code notice and the sub-folder offer are
+//!   `ProjectSetup`'s methods (`NoSetup` until then); watch mode, the step debugger, Build and the editor's files are
+//!   left out, each place they act marked `P4`. The events stay those of a project that has none of them: `watch` (as
+//!   saved) and `breakpoints` (empty).
 mod run;
 mod setup;
 #[cfg(test)]
@@ -39,27 +39,26 @@ pub use setup::{JavaCode, NoSetup, PomStart, ProjectSetup, pom_start};
 
 use crate::flaky::find_flaky;
 use crate::history::{self, ListedRun, clear_history, list_runs, read_run_record};
-#[cfg(test)]
-use crate::karate::command::Env;
 use crate::karate::command::{
-    BuildArgs, OUT_OF_MEMORY, ProjectLayout, absolute, build_args, child_env, detect_layout, extension_jars, locate,
-    out_of_memory, tag_args,
+    BuildArgs, Env, OUT_OF_MEMORY, ProjectLayout, absolute, build_args, child_env, detect_layout, extension_jars,
+    locate, out_of_memory, tag_args,
 };
 use crate::karate::environments::{feature_tag_envs, overlay_envs};
 use crate::karate::events::read_all_events;
-use crate::karate::process::{KarateProcess, SpawnOptions, spawn_karate};
+use crate::karate::libraries::{self, Goal, KeptLibraries, ToolEnv, ToolStart};
+use crate::karate::process::{Exit, KarateProcess, SpawnOptions, spawn_karate};
 use crate::karate::tree::{build_tree, leaf_keys, parse_ref_id, row_lines};
 use crate::model::env::{
     EnvView, PlainRow, PropertiesEdit, PropertyListsView, RowEdit, RowView, SecretRowView, SecretState, edit_errors,
     property_value_error, sorted_unique, valid_env_name,
 };
-use crate::model::events::{AppEvent, Breakpoint, Project};
+use crate::model::events::{AppEvent, Breakpoint, BuildTool, Project};
 use crate::model::history::{HistoryEntry, to_entry};
 use crate::model::js;
 use crate::model::tags::{FilterState, no_filter, project_tags, prune_filter};
 use crate::model::threads::{THREADS_ERROR, parse_threads};
 use crate::model::trends::TrendPoint;
-use crate::model::{NodeKind, TestNode};
+use crate::model::{Layout, NodeKind, TestNode};
 use crate::recent::RecentSender;
 use crate::secrets::SecretBox;
 use crate::settings::{
@@ -181,6 +180,8 @@ struct State {
     overlays: Vec<String>,
     tag_envs: Vec<String>,
     phase: Phase,
+    /// The build tool running to list the project's libraries.
+    listing: Option<BuildTool>,
     report: Option<PathBuf>,
     /// The open project's breakpoints, in memory only (step debugger R3.1); always empty until P4 ports the debugger.
     breakpoints: Vec<Breakpoint>,
@@ -200,6 +201,7 @@ impl State {
             overlays: Vec::new(),
             tag_envs: Vec::new(),
             phase: Phase::Idle,
+            listing: None,
             report: None,
             breakpoints: Vec::new(),
             watching: false,
@@ -267,6 +269,8 @@ pub struct RunnerOptions {
     pub fingerprint: Option<Walk>,
     /// Where `~/.karate/ext` is; `None` is the person's home folder. A test seam.
     pub home: Option<PathBuf>,
+    /// The variables Maven and Gradle are looked for with (find-build-tools R1); `None` is Grace's own. A test seam.
+    pub lookup_env: Option<Env>,
     /// Phase P4's parts; `NoSetup` until then.
     pub setup: Arc<dyn ProjectSetup>,
 }
@@ -280,6 +284,7 @@ impl RunnerOptions {
             emit,
             fingerprint: None,
             home: None,
+            lookup_env: None,
             setup: Arc::new(NoSetup),
         }
     }
@@ -307,6 +312,7 @@ struct Inner {
     emit: Emit,
     walk: Walk,
     home: PathBuf,
+    lookup_env: Option<Env>,
     setup: Arc<dyn ProjectSetup>,
     pid_file: PathBuf,
     recent: Arc<RecentSender<LoadRecent, EmitRecent>>,
@@ -359,6 +365,7 @@ impl Runner {
                 .fingerprint
                 .unwrap_or_else(|| Arc::new(crate::fingerprint::project_fingerprint)),
             home: o.home.or_else(std::env::home_dir).unwrap_or_default(),
+            lookup_env: o.lookup_env,
             setup: o.setup,
             recent: Arc::new(RecentSender::new(load, emit_recent)),
             state: Mutex::new(State::new()),
@@ -663,7 +670,7 @@ impl Inner {
         let report = self.state().report.take(); // a report of the project open before
         let skipped = skipped_properties(&self.data_dir, root);
         let layout = detect_layout(Path::new(root)).layout;
-        let libraries = self.setup.list_libraries(Path::new(root), layout);
+        let libraries = self.list_libraries(root, layout)?;
         let start = self.start(
             root,
             // unreadable: none saved, as the loaders read it
@@ -796,8 +803,7 @@ impl Inner {
     }
 
     fn refresh_body(&self, project: Project) -> io::Result<()> {
-        let root = Path::new(&project.root);
-        let libraries = self.setup.list_libraries(root, project.layout);
+        let libraries = self.list_libraries(&project.root, project.layout)?;
         let (filter, envs, threads) = {
             let s = self.state();
             (s.filter.clone(), s.envs.clone(), s.threads)
@@ -1080,7 +1086,7 @@ impl Inner {
     }
 
     fn replay(&self) -> Vec<AppEvent> {
-        let (head, project, tree, breakpoints, opening, busy) = {
+        let (head, project, tree, breakpoints, opening, busy, listing) = {
             let s = self.state();
             let head = s.last_event().map(|last| {
                 [
@@ -1100,19 +1106,24 @@ impl Inner {
                 s.breakpoints.clone(),
                 s.opening(),
                 s.busy(),
+                s.listing,
             )
         };
         let opening = AppEvent::Opening { root: opening };
-        // `listing` while a build tool runs: P4
         let busy = AppEvent::Busy { busy };
+        // only while it runs: a window that just loaded starts with none
+        let listing = listing.map(|tool| AppEvent::Listing {
+            tool: Some(tool),
+            build: false,
+        });
+        let tail = [opening, busy].into_iter().chain(listing);
         let Some(head) = head else {
-            return vec![opening, busy];
+            return tail.collect();
         };
         let mut events = Vec::from(head);
         events.extend(self.history_events(project.as_ref(), tree.as_deref()));
         events.push(AppEvent::Breakpoints { breakpoints });
-        events.push(opening);
-        events.push(busy);
+        events.extend(tail);
         events
     }
 
@@ -1404,6 +1415,118 @@ impl Inner {
         Ok(true)
     }
 
+    /// Lists a Maven or Gradle project's libraries with its own build when the kept list is stale (project libraries
+    /// spec R2–R6). The notice of a failure; None when listed, still good, standalone or cancelled.
+    fn list_libraries(&self, root: &str, layout: Layout) -> io::Result<Option<String>> {
+        let Some(tool) = BuildTool::of(layout) else {
+            return Ok(None);
+        };
+        let folder = Path::new(root);
+        // nowhere to look for tests: nothing could use the libraries (sub-folder offer R5)
+        if detect_layout(folder).feature_roots.is_empty() {
+            return Ok(None);
+        }
+        let dir = self.project_dir_of(root);
+        let key = libraries::library_key(folder, tool);
+        let kept = libraries::read_kept(&dir);
+        if !libraries::is_stale(kept.as_ref(), tool, &key) {
+            return Ok(None);
+        }
+        let said = |reason: &str| {
+            let rest = if kept.as_ref().is_some_and(|k| k.tool == layout) {
+                "Grace uses the libraries it listed before."
+            } else {
+                "Tests that use them will fail."
+            };
+            format!("Grace could not list the project's libraries with {tool:?}: {reason}. {rest}")
+        };
+        let lookup = self.lookup_env.clone().unwrap_or_else(|| std::env::vars_os().collect());
+        let Some(launcher) = libraries::find_tool(folder, tool, &lookup) else {
+            let why = said(libraries::no_tool_reason(tool));
+            return Ok(Some(format!(
+                "{why} Install {tool:?}, or add the {tool:?} wrapper to the project."
+            )));
+        };
+        fs::create_dir_all(&dir).map_err(at(&dir))?;
+        let file = dir.join("libraries.txt");
+        let init_script = dir.join("libraries.gradle");
+        // never a list of an earlier call
+        if let Err(e) = fs::remove_file(&file)
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            return Err(at(&file)(e));
+        }
+        if tool == BuildTool::Gradle {
+            fs::write(&init_script, libraries::INIT_SCRIPT).map_err(at(&init_script))?;
+        }
+        // the person's environment as is: it is their build
+        let env = libraries::tool_env(
+            std::env::vars_os().collect(),
+            &ToolEnv {
+                tool: &launcher,
+                file: &file,
+                init_script: &init_script,
+                search_path: libraries::var(&lookup, "PATH").unwrap_or_default(),
+                jre_dir: (tool == BuildTool::Maven).then_some(self.vendor.jre_dir.as_path()),
+            },
+        );
+        let start = libraries::tool_start(tool, Goal::List, &launcher, &file, &init_script);
+        let (code, lines) = self.run_tool(folder, tool, start, env);
+        if self.cancelled() {
+            return Ok(None);
+        }
+        let list = fs::read(&file).ok(); // no file: a failure
+        let _ = fs::remove_file(&file);
+        let Some(list) = list.filter(|_| code == Some(0)) else {
+            return Ok(Some(said(&libraries::failure_reason(&lines))));
+        };
+        let jars = libraries::parse_libraries(&String::from_utf8_lossy(&list), &detect_layout(folder).classpath);
+        let kept = KeptLibraries {
+            tool: layout,
+            key,
+            jars,
+        };
+        libraries::write_kept(&dir, &kept).map_err(at(&dir))?;
+        Ok(None)
+    }
+
+    /// Runs the project's build tool (project libraries R3) as the runner's one process, so Cancel stops it, and says
+    /// so with `listing` events. Its exit code and output; starts nothing once cancelled.
+    fn run_tool(&self, root: &Path, tool: BuildTool, start: ToolStart, env: Env) -> (Exit, Vec<String>) {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let proc = {
+            let mut c = self.ctl();
+            if c.cancelled {
+                return (None, Vec::new());
+            }
+            let sink = Arc::clone(&lines);
+            let options = SpawnOptions {
+                env: Some(env),
+                verbatim_args: start.verbatim_args,
+                ..SpawnOptions::default()
+            };
+            let on_lines = move |l| lock(&sink).extend::<Vec<String>>(l);
+            let proc = Arc::new(spawn_karate(&start.program, &start.args, root, on_lines, options));
+            c.proc = Some(Arc::clone(&proc));
+            proc
+        };
+        // after the spawn: a Cancel prompted by this event finds the process to kill
+        self.state().listing = Some(tool);
+        self.emit(AppEvent::Listing {
+            tool: Some(tool),
+            build: false,
+        });
+        let code = proc.wait();
+        self.clear_proc();
+        self.state().listing = None;
+        self.emit(AppEvent::Listing {
+            tool: None,
+            build: false,
+        });
+        let lines = std::mem::take(&mut *lock(&lines));
+        (code, lines)
+    }
+
     /// Empties and returns `<project dir>/dryrun`, so no file of an earlier dry run is ever read.
     fn dry_run_dir(&self, root: &str) -> io::Result<PathBuf> {
         let dir = self.project_dir_of(root).join("dryrun");
@@ -1424,7 +1547,7 @@ impl Inner {
         let tags = if p.dry_run { Vec::new() } else { tag_args(p.filter) };
         let mut classpath = p.layout.classpath.clone();
         classpath.extend(extension_jars(&self.home, root));
-        classpath.extend(self.setup.kept_jars(&self.project_dir_of(p.root), p.layout.layout));
+        classpath.extend(libraries::kept_jars(&self.project_dir_of(p.root), p.layout.layout));
         let args = build_args(&BuildArgs {
             jar: &self.vendor.jar,
             classpath: &classpath,

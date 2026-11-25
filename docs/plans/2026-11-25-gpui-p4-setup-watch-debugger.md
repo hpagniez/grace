@@ -165,6 +165,61 @@ Specs: [project libraries](../specs/2026-11-02-project-libraries.md), [find buil
 3. `runner.libraries.test.ts`'s 14 tests outside "the project's Java code" (its first 9 and its last 5) in `grace_core::runner::tests::libraries`, each wrapper a stand-in written by the test (porting rule 3): PL-02 to PL-10, PL-13, FB-01 to FB-06.
 4. `project_setup.rs`: E-project-setup-05, its stand-in `mvnw.cmd` and an executable `mvnw` on Linux, which put a `report_zip` jar on the list.
 
+What slice 3 built: `grace-core::karate::libraries`, and the runner's `list_libraries` and `run_tool`, so GPUI Grace now lists a Maven or Gradle project's libraries with its own build on open and Refresh, shows the listing, stops it on Cancel, says why it failed, and puts the kept jars on Java's classpath; `ProjectSetup::list_libraries` and `kept_jars` are gone. The window needed nothing: P2 drew the listing line and the notice, so the look does not change. `RunnerOptions::lookup_env` is where the tool is looked for. The functions of the Build button that `libraries.test.ts` tests (`Goal::Build`, `has_jdk`, `build_failure`) are ported and have no caller until slice 4. Two Redesigns rows (`libraries` (lists), `e2e` (build tools)). No row is handed on. `runner::tests::libraries` holds one test more for each of FB-02 to FB-05, whose scenarios open a project, which `find_tool`'s tests do not do, and one for a tool that succeeds without writing a list (project libraries R6.1). The "spaces and &" test of the listing is ported here; the one of Build (`runner.libraries.test.ts`, "builds in a folder whose path has spaces and &") calls `build()` and goes with slice 4. The tests, test for test:
+
+#### `libraries.test.ts` (29) in `grace_core::karate::libraries::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes the project's wrapper before PATH | ported | `find_tool::takes_the_projects_wrapper_before_path` |
+| 2. searches PATH in order, mvn.cmd before mvn.bat | ported | `find_tool::searches_path_in_order_mvn_cmd_before_mvn_bat` (Windows; Linux: `linux::searches_path_at_colons_in_order`) |
+| 3. finds gradlew.bat, else gradle.bat | ported | `find_tool::finds_the_gradle_wrapper_else_gradle` |
+| 4. reads a quoted PATH entry as cmd.exe does | ported | `find_tool::reads_a_quoted_path_entry_as_cmd_exe_does` (Windows) |
+| 5. then looks in MAVEN_HOME, then M2_HOME, and in GRADLE_HOME for Gradle | ported | `find_tool::then_looks_in_maven_home_then_m2_home_and_in_gradle_home_for_gradle` |
+| 6. then takes IntelliJ IDEA's Maven, the newest build first | ported | `find_tool::then_takes_intellij_ideas_maven_the_newest_build_first` (Windows) |
+| 7. finds nothing | ported | `find_tool::finds_nothing` |
+| 8. names where it looked | ported | `find_tool::names_where_it_looked` |
+| 9. changes with the layout's build files only | ported | `library_key::changes_with_the_layouts_build_files_only` (also pins Electron Grace's key of the same files) |
+| 10. reads Gradle's version catalog | ported | `library_key::reads_gradles_version_catalog` |
+| 11. round-trips | ported | `the_kept_list::round_trips` |
+| 12. reads anything else as none | ported | `the_kept_list::reads_anything_else_as_none` |
+| 13. is stale when missing, of another tool or key, or a jar is gone | ported | `the_kept_list::is_stale_when_missing_of_another_tool_or_key_or_a_jar_is_gone` |
+| 14. gives the jars only to the same tool | ported | `the_kept_list::gives_the_jars_only_to_the_same_tool` |
+| 15. passes every path through a quoted variable | ported | `the_command::passes_every_path_through_a_quoted_variable` |
+| 16. keeps the person's environment and adds Grace's variables | ported | `the_command::keeps_the_persons_environment_and_adds_graces_variables` |
+| 17. lends the bundled Java only when there is no other | ported | `the_command::lends_the_bundled_java_only_when_there_is_no_other` |
+| 18. lends nothing without a Java to lend (Gradle needs a JDK) | ported | `the_command::lends_nothing_without_a_java_to_lend` |
+| 19. keeps existing entries in order, once, less the classpath | ported | `parse_libraries::keeps_existing_entries_in_order_once_less_the_classpath` |
+| 20. takes Maven's first error | ported | `failure_reason::takes_mavens_first_error` |
+| 21. takes the cause under Maven's POM problems line | ported | `failure_reason::takes_the_cause_under_mavens_pom_problems_line` |
+| 22. takes what Gradle says went wrong | ported | `failure_reason::takes_what_gradle_says_went_wrong` |
+| 23. takes the deepest cause Gradle gives | ported | `failure_reason::takes_the_deepest_cause_gradle_gives` |
+| 24. takes a launcher's ERROR line | ported | `failure_reason::takes_a_launchers_error_line` |
+| 25. else the last line, cut to 300 characters | ported | `failure_reason::else_the_last_line_cut_to_300_characters` |
+| 26. runs the plain compile of the test code | ported | `building::runs_the_plain_compile_of_the_test_code` |
+| 27. finds a JDK by javac.exe in JAVA_HOME or on PATH | ported | `building::finds_a_jdk_by_javac_in_java_home_or_on_path` |
+| 28. names javac's first error before Gradle's cause | ported | `building::names_javacs_first_error_before_gradles_cause` |
+| 29. adds no stop after a question and says when a JDK is missing | ported | `building::adds_no_stop_after_a_question_and_says_when_a_jdk_is_missing` |
+
+#### `runner.libraries.test.ts` (14 of 31) in `grace_core::runner::tests::libraries`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. runs mvnw.cmd and puts the listed jar on the classpath | ported | `runs_mvnw_and_puts_the_listed_jar_on_the_classpath` |
+| 2. runs the Maven of MAVEN_HOME when the project has no wrapper | ported | `runs_the_maven_of_maven_home_when_the_project_has_no_wrapper` |
+| 3. runs gradlew.bat without a daemon | ported | `runs_gradlew_without_a_daemon` |
+| 4. keeps the list until a build file changes | ported | `keeps_the_list_until_a_build_file_changes` |
+| 5. never lists on an environment switch or a run | ported | `never_lists_on_an_environment_switch_or_a_run` |
+| 6. says when there is no tool | ported | `says_when_there_is_no_tool` |
+| 7. keeps the last list when the tool fails | ported | `keeps_the_last_list_when_the_tool_fails` |
+| 8. ends the notice with one full stop | ported | `ends_the_notice_with_one_full_stop` |
+| 9. puts the classpath in its order | ported | `puts_the_classpath_in_its_order` (also checks Java's `-cp`) |
+| 27. joins the open notice | ported | `joins_the_open_notice` |
+| 28. runs the tool in a folder whose path has spaces and & | ported | `runs_the_tool_in_a_folder_whose_path_has_spaces_and_ampersands` |
+| 29. says it is listing, also in a replay | ported | `says_it_is_listing_also_in_a_replay` |
+| 30. stops the tool on Cancel | ported | `stops_the_tool_on_cancel` |
+| 31. runs no tool for a standalone project | ported | `runs_no_tool_for_a_standalone_project` |
+
 ### Slice 4: the not-built notice and Build
 
 Spec: [build from the notice](../specs/2026-11-04-build-from-notice.md).
@@ -248,6 +303,8 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 | `runner` (setup) | `ProjectSetup` and `NoSetup` (P1's seam) go, a method per slice from 2 to 5: the runner calls `karate::{maven, libraries, compiled, subfolders}` where `runner.ts` calls them. Where a tool is looked for is `RunnerOptions::lookup_env`, as Electron Grace's `lookupEnv` | The trait stood in for modules not yet ported; with them ported it is a layer with one implementation. The runner's tests steer the search as the Vitest tests did | `runner::tests::{pom, libraries, build, subfolders}` |
 | `maven` | An element nested more than 100 deep is refused, so such a pom.xml gives no environment, as one that is not well nested | Dropping a tree of elements recurses in Rust: one nested deep enough overflows the stack and ends Grace. No real pom comes near | `karate::maven::tests`, the 19 of `maven.test.ts` and `gives_none_for_elements_nested_deeper_than_any_pom` |
 | `libraries` (Linux) | Windows runs the tool as Electron Grace does: `cmd.exe /d /s /c "…"`, every path in a `GRACE_*` variable, as P1 ported it in `process` (`cmd()`, `verbatim_args`): the wrappers and `mvn.cmd` are batch files, which only `cmd.exe` runs. Linux, which Electron Grace never ran on, starts `mvnw`, `mvn`, `gradlew` or `gradle` itself with an argument list, the classpath file an argument (`-Dmdep.outputFile=<file>`) and still in `GRACE_CLASSPATH_FILE` for the init script; it looks for `java` and `javac` without `.exe`, splits PATH at `:`, has no IntelliJ search, and its no-tool notice names `mvnw` and `gradlew` | The Windows strings are pinned by the libraries spec (R3) and `libraries.test.ts`; Linux has no `cmd.exe` and needs no quoting | `libraries.test.ts`'s "the command" on the same strings; `runner.libraries.test.ts`'s "runs the tool in a folder whose path has spaces and &" and "builds in a folder whose path has spaces and &"; Linux tests beside them |
+| `libraries` (lists) | The Linux list is split at `:` and its newlines, `File.pathSeparator` there, which Maven and the init script join it with; two entries that differ in letter case are two files. On both platforms a launcher or wrapper is taken only when it is a file, where `existsSync` took a folder of that name too. PATH is split by `std::env::split_paths`, which on Windows keeps a `;` inside quotes in its entry, as `cmd.exe` does, where `split(";")` broke the entry there. The Linux build tool runs as Java does (nice 10, its own process group, `LC_ALL=C.UTF-8`, `process::spawn_karate`'s seam) | Linux has its own list separator and case-sensitive paths; a folder is not a program | `libraries::tests`, `libraries::tests::linux` |
+| `e2e` (build tools) | The e2e build gives its runner an empty `lookup_env`, so only a project's own wrapper runs, where Electron's `launch()` took the tools' folders off PATH, dropped their home variables and pointed `ProgramFiles` and `LOCALAPPDATA` at an empty folder. The release build looks where Grace's own variables lead | On Linux `mvn` and `gradle` can share `/usr/bin` with `java` and `xdotool`, which a test cannot take off PATH | E-project-setup-03 and 05; `runner::tests::libraries` for the search |
 | `watch` | Windows: `ReadDirectoryChangesW` through `windows` 0.62.2, one thread per handle. The handle is opened with `CreateFileW` (`FILE_FLAG_BACKUP_SEMANTICS`, `FILE_FLAG_OVERLAPPED`, every share mode) and read overlapped with an event; the thread waits on that event and a stop event, with no timeout. `close` sets the stop event, so a close that lands before the read is issued is not lost, then `CancelIoEx`, waits for the read to end (`GetOverlappedResult`) before the buffer is freed, and `CloseHandle`. An overflow is a read of 0 bytes or `ERROR_NOTIFY_ENUM_DIR`. The `unsafe` calls sit in one `#[cfg(windows)] mod sys` of `watch.rs`, each block with its `// SAFETY:` comment as in `process.rs`; the walk of the variable-length `FILE_NOTIFY_INFORMATION` entries is safe code over a byte slice, each offset checked against its length. Linux: `notify` 8.2.2's inotify backend, which blocks with no timeout and flags an overflow `Rescan`. Not `notify` on Windows, which the guide's feature map named: its loop waits 100 ms at a time (`WaitForSingleObjectEx(.., 100, ..)` in its `windows.rs`), 10 wake-ups a second while watch mode is on, and it reports no overflow. No new crate: `notify` is in the lock and in Grace's build through GPUI Kit, and the two `windows` features it needs (`Win32_Storage_FileSystem`, `Win32_System_IO`) are ones GPUI's Windows backend already compiles | ADR 0030 and the spec's "never a poll"; the burst test needs the overflow; an event, not a synchronous read, so a close never races the start of the call | `watch.test.ts` on both platforms; `watch::tests::windows` and the idle test (slice 6); `npm run bench:gpui -- --watch` in `gpui-idle` (slice 7) |
 | `debug` (session) | Grace listens on `127.0.0.1`, port 0, with `std::net::TcpListener`: one thread accepts, and each connection reads its first line on a thread of its own, so a connection that never sends one keeps no other out, as Node served them side by side; the first with the token is kept and the others closed, and its thread then reads the listener's pause lines; a write is a line of JSON, as `debug.ts`'s. The protocol and `listener/grace/DebugListener.java` do not change | One process, no event loop: threads blocked on the socket cost nothing while paused (R2.4) | `debug.test.ts`, `runner.debug.test.ts`, `a_silent_connection_does_not_keep_the_listener_out`, E-debug-01 on the unchanged jar |
 | `debug` (token) | The token's 16 random bytes come from `getrandom` 0.3.4, added in slice 9 as a direct dependency of `grace-core`, where Node had `randomBytes`. It is the version GPUI's `rand` links on both platforms (0.4.3 is in the lock too, through AccessKit's `uuid`). The pin follows the lock, as `sha2`'s and `base64`'s follow the versions GPUI links: a weekly bump (ADR 0032) that moves GPUI's `rand` moves it too, and if 0.3 leaves the lock it moves to the version left | `std` has no random source; no new crate | `debug.test.ts`'s wrong-token test (SD-08) |
