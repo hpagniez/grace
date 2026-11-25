@@ -33,6 +33,7 @@ mod home;
 mod properties;
 mod rerun;
 mod runs;
+mod setup;
 mod tags;
 mod threads;
 mod trends;
@@ -123,7 +124,8 @@ pub(super) struct TestRunner {
     pub data: Arc<TempDir>,
     pub data_dir: PathBuf,
     sink: Arc<Sink>,
-    _home: TempDir,
+    /// The runner's home folder, where `~/.karate/ext` is looked for.
+    pub home: TempDir,
 }
 
 pub(super) fn setup() -> TestRunner {
@@ -152,7 +154,7 @@ pub(super) fn setup_with(o: Setup) -> TestRunner {
         data_dir: data.path().to_path_buf(),
         data,
         sink,
-        _home: home,
+        home,
     }
 }
 
