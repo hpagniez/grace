@@ -16,6 +16,7 @@ use grace_core::state::{AppState, TestResult};
 
 use crate::details::Details;
 use crate::testing::{self, Harness};
+use crate::theme::Theme;
 
 const COIN: &str = "s:tests/x.feature#1";
 const STEADY: &str = "s:tests/x.feature#2";
@@ -203,6 +204,18 @@ fn heads_the_box_with_the_shuffle_icon(cx: &mut TestAppContext) {
     let (_h, mut cx) = setup(cx, 1008., state(vec![env(Some("qa"), pair("a", "b"))]));
     let (b, i) = (at(&mut cx, "flaky-proof:qa"), at(&mut cx, "flaky-proof-icon:qa"));
     assert!(b.contains(&i.origin) && i.size.width == px(14.));
+}
+
+/// #398: the box colours its heading as it fills, in the cancelled tokens, in both themes (`TINT.cancelled`); the
+/// icon takes the same colour. The counts and rows set ink themselves.
+#[test]
+fn colours_the_heading_and_its_icon_as_the_cancelled_box() {
+    for dark in [false, true] {
+        let t = Theme::new(dark).tokens;
+        let (mut b, mut i) = (super::tinted(t), super::shuffle(t));
+        assert_eq!(b.style().text.color, Some(Theme::color(t.cancelled)));
+        assert_eq!(i.style().text.color, Some(Theme::color(t.cancelled)));
+    }
 }
 
 /// 6: Report opens that run's report, only when it has one, and not while the runner is busy or a run goes on.

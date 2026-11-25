@@ -2,7 +2,7 @@
 //! closing during a run, on the real runner and Java. A row's status is in its name ("slow loop, running").
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use grace_e2e::{App, Node, Role, project};
@@ -46,9 +46,31 @@ fn bar(tree: &Node) -> Option<&Node> {
     tree.find(&Role::ProgressBar, "Run progress")
 }
 
+/// Holds a run at the top of the scenario `name` of `tests/<feature>` until the returned file exists, so a state the
+/// run only passes through stays until the test has read it. A minute at most: no Java waits for good.
+fn gate(dir: &Path, feature: &str, name: &str) -> PathBuf {
+    let open = dir.parent().unwrap().join(format!("open {name}"));
+    let file = dir.join("tests").join(feature);
+    let text = std::fs::read_to_string(&file).unwrap();
+    let at = text.find(&format!("Scenario: {name}")).unwrap();
+    let end = at + text[at..].find('\n').unwrap() + 1;
+    let text = format!(
+        "{}  * def hold = function(p){{ var File = Java.type('java.io.File'); var Thread = Java.type('java.lang.Thread'); for (var i = 0; i < 1200 && !new File(p).exists(); i++) Thread.sleep(50) }}\n  * eval hold('{}')\n{}",
+        &text[..end],
+        open.to_string_lossy().replace('\\', "/"),
+        &text[end..]
+    );
+    std::fs::write(file, text).unwrap();
+    open
+}
+
 /// Grace on the clean sample project, its 9 tests found.
-fn open_clean() -> (std::path::PathBuf, App) {
-    let dir = project("clean").unwrap();
+fn open_clean() -> (PathBuf, App) {
+    open(project("clean").unwrap())
+}
+
+/// Grace on a copy of the clean sample project, once its 9 tests are found.
+fn open(dir: PathBuf) -> (PathBuf, App) {
     let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
     app.wait_for("the tests found", Duration::from_secs(30), |t| {
         label(t, "9 tests · Not run yet").is_some()
@@ -64,22 +86,26 @@ fn run_all(app: &App) {
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn run_all_with_live_progress() {
-    let (_, app) = open_clean();
+    let dir = project("clean").unwrap();
+    let first = gate(&dir, "basic.feature", "passing hello");
+    let slow = gate(&dir, "slow.feature", "slow loop");
+    let (_, app) = open(dir);
     open_features(&app);
     run_all(&app);
     // the bar waits, with no values, until the first result (LV-05, LV-09)
-    let tree = app
-        .wait_for("0 / 9", Duration::from_secs(15), |t| label(t, "0 / 9").is_some())
-        .unwrap();
-    assert_eq!(bar(&tree).unwrap().value, None, "{}", tree.dump());
-    app.wait_for("slow loop running", Duration::from_secs(45), |t| {
-        label(t, "Running…").is_some() && says(t, "slow loop", "running")
+    app.wait_for("0 / 9, the bar with no value", RUN, |t| {
+        label(t, "0 / 9").is_some() && bar(t).is_some_and(|b| b.value.is_none())
     })
     .unwrap();
-    app.wait_for("a scenario passed and one failed", RUN, |t| {
-        says(t, "passing hello", "passed") && says(t, "failing match", "failed")
+    std::fs::write(first, "").unwrap();
+    app.wait_for("slow loop running, a scenario passed and one failed", RUN, |t| {
+        label(t, "Running…").is_some()
+            && says(t, "slow loop", "running")
+            && says(t, "passing hello", "passed")
+            && says(t, "failing match", "failed")
     })
     .unwrap();
+    std::fs::write(slow, "").unwrap();
     // as Playwright's expect, which retries: the driver reads the tree node by node, so one read can hold a
     // node from before an update and one from after it
     app.wait_for("Finished with 8 passed and 1 failed", RUN, |t| {

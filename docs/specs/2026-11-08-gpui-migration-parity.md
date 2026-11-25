@@ -6,7 +6,7 @@ summary: "The checklist of every spec scenario, e2e test and unit test that the 
 
 # GPUI migration: parity checklist
 
-Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Porting, phase P3 ([plan](../plans/2026-11-12-gpui-p3-panels.md)).
+Date 2026-11-08. Part of the [GPUI migration guide](2026-11-08-gpui-migration.md). Porting, phase P4 ([plan](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md)).
 
 This is the list the cut-over is checked against ([guide R3](2026-11-08-gpui-migration.md#r3-what-ported-means)): 594 spec scenarios, 194 end-to-end tests and 1,773 unit and component tests, taken from `develop` at `32a5ef6`, the commit of the go decision. A row is ported when the behaviour it names works in GPUI Grace and a test proves it: fill **Proof** with the test (`crates/…::test_name`, `e2e-uia/…`, a bench measure, or a dated check record for a by-hand check) and tick the box in the PR that ports it. A row that does not apply any more says why, in words, in **Proof**, with `n/a` in the last column; only the owner can accept an `n/a` on a user-facing row.
 
@@ -393,7 +393,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PU-30 | Details with nothing selected | `details::tests::nothing_selected`; the e2e test reads its words before a run | ☑ |
 | PU-31 | Empty history and HTTP tabs | The HTTP half: `grace::http::tests::shows_the_three_empty_states`, `grace_core::http_list::tests::added::the_empty_text_says_why_the_list_is_empty`; the History half: `grace::history::tests::says_no_runs_yet_in_an_empty_state_with_the_history_icon`, `grace-e2e/tests/history.rs::before_any_run_the_history_and_http_tabs_say_so` | ☑ |
 | PU-32 | Dialogs keep their order and keyboard behaviour | Clear history: `grace::history::tests::clear::puts_delete_first_then_cancel_which_has_the_focus`, `cancel_has_the_focus_when_the_dialog_opens`, `clear::escape_closes_it_and_deletes_nothing`; `grace-e2e/tests/history.rs::clear_history_keeps_its_button_order_and_closes_on_escape` (Delete before Cancel, Cancel focused, Escape closes it and deletes nothing). The Properties dialog's Escape: `grace-e2e/tests/properties.rs` | ☑ |
-| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' with phase P3 | ☐ |
+| PU-33 | Before and after screenshots exist (by hand) | P2's screens, GPUI beside Electron in light and dark, in [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md); the panels' in [the P3 exit check](../checks/2026-11-25-gpui-p3-exit.md), light and dark | ☑ |
 
 ### VL · Big projects: virtual lists and keyboard navigation
 
@@ -427,7 +427,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | VL-24 | A row's name says its status, flakiness and tags | `grace-e2e/tests/run.rs::run_all_with_live_progress` ("slow loop, running"); `grace_core::rows::tests::row_name_joins_the_label_the_status_word_in_lower_case_the_flaky_words_and_the_tags` | ☑ |
 | VL-25 | Calls are options | `grace-e2e/tests/http.rs::reading_the_calls_of_one_run_all` (the list box "HTTP calls", 13 options, none selected, then one); each option's place and set size: `grace::http::HttpCalls::row`; its name: `grace_core::http_list::tests::added::a_call_is_named_by_status_method_url_and_test` | ☑ |
 | VL-26 | Opening 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): 4.4 s to the tree (Electron 4.8 s), longest stall 17 ms, 57 MB (Electron 278 MB) | ☑ |
-| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab with phase P3 | ☐ |
+| VL-27 | Folders, selection and the HTTP tab at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): folders 35 ms, selection 34 ms, Down 50 ms; the HTTP tab at 3,000 calls opens in 33 ms in [the P3 exit check](../checks/2026-11-25-gpui-p3-exit.md) (aim 100) | ☑ |
 | VL-28 | Run all at 10,000 tests (perf) | [the P2 exit check](../checks/2026-11-10-gpui-p2-exit.md): longest stall 27 ms, Finished 0.4 s after Karate, peak 267 MB (Electron 698 MB) | ☑ |
 | VL-29 | 2,000 tests are not slower (perf) | Passes in [the VL-29 check](../checks/2026-11-12-gpui-p2-vl29.md), after #351: with no UI Automation client, app CPU 1,156 ms against Electron's 4,922 ms during Run all (-77%); run time, Java's CPU and memory are as good or better (#320) | ☑ |
 
@@ -506,7 +506,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PL-01 | A jar in the project's .karate/ext is on the classpath | | ☐ |
+| PL-01 | A jar in the project's .karate/ext is on the classpath | `grace-core::karate::command::tests::extension_jars::lists_the_home_folder_then_the_projects_as_wildcards`, `grace-core::runner::tests::setup::puts_the_jars_of_the_projects_karate_ext_on_the_classpath`, `grace-core::runner::tests::setup::puts_the_jars_of_the_home_karate_ext_on_the_classpath`, `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | PL-02 | A Maven project's libraries are on the classpath | | ☐ |
 | PL-03 | A Gradle project's libraries are on the classpath | | ☐ |
 | PL-04 | The order of the classpath | | ☐ |
@@ -526,15 +526,15 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| PS-01 | The pom's run settings do not change a run | | ☐ |
-| PS-02 | The pom's paths choose the tests | | ☐ |
-| PS-03 | The pom's configDir gives the config and the environments | | ☐ |
-| PS-04 | A pom Grace cannot read | | ☐ |
-| PS-05 | The notice shows only on open | | ☐ |
-| PS-06 | Maven's compiled output is on the classpath | | ☐ |
-| PS-07 | Compiled copies stay out of the tree and the environments | | ☐ |
-| PS-08 | One row of a Maven outline runs | | ☐ |
-| PS-09 | Gradle's compiled output is on the classpath | | ☐ |
+| PS-01 | The pom's run settings do not change a run | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::build_args::builds_the_exact_command_line` (`env` now starts the Env box, the later [pom defaults](2026-11-04-pom-defaults.md) spec, PD-01: the test's pom holds `dryRun`) | ☑ |
+| PS-02 | The pom's paths choose the tests | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::keeps_the_paths_inside_the_project_and_names_the_others` | ☑ |
+| PS-03 | The pom's configDir gives the config and the environments | `grace-core::runner::tests::setup::takes_paths_and_config_dir_from_karate_pom_json_and_names_the_rest`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::passes_config_dir_as_written_and_reads_environments_there_and_in_the_project`, `grace-e2e/tests/project_setup.rs::karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest` | ☑ |
+| PS-04 | A pom Grace cannot read | `grace-core::runner::tests::setup::uses_the_default_folders_when_karate_pom_json_cannot_be_read`, `grace-core::karate::command::tests::detect_layout::karate_pom_json::uses_nothing_from_a_file_it_cannot_read` | ☑ |
+| PS-05 | The notice shows only on open | `grace-core::runner::tests::setup::says_it_only_on_open` | ☑ |
+| PS-06 | Maven's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder`, `grace-core::runner::tests::setup::puts_mavens_compiled_output_on_the_classpath`, `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
+| PS-07 | Compiled copies stay out of the tree and the environments | `grace-core::runner::tests::setup::compiled_copies_stay_out_of_the_tree_and_the_environments`, `grace-core::karate::command::tests::detect_layout::compiled_output::maven_after_the_source_folders_never_a_feature_root_or_a_config_folder` | ☑ |
+| PS-08 | One row of a Maven outline runs | `grace-e2e/tests/open.rs::running_one_test_of_a_maven_project_shows_its_result`, `grace-core::runner::tests::setup::runs_one_row_of_a_maven_outline` | ☑ |
+| PS-09 | Gradle's compiled output is on the classpath | `grace-core::karate::command::tests::detect_layout::compiled_output::gradle_in_its_order` | ☑ |
 
 ### SD · Step debugger: breakpoints on steps, pause, step, inspect variables
 
@@ -852,9 +852,9 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | PD-06 | A pom filter whose tags no test has is not saved | | ☐ |
 | PD-07 | Refresh applies an edited pom to the controls with nothing saved | | ☐ |
 | PD-08 | Refresh drops a value the pom no longer gives | | ☐ |
-| PD-09 | Tag entries the filter can show | | ☐ |
-| PD-10 | Tag entries the filter cannot show are named | | ☐ |
-| PD-11 | An env or thread count Grace cannot take is named | | ☐ |
+| PD-09 | Tag entries the filter can show | `grace-core::runner::tests::setup::opening_shows_the_poms_tag_entries_in_the_filter_and_names_none`, `grace-core::karate::pom::tests::read_pom::takes_env_tags_and_threads` and the four `shows_the_tag_entries_*_as_chips` beside it | ☑ |
+| PD-10 | Tag entries the filter cannot show are named | `grace-core::runner::tests::setup::opening_keeps_the_tag_entry_it_can_show_and_names_the_other`, `grace-core::karate::pom::tests::read_pom::names_the_tag_entries_of_any_of_it_cannot_show` and the four `names_the_tag_entries_of_*` beside it; the notice's sentence: `grace-core::karate::command::tests::detect_layout::karate_pom_json::says_both_settings_first` | ☑ |
+| PD-11 | An env or thread count Grace cannot take is named | `grace-core::runner::tests::setup::opening_picks_no_env_and_1_thread_for_values_it_cannot_take_and_names_them`, `grace-core::karate::pom::tests::read_pom::names_an_env_or_a_thread_count_grace_cannot_take` | ☑ |
 | PD-12 | The notice names only what Grace does not use | | ☐ |
 | PD-13 | Surefire passes the project's karate.env (e2e) | | ☐ |
 | PD-14 | Maven's karate.env | | ☐ |
@@ -873,7 +873,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | RP-03 | Dragging a tab onto another takes its place | `grace::bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` (HTTP onto Console); `grace-core::panel_tabs::tests::puts_the_tab_in_the_place_asked_and_shifts_the_ones_between` (the three examples) | ☑ |
 | RP-04 | A drop marker shows where the tab will land | `grace::bottom_panel::tests::tabs::a_drop_bar_shows_on_the_side_the_tab_will_land_and_not_over_the_dragged_tab` | ☑ |
 | RP-05 | Dragging "HTTP" over "History" marks the left side | `grace::bottom_panel::tests::tabs::dragging_a_tab_from_the_right_marks_the_left_side` | ☑ |
-| RP-06 | A drag that goes nowhere changes nothing | Two of the three ends: `grace::bottom_panel::tests::tabs::a_drag_that_ends_on_itself_changes_and_saves_nothing`; `grace::bottom_panel::tests::tabs::a_drop_outside_the_tabs_changes_and_saves_nothing`. Escape is left: GPUI has no Escape handler for a drag, and in a headless window any key ends it, so no test can tell Escape's. Looked at by hand in slice 11 (plan) | ☐ |
+| RP-06 | A drag that goes nowhere changes nothing | `grace::bottom_panel::tests::tabs::a_drag_that_ends_on_itself_changes_and_saves_nothing`; `grace::bottom_panel::tests::tabs::a_drop_outside_the_tabs_changes_and_saves_nothing`; Escape, the pointer moved after it: `grace::bottom_panel::tests::tabs::escape_cancels_a_tab_drag_and_saves_nothing`, with `another_key_leaves_a_tab_drag_going` beside it ([#396](https://github.com/hpagniez/grace/issues/396)) | ☑ |
 | RP-07 | A drag keeps the shown tab | `grace::bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` (the shown tab stays Console) | ☑ |
 | RP-08 | Something dragged in from outside is ignored | `grace::bottom_panel::tests::tabs::a_file_dragged_in_from_outside_shows_no_bar_and_moves_no_tab` | ☑ |
 | RP-09 | Alt+Right moves a tab one place right | `grace::bottom_panel::tests::tabs::alt_right_and_alt_left_move_a_focused_tab_keep_its_focus_and_save`; `grace::bottom_panel::tests::tabs::alt_right_stops_at_the_last_place_and_the_shown_tab_stays`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` | ☑ |
@@ -1031,7 +1031,7 @@ Phase P3 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-examples-01 | An outline's Examples as a table | | ☐ |
+| E-examples-01 | An outline's Examples as a table | `grace-e2e/tests/examples.rs::an_outlines_examples_as_a_table` | ☑ |
 
 ### e2e/failures.spec.ts
 
@@ -1047,13 +1047,13 @@ Phase P3 · 7 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-flaky-01 | A test that flips with no change is marked flaky | | ☐ |
-| E-flaky-02 | A fix in the project is not flaky | | ☐ |
-| E-flaky-03 | Different environments are not compared | | ☐ |
-| E-flaky-04 | The proof opens a run's report | | ☐ |
-| E-flaky-05 | The mark stays on its test when the tree changes | | ☐ |
-| E-flaky-06 | Marks survive a restart | | ☐ |
-| E-flaky-07 | Clear history removes the marks | | ☐ |
+| E-flaky-01 | A test that flips with no change is marked flaky | `grace-e2e/tests/flaky.rs::a_test_that_flips_with_no_change_is_marked_flaky` | ☑ |
+| E-flaky-02 | A fix in the project is not flaky | `grace-e2e/tests/flaky.rs::a_fix_in_the_project_is_not_flaky` | ☑ |
+| E-flaky-03 | Different environments are not compared | `grace-e2e/tests/flaky.rs::different_environments_are_not_compared` | ☑ |
+| E-flaky-04 | The proof opens a run's report | `grace-e2e/tests/flaky.rs::the_proof_opens_a_runs_report` | ☑ |
+| E-flaky-05 | The mark stays on its test when the tree changes | `grace-e2e/tests/flaky.rs::the_mark_stays_on_its_test_when_the_tree_changes` | ☑ |
+| E-flaky-06 | Marks survive a restart | `grace-e2e/tests/flaky.rs::marks_survive_a_restart` | ☑ |
+| E-flaky-07 | Clear history removes the marks | `grace-e2e/tests/flaky.rs::clear_history_removes_the_marks` | ☑ |
 
 ### e2e/history.spec.ts
 
@@ -1176,12 +1176,12 @@ Phase P4 · 8 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-project-setup-01 | karate-pom.json gives the tests and the config, and a notice names the rest | | ☐ |
+| E-project-setup-01 | karate-pom.json gives the tests and the config, and a notice names the rest | `grace-e2e/tests/project_setup.rs::karate_pom_json_gives_the_tests_and_the_config_and_a_notice_names_the_rest` | ☑ |
 | E-project-setup-02 | karate-pom.json starts the environment, filter and thread count | | ☐ |
 | E-project-setup-03 | Maven's karate.env starts the environment | | ☐ |
-| E-project-setup-04 | Maven's compiled output is on the classpath | | ☐ |
+| E-project-setup-04 | Maven's compiled output is on the classpath | `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
 | E-project-setup-05 | a Maven project's libraries come from its build | | ☐ |
-| E-project-setup-06 | jars in .karate/ext are on the classpath | | ☐ |
+| E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
 | E-project-setup-07 | an empty folder offers the Karate project below it | | ☐ |
 | E-project-setup-08 | the not-built notice builds the project's Java code | | ☐ |
 
@@ -1374,7 +1374,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.properties.test.ts` | 18 | `grace-core::runner::tests::properties` (19 tests, real Java and Karate) (one, a file another process holds, runs on Windows only) | ☑ |
 | `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.runs.test.ts` | 13 | `grace-core::runner::tests::runs` (14 tests, real Java and Karate) (and one new: a cancel just before Java starts) | ☑ |
-| `src/main/runner.setup.test.ts` | 9 | `grace-core::runner` (setup) | ☐ |
+| `src/main/runner.setup.test.ts` | 9 | `grace-core::runner::tests::setup` (9 tests, real Java and Karate) | ☑ |
 | `src/main/runner.subfolders.test.ts` | 7 | `grace-core::runner` (subfolders) | ☐ |
 | `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 79 ported, the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 9 wait: test 28 for P3, the flaky mark's name, and 8 for P4, the debugger, Build and sub-folders) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; 8 wait for P4, the debugger, Build and sub-folders) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |

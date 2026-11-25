@@ -621,3 +621,71 @@ fn every_button_of_a_row_fits_the_window_at_any_width(cx: &mut TestAppContext) {
         assert_eq!(h.backend.calls(), ["rerun_failed a"], "at {width} px");
     }
 }
+
+fn long_tags(id: &str) -> HistoryEntry {
+    HistoryEntry {
+        filter: FilterState {
+            include: vec!["regression".into()],
+            exclude: vec!["integration".into()],
+            hide_non_matching: false,
+        },
+        ..entry(id)
+    }
+}
+
+/// #399: when a listed run's tags would be cut beside the labelled buttons, the buttons show their icons, as in a
+/// narrow window, and the two tags show whole at 1200 px.
+#[gpui::test]
+fn shows_the_buttons_as_icons_so_two_long_tags_fit_at_1200_px(cx: &mut TestAppContext) {
+    let (_h, mut cx, _list) = setup_at(cx, 1216., vec![long_tags("a")]);
+    let cell = bounds(&mut cx, "history-tags-cell:1".into());
+    for k in 0..2 {
+        let chip = bounds(&mut cx, format!("history-tag:1:{k}"));
+        assert!(
+            chip.right() <= cell.right(),
+            "chip {k} {chip:?} runs past its cell {cell:?}"
+        );
+    }
+    assert_eq!(bounds(&mut cx, "history-report:1".into()).size.width, px(24.));
+}
+
+/// #399: the "Tags" title stays on one line at the window's least width, where it wrapped letter by letter.
+#[gpui::test]
+fn keeps_the_tags_title_on_one_line_at_the_least_width(cx: &mut TestAppContext) {
+    let (_h, mut cx, _list) = setup_at(cx, crate::window::MIN_SIZE.0, vec![long_tags("a")]);
+    let title = bounds(&mut cx, "history-head:Tags".into());
+    assert!(title.size.height <= px(ROW_HEIGHT), "{title:?}");
+}
+
+/// #399: tags the row cuts are named in a tooltip over the cell, which keeps room to be pointed at; whole tags have
+/// none.
+#[gpui::test]
+fn names_the_tags_it_cuts_in_a_tooltip(cx: &mut TestAppContext) {
+    for (width, run, tip) in [
+        (
+            crate::window::MIN_SIZE.0,
+            long_tags("a"),
+            Some("@regression, not @integration"),
+        ),
+        (
+            1216.,
+            HistoryEntry {
+                filter: FilterState {
+                    include: vec!["smoke".into()],
+                    exclude: vec![],
+                    hide_non_matching: false,
+                },
+                ..entry("a")
+            },
+            None,
+        ),
+    ] {
+        let (h, mut cx, _list) = setup_at(cx, width, vec![run]);
+        let cell = bounds(&mut cx, "history-tags-cell:1".into());
+        assert!(cell.size.width >= px(24.), "at {width} px {cell:?}");
+        cx.simulate_mouse_move(cell.center(), None, Modifiers::none());
+        cx.executor().advance_clock(crate::tooltip::DELAY);
+        cx.run_until_parked();
+        assert_eq!(h.tip(&mut cx).map(|t| t.to_string()).as_deref(), tip, "at {width} px");
+    }
+}
