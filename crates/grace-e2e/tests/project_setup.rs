@@ -335,7 +335,9 @@ fn the_not_built_notice_builds_the_projects_java_code() {
     assert!(!class.exists());
     app.press_named(Role::Button, "Build").unwrap();
     app.wait_for("the class built and the notice gone", WAIT, |t| {
-        class.exists() && t.all().iter().all(|n| n.name != notice) && t.find(&Role::Button, "Build").is_none()
+        class.exists()
+            && t.all().iter().all(|n| !n.name.starts_with(notice))
+            && t.find(&Role::Button, "Build").is_none()
     })
     .unwrap();
     drop(app);

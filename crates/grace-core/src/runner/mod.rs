@@ -5,12 +5,12 @@
 //! # Threads
 //!
 //! A `Runner` is a cheap handle (`Clone`, `Send`, `Sync`). Its methods block: `open`, `refresh`, `build`, `set_env`,
-//! `run`, `rerun` and `rerun_failed` for as long as their build tool, dry run and run take, on the thread that calls them, which is never
-//! GPUI's main thread (P2 calls them from a background task or a thread of its own). While one of them works, the
-//! runner is busy: any other of them, and every change that a run would see, is refused with "A run is already in
-//! progress", as in Electron Grace; `cancel`, `replay`, `current` and the other reads answer at once from any thread.
-//! Nothing of the runner runs or wakes while it is idle (ADR 0030): a run's thread reads its events file every 100 ms
-//! only while Java runs.
+//! `run`, `rerun` and `rerun_failed` for as long as their build tool, dry run and run take, on the thread that calls
+//! them, which is never GPUI's main thread (P2 calls them from a background task or a thread of its own). While one of
+//! them works, the runner is busy: any other of them, and every change that a run would see, is refused with "A run is
+//! already in progress", as in Electron Grace; `cancel`, `replay`, `current` and the other reads answer at once from
+//! any thread. Nothing of the runner runs or wakes while it is idle (ADR 0030): a run's thread reads its events file
+//! every 100 ms only while Java runs.
 //!
 //! `emit` is called on the thread that does the work (a run's events on the run's caller, the recent list on a short
 //! thread of its own), never under one of the runner's locks: it may call `cancel`, as a test of Electron Grace's
