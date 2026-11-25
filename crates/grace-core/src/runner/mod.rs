@@ -26,10 +26,10 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's parts are seams or left out: the libraries, the test code notice, pom.xml's environment and the
-//!   sub-folder offer are `ProjectSetup`'s methods (`NoSetup` until then); watch mode, the step debugger, Build and the
-//!   editor's files are left out, each place they act marked `P4`. The events stay those of a project that has none of
-//!   them: `watch` (as saved), `breakpoints` (empty), no `listing`.
+//! - Phase P4's parts still to port are seams or left out: the libraries, the test code notice and the sub-folder offer
+//!   are `ProjectSetup`'s methods (`NoSetup` until then); watch mode, the step debugger, Build and the editor's files
+//!   are left out, each place they act marked `P4`. The events stay those of a project that has none of them: `watch`
+//!   (as saved), `breakpoints` (empty), no `listing`.
 mod run;
 mod setup;
 #[cfg(test)]
@@ -1264,7 +1264,7 @@ impl Inner {
 
     /// Open and Refresh (pom defaults R1): each control's value when `saved`, else the pom's, else Grace's default.
     fn start(&self, root: &str, saved: SavedControls, filter: FilterState, envs: EnvSettings, threads: u32) -> Start {
-        let pom = pom_start(Path::new(root), self.setup.as_ref());
+        let pom = pom_start(Path::new(root));
         Start {
             filter: if saved.filter {
                 filter
