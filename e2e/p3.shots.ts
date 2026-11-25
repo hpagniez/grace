@@ -6,7 +6,7 @@
 // Not taken: GPUI's `tree-row-menu` (the tree's right-click menu is a native menu, which a page screenshot cannot take),
 // and its narrow-window shots of History (`history-narrow`, `history-narrow-tooltip`: a GPUI-only layout).
 // The bottom panel's height is the app's `grace.panelHeight` in localStorage, set before a project opens (192 px
-// without it). Details is above the panel here, not in it: the failure shots keep the default so Details has room.
+// without it). Details is above the panel here, not in it: the failure shots take the least panel and a taller window.
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
@@ -40,12 +40,15 @@ const tmp = path.resolve("out", "shots-tmp");
 mkdirSync(tmp, { recursive: true });
 process.env.TEMP = process.env.TMP = tmp;
 
-/** Starts the app at 1280 × 800 under this colour scheme; `panel` is the bottom panel's height in px. */
-async function start(theme: "light" | "dark", opts: { userData?: string; panel?: number } = {}) {
+/** Starts the app at 1280 × `height` under this colour scheme; `panel` is the bottom panel's height in px. */
+async function start(
+  theme: "light" | "dark",
+  opts: { userData?: string; panel?: number; height?: number } = {},
+) {
   const started = await launch(opts.userData, {}, { colorScheme: theme });
   await started.app.evaluate(
     ({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h),
-    [WIDTH, HEIGHT],
+    [WIDTH, opts.height ?? HEIGHT],
   );
   if (opts.panel) {
     await started.win.evaluate(
@@ -279,7 +282,8 @@ for (const theme of ["light", "dark"] as const) {
     });
 
     await test.step("a broken config: banner, error and stepper, then the folder's list", async () => {
-      const { app, win } = await start(theme);
+      // the least bottom panel and a tall window, so the banner, the error and the stepper show whole
+      const { app, win } = await start(theme, { panel: 96, height: 1050 });
       await openProject(app, brokenConfigProject());
       await expect(win.getByTestId("run-all-button")).toBeEnabled({ timeout: 15_000 });
       await openFeatures(win);
