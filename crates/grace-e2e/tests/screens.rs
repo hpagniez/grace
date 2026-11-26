@@ -974,3 +974,42 @@ fn subfolder_offer(dark: bool) {
     app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
     shot(&app, &themed("subfolder-offer-narrow", dark));
 }
+
+/// The toolbar with watch mode on, as saved for the project, and off (slice 7 of P4), also at the narrowest window. The
+/// build before has no Watch button, so the project's saved choice turns it on and the tree is what is waited for.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_watch() {
+    for dark in [false, true] {
+        watch(dark, false);
+        watch(dark, true);
+    }
+}
+
+fn watch(dark: bool, on: bool) {
+    let dir = one_feature(
+        "Feature: checkout
+
+Scenario: pays
+  * match 1 == 1
+",
+    );
+    let root = dir.to_string_lossy().into_owned();
+    let mut settings = look(json!({ "lastProject": root, "projects": {} }), dark);
+    settings["projects"][&root] = json!({ "watch": on });
+    let app = App::launch_with_settings(&settings, &[]).unwrap();
+    app.wait_for("the tests found and the open over", WAIT, |t| {
+        starting(t, "checkout.feature").is_some() && starting(t, "Finding tests").is_none()
+    })
+    .unwrap();
+    let name = if on { "watch-on" } else { "watch-off" };
+    shot(&app, &themed(name, dark));
+    let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
+        x: 0,
+        y: 0,
+        width: 1200,
+        height: 800,
+    });
+    app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
+    shot(&app, &themed(&format!("{name}-narrow"), dark));
+}
