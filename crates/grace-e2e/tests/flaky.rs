@@ -386,11 +386,11 @@ fn the_mark_stays_on_its_test_when_the_tree_changes() {
     app.press_named(Role::Button, "Refresh").unwrap();
     let t = app
         .wait_for("added and coin marked", WAIT, |t| {
-            row(t, "added").is_some() && flaky_row(t, "coin", None)
+            // one read can hold a row's new name and its old children: wait for the mark with the name
+            row(t, "added").is_some() && flaky_row(t, "coin", None) && marks(t) == 1
         })
         .unwrap();
     assert!(!flaky_row(&t, "added", None));
-    assert_eq!(marks(&t), 1);
 }
 
 /// E-flaky-06, FL-06

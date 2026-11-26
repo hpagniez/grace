@@ -13,7 +13,7 @@ use gpui::{App, AppContext as _, Context, Entity, Task};
 use grace_core::model::env::{ImportResult, PropertiesEdit};
 use grace_core::model::events::AppEvent;
 use grace_core::model::tags::FilterState;
-use grace_core::runner::Runner;
+use grace_core::runner::{Runner, RunnerOptions};
 use grace_core::state::AppState;
 
 use crate::seams::Seams;
@@ -34,6 +34,8 @@ pub trait Backend: Send + Sync + 'static {
     fn replay(&self) -> Vec<AppEvent>;
     /// Lists the open project's tests again.
     fn refresh(&self) -> std::io::Result<()>;
+    /// Builds the open project's Java code with its own build tool, then lists the tests again.
+    fn build(&self) -> std::io::Result<()>;
     /// Runs the tests under a node: the tree's root for Run all.
     fn run(&self, key: &str) -> std::io::Result<()>;
     /// Runs a listed run again on its environment and filter (RH-06).
@@ -87,6 +89,9 @@ impl Backend for Runner {
     }
     fn refresh(&self) -> std::io::Result<()> {
         Runner::refresh(self)
+    }
+    fn build(&self) -> std::io::Result<()> {
+        Runner::build(self)
     }
     fn run(&self, key: &str) -> std::io::Result<()> {
         Runner::run(self, key)
@@ -345,6 +350,11 @@ impl Grace {
         self.background(cx, Order::Start, |b| b.refresh());
     }
 
+    /// The notice's Build button: builds the project's Java code (build from the notice R1).
+    pub fn build(&mut self, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, |b| b.build());
+    }
+
     /// Run all: every test of the tree, whatever the filter hides (the runner applies the filter).
     pub fn run_all(&mut self, cx: &mut Context<Self>) {
         let Some(key) = self.state.tree.as_ref().map(|t| t.key.clone()) else {
@@ -587,14 +597,17 @@ pub fn new_app(
     cx: &mut App,
 ) -> Entity<Grace> {
     let (tx, rx) = events();
-    let runner = Runner::new(
+    let mut options = RunnerOptions::new(
         data_dir.clone(),
         vendor,
         Arc::new(grace_core::secrets::os_secret_box()),
-        move |e| {
+        Arc::new(move |e| {
             let _ = tx.try_send(e); // unbounded: fails only once the window is gone
-        },
+        }),
     );
+    // an end-to-end test runs only the wrapper it wrote, never the machine's Maven or Gradle (find-build-tools, Tests)
+    options.lookup_env = cfg!(feature = "e2e").then(Vec::new);
+    let runner = Runner::with_options(options);
     cx.new(|cx| Grace::new(Arc::new(runner), seams, data_dir, rx, cx))
 }
 
@@ -660,6 +673,10 @@ pub mod fake {
         }
         fn refresh(&self) -> std::io::Result<()> {
             self.record("refresh".into());
+            Ok(())
+        }
+        fn build(&self) -> std::io::Result<()> {
+            self.record("build".into());
             Ok(())
         }
         fn run(&self, key: &str) -> std::io::Result<()> {

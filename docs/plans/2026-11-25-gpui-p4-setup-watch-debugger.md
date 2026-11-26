@@ -18,7 +18,7 @@ Counted from the parity file on `develop` at `cf6b888`, by its Ported column.
 |---|---|---|
 | Spec scenarios | 107 | 103 of P4's own sections (PL 13, PS 9, SD 23, FB 6, WM 17, BN 10, PD 17, SO 8) and 4 handed on: SC-06, SC-08 and GF-04 from P3, TO-16 from P2 |
 | End-to-end tests | 12 | 11 of P4's files (`debug` 2, `project-setup` 8, `watch` 1) and E-details-01's first half (a test's steps before a run) from P2 |
-| Unit and component files | 14 files, 187 tests | `compiled.test.ts` 11, `debug.test.ts` 8, `libraries.test.ts` 29, `maven.test.ts` 19, `pom.test.ts` 5 (the `pomStart` tests; its other 14 are P1's), `subfolders.test.ts` 10, `watch.test.ts` 13, `runner.debug.test.ts` 11, `runner.libraries.test.ts` 31, `runner.pom.test.ts` 12, `runner.setup.test.ts` 9, `runner.subfolders.test.ts` 7, `runner.watch.test.ts` 18, `Variables.test.tsx` 4 |
+| Unit and component files | 14 files, 188 tests | `compiled.test.ts` 12, `debug.test.ts` 8, `libraries.test.ts` 29, `maven.test.ts` 19, `pom.test.ts` 5 (the `pomStart` tests; its other 14 are P1's), `subfolders.test.ts` 10, `watch.test.ts` 13, `runner.debug.test.ts` 11, `runner.libraries.test.ts` 31, `runner.pom.test.ts` 12, `runner.setup.test.ts` 9, `runner.subfolders.test.ts` 7, `runner.watch.test.ts` 18, `Variables.test.tsx` 4 |
 | Tests waiting in files P2 ticked | 22 | `Details.test.tsx` 14 to 17 and 29, `Toolbar.test.tsx` 31 to 36, `Tree.test.tsx` 22, 25, 41, 65, 73, 83, 84, 85 (the numbers of the [P2 plan's tables](2026-11-09-gpui-p2-main-screen.md#the-component-tests)), and `BottomPanel.test.tsx`'s Variables tests: "shows only while a debug run is going" and the Variables halves of "makes the three tabs draggable, and not Variables" and "allows the drop only over the three tabs". The checklist shows `BottomPanel.test.tsx` ticked, but GPUI Grace has no Variables tab (the P2 plan's Redesigns, `bottom_panel`, handed it to P4): slice 10 corrects that row |
 
 `runner.subfolders.test.ts` holds 8 tests on `develop`, where the checklist counts 7: slice 5 ports the 8 and corrects the count. SD-01 ("variables") and SD-02 ("second") are not scenarios of Grace: they are the two `Scenario:` lines of the fixture feature in the debugger spec's Background, which the list's generator took as rows. Slice 9 marks them `n/a` with that reason; nobody using Grace could notice them.
@@ -62,7 +62,7 @@ One PR each, in this order, each `Part of #283`, each from the merged `develop`.
 | 10 | The debugger in the window: Debug, the toolbar's controls and keys, the pause, the Variables tab | SD-17 to SD-23, SC-06, TO-16; E-debug-01, E-debug-02; `Variables.test.tsx`; `Details.test.tsx` 16; `Toolbar.test.tsx` 31, 32; `Tree.test.tsx` 41, 65, 73, 83, 85; `BottomPanel.test.tsx`'s 3 | `sonnet` |
 | 11 | The exit check | The regressions table; the check record | `sonnet` |
 
-Two slices are marked hard. The watcher (6) works on two operating systems' file events, each with its own way to lose names (a buffer that overflows), to report a deleted root (Node's `fs.watch` reported the root's own path in a loop; the test decides what `ReadDirectoryChangesW` and inotify do) and to miss a renamed one, and must cost nothing while no file changes. The debug session (9) runs a socket server and two threads against a Java listener that cannot change, stops the run's events tail while paused with no deadline, and must survive Cancel and a broken socket at any point. Spec rows: 13 + 14 + 16 + 12 + 8 + 3 + 14 + 5 + 13 + 9 + 0 = 107 (103 of P4's own and the 4 handed on: SC-08 and GF-04 in slice 8, SC-06 and TO-16 in slice 10). E2e rows: 3 + 2 + 1 + 1 + 1 + 0 + 1 + 1 + 0 + 2 + 0 = 12 (E-details-01 is slice 8's). Unit tests: 9 + 36 + 43 + 28 + 17 + 13 + 18 + 2 + 17 + 4 = 187, of which 186 are ported and 1 is `n/a` (`runner.watch.test.ts` test 2, with WM-02). Tests waiting in ticked files: 1 + 1 + 4 + 5 + 11 = 22 (slices 4, 5, 7, 8 and 10).
+Two slices are marked hard. The watcher (6) works on two operating systems' file events, each with its own way to lose names (a buffer that overflows), to report a deleted root (Node's `fs.watch` reported the root's own path in a loop; the test decides what `ReadDirectoryChangesW` and inotify do) and to miss a renamed one, and must cost nothing while no file changes. The debug session (9) runs a socket server and two threads against a Java listener that cannot change, stops the run's events tail while paused with no deadline, and must survive Cancel and a broken socket at any point. Spec rows: 13 + 14 + 16 + 12 + 8 + 3 + 14 + 5 + 13 + 9 + 0 = 107 (103 of P4's own and the 4 handed on: SC-08 and GF-04 in slice 8, SC-06 and TO-16 in slice 10). E2e rows: 3 + 2 + 1 + 1 + 1 + 0 + 1 + 1 + 0 + 2 + 0 = 12 (E-details-01 is slice 8's). Unit tests: 9 + 36 + 43 + 29 + 17 + 13 + 18 + 2 + 17 + 4 = 188, of which 187 are ported and 1 is `n/a` (`runner.watch.test.ts` test 2, with WM-02). Tests waiting in ticked files: 1 + 1 + 4 + 5 + 11 = 22 (slices 4, 5, 7, 8 and 10).
 
 ### Slice 1: what is already built
 
@@ -103,6 +103,59 @@ Specs: [pom defaults](../specs/2026-11-04-pom-defaults.md), [project setup](../s
 4. `runner.pom.test.ts` test for test in `grace_core::runner::tests::pom`, real Java and Karate: PD-01 to PD-08, PD-12 to PD-17. PD-05 is the Properties dialog's save, which P2 left for this slice.
 5. `project_setup.rs`: E-project-setup-02 (karate-pom.json's environment, filter and thread count), 03 (Maven's `karate.env`). E-project-setup-02 reads the chips' states through the accessibility tree, as `tags.rs` does; the Env and Threads boxes are checked by what they did, as `threads.rs::the_box_starts_from_karate_pom_json_and_the_persons_count_wins` does, since AT-SPI cannot read an `Input`'s text.
 
+What slice 2 built: `grace-core::karate::maven`, which `runner::pom_start` calls when karate-pom.json gives no `env`, so a Maven project now starts with pom.xml's `karate.env`; `ProjectSetup::maven_env` and the P1 test with its stand-in `PomXml` are gone. One Redesigns row (`maven`). No row is handed on, and the look does not change. `runner::tests::pom` holds one test more for each of PD-15, PD-16 and PD-17, whose scenarios open a project, which no Vitest test did; PD-14's rows are `maven`'s tests, opened by "Surefire passes a Maven project's karate.env". Only that test failed before the runner called `maven_env`, the rest being P1's behaviour, so each was seen failing with its behaviour broken: the pom's values ignored, the saved values ignored, the environment saved with the properties, dropped tags saved, a filter change not saved, an unreadable `settings.json` read as nothing saved, an environment the pom no longer gives kept, a used `env` named in the notice, pom.xml read over karate-pom.json's `env`, pom.xml read for an unused `env`, an environment given without a pom.xml. E-project-setup-03 adds a scenario that passes only in `dev` (AT-SPI cannot read the Env box). For slice 3: the Maven and Gradle projects of `runner::tests::pom` and of E-project-setup-03 hold no stand-in wrapper, so listing their libraries must not reach a real tool (porting rule 3). The tests, test for test:
+
+#### `maven.test.ts` (19) in `grace_core::karate::maven::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes the karate.env property alone | ported | `takes_the_karate_env_property_alone` |
+| 2. takes Surefire's entry as written | ported | `takes_surefires_entry_as_written` |
+| 3. resolves Surefire's ${karate.env} from the properties | ported | `resolves_surefires_karate_env_from_the_properties` |
+| 4. resolves one ${…} inside other text | ported | `resolves_one_reference_inside_other_text` |
+| 5. gives none when Surefire's property is missing, without falling back | ported | `gives_none_when_surefires_property_is_missing_without_falling_back` |
+| 6. takes Failsafe's entry | ported | `takes_failsafes_entry` |
+| 7. takes Surefire's entry in pluginManagement | ported | `takes_surefires_entry_in_plugin_management` |
+| 8. puts Surefire before Failsafe | ported | `puts_surefire_before_failsafe` |
+| 9. leaves out an execution's configuration | ported | `leaves_out_an_executions_configuration` |
+| 10. leaves out a profile's properties | ported | `leaves_out_a_profiles_properties` |
+| 11. leaves out a comment | ported | `leaves_out_a_comment` |
+| 12. gives none for a name Grace does not take | ported | `gives_none_for_a_name_grace_does_not_take` |
+| 13. gives none when elements are not well nested | ported | `gives_none_when_elements_are_not_well_nested` |
+| 14. gives none for more than one ${ | ported | `gives_none_for_more_than_one_reference` |
+| 15. gives none when the resolved value still holds ${ | ported | `gives_none_when_the_resolved_value_still_holds_a_reference` |
+| 16. lets an empty Surefire entry decide | ported | `lets_an_empty_surefire_entry_decide` |
+| 17. reads a namespaced project with a BOM and Windows line ends | ported | `reads_a_namespaced_project_with_a_bom_and_windows_line_ends` |
+| 18. reads CDATA as text | ported | `reads_cdata_as_text` |
+| 19. gives none without a pom.xml | ported | `gives_none_without_a_pom_xml` |
+
+#### `pom.test.ts`'s `pomStart` (5) in `grace_core::runner::setup::tests::pom_start`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes pom.xml's karate.env without a karate-pom.json | ported | `takes_pom_xmls_karate_env_without_a_karate_pom_json` |
+| 2. puts karate-pom.json's env first | ported | `puts_karate_pom_jsons_env_first` |
+| 3. keeps pom.xml out when karate-pom.json's env is unused | ported | `keeps_pom_xml_out_when_karate_pom_jsons_env_is_unused` |
+| 4. reads a karate-pom.json that cannot be read as absent | ported | `reads_a_karate_pom_json_that_cannot_be_read_as_absent` |
+| 5. takes the filter and the thread count | ported | `takes_the_filter_and_the_thread_count` |
+
+#### `runner.pom.test.ts` (12) in `grace_core::runner::tests::pom`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. karate-pom.json starts the controls, and a run passes them | ported | `karate_pom_json_starts_the_controls_and_a_run_passes_them` (also checks Java's arguments) |
+| 2. what the person saved wins | ported | `what_the_person_saved_wins` |
+| 3. each control decides on its own | ported | `each_control_decides_on_its_own` |
+| 4. picking no environment is saved | ported | `picking_no_environment_is_saved` |
+| 5. saving run properties does not save the pom's environment | ported | `saving_run_properties_does_not_save_the_poms_environment` |
+| 6. a pom filter whose tags no test has is not saved | ported | `a_pom_filter_whose_tags_no_test_has_is_not_saved` |
+| 7. a change in the filter bar saves the whole filter shown | ported | `a_change_in_the_filter_bar_saves_the_whole_filter_shown` |
+| 8. Refresh applies an edited pom to the controls with nothing saved | ported | `refresh_applies_an_edited_pom_to_the_controls_with_nothing_saved` |
+| 9. Refresh keeps the controls in force when settings.json cannot be read | ported | `refresh_keeps_the_controls_in_force_when_settings_json_cannot_be_read` |
+| 10. Refresh drops a value the pom no longer gives | ported | `refresh_drops_a_value_the_pom_no_longer_gives` |
+| 11. the notice names only what Grace does not use | ported | `the_notice_names_only_what_grace_does_not_use` |
+| 12. Surefire passes a Maven project's karate.env | ported | `surefire_passes_a_maven_projects_karate_env` |
+
 ### Slice 3: find Maven and Gradle, list the libraries
 
 Specs: [project libraries](../specs/2026-11-02-project-libraries.md), [find build tools](../specs/2026-11-03-find-build-tools.md).
@@ -112,6 +165,61 @@ Specs: [project libraries](../specs/2026-11-02-project-libraries.md), [find buil
 3. `runner.libraries.test.ts`'s 14 tests outside "the project's Java code" (its first 9 and its last 5) in `grace_core::runner::tests::libraries`, each wrapper a stand-in written by the test (porting rule 3): PL-02 to PL-10, PL-13, FB-01 to FB-06.
 4. `project_setup.rs`: E-project-setup-05, its stand-in `mvnw.cmd` and an executable `mvnw` on Linux, which put a `report_zip` jar on the list.
 
+What slice 3 built: `grace-core::karate::libraries`, and the runner's `list_libraries` and `run_tool`, so GPUI Grace now lists a Maven or Gradle project's libraries with its own build on open and Refresh, shows the listing, stops it on Cancel, says why it failed, and puts the kept jars on Java's classpath; `ProjectSetup::list_libraries` and `kept_jars` are gone. The window needed nothing: P2 drew the listing line and the notice, so the look does not change. `RunnerOptions::lookup_env` is where the tool is looked for. The functions of the Build button that `libraries.test.ts` tests (`Goal::Build`, `has_jdk`, `build_failure`) are ported and have no caller until slice 4. Two Redesigns rows (`libraries` (lists), `e2e` (build tools)). No row is handed on. `runner::tests::libraries` holds one test more for each of FB-02 to FB-05, whose scenarios open a project, which `find_tool`'s tests do not do, and one for a tool that succeeds without writing a list (project libraries R6.1). The "spaces and &" test of the listing is ported here; the one of Build (`runner.libraries.test.ts`, "builds in a folder whose path has spaces and &") calls `build()` and goes with slice 4. The tests, test for test:
+
+#### `libraries.test.ts` (29) in `grace_core::karate::libraries::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. takes the project's wrapper before PATH | ported | `find_tool::takes_the_projects_wrapper_before_path` |
+| 2. searches PATH in order, mvn.cmd before mvn.bat | ported | `find_tool::searches_path_in_order_mvn_cmd_before_mvn_bat` (Windows; Linux: `linux::searches_path_at_colons_in_order`) |
+| 3. finds gradlew.bat, else gradle.bat | ported | `find_tool::finds_the_gradle_wrapper_else_gradle` |
+| 4. reads a quoted PATH entry as cmd.exe does | ported | `find_tool::reads_a_quoted_path_entry_as_cmd_exe_does` (Windows) |
+| 5. then looks in MAVEN_HOME, then M2_HOME, and in GRADLE_HOME for Gradle | ported | `find_tool::then_looks_in_maven_home_then_m2_home_and_in_gradle_home_for_gradle` |
+| 6. then takes IntelliJ IDEA's Maven, the newest build first | ported | `find_tool::then_takes_intellij_ideas_maven_the_newest_build_first` (Windows) |
+| 7. finds nothing | ported | `find_tool::finds_nothing` |
+| 8. names where it looked | ported | `find_tool::names_where_it_looked` |
+| 9. changes with the layout's build files only | ported | `library_key::changes_with_the_layouts_build_files_only` (also pins Electron Grace's key of the same files) |
+| 10. reads Gradle's version catalog | ported | `library_key::reads_gradles_version_catalog` |
+| 11. round-trips | ported | `the_kept_list::round_trips` |
+| 12. reads anything else as none | ported | `the_kept_list::reads_anything_else_as_none` |
+| 13. is stale when missing, of another tool or key, or a jar is gone | ported | `the_kept_list::is_stale_when_missing_of_another_tool_or_key_or_a_jar_is_gone` |
+| 14. gives the jars only to the same tool | ported | `the_kept_list::gives_the_jars_only_to_the_same_tool` |
+| 15. passes every path through a quoted variable | ported | `the_command::passes_every_path_through_a_quoted_variable` |
+| 16. keeps the person's environment and adds Grace's variables | ported | `the_command::keeps_the_persons_environment_and_adds_graces_variables` |
+| 17. lends the bundled Java only when there is no other | ported | `the_command::lends_the_bundled_java_only_when_there_is_no_other` |
+| 18. lends nothing without a Java to lend (Gradle needs a JDK) | ported | `the_command::lends_nothing_without_a_java_to_lend` |
+| 19. keeps existing entries in order, once, less the classpath | ported | `parse_libraries::keeps_existing_entries_in_order_once_less_the_classpath` |
+| 20. takes Maven's first error | ported | `failure_reason::takes_mavens_first_error` |
+| 21. takes the cause under Maven's POM problems line | ported | `failure_reason::takes_the_cause_under_mavens_pom_problems_line` |
+| 22. takes what Gradle says went wrong | ported | `failure_reason::takes_what_gradle_says_went_wrong` |
+| 23. takes the deepest cause Gradle gives | ported | `failure_reason::takes_the_deepest_cause_gradle_gives` |
+| 24. takes a launcher's ERROR line | ported | `failure_reason::takes_a_launchers_error_line` |
+| 25. else the last line, cut to 300 characters | ported | `failure_reason::else_the_last_line_cut_to_300_characters` |
+| 26. runs the plain compile of the test code | ported | `building::runs_the_plain_compile_of_the_test_code` |
+| 27. finds a JDK by javac.exe in JAVA_HOME or on PATH | ported | `building::finds_a_jdk_by_javac_in_java_home_or_on_path` |
+| 28. names javac's first error before Gradle's cause | ported | `building::names_javacs_first_error_before_gradles_cause` |
+| 29. adds no stop after a question and says when a JDK is missing | ported | `building::adds_no_stop_after_a_question_and_says_when_a_jdk_is_missing` |
+
+#### `runner.libraries.test.ts` (14 of 31) in `grace_core::runner::tests::libraries`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. runs mvnw.cmd and puts the listed jar on the classpath | ported | `runs_mvnw_and_puts_the_listed_jar_on_the_classpath` |
+| 2. runs the Maven of MAVEN_HOME when the project has no wrapper | ported | `runs_the_maven_of_maven_home_when_the_project_has_no_wrapper` |
+| 3. runs gradlew.bat without a daemon | ported | `runs_gradlew_without_a_daemon` |
+| 4. keeps the list until a build file changes | ported | `keeps_the_list_until_a_build_file_changes` |
+| 5. never lists on an environment switch or a run | ported | `never_lists_on_an_environment_switch_or_a_run` |
+| 6. says when there is no tool | ported | `says_when_there_is_no_tool` |
+| 7. keeps the last list when the tool fails | ported | `keeps_the_last_list_when_the_tool_fails` |
+| 8. ends the notice with one full stop | ported | `ends_the_notice_with_one_full_stop` |
+| 9. puts the classpath in its order | ported | `puts_the_classpath_in_its_order` (also checks Java's `-cp`) |
+| 27. joins the open notice | ported | `joins_the_open_notice` |
+| 28. runs the tool in a folder whose path has spaces and & | ported | `runs_the_tool_in_a_folder_whose_path_has_spaces_and_ampersands` |
+| 29. says it is listing, also in a replay | ported | `says_it_is_listing_also_in_a_replay` |
+| 30. stops the tool on Cancel | ported | `stops_the_tool_on_cancel` |
+| 31. runs no tool for a standalone project | ported | `runs_no_tool_for_a_standalone_project` |
+
 ### Slice 4: the not-built notice and Build
 
 Spec: [build from the notice](../specs/2026-11-04-build-from-notice.md).
@@ -120,6 +228,47 @@ Spec: [build from the notice](../specs/2026-11-04-build-from-notice.md).
 2. The runner's `java_code` and `build`: the plain compile through `run_tool` with `building`, then a Refresh; "Build cancelled.", the build's first error, the JDK sentence, busy refused. `runner.libraries.test.ts`'s 17 tests under "the project's Java code" in `grace_core::runner::tests::build`: PL-11, PL-12, BN-01 to BN-10.
 3. `Backend::build` and `Grace::build`; the notice's Build button, shown when `NoticeView.build` says so and off while busy (`Tree.test.tsx` 25 is the notice's test, ported where the notice is drawn).
 4. `project_setup.rs`: E-project-setup-08, with the stand-in that writes a class. `screens_build_notice`.
+
+What slice 4 built: `grace-core::karate::compiled`, the runner's `java_code` and `build`, `Backend::build`, `Grace::build` and the notice's Build button, so GPUI Grace now says on open and Refresh that a Maven or Gradle project's Java code is not built, leaving a JUnit runner out (#236), and builds it on a click with the project's own tool, then refreshes. `ProjectSetup::java_code` and `JavaCode` are gone. The look changes by the button, which follows the notice's text as Electron Grace's does: `ui::notice`'s text no longer fills the row. One Redesigns row (`compiled`). No row is handed on. `runner::tests::build` holds one test more for each of PL-12, BN-05, BN-07 and BN-10, which no Vitest test plays; `compiled::tests` one more, for a byte order mark before a runner's import and a source that is not UTF-8, both of which Node read. "never lends Grace's Java" is checked as the build tool's `JAVA_HOME` being the person's own, since on Linux the tests' Java can be that very folder. `Tree.test.tsx` 25 is `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`. The plan counted `compiled.test.ts` as 11 tests; it holds 12. The tests, test for test:
+
+#### `compiled.test.ts` (12) in `grace_core::karate::compiled::tests`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. says nothing without Java code in src/test/java | ported | `test_code_notice::says_nothing_without_java_code_in_src_test_java` |
+| 2. says when the code was never built | ported | `test_code_notice::says_when_the_code_was_never_built` |
+| 3. counts an empty compiled folder as not built | ported | `test_code_notice::counts_an_empty_compiled_folder_as_not_built` |
+| 4. says nothing when the newest class is newer than every source | ported | `test_code_notice::says_nothing_when_the_newest_class_is_newer_than_every_source` |
+| 5. says when a source changed after the last build | ported | `test_code_notice::says_when_a_source_changed_after_the_last_build` |
+| 6. reads Gradle's compiled folder and names its task | ported | `test_code_notice::reads_gradles_compiled_folder_and_names_its_task` |
+| 7. leaves out a JUnit runner (%s): Grace never runs it | ported | `test_code_notice::{leaves_out_a_karate_1_junit_runner, leaves_out_a_karate_2_junit_runner, leaves_out_the_parallel_junit_runner}` |
+| 8. still checks a helper beside a runner | ported | `test_code_notice::still_checks_a_helper_beside_a_runner` |
+| 9. says nothing for a standalone project | ported | `test_code_notice::says_nothing_for_a_standalone_project` |
+| 10. counts sources older than the last Build as built | ported | `the_last_build::counts_sources_older_than_the_last_build_as_built` |
+| 11. never counts a project with no class as built | ported | `the_last_build::never_counts_a_project_with_no_class_as_built` |
+| 12. keeps the time in built.json | ported | `the_last_build::keeps_the_time_in_built_json` |
+
+#### `runner.libraries.test.ts` (17 of 31, "the project's Java code") in `grace_core::runner::tests::build`
+
+| Vitest test | Class | Rust test or reason |
+|---|---|---|
+| 1. says on open when it is not built | ported | `says_on_open_when_it_is_not_built` |
+| 2. comes after the libraries' notice | ported | `comes_after_the_libraries_notice` |
+| 3. says nothing once built, and says on Refresh when it changed since | ported | `says_nothing_once_built_and_says_on_refresh_when_it_changed_since` |
+| 4. offers Build with the not-built notice | ported | `offers_build_with_the_not_built_notice` |
+| 5. offers no Build without a tool | ported | `offers_no_build_without_a_tool` |
+| 6. offers Build in a joined notice | ported | `offers_build_in_a_joined_notice` |
+| 7. offers Build after the libraries' failure on Refresh | ported | `offers_build_after_the_libraries_failure_on_refresh` |
+| 8. builds with test-compile, then refreshes | ported | `builds_with_test_compile_then_refreshes` |
+| 9. builds in a folder whose path has spaces and & | ported | `builds_in_a_folder_whose_path_has_spaces_and_ampersands` |
+| 10. says the build's first error and keeps Build | ported | `says_the_builds_first_error_and_keeps_build` |
+| 11. says nothing of a JDK when JAVA_HOME has javac.exe | ported | `says_nothing_of_a_jdk_when_java_home_has_javac` |
+| 12. stops the build on Cancel | ported | `stops_the_build_on_cancel` |
+| 13. says it is building, also in a replay | ported | `says_it_is_building_also_in_a_replay` |
+| 14. refuses a second build while one runs | ported | `refuses_a_second_build_while_one_runs` |
+| 15. says when the tool is gone at the click | ported | `says_when_the_tool_is_gone_at_the_click` |
+| 16. a Gradle build that rewrites no class still counts | ported | `a_gradle_build_that_rewrites_no_class_still_counts` |
+| 17. runs nothing with no project or for a standalone project | ported | `runs_nothing_with_no_project_or_for_a_standalone_project` |
 
 ### Slice 5: the sub-folder offer
 
@@ -193,7 +342,11 @@ Changes from Electron Grace's design (guide R3.6). The rows below are decided by
 | Module | Change from Electron Grace | Why | Parity kept by |
 |---|---|---|---|
 | `runner` (setup) | `ProjectSetup` and `NoSetup` (P1's seam) go, a method per slice from 2 to 5: the runner calls `karate::{maven, libraries, compiled, subfolders}` where `runner.ts` calls them. Where a tool is looked for is `RunnerOptions::lookup_env`, as Electron Grace's `lookupEnv` | The trait stood in for modules not yet ported; with them ported it is a layer with one implementation. The runner's tests steer the search as the Vitest tests did | `runner::tests::{pom, libraries, build, subfolders}` |
+| `maven` | An element nested more than 100 deep is refused, so such a pom.xml gives no environment, as one that is not well nested | Dropping a tree of elements recurses in Rust: one nested deep enough overflows the stack and ends Grace. No real pom comes near | `karate::maven::tests`, the 19 of `maven.test.ts` and `gives_none_for_elements_nested_deeper_than_any_pom` |
 | `libraries` (Linux) | Windows runs the tool as Electron Grace does: `cmd.exe /d /s /c "…"`, every path in a `GRACE_*` variable, as P1 ported it in `process` (`cmd()`, `verbatim_args`): the wrappers and `mvn.cmd` are batch files, which only `cmd.exe` runs. Linux, which Electron Grace never ran on, starts `mvnw`, `mvn`, `gradlew` or `gradle` itself with an argument list, the classpath file an argument (`-Dmdep.outputFile=<file>`) and still in `GRACE_CLASSPATH_FILE` for the init script; it looks for `java` and `javac` without `.exe`, splits PATH at `:`, has no IntelliJ search, and its no-tool notice names `mvnw` and `gradlew` | The Windows strings are pinned by the libraries spec (R3) and `libraries.test.ts`; Linux has no `cmd.exe` and needs no quoting | `libraries.test.ts`'s "the command" on the same strings; `runner.libraries.test.ts`'s "runs the tool in a folder whose path has spaces and &" and "builds in a folder whose path has spaces and &"; Linux tests beside them |
+| `libraries` (lists) | The Linux list is split at `:` and its newlines, `File.pathSeparator` there, which Maven and the init script join it with; two entries that differ in letter case are two files. On both platforms a launcher or wrapper is taken only when it is a file, where `existsSync` took a folder of that name too. PATH is split by `std::env::split_paths`, which on Windows keeps a `;` inside quotes in its entry, as `cmd.exe` does, where `split(";")` broke the entry there. The Linux build tool runs as Java does (nice 10, its own process group, `LC_ALL=C.UTF-8`, `process::spawn_karate`'s seam) | Linux has its own list separator and case-sensitive paths; a folder is not a program | `libraries::tests`, `libraries::tests::linux` |
+| `e2e` (build tools) | The e2e build gives its runner an empty `lookup_env`, so only a project's own wrapper runs, where Electron's `launch()` took the tools' folders off PATH, dropped their home variables and pointed `ProgramFiles` and `LOCALAPPDATA` at an empty folder. The release build looks where Grace's own variables lead | On Linux `mvn` and `gradle` can share `/usr/bin` with `java` and `xdotool`, which a test cannot take off PATH | E-project-setup-03 and 05; `runner::tests::libraries` for the search |
+| `compiled` | The walk for the newest `.java` and `.class` enters no linked folder, and leaves out a folder it cannot read, where a recursive `readdir` that failed anywhere read as no file at all. `built.json`'s time is read as whole milliseconds, which is all Grace writes | A link back to a parent folder never ends a walk; one unreadable folder must not hide the notice | `karate::compiled::tests`, `runner::tests::build` |
 | `watch` | Windows: `ReadDirectoryChangesW` through `windows` 0.62.2, one thread per handle. The handle is opened with `CreateFileW` (`FILE_FLAG_BACKUP_SEMANTICS`, `FILE_FLAG_OVERLAPPED`, every share mode) and read overlapped with an event; the thread waits on that event and a stop event, with no timeout. `close` sets the stop event, so a close that lands before the read is issued is not lost, then `CancelIoEx`, waits for the read to end (`GetOverlappedResult`) before the buffer is freed, and `CloseHandle`. An overflow is a read of 0 bytes or `ERROR_NOTIFY_ENUM_DIR`. The `unsafe` calls sit in one `#[cfg(windows)] mod sys` of `watch.rs`, each block with its `// SAFETY:` comment as in `process.rs`; the walk of the variable-length `FILE_NOTIFY_INFORMATION` entries is safe code over a byte slice, each offset checked against its length. Linux: `notify` 8.2.2's inotify backend, which blocks with no timeout and flags an overflow `Rescan`. Not `notify` on Windows, which the guide's feature map named: its loop waits 100 ms at a time (`WaitForSingleObjectEx(.., 100, ..)` in its `windows.rs`), 10 wake-ups a second while watch mode is on, and it reports no overflow. No new crate: `notify` is in the lock and in Grace's build through GPUI Kit, and the two `windows` features it needs (`Win32_Storage_FileSystem`, `Win32_System_IO`) are ones GPUI's Windows backend already compiles | ADR 0030 and the spec's "never a poll"; the burst test needs the overflow; an event, not a synchronous read, so a close never races the start of the call | `watch.test.ts` on both platforms; `watch::tests::windows` and the idle test (slice 6); `npm run bench:gpui -- --watch` in `gpui-idle` (slice 7) |
 | `debug` (session) | Grace listens on `127.0.0.1`, port 0, with `std::net::TcpListener`: one thread accepts, and each connection reads its first line on a thread of its own, so a connection that never sends one keeps no other out, as Node served them side by side; the first with the token is kept and the others closed, and its thread then reads the listener's pause lines; a write is a line of JSON, as `debug.ts`'s. The protocol and `listener/grace/DebugListener.java` do not change | One process, no event loop: threads blocked on the socket cost nothing while paused (R2.4) | `debug.test.ts`, `runner.debug.test.ts`, `a_silent_connection_does_not_keep_the_listener_out`, E-debug-01 on the unchanged jar |
 | `debug` (token) | The token's 16 random bytes come from `getrandom` 0.3.4, added in slice 9 as a direct dependency of `grace-core`, where Node had `randomBytes`. It is the version GPUI's `rand` links on both platforms (0.4.3 is in the lock too, through AccessKit's `uuid`). The pin follows the lock, as `sha2`'s and `base64`'s follow the versions GPUI links: a weekly bump (ADR 0032) that moves GPUI's `rand` moves it too, and if 0.3 leaves the lock it moves to the version left | `std` has no random source; no new crate | `debug.test.ts`'s wrong-token test (SD-08) |

@@ -2,9 +2,8 @@
 //! R1, docs/specs/2026-11-04-pom-defaults.md R2). `command::detect_layout` reads it for the feature roots, the config
 //! folder and the open notice.
 //!
-//! Only `readPom` ports in phase P1, with its tests. `pomStart`, the starting values of a project, also reads pom.xml's
-//! `karate.env` through `maven.ts`'s `mavenEnv`; both port in phase P4 with the rest of project setup, and its five
-//! tests with them.
+//! `pomStart`, the starting values of a project, is `runner::pom_start`, which also reads pom.xml's `karate.env`
+//! (`maven`), with its five tests.
 use super::js;
 use crate::model::env::valid_env_name;
 use crate::model::tags::{FilterState, filterable, parse_filter_state};
@@ -230,8 +229,8 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    /// A project folder with this `karate-pom.json`, or none. Phase P4 adds the TypeScript's second argument, a
-    /// `pom.xml`, with `pomStart`.
+    /// A project folder with this `karate-pom.json`, or none. The TypeScript's second argument, a `pom.xml`, is only
+    /// `pomStart`'s (`runner::setup::tests`).
     fn project(pom: Option<&str>) -> TempDir {
         let d = tempfile::Builder::new().prefix("kk-pom-").tempdir().unwrap();
         if let Some(pom) = pom {

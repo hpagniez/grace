@@ -23,6 +23,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
+mod build;
 mod discovery;
 mod editor;
 mod env;
@@ -30,6 +31,8 @@ mod fingerprint;
 mod flaky;
 mod history;
 mod home;
+mod libraries;
+mod pom;
 mod properties;
 mod rerun;
 mod runs;
@@ -53,6 +56,23 @@ pub(super) fn vendor() -> VendorPaths {
 /// A temporary folder, prefixed as the TypeScript's `mkdtempSync(path.join(tmpdir(), prefix))`.
 pub(super) fn temp(prefix: &str) -> TempDir {
     tempfile::Builder::new().prefix(prefix).tempdir().unwrap()
+}
+
+/// Writes `files` (relative path, content) under `root`.
+pub(super) fn write(root: &Path, files: &[(&str, &str)]) {
+    for (rel, text) in files {
+        let path = root.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+}
+
+/// A fresh temporary project of `files`.
+pub(super) fn project(files: &[(&str, &str)]) -> (TempDir, String) {
+    let dir = temp("kk-pom-");
+    write(dir.path(), files);
+    let root = dir.path().to_string_lossy().into_owned();
+    (dir, root)
 }
 
 /// `copyFixture(name)`: a fresh copy of a fixture project, removed when dropped. `broken` is `clean` plus
@@ -116,6 +136,8 @@ pub(super) struct Setup {
     pub data: Option<Arc<TempDir>>,
     pub secrets: Option<Arc<dyn SecretBox>>,
     pub fingerprint: Option<Walk>,
+    /// Where a build tool is looked for; nowhere by default.
+    pub lookup_env: Vec<(OsString, OsString)>,
 }
 
 /// `setup()`'s result. Dropping it disposes the runner and removes its folders (`cleanUp`).
@@ -134,7 +156,7 @@ pub(super) fn setup() -> TestRunner {
 
 pub(super) fn setup_with(o: Setup) -> TestRunner {
     let data = o.data.unwrap_or_else(|| Arc::new(temp("kk-data-")));
-    // never the developer's own ~/.karate/ext
+    // never the developer's own ~/.karate/ext, nor a real Maven or Gradle
     let home = temp("kk-home-");
     let sink = Arc::new(Sink::default());
     let emit = {
@@ -149,6 +171,7 @@ pub(super) fn setup_with(o: Setup) -> TestRunner {
     );
     options.fingerprint = o.fingerprint;
     options.home = Some(home.path().to_path_buf());
+    options.lookup_env = Some(o.lookup_env);
     TestRunner {
         runner: Runner::with_options(options),
         data_dir: data.path().to_path_buf(),
