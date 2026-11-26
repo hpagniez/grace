@@ -1277,4 +1277,72 @@ mod tests {
         press(&mut vcx, "f5 f10 f11");
         assert!(commands(&h).is_empty());
     }
+
+    /// SD-19 (step debugger R7.2, ADR 0030): once a debug run waits, the whole window asks for no next step and draws
+    /// nothing again by itself: the running marks of the rows above the paused test, the pane's spinner and the
+    /// Console's cursor stand still. The next command turns them again.
+    #[gpui::test]
+    fn a_paused_debug_run_leaves_the_window_idle(cx: &mut TestAppContext) {
+        use grace_core::model::events::AppEvent;
+        use grace_core::model::node::Status;
+        let mut state = paused_state();
+        state.paused = None;
+        state.statuses.insert("f:a.feature".into(), Status::Running);
+        state.statuses.insert("s:a.feature#0".into(), Status::Running);
+        state.statuses.insert("s:a.feature#1".into(), Status::Running);
+        state.selected = Some("s:a.feature#0".into());
+        let (h, mut vcx) = window_on(cx, state);
+        vcx.update(|_, cx| crate::a11y::set_reduce_motion(false, cx));
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("steps-spinner").is_some(), "the pane's spinner shows");
+        assert!(
+            vcx.debug_bounds("console-banner").is_some(),
+            "the cursor's banner shows"
+        );
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn");
+        let send = |vcx: &mut gpui::VisualTestContext, e: AppEvent| {
+            h.grace.update(vcx, |g, cx| {
+                g.state_mut().reduce(&e);
+                cx.notify();
+            });
+            vcx.run_until_parked();
+        };
+        let mut pause = crate::testing::paused("s:a.feature#0");
+        pause.file = "a.feature".into();
+        send(&mut vcx, AppEvent::DebugPaused { paused: pause });
+        // the Console, whose cursor blinks, back in front of the Variables tab the first pause shows
+        h.grace
+            .update(&mut vcx, |g, cx| g.show_panel(grace_core::state::Panel::Console, cx));
+        // a step asked for before the pause may still come
+        vcx.executor().advance_clock(std::time::Duration::from_secs(1));
+        vcx.run_until_parked();
+        let drawn = Rc::new(Cell::new(0));
+        let window = vcx.update(|window, _| window.window_handle().downcast::<GraceWindow>());
+        let window = window.expect("Grace's window");
+        fn watch<V: 'static>(view: &gpui::Entity<V>, drawn: &Rc<Cell<u32>>, cx: &mut gpui::App) -> gpui::Subscription {
+            let drawn = drawn.clone();
+            cx.observe(view, move |_, _| drawn.set(drawn.get() + 1))
+        }
+        let watched = window
+            .update(&mut vcx, |w, _, cx| {
+                let console = w.panel.clone().unwrap().read(cx).console.clone();
+                [
+                    watch(w.tree.as_ref().unwrap(), &drawn, cx),
+                    watch(w.details.as_ref().unwrap(), &drawn, cx),
+                    watch(w.progress.as_ref().unwrap(), &drawn, cx),
+                    watch(&console, &drawn, cx),
+                ]
+            })
+            .unwrap();
+        vcx.update(|_, cx| crate::spin::forget_asked(cx));
+        for _ in 0..20 {
+            vcx.executor().advance_clock(std::time::Duration::from_millis(250));
+            vcx.run_until_parked();
+        }
+        assert_eq!(vcx.update(|_, cx| crate::spin::asked(cx)), 0, "no next step");
+        assert_eq!(drawn.get(), 0, "no view told to draw again");
+        drop(watched);
+        send(&mut vcx, AppEvent::DebugResumed);
+        assert!(vcx.update(|_, cx| crate::spin::asked(cx)) > 0, "the marks turn again");
+    }
 }

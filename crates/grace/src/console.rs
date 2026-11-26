@@ -542,7 +542,8 @@ pub fn banner(state: &AppState, cx: &App) -> impl IntoElement {
     let project = state.project.as_ref().map_or("none".to_string(), |p| p.root.clone());
     let tests = tests_text(state);
     let st = banner_state(state);
-    let moving = blinks(st, cx.reduce_motion());
+    // a debug run that waits moves nothing (step debugger R7.2)
+    let moving = blinks(st, cx.reduce_motion() || state.paused.is_some());
     div()
         .id("console-banner")
         .debug_selector(|| "console-banner".into())
@@ -579,7 +580,7 @@ pub fn banner(state: &AppState, cx: &App) -> impl IntoElement {
                 .bg(Theme::color(t.ink));
             // shown half a second, hidden half a second: two frames a second, not 60
             let cursor = if moving {
-                let (phase, ask) = crate::spin::stepped(2, Duration::from_secs(1));
+                let (phase, ask) = crate::spin::stepped(2, Duration::from_secs(1), cx);
                 div()
                     .relative()
                     .child(cursor.opacity(if phase < 0.5 { 1. } else { 0. }))

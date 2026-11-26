@@ -569,6 +569,11 @@ pub fn mark(s: Status) -> MarkStatus {
     }
 }
 
+/// A test's mark: its status', or the pause's while a debug run waits in it.
+pub fn mark_of(s: Status, paused: bool) -> MarkStatus {
+    if paused { MarkStatus::Paused } else { mark(s) }
+}
+
 /// An id unique to a row's part.
 fn part(what: &str, key: &str) -> SharedString {
     SharedString::from(format!("{what}:{key}"))
@@ -797,7 +802,7 @@ impl Tree {
         } else {
             div().flex_none().w(px(ROW_HEIGHT)).h(px(ROW_HEIGHT)).into_any_element()
         };
-        let shown_mark = if paused { MarkStatus::Paused } else { mark(status) };
+        let shown_mark = mark_of(status, paused);
         let mark_tip = if paused { "Paused" } else { status_label(status) };
         let mark = tooltip(part("mark-tip", &key), Some(SharedString::from(mark_tip)))
             .side(Side::Right)

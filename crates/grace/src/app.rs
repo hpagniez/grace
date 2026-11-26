@@ -233,6 +233,9 @@ impl Grace {
                 cx.background_executor().timer(crate::spin::until_next_step_now()).await;
             }
         });
+        // while a debug run waits, no mark turns (step debugger R7.2); this runs before any view draws the new state
+        cx.observe_self(|grace, cx| crate::spin::hold(grace.state.paused.is_some(), cx))
+            .detach();
         let (_, order) = async_channel::bounded(1);
         Self {
             state: Rc::new(AppState::new()),

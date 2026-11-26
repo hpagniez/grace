@@ -158,6 +158,7 @@ fn press_enter(cx: &mut VisualTestContext) {
 
 mod breakpoints;
 mod failure_groups;
+mod step_debugger;
 
 mod a_test {
     use super::*;

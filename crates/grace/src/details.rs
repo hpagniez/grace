@@ -1,7 +1,8 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
 //! (#229) and the Examples table came with P3, and with P4 the feature file's steps before a run and each step's
-//! breakpoint toggle; the paused step comes with the debug run. A call selected in the HTTP tab takes the pane from
+//! breakpoint toggle; while a debug run waits in the test, the step it is paused before is marked, or the place inside a
+//! called feature is named (step debugger R7). A call selected in the HTTP tab takes the pane from
 //! the node (`http::call_details`).
 use gpui::AppContext as _;
 use gpui_component::scroll::ScrollableElement as _;
@@ -36,6 +37,7 @@ pub const STEPS_LATER: &str = "Steps are available when the feature finishes";
 pub const ERROR: &str = "Error";
 pub const STEPS: &str = "Steps";
 pub const OPEN_IN_EDITOR: &str = "Open in VS Code";
+pub const PAUSED: &str = "Paused";
 
 /// `formatMillis`, in `grace-core` since the trends' tooltips say times too.
 pub use grace_core::rows::format_millis;
@@ -346,7 +348,7 @@ impl Details {
     }
 
     /// The status as a tinted badge: its mark and its word, which names it, so the mark is decorative (R7.1).
-    fn badge(status: Status, cx: &App) -> impl IntoElement {
+    fn badge(status: Status, paused: bool, cx: &App) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         let (bg, fg) = badge_tint(status, t);
         let word = status_label(status);
@@ -368,7 +370,7 @@ impl Details {
                 .font_weight(FontWeight::MEDIUM)
                 .child(status_mark(
                     "details-status-mark",
-                    crate::tree::mark(status),
+                    crate::tree::mark_of(status, paused),
                     14.,
                     true,
                     cx.reduce_motion(),
@@ -397,6 +399,11 @@ impl Details {
         let status = state.statuses.get(&node.key).copied().unwrap_or(Status::NotRun);
         let result = state.results.get(&node.key);
         let duration = result.and_then(|r| r.duration_millis).map(format_millis);
+        // where the debug run waits, if it waits in this test (R7.1)
+        let paused = state
+            .paused
+            .as_ref()
+            .filter(|p| p.key.as_deref() == Some(node.key.as_str()));
         let meta = div()
             .flex()
             .flex_wrap()
@@ -482,6 +489,7 @@ impl Details {
                 .and_then(|f| f.steps.as_ref())
                 .map(|steps| steps.iter().map(StepRow::from).collect()),
         };
+        let has_steps = rows.is_some();
         let steps = match rows {
             Some(rows) => self.steps(this, node, &rows, state, cx).into_any_element(),
             None => {
@@ -492,7 +500,7 @@ impl Details {
                     if cx.reduce_motion() {
                         mark.into_any_element()
                     } else {
-                        crate::spin::turning(mark).into_any_element()
+                        crate::spin::turning(mark, cx).into_any_element()
                     }
                 });
                 div()
@@ -516,15 +524,33 @@ impl Details {
             let boxes = proof_boxes(envs, current, (self.clock)(), locked(state));
             crate::flaky_proof::view(&self.grace, &boxes, cx)
         });
+        // R7.3: inside a called feature no step of the test is marked, and its place is named under them
+        let called = paused.filter(|p| p.depth > 0 && has_steps).map(|p| {
+            let text = SharedString::from(format!("Paused in {}:{}", p.file, p.line));
+            div()
+                .id("paused-in")
+                .debug_selector(|| "paused-in".into())
+                .role(Role::Label)
+                .aria_value(text.clone())
+                .rounded(px(METRICS.radius))
+                .bg(Theme::color(t.running_tint))
+                .px_2()
+                .py_1()
+                .text_size(px(METRICS.text_sm.size))
+                .text_color(Theme::color(t.running))
+                .child(text)
+                .into_any_element()
+        });
         vec![
             Self::heading(node_name(node)).into_any_element(),
-            Self::badge(status, cx).into_any_element(),
+            Self::badge(status, paused.is_some(), cx).into_any_element(),
             meta.into_any_element(),
         ]
         .into_iter()
         .chain(proof.into_iter().flatten())
         .chain(error.map(|e| e.into_any_element()))
         .chain(std::iter::once(steps))
+        .chain(called)
         .collect()
     }
 
@@ -644,12 +670,27 @@ impl Details {
                         .text_size(px(METRICS.text_xs.size))
                         .child(log)
                 });
+                // the step the debug run is paused before (R7.1): the test's own line, never a called feature's
+                let paused = state.paused.as_ref().is_some_and(|p| {
+                    p.key.as_deref() == Some(node.key.as_str())
+                        && p.depth == 0
+                        && p.file == node.file
+                        && p.line == step.line
+                });
                 div()
                     .id(("step", i))
                     .role(Role::ListItem)
                     .aria_label(SharedString::from(whole.clone()))
                     .py_1()
                     .when(i > 0, |d| d.border_t_1().border_color(Theme::color(t.line)))
+                    .when(paused, |d| {
+                        d.debug_selector(move || format!("step-paused-{i}"))
+                            .mx(px(-8.))
+                            .px_2()
+                            .rounded(px(METRICS.radius))
+                            .bg(Theme::color(t.running_tint))
+                            .text_color(Theme::color(t.running))
+                    })
                     .when(!comments.is_empty(), |d| {
                         d.child(
                             div()
@@ -692,6 +733,19 @@ impl Details {
                                     ),
                             )
                             .children(time)
+                            .when(paused, |d| {
+                                d.child(
+                                    div()
+                                        .id(("step-paused-word", i))
+                                        .debug_selector(move || format!("step-paused-word-{i}"))
+                                        .role(Role::Label)
+                                        .aria_value(PAUSED)
+                                        .flex_none()
+                                        .text_size(px(METRICS.text_xs.size))
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(PAUSED),
+                                )
+                            })
                             .children(toggle),
                     )
                     .children(log)
@@ -739,7 +793,7 @@ impl Details {
             }));
         vec![
             Self::heading(node.name.clone()).into_any_element(),
-            Self::badge(status, cx).into_any_element(),
+            Self::badge(status, false, cx).into_any_element(),
             div()
                 .flex()
                 .text_size(px(METRICS.text_xs.size))
