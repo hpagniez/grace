@@ -737,10 +737,16 @@ impl Inner {
                 // Java's output has ended, its last line handed over, and it has exited (`tx` lives here: never None)
                 Some(Msg::Exited) | None => break,
                 Some(Msg::Paused(p)) => {
-                    run.poll(&mut tail, &mut fatal, &proc); // the last read before the pause
-                    if let Some(d) = lock(&self.debug).as_mut() {
-                        d.paused = true;
+                    // a pause read as another thread's write dropped the listener: its `Ended` came first, and Java,
+                    // its socket shut, goes on unpaused
+                    let waits = lock(&self.debug).as_mut().is_some_and(|d| {
+                        d.paused = d.session.connected();
+                        d.paused
+                    });
+                    if !waits {
+                        continue;
                     }
+                    run.poll(&mut tail, &mut fatal, &proc); // the last read before the pause
                     paused = true;
                     let p = run.paused(p);
                     run.emit(AppEvent::DebugPaused { paused: p });

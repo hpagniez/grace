@@ -119,6 +119,8 @@ struct Shared {
 
 impl Shared {
     /// Wakes `accept` with a connection of its own; false if it could not, and must not be waited for.
+    // shortcut: if this loopback connect fails (the system out of ports), the `accept` thread and its port stay until
+    // the next connection to it; a non-blocking listener would fix it, if it is ever seen
     fn wake(&self) -> bool {
         TcpStream::connect((Ipv4Addr::LOCALHOST, self.port)).is_ok()
     }
@@ -295,6 +297,11 @@ impl DebugSession {
         };
         lock(&shared.conn).accept = Some(accept);
         Ok(Self { shared })
+    }
+
+    /// True while the listener's connection is served: false before it, and once it was dropped or ended.
+    pub fn connected(&self) -> bool {
+        lock(&self.shared.conn).socket.is_some()
     }
 
     pub fn port(&self) -> u16 {

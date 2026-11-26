@@ -1543,14 +1543,17 @@ impl Inner {
     /// Changes the breakpoints under the lock, so two toggles never lose one, then sends the whole set, to the debug
     /// run's listener first (R2.3).
     fn send_breakpoints(&self, change: impl FnOnce(&mut Vec<Breakpoint>)) {
-        let breakpoints = {
-            let mut s = self.state();
-            change(&mut s.breakpoints);
-            if let Some(d) = lock(&self.debug).as_ref() {
-                d.session.set_breakpoints(s.breakpoints.clone());
-            }
-            s.breakpoints.clone()
-        };
+        let mut s = self.state();
+        change(&mut s.breakpoints);
+        let breakpoints = s.breakpoints.clone();
+        // `debug` taken before `state` is let go keeps two toggles' writes in order; the write, which can wait for
+        // Java to read, holds `debug` alone
+        let d = lock(&self.debug);
+        drop(s);
+        if let Some(d) = d.as_ref() {
+            d.session.set_breakpoints(breakpoints.clone());
+        }
+        drop(d);
         self.emit(AppEvent::Breakpoints { breakpoints });
     }
 
