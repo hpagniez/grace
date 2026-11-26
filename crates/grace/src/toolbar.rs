@@ -263,7 +263,7 @@ pub fn render(
     let g = grace.clone();
     let properties = labelled(
         "properties-button",
-        (Icon::SlidersHorizontal, ButtonKind::Plain),
+        (Icon::SlidersHorizontal, ButtonKind::Plain, None),
         crate::properties::LABEL,
         a.properties,
         narrow,
@@ -273,7 +273,7 @@ pub fn render(
     let g = grace.clone();
     let open = labelled(
         "open-button",
-        (Icon::FolderOpen, ButtonKind::Plain),
+        (Icon::FolderOpen, ButtonKind::Plain, None),
         OPEN,
         a.open,
         narrow,
@@ -283,7 +283,7 @@ pub fn render(
     let g = grace.clone();
     let report = labelled(
         "report-button",
-        (Icon::FileText, ButtonKind::Plain),
+        (Icon::FileText, ButtonKind::Plain, None),
         REPORT,
         a.report,
         narrow,
@@ -294,7 +294,7 @@ pub fn render(
     let pill = (a.failed > 0).then(|| count_pill(a.failed, cx));
     let rerun = labelled(
         "rerun-failed-button",
-        (Icon::RotateCcw, ButtonKind::Plain),
+        (Icon::RotateCcw, ButtonKind::Plain, None),
         RERUN_FAILED,
         a.rerun_failed,
         narrow,
@@ -304,7 +304,7 @@ pub fn render(
     let g = grace.clone();
     let cancel = labelled(
         "cancel-button",
-        (Icon::Square, ButtonKind::Plain),
+        (Icon::Square, ButtonKind::Plain, None),
         CANCEL,
         a.cancel,
         narrow,
@@ -333,7 +333,7 @@ pub fn render(
             vec![
                 labelled(
                     "debug-pause",
-                    (Icon::Pause, ButtonKind::Plain),
+                    (Icon::Pause, ButtonKind::Plain, None),
                     PAUSE,
                     true,
                     narrow,
@@ -352,9 +352,15 @@ pub fn render(
                 } else {
                     ButtonKind::Plain
                 };
-                labelled(s.id, (s.icon, kind), s.label, true, narrow, None, move |_, cx| {
-                    g.update(cx, |g, cx| g.debug_command(command, cx))
-                })
+                labelled(
+                    s.id,
+                    (s.icon, kind, Some(s.shortcut)),
+                    s.label,
+                    true,
+                    narrow,
+                    None,
+                    move |_, cx| g.update(cx, |g, cx| g.debug_command(command, cx)),
+                )
                 .into_any_element()
             })
             .collect(),
@@ -422,7 +428,7 @@ fn count_pill(n: u32, cx: &App) -> AnyElement {
 /// label in a tooltip, also while disabled; while the label shows, no tooltip repeats it.
 fn labelled(
     id: &'static str,
-    (icon, kind): (Icon, ButtonKind),
+    (icon, kind, keys): (Icon, ButtonKind, Option<&'static str>),
     label: &'static str,
     enabled: bool,
     narrow: bool,
@@ -452,10 +458,14 @@ fn labelled(
         } else {
             icon_text_button(id, icon, label, kind, ButtonSize::Medium)
         };
-        b.track_focus(f)
-            .off(!enabled)
-            .children(extra)
-            .on_click(move |_, window, cx| press(window, cx))
+        crate::a11y::aria(b, |a| match keys {
+            Some(keys) => a.aria_keyshortcuts(keys),
+            None => a,
+        })
+        .track_focus(f)
+        .off(!enabled)
+        .children(extra)
+        .on_click(move |_, window, cx| press(window, cx))
     });
     div().debug_selector(move || id.into()).child(wrapped)
 }

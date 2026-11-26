@@ -308,7 +308,8 @@ impl Render for Progress {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.grace.read(cx).state.clone();
         let t = Theme::global(cx).tokens;
-        let still = cx.reduce_motion();
+        // paused, nothing asks for another frame (step debugger R7.2): the bar shows its ends at once
+        let still = cx.reduce_motion() || state.paused.is_some();
         let waiting = waiting(&state);
         let idle = idle(&state);
         let run = &state.run;

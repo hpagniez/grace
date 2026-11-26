@@ -477,6 +477,23 @@ mod the_clock {
         });
     }
 
+    /// Step debugger R7.2: a result that lands with a pause shows whole at once: no frame comes to finish a spring
+    /// while the run waits.
+    #[gpui::test]
+    fn a_result_that_lands_with_a_pause_is_not_left_half_way(cx: &mut TestAppContext) {
+        let mut s = loaded(2);
+        started(&mut s, 2);
+        s.run.debug = true;
+        let (h, p, mut cx) = view(cx, s);
+        h.update(&mut cx, |s| {
+            result(s, true);
+            s.paused = Some(paused());
+        });
+        let end = widths(&h.grace.read_with(&cx, |g, _| g.state.clone()))[0];
+        assert!(end > 0.);
+        p.read_with(&cx, |p, _| assert_eq!(p.bar.springs[0].position, end));
+    }
+
     /// Step debugger R7.2: paused, it says Paused, turns nothing, and holds its time.
     #[gpui::test]
     fn a_paused_debug_run_says_paused_turns_nothing_and_stops_the_clock(cx: &mut TestAppContext) {

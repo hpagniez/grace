@@ -482,7 +482,7 @@ What the tests decided that the plan left open:
 - A window that waits is idle: `window::tests::a_paused_debug_run_leaves_the_window_idle` finds no next step asked for and no view told to draw again over five seconds of the test's clock. Paused CPU is not measured on CI; slice 11 measures it on the owner's machine.
 - `Tree.test.tsx` 41, 73 and 85 and TO-16 needed no change: P2's tree already followed a run and a pause. Their tests passed when written; the two of 73 and TO-16 were seen failing with the pause's opening taken out.
 
-Every other new view test was seen failing before its behaviour, `a_value_cut_through_an_emoji…` and the modified-keys test excepted, which hold what was already so; the e2e tests were written after theirs and run on CI. `screens_debugger` takes a run paused before a step, a variable opened and both at 760 px, in both looks.
+The new view tests were seen failing before their behaviour, but for these, which passed when written: the emoji test, the modified-keys and no-pause key tests, the row button's cursor, the other-test, other-file and other-line pause, Alt+Left on Variables, and 41. The `grace_core::variables` tests were seen only as not compiling before their functions. The e2e tests were written after their behaviour and run on CI. `screens_debugger` takes a run paused before a step, a variable opened and both at 760 px, in both looks. A result that lands with a pause shows whole in the bar (`progress::tests::the_clock::a_result_that_lands_with_a_pause_is_not_left_half_way`): no frame comes to finish a spring then.
 
 The tests, test for test:
 
