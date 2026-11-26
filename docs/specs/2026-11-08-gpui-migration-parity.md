@@ -741,23 +741,23 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| WM-01 | The toggle turns watch mode on and is remembered | | ☐ |
-| WM-02 | Main refuses a malformed request | | ☐ |
-| WM-03 | The toggle works during a run | | ☐ |
-| WM-04 | A saved feature runs | | ☐ |
-| WM-05 | Nothing runs while off | | ☐ |
-| WM-06 | Only features count | `grace_core::watch::tests::watch_features::does_not_count_other_files` (`karate-config.js` and `data.json` written, then a feature: the batch holds the feature alone) and `counts::leaves_other_files_and_the_skipped_folders`; that nothing then runs is the runner's, slice 7 | ☑ |
+| WM-01 | The toggle turns watch mode on and is remembered | `grace_core::runner::tests::watch::turning_on_saves_it_sends_it_and_is_replayed`, `applies_a_choice_it_cannot_save_and_says_so`; the button: `grace::toolbar::tests::the_watch_toggle_watch_mode_r1`; pressed once the runner answers: `grace-e2e/tests/watch.rs::a_save_runs_the_saved_feature_while_watch_is_on` | ☑ |
+| WM-02 | Main refuses a malformed request | Nothing to refuse: no IPC, and `set_watch` takes a `bool` (plan P4, as OE-07) | ☑ |
+| WM-03 | The toggle works during a run | `grace::toolbar::tests::the_watch_toggle_watch_mode_r1::stays_on_during_a_run_and_is_off_during_an_open_and_with_no_project`; applied during a run: `grace_core::runner::tests::watch::turning_watch_mode_off_drops_the_saves_waiting`; refused during an open: `refuses_the_toggle_while_a_project_is_being_opened` | ☑ |
+| WM-04 | A saved feature runs | `grace_core::runner::tests::watch::runs_a_saved_feature_as_its_selection_and_its_run_starts_no_other` | ☑ |
+| WM-05 | Nothing runs while off | `grace_core::runner::tests::watch::runs_nothing_while_off` | ☑ |
+| WM-06 | Only features count | `grace_core::watch::tests::watch_features::does_not_count_other_files` (`karate-config.js` and `data.json` written, then a feature: the batch holds the feature alone) and `counts::leaves_other_files_and_the_skipped_folders`; the runner runs only what a batch holds | ☑ |
 | WM-07 | An event with no new modified time does not count | `grace_core::watch::tests::watch_features::does_not_count_an_event_with_no_new_modified_time` (an attribute event on a feature saved before the start, and on one already counted) | ☑ |
-| WM-08 | A broken project is still watched | | ☐ |
+| WM-08 | A broken project is still watched | `grace_core::runner::tests::watch::watches_a_project_whose_dry_run_failed_and_runs_the_fix` | ☑ |
 | WM-09 | Skipped folders do not count | `grace_core::watch::tests::watch_features::does_not_count_other_files` (`node_modules/x/c.feature` written) and `counts::leaves_other_files_and_the_skipped_folders` | ☑ |
-| WM-10 | Save all is one run | | ☐ |
-| WM-11 | The filter applies | | ☐ |
-| WM-12 | A called feature is skipped quietly | | ☐ |
-| WM-13 | A save during a run waits | | ☐ |
-| WM-14 | Cancel drops waiting saves | | ☐ |
-| WM-15 | A watcher error stops watch mode | | ☐ |
-| WM-16 | Closing the project stops watching | | ☐ |
-| WM-17 | Re-run on save in the app (e2e) | | ☐ |
+| WM-10 | Save all is one run | `grace_core::runner::tests::watch::runs_two_features_saved_together_as_one_run_with_no_selection` | ☑ |
+| WM-11 | The filter applies | `grace_core::runner::tests::watch::runs_only_the_tests_that_match_the_filter` | ☑ |
+| WM-12 | A called feature is skipped quietly | `grace_core::runner::tests::watch::skips_a_feature_with_nothing_to_run_without_a_notice` | ☑ |
+| WM-13 | A save during a run waits | `grace_core::runner::tests::watch::runs_a_save_made_during_a_run_once_the_run_ends` | ☑ |
+| WM-14 | Cancel drops waiting saves | `grace_core::runner::tests::watch::cancel_drops_the_saves_waiting` | ☑ |
+| WM-15 | A watcher error stops watch mode | `grace_core::runner::tests::watch::a_watcher_error_stops_watch_mode_in_memory_only`, `turned_on_again_after_an_error_it_watches` | ☑ |
+| WM-16 | Closing the project stops watching | `grace_core::runner::tests::watch::closing_the_project_stops_watching`, `opening_another_project_stops_watching_the_first`, `dispose_stops_it_before_a_waiting_batch_runs` | ☑ |
+| WM-17 | Re-run on save in the app (e2e) | `grace-e2e/tests/watch.rs::a_save_runs_the_saved_feature_while_watch_is_on` | ☑ |
 
 ### BN · Build the project's Java code from the not-built notice
 
@@ -1310,7 +1310,7 @@ Phase P4 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-watch-01 | Re-run on save (docs/specs/2026-11-03-watch-mode.md) | | ☐ |
+| E-watch-01 | Re-run on save (docs/specs/2026-11-03-watch-mode.md) | `grace-e2e/tests/watch.rs::a_save_runs_the_saved_feature_while_watch_is_on` | ☑ |
 
 ### e2e/window.spec.ts
 
@@ -1379,7 +1379,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
 | `src/main/runner.trends.test.ts` | 2 | `grace-core::runner::tests::trends` (2 tests, real Java and Karate) | ☑ |
-| `src/main/runner.watch.test.ts` | 18 | `grace-core::runner` (watch) | ☐ |
+| `src/main/runner.watch.test.ts` | 18 | `grace-core::runner::tests::watch` (20 tests: 17 of the Vitest file's 18, test for test in [P4 slice 7](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), real Java and Karate, 1 `n/a` with WM-02, and 3 added) | ☑ |
 | `src/main/secrets.test.ts` | 6 | `grace-core::secrets::tests` (10 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/settings.test.ts` | 62 | `grace-core::settings::tests` (80 tests: every Vitest case, `it.each` rows one test each, and the bytes Node writes) | ☑ |
 | `src/main/trends.test.ts` | 10 | `grace-core::trends::tests` (11 tests) | ☑ |
@@ -1416,7 +1416,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/StatusMark.test.tsx` | 8 | `grace::elements::tests` (the statuses, shapes, colours, turning and sizes); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
-| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
+| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (30 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 2 wait for P4's step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
 | `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; 6 wait for the debugger, P4) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
