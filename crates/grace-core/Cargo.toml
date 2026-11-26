@@ -14,6 +14,9 @@ base64 = "=0.22.1"
 # The zip of a run's report (report_zip.rs). The version already in the lock and in Grace.exe, through the PNG decoder
 # of GPUI's SVG renderer: no new crate.
 flate2 = "=1.1.11"
+# The step debugger's token (karate/debug.rs): std has no random source. The version GPUI's `rand` links on both
+# platforms, with no feature: no new crate.
+getrandom = { version = "=0.3.4", default-features = false }
 indexmap = { version = "2.14.2", features = ["serde"] }
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
