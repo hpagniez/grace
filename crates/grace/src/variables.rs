@@ -242,8 +242,6 @@ impl Render for Variables {
         div()
             .id("variables")
             .debug_selector(|| "variables".into())
-            .role(Role::Group)
-            .aria_label(LABEL)
             .flex()
             .flex_col()
             .flex_1()
@@ -265,7 +263,16 @@ impl Render for Variables {
                         .child(RUNNING),
                 )
             })
-            .children(rows)
+            .child(
+                div()
+                    .id("variables-list")
+                    .role(Role::List)
+                    .aria_label(LABEL)
+                    .flex()
+                    .flex_col()
+                    .flex_none()
+                    .children(rows),
+            )
             .into_any_element()
     }
 }

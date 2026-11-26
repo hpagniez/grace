@@ -72,7 +72,7 @@ pub fn more_characters(n: u32) -> String {
     let digits = n.to_string();
     let mut grouped = String::new();
     for (i, d) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             grouped.push(',');
         }
         grouped.push(d);
