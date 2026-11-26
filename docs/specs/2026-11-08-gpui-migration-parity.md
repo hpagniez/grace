@@ -746,10 +746,10 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | WM-03 | The toggle works during a run | | ☐ |
 | WM-04 | A saved feature runs | | ☐ |
 | WM-05 | Nothing runs while off | | ☐ |
-| WM-06 | Only features count | | ☐ |
-| WM-07 | An event with no new modified time does not count | | ☐ |
+| WM-06 | Only features count | `grace_core::watch::tests::watch_features::does_not_count_other_files` (`karate-config.js` and `data.json` written, then a feature: the batch holds the feature alone) and `counts::leaves_other_files_and_the_skipped_folders`; that nothing then runs is the runner's, slice 7 | ☑ |
+| WM-07 | An event with no new modified time does not count | `grace_core::watch::tests::watch_features::does_not_count_an_event_with_no_new_modified_time` (an attribute event on a feature saved before the start, and on one already counted) | ☑ |
 | WM-08 | A broken project is still watched | | ☐ |
-| WM-09 | Skipped folders do not count | | ☐ |
+| WM-09 | Skipped folders do not count | `grace_core::watch::tests::watch_features::does_not_count_other_files` (`node_modules/x/c.feature` written) and `counts::leaves_other_files_and_the_skipped_folders` | ☑ |
 | WM-10 | Save all is one run | | ☐ |
 | WM-11 | The filter applies | | ☐ |
 | WM-12 | A called feature is skipped quietly | | ☐ |
@@ -1390,7 +1390,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/updates/startup.test.ts` | 32 | `grace-core::updates::startup` | ☐ |
 | `src/main/updates/switch.test.ts` | 22 | `grace-core::updates::switch` | ☐ |
 | `src/main/updates/updater.test.ts` | 36 | `grace-core::updates::updater` | ☐ |
-| `src/main/watch.test.ts` | 13 | `grace-core::watch` | ☐ |
+| `src/main/watch.test.ts` | 14 | `grace-core::watch::tests` (24 tests on Windows, 19 on Linux: the 14 of the Vitest file as 15, its `it.each` 2, test for test in [P4 slice 6](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md); one for two roots, 2 of the batch, the idle test, and Windows' 5) | ☑ |
 | `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
 | `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
