@@ -265,6 +265,7 @@ impl Driver for UiaDriver {
                 Key::ShiftF8 => "{shift}{F8}",
                 Key::AltLeft => "{alt}{left}",
                 Key::AltRight => "{alt}{right}",
+                Key::F10 => "{F10}",
                 Key::ShiftF10 => "{shift}{F10}",
             })
             .map_err(err)

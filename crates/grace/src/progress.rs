@@ -308,7 +308,8 @@ impl Render for Progress {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.grace.read(cx).state.clone();
         let t = Theme::global(cx).tokens;
-        let still = cx.reduce_motion();
+        // paused, nothing asks for another frame (step debugger R7.2): the bar shows its ends at once
+        let still = cx.reduce_motion() || state.paused.is_some();
         let waiting = waiting(&state);
         let idle = idle(&state);
         let run = &state.run;
@@ -359,7 +360,7 @@ impl Render for Progress {
             bar = bar.child(segment.w(relative(w.clamp(0., 100.) / 100.)));
         }
         if moving {
-            bar = bar.child(crate::spin::next_step());
+            bar = bar.child(crate::spin::next_step(cx));
         }
         if waiting {
             let stripe = div()
@@ -373,7 +374,7 @@ impl Render for Progress {
                 bar.child(stripe.left_0().w(relative(0.3)))
             } else {
                 // `slide`, in 1.4 s, a step of the marks' clock at a time (#320)
-                let (phase, ask) = crate::spin::stepped(SLIDE_STEPS, SLIDE);
+                let (phase, ask) = crate::spin::stepped(SLIDE_STEPS, SLIDE, cx);
                 let (left, width) = stripe_span(phase);
                 bar.child(stripe.left(relative(left)).w(relative(width))).child(ask)
             };
@@ -436,7 +437,7 @@ impl Render for Progress {
         let outcome = outcome(&state).map(|o| {
             let mark = icon(o.icon, 16., Theme::color(o.tone.token(cx)));
             let mark = if o.turning && !still {
-                crate::spin::turning(mark).into_any_element()
+                crate::spin::turning(mark, cx).into_any_element()
             } else {
                 mark.into_any_element()
             };

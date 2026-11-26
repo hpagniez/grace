@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Task};
 use grace_core::model::env::{ImportResult, PropertiesEdit};
-use grace_core::model::events::{AppEvent, FileStep};
+use grace_core::model::events::{AppEvent, DebugCommand, FileStep};
 use grace_core::model::tags::FilterState;
 use grace_core::runner::{Runner, RunnerOptions};
 use grace_core::state::AppState;
@@ -42,6 +42,10 @@ pub trait Backend: Send + Sync + 'static {
     fn build(&self) -> std::io::Result<()>;
     /// Runs the tests under a node: the tree's root for Run all.
     fn run(&self, key: &str) -> std::io::Result<()>;
+    /// Runs the tests under a node with the step debugger (step debugger R2).
+    fn debug(&self, key: &str) -> std::io::Result<()>;
+    /// Pause, continue or step in the debug run going on; nothing with none.
+    fn debug_command(&self, command: DebugCommand);
     /// Runs a listed run again on its environment and filter (RH-06).
     fn rerun(&self, id: &str) -> std::io::Result<()>;
     /// Runs again the tests that failed in a listed run.
@@ -109,6 +113,12 @@ impl Backend for Runner {
     }
     fn run(&self, key: &str) -> std::io::Result<()> {
         Runner::run(self, key)
+    }
+    fn debug(&self, key: &str) -> std::io::Result<()> {
+        Runner::debug(self, key)
+    }
+    fn debug_command(&self, command: DebugCommand) {
+        Runner::debug_command(self, command)
     }
     fn rerun(&self, id: &str) -> std::io::Result<()> {
         Runner::rerun(self, id)
@@ -223,6 +233,9 @@ impl Grace {
                 cx.background_executor().timer(crate::spin::until_next_step_now()).await;
             }
         });
+        // while a debug run waits, no mark turns (step debugger R7.2); this runs before any view draws the new state
+        cx.observe_self(|grace, cx| crate::spin::hold(grace.state.paused.is_some(), cx))
+            .detach();
         let (_, order) = async_channel::bounded(1);
         Self {
             state: Rc::new(AppState::new()),
@@ -429,6 +442,20 @@ impl Grace {
     /// Runs the tests under a row of the tree.
     pub fn run(&mut self, key: String, cx: &mut Context<Self>) {
         self.background(cx, Order::Start, move |b| b.run(&key));
+    }
+
+    /// A debug run of the tests under a row of the tree (the row's Debug button, Ctrl+Shift+Enter).
+    pub fn debug(&mut self, key: String, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, move |b| b.debug(&key));
+    }
+
+    /// Pause, Continue, Step over or Step into. Sent in turn behind the calls made before it, which are all quick
+    /// during a run, so a breakpoint toggled before Continue is in force, and two presses stay in order.
+    pub fn debug_command(&mut self, command: DebugCommand, cx: &mut Context<Self>) {
+        self.background(cx, Order::End, move |b| {
+            b.debug_command(command);
+            Ok(())
+        });
     }
 
     /// The tree's selection, which the details pane shows.
@@ -744,6 +771,13 @@ pub mod fake {
         fn run(&self, key: &str) -> std::io::Result<()> {
             self.record(format!("run {key}"));
             Ok(())
+        }
+        fn debug(&self, key: &str) -> std::io::Result<()> {
+            self.record(format!("debug {key}"));
+            Ok(())
+        }
+        fn debug_command(&self, command: DebugCommand) {
+            self.record(format!("debug_command {command:?}"));
         }
         fn rerun(&self, id: &str) -> std::io::Result<()> {
             self.record(format!("rerun {id}"));

@@ -695,8 +695,8 @@ fn a_folder_and_a_feature_have_their_icon_and_a_test_none() {
 /// `Tree.test.tsx` "shows the run button muted, green when its row is hovered, focused or selected".
 #[gpui::test]
 fn the_run_button_is_green_on_a_hovered_focused_or_selected_row(cx: &mut TestAppContext) {
-    assert!(!run_is_green(false, false, false));
-    assert!(run_is_green(true, false, false) && run_is_green(false, true, false) && run_is_green(false, false, true));
+    assert!(!lit(false, false, false));
+    assert!(lit(true, false, false) && lit(false, true, false) && lit(false, false, true));
     let (_h, mut cx, tree) = setup(cx, state("/p", &["a", "b"]));
     let hovered = |tree: &Entity<Tree>, cx: &mut VisualTestContext| cx.update(|_, cx| tree.read(cx).hovered.clone());
     cx.simulate_mouse_move(at_row(1, 2, 150.), None, gpui::Modifiers::none());
@@ -799,15 +799,15 @@ fn a_rows_run_button_shows_the_hand() {
     use gpui::{CursorStyle, Styled as _};
     let cursor = |mut b: Button| b.style().mouse_cursor;
     assert_eq!(
-        cursor(run_button("run", "basic.feature")),
+        cursor(row_button("run", "Run basic.feature".into())),
         Some(CursorStyle::PointingHand)
     );
     assert_eq!(
-        cursor(run_button("run", "basic.feature").off(false)),
+        cursor(row_button("run", "Run basic.feature".into()).off(false)),
         Some(CursorStyle::PointingHand)
     );
     assert_eq!(
-        cursor(run_button("run", "basic.feature").off(true)),
+        cursor(row_button("run", "Run basic.feature".into()).off(true)),
         Some(CursorStyle::OperationNotAllowed)
     );
 }
@@ -1126,3 +1126,5 @@ fn marks_the_feature_and_the_scenario_holding_a_breakpoint(cx: &mut TestAppConte
     h.update(&mut cx, |s| s.breakpoints.clear());
     assert!(dotted(&mut cx).is_empty());
 }
+
+mod step_debugger;

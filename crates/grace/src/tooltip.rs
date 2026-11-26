@@ -58,7 +58,8 @@ type Seen = (Bounds<Pixels>, bool);
 /// A window's tooltip: at most one open, at most one waiting for its pause.
 pub struct Tips {
     open: Option<Open>,
-    pending: Option<Task<()>>,
+    /// The trigger the pointer rests on, and its wait.
+    pending: Option<(ElementId, Task<()>)>,
     /// The trigger last pressed: a press often redraws the target under a pointer that has not moved, and the
     /// hover that brings must not bring the tooltip back. Cleared when the pointer leaves it.
     pressed: Option<ElementId>,
@@ -128,9 +129,14 @@ impl Tips {
         self.drawn.get()
     }
 
-    /// Closes the open tooltip and forgets one waiting for its pause.
+    /// Closes the open tooltip and forgets one waiting for its pause: a press or Escape.
     pub fn hide(&mut self, cx: &mut Context<Self>) {
         self.pending = None;
+        self.close(cx);
+    }
+
+    /// Closes the open tooltip; one waiting for its pause, which may be another trigger's, goes on.
+    fn close(&mut self, cx: &mut Context<Self>) {
         if self.open.take().is_some() {
             self.drawn.set(None);
             cx.notify();
@@ -151,24 +157,29 @@ impl Tips {
         if self.pressed.as_ref() == Some(&open.trigger) || self.is_open_for(&open.trigger) {
             return;
         }
-        self.pending = Some(cx.spawn_in(window, async move |this, cx| {
+        let trigger = open.trigger.clone();
+        let wait = cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(DELAY).await;
             let _ = this.update(cx, |this, cx| this.show(open, cx));
-        }));
+        });
+        self.pending = Some((trigger, wait));
     }
 
     fn leave(&mut self, trigger: &ElementId, window: &Window, cx: &mut Context<Self>) {
         if self.pressed.as_ref() == Some(trigger) {
             self.pressed = None;
         }
-        self.pending = None;
+        // only this trigger's wait: the pointer may be on the next one already, which heard of it first
+        if self.pending.as_ref().is_some_and(|(waits, _)| waits == trigger) {
+            self.pending = None;
+        }
         // the gap between the target and the tooltip counts as the tooltip, so the pointer can cross it
         let onto_tip = self
             .drawn
             .get()
             .is_some_and(|b| b.dilate(px(GAP)).contains(&window.mouse_position()));
         if self.is_open_for(trigger) && !onto_tip {
-            self.hide(cx);
+            self.close(cx);
         }
     }
 
@@ -194,7 +205,7 @@ impl Tips {
         } else if !focused && mine {
             self.focused = None;
             if self.is_open_for(&open.trigger) {
-                self.hide(cx);
+                self.close(cx);
             }
         }
     }
@@ -263,7 +274,7 @@ impl Render for Tips {
                     .on_hover(move |hovered, window, cx| {
                         // leaving the tooltip for anything but its target closes it
                         if !*hovered && !target.contains(&window.mouse_position()) {
-                            let _ = leave.update(cx, |tips, cx| tips.hide(cx));
+                            let _ = leave.update(cx, |tips, cx| tips.close(cx));
                         }
                     })
                     // A click on it closes it rather than reaching what lies under it; one over its target lies on
@@ -296,7 +307,7 @@ impl Render for Tips {
                                         let _ = follow.update(cx, |tips, cx| tips.follow(now, cx));
                                     }),
                                     _ => cx.defer(move |cx| {
-                                        let _ = follow.update(cx, |tips, cx| tips.hide(cx));
+                                        let _ = follow.update(cx, |tips, cx| tips.close(cx));
                                     }),
                                 }
                                 let moved = moved.clone();
@@ -310,7 +321,7 @@ impl Render for Tips {
                                         && !on_tip
                                         && !target.contains(&event.position)
                                     {
-                                        let _ = moved.update(cx, |tips, cx| tips.hide(cx));
+                                        let _ = moved.update(cx, |tips, cx| tips.close(cx));
                                     }
                                 });
                             },

@@ -356,6 +356,115 @@ mod tabs {
         assert_eq!(cx.update(|_, cx| h.grace.read(cx).state.panel), Panel::Http);
     }
 
+    /// A run going on, a debug run or not.
+    fn running(h: &Harness, cx: &mut VisualTestContext, debug: bool) {
+        h.update(cx, |s| {
+            s.run.active = true;
+            s.run.debug = debug;
+        });
+        draw(cx);
+    }
+
+    /// `BottomPanel.test.tsx` "shows only while a debug run is going" (step debugger R7.4): the Variables tab comes
+    /// after HTTP, shows the variables once chosen and goes with the run, the Console in its place.
+    #[gpui::test]
+    fn variables_shows_only_while_a_debug_run_is_going(cx: &mut TestAppContext) {
+        use grace_core::model::events::{AppEvent, RunOutcome};
+        let (h, mut cx, _p) = setup(cx, data_dir("variables"));
+        assert!(cx.debug_bounds("tab-variables").is_none());
+        running(&h, &mut cx, false);
+        assert!(cx.debug_bounds("tab-variables").is_none(), "a normal run");
+        running(&h, &mut cx, true);
+        let tab = cx.debug_bounds("tab-variables").expect("during a debug run");
+        assert!(tab.left() >= cx.debug_bounds("tab-http").unwrap().right(), "after HTTP");
+        cx.simulate_click(tab.center(), Modifiers::none());
+        cx.run_until_parked();
+        draw(&mut cx);
+        assert_eq!(cx.update(|_, cx| h.grace.read(cx).state.panel), Panel::Variables);
+        assert!(cx.debug_bounds("empty-state").is_some(), "no pause yet");
+        h.update(&mut cx, |s| {
+            let mut paused = testing::paused("s:a.feature#0");
+            paused.vars = vec![grace_core::model::events::DebugVar {
+                name: "a".into(),
+                kind: grace_core::model::events::VarKind::Number,
+                type_name: None,
+                value: "1".into(),
+                cut: None,
+            }];
+            s.reduce(&AppEvent::DebugPaused { paused });
+        });
+        draw(&mut cx);
+        assert!(cx.debug_bounds("variables").is_some());
+        assert!(cx.debug_bounds("variable:a").is_some());
+        h.update(&mut cx, |s| {
+            s.reduce(&AppEvent::RunFinished {
+                outcome: RunOutcome::Finished,
+                exit_code: Some(0),
+                summary: None,
+                report_available: false,
+            })
+        });
+        draw(&mut cx);
+        assert!(cx.debug_bounds("tab-variables").is_none() && cx.debug_bounds("variables").is_none());
+        assert_eq!(cx.update(|_, cx| h.grace.read(cx).state.panel), Panel::Console);
+        assert!(cx.debug_bounds("console").is_some());
+    }
+
+    /// `BottomPanel.test.tsx` "makes the three tabs draggable, and not Variables" (RP-02): a drag that starts on
+    /// Variables marks no tab and moves none.
+    #[gpui::test]
+    fn variables_cannot_be_dragged(cx: &mut TestAppContext) {
+        let dir = data_dir("drag-variables");
+        let (h, mut cx, p) = setup(cx, dir.clone());
+        running(&h, &mut cx, true);
+        let to = drag(&mut cx, "tab-variables", "tab-console");
+        assert_eq!(cx.update(|_, cx| p.read(cx).from), None);
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+        cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+    }
+
+    /// `BottomPanel.test.tsx` "allows the drop only over the three tabs" (RP-02): a tab dropped on Variables stays
+    /// where it was, and Variables stays last.
+    #[gpui::test]
+    fn a_tab_dropped_on_variables_moves_nothing(cx: &mut TestAppContext) {
+        let dir = data_dir("drop-variables");
+        let (h, mut cx, p) = setup(cx, dir.clone());
+        running(&h, &mut cx, true);
+        let at = drag(&mut cx, "tab-console", "tab-variables");
+        for id in TAB_IDS {
+            assert_eq!(bar(&p, id, &mut cx), None, "{id:?}");
+        }
+        cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        draw(&mut cx);
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+        let (variables, last) = (
+            cx.debug_bounds("tab-variables").unwrap(),
+            cx.debug_bounds("tab-http").unwrap(),
+        );
+        assert!(variables.left() >= last.right());
+    }
+
+    /// `BottomPanel.test.tsx` "does not move Variables with the keys".
+    #[gpui::test]
+    fn alt_left_does_not_move_variables(cx: &mut TestAppContext) {
+        let dir = data_dir("keys-variables");
+        let (h, mut cx, p) = setup(cx, dir.clone());
+        running(&h, &mut cx, true);
+        let f = cx.update(|_, cx| p.read(cx).variables_tab.clone());
+        cx.update(|window, cx| window.focus(&f, cx));
+        draw(&mut cx);
+        keys(&mut cx, "alt-left");
+        assert_eq!(order(&p, &mut cx), TAB_IDS);
+        assert!(!dir.join("settings.json").exists());
+    }
+
     #[gpui::test]
     fn an_order_that_cannot_be_saved_is_only_forgotten(cx: &mut TestAppContext) {
         // a data folder that is a file: nothing can be written in it

@@ -4,7 +4,8 @@
 //! paints the whole window again: during a 2,000-test run the turning marks cost more CPU than Electron Grace's
 //! CSS spinner, which the compositor turns alone (#320). A mark here turns in `STEPS` steps a turn, one turn a
 //! second as `animate-spin`, and asks for its view's next frame only when its step changes. Nothing is asked once
-//! no mark is drawn, so no timer outlives the run (ADR 0030).
+//! no mark is drawn, so no timer outlives the run (ADR 0030). While a debug run waits, `hold` stops them all where
+//! they are and nothing asks for a frame (step debugger R7.2).
 use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -60,8 +61,26 @@ pub fn forget_asked(cx: &mut App) {
     cx.default_global::<Asked>().0.clear();
 }
 
+/// Where in time the marks stopped; `None` while they turn.
+#[derive(Default)]
+struct Held(Option<Duration>);
+impl Global for Held {}
+
+/// Stops every mark where it is while `on`, and lets them turn again after.
+pub fn hold(on: bool, cx: &mut App) {
+    let held = cx.default_global::<Held>();
+    held.0 = on.then(|| held.0.unwrap_or_else(|| epoch().elapsed()));
+}
+
+fn held(cx: &App) -> Option<Duration> {
+    cx.try_global::<Held>().and_then(|h| h.0)
+}
+
 /// Asks for the current view's frame at the next step of `steps` a `period`, once per view.
 fn ask_next_step(steps: u32, period: Duration, window: &mut Window, cx: &mut App) {
+    if held(cx).is_some() {
+        return;
+    }
     let view = window.current_view();
     if !cx.default_global::<Asked>().0.insert(view) {
         return;
@@ -79,8 +98,8 @@ fn ask_next_step(steps: u32, period: Duration, window: &mut Window, cx: &mut App
 
 /// The phase of something drawn in `steps` steps a `period`, asking for the frame of its next step: for a mark
 /// that changes otherwise than by turning, such as the console's blinking cursor.
-pub fn stepped(steps: u32, period: Duration) -> (f32, impl IntoElement) {
-    let phase = phase_at(epoch().elapsed(), steps, period);
+pub fn stepped(steps: u32, period: Duration, cx: &App) -> (f32, impl IntoElement) {
+    let phase = phase_at(held(cx).unwrap_or_else(|| epoch().elapsed()), steps, period);
     let ask = canvas(
         move |_, window, cx| ask_next_step(steps, period, window, cx),
         |_, _, _, _| {},
@@ -92,13 +111,13 @@ pub fn stepped(steps: u32, period: Duration) -> (f32, impl IntoElement) {
 
 /// Asks for the current view's frame at the next step of the marks' clock: for something that moves otherwise than by
 /// turning, such as the progress bar's springs, so it moves in the frames the marks draw anyway.
-pub fn next_step() -> impl IntoElement {
-    stepped(STEPS, TURN).1
+pub fn next_step(cx: &App) -> impl IntoElement {
+    stepped(STEPS, TURN, cx).1
 }
 
 /// `mark` turning, a step at a time.
-pub fn turning(mark: Svg) -> impl IntoElement {
-    let (phase, ask) = stepped(STEPS, TURN);
+pub fn turning(mark: Svg, cx: &App) -> impl IntoElement {
+    let (phase, ask) = stepped(STEPS, TURN, cx);
     div()
         .relative()
         .flex()

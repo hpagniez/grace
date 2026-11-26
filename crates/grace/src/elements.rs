@@ -113,7 +113,7 @@ pub fn status_mark(
     let color = Theme::color(status.color(Theme::global(cx)));
     let mark = icon(status.icon(), size, color);
     let mark = if turns(status, reduce_motion) {
-        crate::spin::turning(mark).into_any_element()
+        crate::spin::turning(mark, cx).into_any_element()
     } else {
         mark.into_any_element()
     };

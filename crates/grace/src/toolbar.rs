@@ -3,8 +3,10 @@
 //! that order, Run all last and the only primary button. Below 1280 px the labels of Properties…, Open…, Report, Re-run failed and
 //! Cancel go from sight, not from the buttons' names, and say themselves in a tooltip instead (`narrow.ts`).
 //!
-//! The environment and threads boxes are `env_picker`'s and `threads_box`'s, the Properties dialog `properties`'; the
-//! step debugger's buttons come with the runner's debug run in phase P4 (P2 plan).
+//! While a debug run goes on, Run all gives way to Pause, and while it waits to Continue, Step over and Step into
+//! (step debugger R6), icons below 1280 px too; their keys, F5, F10 and F11, are the window's.
+//!
+//! The environment and threads boxes are `env_picker`'s and `threads_box`'s, the Properties dialog `properties`'.
 use crate::elements::Off as _;
 use gpui::accesskit::Role;
 use gpui::{
@@ -12,6 +14,7 @@ use gpui::{
     StatefulInteractiveElement as _, Styled, Window, div, img, prelude::FluentBuilder as _, px,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
+use grace_core::model::events::DebugCommand;
 use grace_core::model::node::Layout;
 use grace_core::model::tags::any_matching_leaf;
 use grace_core::state::AppState;
@@ -31,6 +34,46 @@ pub const REPORT: &str = "Report";
 pub const RERUN_FAILED: &str = "Re-run failed";
 pub const CANCEL: &str = "Cancel";
 pub const RUN_ALL: &str = "Run all";
+pub const PAUSE: &str = "Pause";
+
+/// The step debugger's controls while paused, in order, each with its button's id, label, icon and key (R6.3).
+pub struct DebugStep {
+    pub command: DebugCommand,
+    pub id: &'static str,
+    pub label: &'static str,
+    pub icon: Icon,
+    /// As GPUI names it in a keystroke.
+    pub key: &'static str,
+    /// As assistive technology is told it.
+    pub shortcut: &'static str,
+}
+
+pub const DEBUG_STEPS: [DebugStep; 3] = [
+    DebugStep {
+        command: DebugCommand::Continue,
+        id: "debug-continue",
+        label: "Continue",
+        icon: Icon::Play,
+        key: "f5",
+        shortcut: "F5",
+    },
+    DebugStep {
+        command: DebugCommand::Over,
+        id: "debug-over",
+        label: "Step over",
+        icon: Icon::RedoDot,
+        key: "f10",
+        shortcut: "F10",
+    },
+    DebugStep {
+        command: DebugCommand::Into,
+        id: "debug-into",
+        label: "Step into",
+        icon: Icon::ArrowDownToDot,
+        key: "f11",
+        shortcut: "F11",
+    },
+];
 
 /// Below this window width the toolbar shows four of its buttons as icons (`NARROW_QUERY`).
 pub const NARROW_BELOW: f32 = 1280.;
@@ -220,7 +263,7 @@ pub fn render(
     let g = grace.clone();
     let properties = labelled(
         "properties-button",
-        Icon::SlidersHorizontal,
+        (Icon::SlidersHorizontal, ButtonKind::Plain, None),
         crate::properties::LABEL,
         a.properties,
         narrow,
@@ -230,7 +273,7 @@ pub fn render(
     let g = grace.clone();
     let open = labelled(
         "open-button",
-        Icon::FolderOpen,
+        (Icon::FolderOpen, ButtonKind::Plain, None),
         OPEN,
         a.open,
         narrow,
@@ -240,7 +283,7 @@ pub fn render(
     let g = grace.clone();
     let report = labelled(
         "report-button",
-        Icon::FileText,
+        (Icon::FileText, ButtonKind::Plain, None),
         REPORT,
         a.report,
         narrow,
@@ -251,7 +294,7 @@ pub fn render(
     let pill = (a.failed > 0).then(|| count_pill(a.failed, cx));
     let rerun = labelled(
         "rerun-failed-button",
-        Icon::RotateCcw,
+        (Icon::RotateCcw, ButtonKind::Plain, None),
         RERUN_FAILED,
         a.rerun_failed,
         narrow,
@@ -261,7 +304,7 @@ pub fn render(
     let g = grace.clone();
     let cancel = labelled(
         "cancel-button",
-        Icon::Square,
+        (Icon::Square, ButtonKind::Plain, None),
         CANCEL,
         a.cancel,
         narrow,
@@ -280,6 +323,48 @@ pub fn render(
         .off(!a.run_all)
         .on_click(move |_, _, cx| g.update(cx, |g, cx| g.run_all(cx))),
     );
+
+    // R6: Run all gives way to the debug controls while a debug run goes on; Cancel stays
+    let debugging = state.run.active && state.run.debug;
+    let controls: Vec<AnyElement> = match (debugging, state.paused.is_some()) {
+        (false, _) => vec![run_all.into_any_element()],
+        (true, false) => {
+            let g = grace.clone();
+            vec![
+                labelled(
+                    "debug-pause",
+                    (Icon::Pause, ButtonKind::Plain, None),
+                    PAUSE,
+                    true,
+                    narrow,
+                    None,
+                    move |_, cx| g.update(cx, |g, cx| g.debug_command(DebugCommand::Pause, cx)),
+                )
+                .into_any_element(),
+            ]
+        }
+        (true, true) => DEBUG_STEPS
+            .iter()
+            .map(|s| {
+                let (g, command) = (grace.clone(), s.command);
+                let kind = if command == DebugCommand::Continue {
+                    ButtonKind::Primary
+                } else {
+                    ButtonKind::Plain
+                };
+                labelled(
+                    s.id,
+                    (s.icon, kind, Some(s.shortcut)),
+                    s.label,
+                    true,
+                    narrow,
+                    None,
+                    move |_, cx| g.update(cx, |g, cx| g.debug_command(command, cx)),
+                )
+                .into_any_element()
+            })
+            .collect(),
+    };
 
     div()
         .id("toolbar")
@@ -305,7 +390,7 @@ pub fn render(
         .child(report)
         .child(rerun)
         .child(cancel)
-        .child(run_all)
+        .children(controls)
 }
 
 /// Between the groups of buttons (R13.1): 1 px by 20, in the line colour, not read out.
@@ -343,7 +428,7 @@ fn count_pill(n: u32, cx: &App) -> AnyElement {
 /// label in a tooltip, also while disabled; while the label shows, no tooltip repeats it.
 fn labelled(
     id: &'static str,
-    icon: Icon,
+    (icon, kind, keys): (Icon, ButtonKind, Option<&'static str>),
     label: &'static str,
     enabled: bool,
     narrow: bool,
@@ -355,7 +440,10 @@ fn labelled(
         let b = if narrow {
             let side = METRICS.control_height;
             Button::new(id)
-                .outline()
+                .map(|b| match kind {
+                    ButtonKind::Primary => b.primary(),
+                    _ => b.outline(),
+                })
                 .child(crate::elements::glyph(icon, 16.))
                 .h(px(side))
                 .rounded(px(METRICS.radius))
@@ -368,12 +456,16 @@ fn labelled(
                     }
                 })
         } else {
-            icon_text_button(id, icon, label, ButtonKind::Plain, ButtonSize::Medium)
+            icon_text_button(id, icon, label, kind, ButtonSize::Medium)
         };
-        b.track_focus(f)
-            .off(!enabled)
-            .children(extra)
-            .on_click(move |_, window, cx| press(window, cx))
+        crate::a11y::aria(b, |a| match keys {
+            Some(keys) => a.aria_keyshortcuts(keys),
+            None => a,
+        })
+        .track_focus(f)
+        .off(!enabled)
+        .children(extra)
+        .on_click(move |_, window, cx| press(window, cx))
     });
     div().debug_selector(move || id.into()).child(wrapped)
 }

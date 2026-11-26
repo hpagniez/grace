@@ -316,6 +316,8 @@ impl Driver for AtspiDriver {
                 Key::ShiftF8 => return fake_key(XK_F8, true),
                 Key::AltLeft => "alt+Left",
                 Key::AltRight => "alt+Right",
+                // as F8: xdotool may pick it at a level that needs Alt
+                Key::F10 => return fake_key(XK_F10, false),
                 Key::ShiftF10 => return fake_key(XK_F10, true),
             },
         ])

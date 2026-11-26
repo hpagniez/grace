@@ -130,6 +130,8 @@ pub enum Key {
     AltLeft,
     /// Alt+Right.
     AltRight,
+    /// F10: Step over while a debug run waits.
+    F10,
     /// Shift+F10, the menu key's other form.
     ShiftF10,
 }

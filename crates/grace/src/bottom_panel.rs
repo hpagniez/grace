@@ -1,7 +1,7 @@
 //! `BottomPanel.tsx` and `Splitter.tsx`: the Console, History and HTTP tabs under the tree and details, and Variables
 //! during a debug run, one height for all, with the splitter on top that resizes it (UI polish R1, R18) and tabs that
-//! move (reorder panel tabs). P2 drew the Console, P3 the HTTP tab (`http`) and the History tab (`history`); Variables'
-//! content comes with P4 (P2 plan), so its panel stays empty until then.
+//! move (reorder panel tabs). Its tabs show the Console, `http`, `history` and, after the three during a debug run,
+//! `variables`, which does not move.
 //!
 //! Electron Grace read the panel's and the main area's heights from the layout (`getBoundingClientRect`, a
 //! `ResizeObserver`); GPUI tells them after each layout, which the panel keeps (`canvas`), at no cost while idle,
@@ -11,9 +11,10 @@ use std::rc::Rc;
 
 use gpui::accesskit::{Orientation, Role};
 use gpui::{
-    App, AppContext as _, Context, CursorStyle, DragMoveEvent, Empty, Entity, FocusHandle, InteractiveElement as _,
-    IntoElement, KeyDownEvent, MouseButton, ParentElement as _, Pixels, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Window, canvas, div, prelude::FluentBuilder as _, px,
+    App, AppContext as _, Context, CursorStyle, Div, DragMoveEvent, Empty, Entity, FocusHandle,
+    InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, ParentElement as _, Pixels, Render, SharedString,
+    Stateful, StatefulInteractiveElement as _, Styled as _, Subscription, Window, canvas, div,
+    prelude::FluentBuilder as _, px,
 };
 use grace_core::panel_height::{PANEL_MIN, PanelKey, clamp_panel, key_height, max_panel};
 use grace_core::panel_tabs::{TabId, move_tab};
@@ -92,6 +93,8 @@ pub struct BottomPanel {
     over: Option<TabId>,
     pub splitter: FocusHandle,
     tabs: [FocusHandle; 3],
+    variables: Entity<crate::variables::Variables>,
+    pub variables_tab: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -101,6 +104,7 @@ impl BottomPanel {
         let console = cx.new(|cx| Console::new(grace.clone(), window, cx));
         let http = cx.new(|cx| crate::http::HttpCalls::new(grace.clone(), cx));
         let history = cx.new(|_| crate::history::History::new(grace.clone()));
+        let variables = cx.new(|cx| crate::variables::Variables::new(grace.clone(), cx));
         // GPUI has no Escape for a drag (RP-06). An interceptor, since the focus may be anywhere in the window.
         let me = cx.weak_entity();
         let window_id = window.window_handle().window_id();
@@ -129,6 +133,8 @@ impl BottomPanel {
             over: None,
             splitter: cx.focus_handle().tab_stop(true),
             tabs: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
+            variables,
+            variables_tab: cx.focus_handle().tab_stop(true),
             _subscriptions: subscriptions,
         }
     }
@@ -287,31 +293,27 @@ impl BottomPanel {
         ring_on(line, ring, window, cx)
     }
 
-    fn tab_view(
+    /// What every tab is: its name, its icon and label, the accent line under it while it is open, and a click that
+    /// opens it.
+    fn tab_base(
         &self,
-        id: TabId,
-        k: usize,
-        from: Option<TabId>,
+        selector: SharedString,
+        (panel, glyph, label): (Panel, Icon, &'static str),
+        name: SharedString,
+        focus: &FocusHandle,
         state: &AppState,
-        window: &Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> Stateful<Div> {
         let t = Theme::global(cx).tokens;
-        let ring = ring_shown(&self.tabs[k], window);
-        let (panel, glyph, label) = tab_look(id);
         let active = state.panel == panel;
-        let count = tab_count(id, state);
-        let name = tab_name(id, state);
-        let this = cx.entity();
         let grace = self.grace.clone();
-        let drop_side = self.mark(id, from);
         div()
-            .id(SharedString::from(format!("tab-{}", id.name())))
-            .debug_selector(move || format!("tab-{}", id.name()))
+            .id(selector.clone())
+            .debug_selector(move || selector.to_string())
             .role(Role::Tab)
             .aria_label(name)
             .aria_selected(active)
-            .track_focus(&self.tabs[k])
+            .track_focus(focus)
             .flex()
             .items_center()
             // `tabBase`: `h-8 gap-1.5 border-b-2 px-3 text-sm`, and `font-medium` on the open one
@@ -325,6 +327,42 @@ impl BottomPanel {
             .text_color(Theme::color(if active { t.ink } else { t.muted }))
             .cursor_pointer()
             .hover(|s| s.text_color(Theme::color(t.ink)))
+            .on_click(move |_, _, cx| grace.update(cx, |g, cx| g.show_panel(panel, cx)))
+            .child(icon(glyph, 14., Theme::color(if active { t.ink } else { t.muted })))
+            .child(label)
+    }
+
+    /// The Variables tab, after the three, while a debug run goes on (step debugger R7.4). It does not move: no drag,
+    /// no drop and no Alt+arrow (reorder panel tabs).
+    fn variables_view(&self, state: &AppState, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let ring = ring_shown(&self.variables_tab, window);
+        let tab = self.tab_base(
+            "tab-variables".into(),
+            (Panel::Variables, Icon::Braces, crate::variables::LABEL),
+            crate::variables::LABEL.into(),
+            &self.variables_tab,
+            state,
+            cx,
+        );
+        ring_on(tab, ring, window, cx)
+    }
+
+    fn tab_view(
+        &self,
+        id: TabId,
+        k: usize,
+        from: Option<TabId>,
+        state: &AppState,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let t = Theme::global(cx).tokens;
+        let ring = ring_shown(&self.tabs[k], window);
+        let count = tab_count(id, state);
+        let selector = SharedString::from(format!("tab-{}", id.name()));
+        let this = cx.entity();
+        let drop_side = self.mark(id, from);
+        self.tab_base(selector, tab_look(id), tab_name(id, state), &self.tabs[k], state, cx)
             .when_some(drop_side, |d, right| {
                 if right {
                     d.border_r_2().border_color(Theme::color(t.accent))
@@ -332,7 +370,6 @@ impl BottomPanel {
                     d.border_l_2().border_color(Theme::color(t.accent))
                 }
             })
-            .on_click(move |_, _, cx| grace.update(cx, |g, cx| g.show_panel(panel, cx)))
             .on_key_down({
                 let this = this.clone();
                 move |e: &KeyDownEvent, window, cx| {
@@ -389,8 +426,6 @@ impl BottomPanel {
                     })
                 }
             })
-            .child(icon(glyph, 14., Theme::color(if active { t.ink } else { t.muted })))
-            .child(label)
             // `countPill`: `h-4 min-w-5 rounded-full bg-selected px-1.5 text-2xs font-medium text-muted tabular-nums`
             .children(count.map(|n| {
                 div()
@@ -433,12 +468,15 @@ impl Render for BottomPanel {
             self.over = None;
         }
         let from = self.from;
-        let tabs: Vec<_> = self
+        let mut tabs: Vec<_> = self
             .order
             .into_iter()
             .enumerate()
             .map(|(k, id)| self.tab_view(id, k, from, &state, window, cx).into_any_element())
             .collect();
+        if state.run.active && state.run.debug {
+            tabs.push(self.variables_view(&state, window, cx).into_any_element());
+        }
         let console = self.console.clone();
         let find = tooltip("tip-find", Some(SharedString::from("Find (Ctrl+F)"))).focusable(move |f| {
             crate::elements::icon_button("find-button", Icon::Search, 14., FIND, true)
@@ -471,6 +509,9 @@ impl Render for BottomPanel {
         if state.panel != Panel::History {
             // nothing is asked or held for a closed tab (trends R5.3)
             self.history.update(cx, |h, _| h.close());
+        }
+        if state.panel != Panel::Variables {
+            self.variables.update(cx, |v, _| v.close());
         }
         div()
             .id("bottom-panel")
@@ -529,7 +570,10 @@ impl Render for BottomPanel {
                         d.child(crate::window::cached(self.console.clone(), window))
                     })
                     .when(state.panel == Panel::History, |d| d.child(self.history.clone()))
-                    .when(state.panel == Panel::Http, |d| d.child(self.http.clone())),
+                    .when(state.panel == Panel::Http, |d| d.child(self.http.clone()))
+                    .when(state.panel == Panel::Variables, |d| {
+                        d.child(crate::window::cached(self.variables.clone(), window))
+                    }),
             )
     }
 }

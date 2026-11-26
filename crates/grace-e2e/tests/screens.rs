@@ -1060,3 +1060,61 @@ fn screens_breakpoints() {
         shot(&app, &themed("breakpoints-after-run", dark));
     }
 }
+
+/// A debug run waiting before a step (slice 10 of P4): the paused window, a `json` variable opened, and both at the
+/// narrowest window. The build before has no Debug button, so its pictures are of the breakpoint alone.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_debugger() {
+    for dark in [false, true] {
+        debugger(dark);
+    }
+}
+
+fn debugger(dark: bool) {
+    let dir = project("debug").unwrap();
+    let settings = look(
+        json!({ "lastProject": dir.to_string_lossy(), "panelHeight": 260 }),
+        dark,
+    );
+    let app = App::launch_with_settings(&settings, &[]).unwrap();
+    app.wait_for("the tests found", WAIT, |t| {
+        t.find(&Role::Button, "Expand debug.feature").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Expand debug.feature").unwrap();
+    let tree = app
+        .wait_for("the test's row", WAIT, |t| starting(t, "variables, ").is_some())
+        .unwrap();
+    app.click(starting(&tree, "variables, ").unwrap()).unwrap();
+    app.press_named(Role::Button, "Add breakpoint at line 8").unwrap();
+    app.wait_for_node(Role::Button, "Remove breakpoint at line 8").unwrap();
+    let debugs = app
+        .wait_for("the Debug button", Duration::from_secs(5), |t| {
+            t.find(&Role::Button, "Debug variables").is_some()
+        })
+        .is_ok();
+    if debugs {
+        app.press_named(Role::Button, "Debug variables").unwrap();
+        app.wait_for("the pause", RUN, |t| {
+            t.find(&Role::Button, "Continue").is_some() && starting(t, "from background").is_some()
+        })
+        .unwrap();
+    }
+    shot(&app, &themed("debugger-paused", dark));
+    if debugs {
+        app.press_named(Role::Button, "Step over").unwrap();
+        app.wait_for_node(Role::Button, "Show user").unwrap();
+        app.press_named(Role::Button, "Show user").unwrap();
+        app.wait_for_node(Role::Button, "Hide user").unwrap();
+    }
+    shot(&app, &themed("debugger-variable-open", dark));
+    let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
+        x: 0,
+        y: 0,
+        width: 1200,
+        height: 800,
+    });
+    app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
+    shot(&app, &themed("debugger-narrow", dark));
+}
