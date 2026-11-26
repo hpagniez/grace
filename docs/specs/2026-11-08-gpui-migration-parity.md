@@ -555,9 +555,9 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | SD-11 | Secrets are masked in variables | | ☐ |
 | SD-12 | A long value is cut | | ☐ |
 | SD-13 | Debug runs do not prove a test flaky | | ☐ |
-| SD-14 | Steps before a run, from the feature file | | ☐ |
-| SD-15 | Setting and removing a breakpoint | | ☐ |
-| SD-16 | A background breakpoint shows in every scenario | | ☐ |
+| SD-14 | Steps before a run, from the feature file | `grace_core::runner::tests::debug::lists_a_tests_steps_before_any_run`; `grace::details::tests::breakpoints::lists_the_steps_from_the_file_before_a_run_with_no_status_or_time`; a doc string's steps left out: `grace_core::karate::steps::tests::file_steps::skips_doc_strings_tables_and_comments_and_stops_an_outline_at_its_examples` | ☑ |
+| SD-15 | Setting and removing a breakpoint | `grace::details::tests::breakpoints::toggles_a_breakpoint_on_a_step_and_shows_the_runners_set`; the rows' dots: `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; set and removed: `grace_core::runner::tests::debug::gives_a_reloaded_window_the_breakpoints_and_refuses_a_line_of_no_feature`; in the app, with their names: `grace-e2e/tests/details.rs::a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree` | ☑ |
+| SD-16 | A background breakpoint shows in every scenario | `grace::details::tests::breakpoints::a_background_breakpoint_shows_in_every_scenario` | ☑ |
 | SD-17 | Debugging from the tree, paused, stepping, finished (e2e) | | ☐ |
 | SD-18 | The keyboard starts a debug run or a normal run | | ☐ |
 | SD-19 | Nothing spins while paused | | ☐ |
@@ -708,7 +708,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | SC-05 | Comments show above their step | `grace::details::tests::a_test::shows_a_steps_comments_above_it` | ☑ |
 | SC-06 | The paused step shows its comments | Waits for the step debugger, phase P4: a pause needs it | ☐ |
 | SC-07 | Comments are masked | `grace-core::mask::tests::mask_event::masks_the_run_text_of_every_event` (a secret in a step comment) | ☑ |
-| SC-08 | Comments before and after a run (e2e) | Waits for the step debugger, phase P4, for the steps from the file before a run. After a run: `grace-e2e/tests/details.rs::failure_details` (the error box: place, comment, step); the comment above the step: `grace::details::tests::a_test::shows_a_steps_comments_above_it` | ☐ |
+| SC-08 | Comments before and after a run (e2e) | `grace-e2e/tests/details.rs::failure_details` (before the run, the file's step with its comment; after it, the failed step's comment and the error box: place, comment, step) | ☑ |
 
 ### TO · Open the test tree with only its folders open
 
@@ -818,7 +818,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | GF-01 | A test whose config failed is failed | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::fails_the_tests_whose_config_failed` | ☑ |
 | GF-02 | A test with its own SCENARIO_EXIT keeps its status | `grace-core::karate::run_state::tests::run_state::marks_running_then_passed_or_failed`, `…::run_state_config_failures_and_karates_reason_229::does_not_fail_a_test_twice_across_batches` | ☑ |
 | GF-03 | Karate's synthetic step shows without "undefined" | `grace-core::karate::steps::tests::extract_steps::shows_a_step_with_no_keyword_by_its_text_alone_229_r1_3` | ☑ |
-| GF-04 | Karate's synthetic step has no breakpoint dot | Waits for the step debugger, phase P4: the breakpoint dots are its | ☐ |
+| GF-04 | Karate's synthetic step has no breakpoint dot | `grace::details::tests::breakpoints::has_no_toggle_on_a_step_below_line_1` | ☑ |
 | GF-05 | The reason is Karate's errorReason | `grace-core::karate::run_state::tests::run_state_config_failures_and_karates_reason_229::sends_where_karates_reason_starts`; `grace-core::state::tests::reduce_karates_reason_229_r2_1::keeps_where_the_reason_starts_until_the_test_runs_again` | ☑ |
 | GF-06 | Two karate.fail calls at different lines share an error | `grace_core::failures::tests::failure_groups::groups_karate_fail_at_different_lines` | ☑ |
 | GF-07 | A thrown string's position is left out | `grace_core::failures::tests::failure_groups::groups_a_thrown_string_at_different_positions` | ☑ |
@@ -993,7 +993,7 @@ Phase P2 · 1 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-details-01 | Failure details | Run half: `grace-e2e/tests/details.rs::failure_details`; the steps from the file before a run come with P4 (plan, Redesigns) | ☐ |
+| E-details-01 | Failure details | `grace-e2e/tests/details.rs::failure_details` | ☑ |
 
 ### e2e/editor.spec.ts
 
@@ -1397,7 +1397,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/CallDetails.test.tsx` | 16 | `grace::http::call_details::tests` (12 tests: 10 for 12 Vitest tests, 2 added) and `grace_core::http_list::tests::call_text` (7 tests, the rules the view only draws), test for test in [P3 plan, slice 4](../plans/2026-11-12-gpui-p3-panels.md#calldetailstesttsx-16-in-gracehttpcall_detailstests); 2 `n/a` (a clipboard write that fails), 2 by eye (Tailwind classes) | ☑ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | `grace::failures::tests` (6 tests, one added) and `grace::window::tests::the_config_banner_sits_on_the_sheet_under_the_notice`, test for test in [P3 plan, slice 10](../plans/2026-11-12-gpui-p3-panels.md#configbannertesttsx-6-tests-in-gracefailurestests) | ☑ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 18 ported, 1 `n/a` that counts Solid memo calls; 11 were the failure groups, ported in [P3 slice 10](../plans/2026-11-12-gpui-p3-panels.md#detailstesttsx-23-to-34-the-failure-groups-p2-left-for-this-slice-in-gracedetailstestsfailure_groups) (10 ported, 1 `n/a` for the focus), and 5 wait for P4, the steps before a run and breakpoints) | ☑ |
+| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 22 ported, 1 `n/a` that counts Solid memo calls; 11 were the failure groups, ported in [P3 slice 10](../plans/2026-11-12-gpui-p3-panels.md#detailstesttsx-23-to-34-the-failure-groups-p2-left-for-this-slice-in-gracedetailstestsfailure_groups) (10 ported, 1 `n/a` for the focus); tests 14, 15, 17 and 29 in [P4 slice 8](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::details::tests::breakpoints`; 1 waits for P4's debug run) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | `grace::examples::tests` and `grace_core::examples::tests`, test for test in [P3 plan, Slice 9](../plans/2026-11-12-gpui-p3-panels.md#slice-9-the-data-driven-view) | ☑ |
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (30 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 2 wait for P4's step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; 6 wait for the debugger, P4) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; test 84 in P4 slice 8, `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; 5 wait for P4's debug run) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
