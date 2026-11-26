@@ -49,6 +49,8 @@ pub struct Variables {
     /// The pause the rows are of: its run and its number.
     pause: (Option<String>, u32),
     rows: Rc<Vec<Row>>,
+    /// Whether it was dimmed when it was last told to draw.
+    dimmed: bool,
     /// The values open now, by name, each as its box shows it.
     open: HashMap<SharedString, SharedString>,
     _observe: Subscription,
@@ -62,13 +64,18 @@ fn pause_of(grace: &Entity<Grace>, cx: &App) -> (Option<String>, u32) {
 impl Variables {
     pub fn new(grace: Entity<Grace>, cx: &mut Context<Self>) -> Self {
         let observe = cx.observe(&grace, |this: &mut Self, _, cx| {
-            this.follow(cx);
-            cx.notify();
+            // a run's events change Grace many times a second, most of them nothing this tab shows
+            let dimmed = this.dimmed(cx);
+            if this.follow(cx) || dimmed != this.dimmed {
+                this.dimmed = dimmed;
+                cx.notify();
+            }
         });
         let mut me = Self {
             grace,
             pause: (None, 0),
             rows: Rc::default(),
+            dimmed: false,
             open: HashMap::new(),
             _observe: observe,
         };
@@ -76,11 +83,11 @@ impl Variables {
         me
     }
 
-    /// The rows again on a new pause, every value closed, as Electron Grace made its rows anew.
-    fn follow(&mut self, cx: &App) {
+    /// The rows again on a new pause, every value closed, as Electron Grace made its rows anew; true if it is one.
+    fn follow(&mut self, cx: &App) -> bool {
         let pause = pause_of(&self.grace, cx);
         if pause == self.pause {
-            return;
+            return false;
         }
         self.pause = pause;
         self.open.clear();
@@ -97,6 +104,7 @@ impl Variables {
                 })
                 .collect(),
         );
+        true
     }
 
     /// The rows, shared: the same `Rc` until the next pause.

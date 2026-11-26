@@ -175,6 +175,26 @@ fn works_the_rows_out_once_a_pause_and_closes_them_on_the_next(cx: &mut TestAppC
     assert_eq!(opened(&view, &mut cx, "user").as_deref(), Some("{\n  \"id\": 8\n}"));
 }
 
+/// Between pauses a run's events change Grace many times a second: the tab is drawn again only when its rows or its
+/// dimming change, so an opened value of 64 KB is not laid out on each.
+#[gpui::test]
+fn is_told_to_draw_again_only_when_what_it_shows_changes(cx: &mut TestAppContext) {
+    let (h, mut cx, view) = setup(cx);
+    let told = Rc::new(std::cell::Cell::new(0));
+    let count = Rc::clone(&told);
+    let _watch = cx.update(|_, cx| cx.observe(&view, move |_, _| count.set(count.get() + 1)));
+    pause(&h, &mut cx, vars());
+    assert_eq!(told.get(), 1, "a pause");
+    h.update(&mut cx, |s| s.console.push_back("a line".into()));
+    assert_eq!(told.get(), 1, "a console line");
+    send(&h, &mut cx, AppEvent::DebugResumed);
+    assert_eq!(told.get(), 2, "dimmed");
+    h.update(&mut cx, |s| s.console.push_back("another".into()));
+    assert_eq!(told.get(), 2);
+    pause(&h, &mut cx, vars());
+    assert_eq!(told.get(), 3, "the next pause");
+}
+
 /// A tab that is closed forgets what was open (Electron Grace unmounted it).
 #[gpui::test]
 fn closing_the_tab_closes_the_values(cx: &mut TestAppContext) {
