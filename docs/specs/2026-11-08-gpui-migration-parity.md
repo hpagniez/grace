@@ -889,14 +889,14 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| SO-01 | The empty tree offers the Karate project below | | ☐ |
-| SO-02 | Picking the offer opens the sub-folder as a project | | ☐ |
-| SO-03 | What looks like a Karate project | | ☐ |
-| SO-04 | Grace does not look inside an offered folder | | ☐ |
-| SO-05 | A folder with tests gets no offer | | ☐ |
-| SO-06 | A failed dry run gets no offer | | ☐ |
-| SO-07 | Grace opens only a folder it offered | | ☐ |
-| SO-08 | A Maven project with nowhere to look for tests lists no libraries | | ☐ |
+| SO-01 | The empty tree offers the Karate project below | `grace-core::runner::tests::subfolders::offers_the_karate_project_below_a_folder_with_no_test_without_listing_libraries`; `grace::tree::tests::offers_the_folders_below_an_empty_project`; `grace-e2e/tests/project_setup.rs::an_empty_folder_offers_the_karate_project_below_it` | ☑ |
+| SO-02 | Picking the offer opens the sub-folder as a project | `grace-core::runner::tests::subfolders::opens_an_offered_folder_as_any_project`; `grace-e2e/tests/project_setup.rs::an_empty_folder_offers_the_karate_project_below_it` | ☑ |
+| SO-03 | What looks like a Karate project | `grace-core::runner::tests::subfolders::offers_what_looks_like_a_karate_project` (every row of the table); `grace-core::karate::subfolders::tests` | ☑ |
+| SO-04 | Grace does not look inside an offered folder | `grace-core::runner::tests::subfolders::offers_no_folder_inside_an_offered_one`; `grace-core::karate::subfolders::tests::never_offers_the_project_folder_and_does_not_look_inside_an_offered_one` | ☑ |
+| SO-05 | A folder with tests gets no offer | `grace-core::runner::tests::subfolders::offers_nothing_when_the_tree_has_tests` | ☑ |
+| SO-06 | A failed dry run gets no offer | `grace-core::runner::tests::subfolders::offers_nothing_after_a_failed_dry_run` | ☑ |
+| SO-07 | Grace opens only a folder it offered | `grace-core::runner::tests::subfolders::refuses_a_folder_it_did_not_offer` | ☑ |
+| SO-08 | A Maven project with nowhere to look for tests lists no libraries | `grace-core::runner::tests::subfolders::offers_the_karate_project_below_a_folder_with_no_test_without_listing_libraries` (on open), `skips_the_listing_on_refresh_too` | ☑ |
 
 ### TR · Trends
 
@@ -1182,7 +1182,7 @@ Phase P4 · 8 tests
 | E-project-setup-04 | Maven's compiled output is on the classpath | `grace-e2e/tests/project_setup.rs::mavens_compiled_output_is_on_the_classpath` | ☑ |
 | E-project-setup-05 | a Maven project's libraries come from its build | `grace-e2e/tests/project_setup.rs::a_maven_projects_libraries_come_from_its_build` | ☑ |
 | E-project-setup-06 | jars in .karate/ext are on the classpath | `grace-e2e/tests/project_setup.rs::jars_in_karate_ext_are_on_the_classpath` | ☑ |
-| E-project-setup-07 | an empty folder offers the Karate project below it | | ☐ |
+| E-project-setup-07 | an empty folder offers the Karate project below it | `grace-e2e/tests/project_setup.rs::an_empty_folder_offers_the_karate_project_below_it` | ☑ |
 | E-project-setup-08 | the not-built notice builds the project's Java code | `grace-e2e/tests/project_setup.rs::the_not_built_notice_builds_the_projects_java_code` | ☑ |
 
 ### e2e/report.spec.ts
@@ -1355,7 +1355,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/karate/process.test.ts` | 9 | `grace-core::karate::process::tests` (11 tests; the job object, Windows priority and `taskkill` bodies run on Windows CI) | ☑ |
 | `src/main/karate/run-state.test.ts` | 24 | `grace-core::karate::run_state::tests` (26 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/steps.test.ts` | 8 | `grace-core::karate::steps::tests` (9 tests, every Vitest test and the added ones) | ☑ |
-| `src/main/karate/subfolders.test.ts` | 10 | `grace-core::karate::subfolders` | ☐ |
+| `src/main/karate/subfolders.test.ts` | 10 | `grace-core::karate::subfolders::tests` (12 tests: the 10 of the Vitest file, test for test in [P4 slice 5](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), and 2 added: names in `localeCompare`'s order, and a read that never returns) | ☑ |
 | `src/main/karate/tree.test.ts` | 17 | `grace-core::karate::tree::tests` (20 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/mask.test.ts` | 15 | `grace-core::mask::tests` (26 tests; two gaps of Electron Grace fixed, #293) | ☑ |
 | `src/main/propertiesFile.test.ts` | 12 | `grace-core::properties_file::tests` (13 tests, every Vitest test and the added ones) | ☑ |
@@ -1375,7 +1375,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.rerun.test.ts` | 11 | `grace-core::runner::tests::rerun` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.runs.test.ts` | 13 | `grace-core::runner::tests::runs` (14 tests, real Java and Karate) (and one new: a cancel just before Java starts) | ☑ |
 | `src/main/runner.setup.test.ts` | 9 | `grace-core::runner::tests::setup` (9 tests, real Java and Karate) | ☑ |
-| `src/main/runner.subfolders.test.ts` | 7 | `grace-core::runner` (subfolders) | ☐ |
+| `src/main/runner.subfolders.test.ts` | 8 | `grace-core::runner::tests::subfolders` (12 tests: the 8 of the Vitest file, test for test in [P4 slice 5](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), real Java and Karate, and 4 added) | ☑ |
 | `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
 | `src/main/runner.trends.test.ts` | 2 | `grace-core::runner::tests::trends` (2 tests, real Java and Karate) | ☑ |
@@ -1418,7 +1418,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
 | `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (26 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 6 wait for P4, Watch and the step debugger) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; 7 wait for P4, the debugger and sub-folders) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; 6 wait for the debugger, P4) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |

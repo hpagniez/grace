@@ -24,6 +24,8 @@ pub trait Backend: Send + Sync + 'static {
     /// Opens a folder the person picked; true if it is now the open project.
     fn open(&self, root: &str) -> std::io::Result<bool>;
     fn open_recent(&self, root: &str) -> std::io::Result<()>;
+    /// Opens a folder the empty tree offered, relative to the open project (SO-07).
+    fn open_subfolder(&self, folder: &str) -> std::io::Result<()>;
     fn remove_recent(&self, root: &str);
     /// Checks the saved recent folders and sends them.
     fn send_recent(&self);
@@ -71,6 +73,9 @@ impl Backend for Runner {
     }
     fn open_recent(&self, root: &str) -> std::io::Result<()> {
         Runner::open_recent(self, root)
+    }
+    fn open_subfolder(&self, folder: &str) -> std::io::Result<()> {
+        Runner::open_subfolder(self, folder)
     }
     fn remove_recent(&self, root: &str) {
         Runner::remove_recent(self, root)
@@ -321,6 +326,11 @@ impl Grace {
 
     pub fn open_recent(&mut self, root: String, cx: &mut Context<Self>) {
         self.background(cx, Order::Start, move |b| b.open_recent(&root));
+    }
+
+    /// The empty tree's "Open <folder>/" (sub-folder offer R4).
+    pub fn open_subfolder(&mut self, folder: String, cx: &mut Context<Self>) {
+        self.background(cx, Order::Start, move |b| b.open_subfolder(&folder));
     }
 
     pub fn remove_recent(&mut self, root: String, cx: &mut Context<Self>) {
@@ -653,6 +663,10 @@ pub mod fake {
         }
         fn open_recent(&self, root: &str) -> std::io::Result<()> {
             self.record(format!("open_recent {root}"));
+            Ok(())
+        }
+        fn open_subfolder(&self, folder: &str) -> std::io::Result<()> {
+            self.record(format!("open_subfolder {folder}"));
             Ok(())
         }
         fn remove_recent(&self, root: &str) {

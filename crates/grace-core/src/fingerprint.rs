@@ -23,7 +23,7 @@ pub const SKIPPED_DIRS: &[&str] = &[".git", "node_modules", ".gradle"];
 /// Output folders, lower case. The fingerprint skips them only beside a build file, so a test folder of that name
 /// counts; the sub-folder walk skips them everywhere.
 pub const OUTPUT_DIRS: &[&str] = &["target", "build"];
-const BUILD_FILES: &[&str] = &["pom.xml", "build.gradle", "build.gradle.kts"];
+pub(crate) const BUILD_FILES: &[&str] = &["pom.xml", "build.gradle", "build.gradle.kts"];
 pub const MAX_FILES: usize = 50_000;
 pub const WALK_TIMEOUT_MS: u64 = 2_000;
 

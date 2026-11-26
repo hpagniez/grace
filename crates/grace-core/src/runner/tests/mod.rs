@@ -37,6 +37,7 @@ mod properties;
 mod rerun;
 mod runs;
 mod setup;
+mod subfolders;
 mod tags;
 mod threads;
 mod trends;

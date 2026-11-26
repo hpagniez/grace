@@ -9,8 +9,7 @@
 //! A row's menu, "Open in VS Code", is GPUI Kit's `PopupMenu`, opened by the Tree itself: Kit's `ContextMenu` opens only
 //! on a right press, and the menu key must open it from the focus row (OT-01, P3 plan, Redesigns, `tree`).
 //!
-//! The debug button, the breakpoint dot (phase P4) and the sub-folder buttons of an empty project (P4) come with
-//! their phases (P2 plan, Redesigns).
+//! The debug button and the breakpoint dot come with phase P4 (P2 plan, Redesigns).
 use crate::elements::Off as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -39,7 +38,7 @@ use grace_core::state::AppState;
 
 use crate::app::Grace;
 use crate::assets::Icon;
-use crate::elements::{MarkStatus, icon, status_mark};
+use crate::elements::{ButtonKind, ButtonSize, MarkStatus, button, icon, status_mark};
 use crate::theme::{METRICS, Theme};
 use crate::tooltip::{Side, cut, tooltip};
 
@@ -307,6 +306,26 @@ impl Tree {
         self.grace.update(cx, |g, cx| g.select(key, cx));
     }
 
+    /// "Open <folder>/", for a Karate project found below an empty one (SO-01, SO-02). Off while Grace is busy.
+    fn offer(&self, folder: &str, state: &AppState, cx: &Context<Self>) -> AnyElement {
+        let selector = part("open-subfolder", folder);
+        let (grace, name) = (self.grace.clone(), folder.to_owned());
+        let open = button(
+            selector.clone(),
+            format!("Open {folder}/"),
+            ButtonKind::Plain,
+            ButtonSize::Small,
+        )
+        .off(busy(state))
+        .on_click(cx.listener(move |_, _, _, cx| {
+            grace.update(cx, |g, cx| g.open_subfolder(name.clone(), cx));
+        }));
+        div()
+            .debug_selector(move || selector.to_string())
+            .child(open)
+            .into_any_element()
+    }
+
     /// Moves to row `index` as an arrow key does: in view, the focus row from the keyboard, selected (VL-07).
     fn move_to(&mut self, index: usize, cx: &mut Context<Self>) {
         let Some(key) = self.keys.get(index).cloned() else {
@@ -530,7 +549,7 @@ impl Render for Tree {
                 .size_full()
                 .flex_1()
                 .min_h_0()
-                .overflow_hidden()
+                .overflow_y_scroll()
                 .p_2()
                 .child(child)
                 .into_any_element()
@@ -562,22 +581,39 @@ impl Render for Tree {
             );
         };
         if leaves(tree).is_empty() {
+            // the hint, then the Karate projects found below the folder (sub-folder offer R3)
+            let below = div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap_2()
+                .child(
+                    // a label, so a screen reader reads the hint as it read Electron Grace's (PU-28)
+                    div()
+                        .id("tree-empty-hint")
+                        .debug_selector(|| "tree-empty-hint".into())
+                        .role(Role::Label)
+                        .aria_value(EMPTY_HINT)
+                        .text_size(px(METRICS.text_xs.size))
+                        .text_color(Theme::color(t.muted))
+                        .child(EMPTY_HINT),
+                )
+                .when(!state.subfolders.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .justify_center()
+                            .gap_2()
+                            .children(state.subfolders.iter().map(|folder| self.offer(folder, &state, cx))),
+                    )
+                });
             return message(
                 crate::ui::empty_state(
                     "tree-empty",
                     Icon::FileSearch,
                     "No feature files found",
-                    Some(
-                        // a label, so a screen reader reads the hint as it read Electron Grace's (PU-28)
-                        div()
-                            .id("tree-empty-hint")
-                            .role(Role::Label)
-                            .aria_value(EMPTY_HINT)
-                            .text_size(px(METRICS.text_xs.size))
-                            .text_color(Theme::color(t.muted))
-                            .child(EMPTY_HINT)
-                            .into_any_element(),
-                    ),
+                    Some(below.into_any_element()),
                     cx,
                 )
                 .into_any_element(),

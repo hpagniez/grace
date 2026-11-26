@@ -934,3 +934,43 @@ fn build_notice(dark: bool) {
     app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
     shot(&app, &themed("build-failed-narrow", dark));
 }
+
+/// A folder with no test over two Karate projects (slice 5 of P4): the empty tree with its offer, also at the
+/// narrowest window. The build before shows the empty tree alone.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_subfolder_offer() {
+    for dark in [false, true] {
+        subfolder_offer(dark);
+    }
+}
+
+fn subfolder_offer(dark: bool) {
+    let dir = grace_e2e::fresh_data_dir().unwrap().join("repo");
+    for (rel, text) in [
+        ("pom.xml", "<project/>"),
+        ("karate/karate-config.js", "function fn() { return {}; }"),
+        ("tests/api/karate-pom.json", "{}"),
+    ] {
+        let path = dir.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+    let settings = look(json!({ "lastProject": dir.to_string_lossy() }), dark);
+    let app = App::launch_with_settings(&settings, &[]).unwrap();
+    app.wait_for("the empty tree and the open over", WAIT, |t| {
+        starting(t, "No feature files found").is_some()
+            && starting(t, "0 tests").is_some()
+            && starting(t, "Finding tests").is_none()
+    })
+    .unwrap();
+    shot(&app, &themed("subfolder-offer", dark));
+    let at = app.tree().unwrap().rect.unwrap_or(grace_e2e::Rect {
+        x: 0,
+        y: 0,
+        width: 1200,
+        height: 800,
+    });
+    app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
+    shot(&app, &themed("subfolder-offer-narrow", dark));
+}
