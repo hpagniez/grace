@@ -484,6 +484,8 @@ What the tests decided that the plan left open:
 
 The new view tests were seen failing before their behaviour, but for these, which passed when written: the emoji test, the modified-keys and no-pause key tests, the row button's cursor, the other-test, other-file and other-line pause, Alt+Left on Variables, and 41. The `grace_core::variables` tests were seen only as not compiling before their functions. The e2e tests were written after their behaviour and run on CI. `screens_debugger` takes a run paused before a step, a variable opened and both at 760 px, in both looks. A result that lands with a pause shows whole in the bar (`progress::tests::the_clock::a_result_that_lands_with_a_pause_is_not_left_half_way`): no frame comes to finish a spring then. The branch's review added that the Variables tab is told to draw again only when its rows or its dimming change (`variables::tests::is_told_to_draw_again_only_when_what_it_shows_changes`).
 
+The Windows e2e run found a tooltip bug that the Debug button exposed: a pointer that went from one trigger to the next one in a single move got no tooltip, as the first one's leave, heard after the second one's hover, ended the second one's wait. The Windows driver moves in 20 px steps, so it crossed from Debug to Run; xdotool jumps. A wait now belongs to its trigger, and only a press or Escape ends another's (`tree::tests::step_debugger::the_pointer_going_from_debug_to_run_shows_runs_tooltip`); `grace-e2e/tests/tree.rs` is unchanged.
+
 The tests, test for test:
 
 #### `Variables.test.tsx` (4) in `grace::variables::tests`

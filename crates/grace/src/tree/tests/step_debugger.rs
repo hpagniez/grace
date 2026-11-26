@@ -91,6 +91,43 @@ fn a_debug_button_before_run_debugs_its_row_and_nothing_during_a_run(cx: &mut Te
     assert!(cx.debug_bounds("debug:f:tests/a.feature").is_none());
 }
 
+/// The pointer goes from Debug to Run beside it in one move, before Debug's tooltip shows or while it does: Run's
+/// shows, as its own trigger's wait is not ended by the leave of the one before.
+#[gpui::test]
+fn the_pointer_going_from_debug_to_run_shows_runs_tooltip(cx: &mut TestAppContext) {
+    let (h, mut cx, _tree) = setup(cx, state("/p", &["a"]));
+    let debug = cx
+        .debug_bounds("debug:f:tests/a.feature")
+        .expect("the Debug button")
+        .center();
+    let run = cx
+        .debug_bounds("run:f:tests/a.feature")
+        .expect("the Run button")
+        .center();
+    let rest = |cx: &mut VisualTestContext, at: gpui::Point<gpui::Pixels>, shown: bool| {
+        cx.simulate_mouse_move(at, None, gpui::Modifiers::none());
+        if shown {
+            cx.executor().advance_clock(crate::tooltip::DELAY);
+        }
+        cx.run_until_parked();
+    };
+    for debugs_shows_first in [false, true] {
+        for (from, to, tip) in [
+            (debug, run, "Run a.feature (Ctrl+Enter)"),
+            (run, debug, "Debug a.feature (Ctrl+Shift+Enter)"),
+        ] {
+            rest(&mut cx, gpui::point(gpui::px(5.), gpui::px(600.)), false);
+            rest(&mut cx, from, debugs_shows_first);
+            rest(&mut cx, to, true);
+            assert_eq!(
+                h.tip(&mut cx).as_deref(),
+                Some(tip),
+                "shown first: {debugs_shows_first}"
+            );
+        }
+    }
+}
+
 /// UP-13: the Debug button shows the hand, and the not-allowed sign during a run, as the run button does.
 #[test]
 fn a_rows_debug_button_shows_the_hand() {
