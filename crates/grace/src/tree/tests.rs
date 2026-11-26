@@ -1019,3 +1019,70 @@ mod open_in_vs_code {
         assert_eq!(h.seams.urls(), ["vscode://file/tests/a.feature:14"]);
     }
 }
+
+/// A project whose tree has no test, offering `folders`.
+fn empty_offering(folders: &[&str]) -> AppState {
+    let mut s = testing::project("D:/p", Layout::Maven, 0);
+    s.tree = Some(node("d:", NodeKind::Folder, vec![]));
+    s.subfolders = folders.iter().map(|f| f.to_string()).collect();
+    s
+}
+
+/// `Tree.test.tsx` "offers the folders below an empty project" (SO-01, SO-02): a button per folder under the hint,
+/// which opens it, off while Grace is busy, gone once a tree offers nothing.
+#[gpui::test]
+fn offers_the_folders_below_an_empty_project(cx: &mut TestAppContext) {
+    let (h, mut cx, _tree) = setup(cx, empty_offering(&["karate", "tests/api"]));
+    let area = cx.debug_bounds("tree-message").unwrap();
+    let hint = cx.debug_bounds("tree-empty-hint").expect("the hint");
+    let first = cx.debug_bounds("open-subfolder:karate").expect("Open karate/");
+    let second = cx.debug_bounds("open-subfolder:tests/api").expect("Open tests/api/");
+    for button in [first, second] {
+        assert!(area.contains(&button.center()), "{area:?} {button:?}");
+        assert!(button.top() >= hint.bottom(), "under the hint: {hint:?} {button:?}");
+    }
+    let click = |cx: &mut VisualTestContext, at: gpui::Bounds<gpui::Pixels>| {
+        cx.simulate_click(at.center(), gpui::Modifiers::none());
+        cx.run_until_parked();
+    };
+    click(&mut cx, second);
+    assert_eq!(h.backend.calls(), ["open_subfolder tests/api"]);
+
+    // a discovery or a listing, then a run
+    for (busy, run) in [(true, false), (false, true)] {
+        h.update(&mut cx, |s| {
+            s.busy = busy;
+            s.run.active = run;
+        });
+        click(&mut cx, first);
+        click(&mut cx, second);
+        assert_eq!(h.backend.calls().len(), 1, "busy {busy}, run {run}");
+    }
+
+    h.set(&mut cx, empty_offering(&[]));
+    assert!(cx.debug_bounds("tree-empty-hint").is_some());
+    assert!(cx.debug_bounds("open-subfolder:karate").is_none());
+}
+
+/// The most the walk offers, in a short window: the empty tree scrolls to the last, as Electron Grace's does.
+#[gpui::test]
+fn scrolls_to_the_offers_that_do_not_fit(cx: &mut TestAppContext) {
+    let folders: Vec<String> = (0..10)
+        .map(|i| format!("services/a-long-module-name-{i}/karate"))
+        .collect();
+    let names: Vec<&str> = folders.iter().map(String::as_str).collect();
+    let (_h, mut cx, _tree) = setup(cx, empty_offering(&names));
+    cx.simulate_resize(gpui::size(gpui::px(320.), gpui::px(200.)));
+    cx.run_until_parked();
+    let last = "open-subfolder:services/a-long-module-name-9/karate";
+    let area = cx.debug_bounds("tree-message").unwrap();
+    assert!(cx.debug_bounds(last).unwrap().top() > area.bottom(), "below the view");
+    cx.simulate_event(gpui::ScrollEvent {
+        position: area.center(),
+        delta: gpui::ScrollDelta::Pixels(gpui::point(gpui::px(0.), gpui::px(-2000.))),
+        ..Default::default()
+    });
+    cx.run_until_parked();
+    let shown = cx.debug_bounds(last).unwrap();
+    assert!(area.contains(&shown.center()), "{area:?} {shown:?}");
+}
