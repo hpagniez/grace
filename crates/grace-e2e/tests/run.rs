@@ -49,10 +49,11 @@ fn bar(tree: &Node) -> Option<&Node> {
 /// Holds a run at the top of the scenario `name` of `tests/<feature>` until the returned file exists, so a state the
 /// run only passes through stays until the test has read it. A minute at most: no Java waits for good.
 fn gate(dir: &Path, feature: &str, name: &str) -> PathBuf {
-    let open = dir.parent().unwrap().join(format!("open {name}"));
+    // named by the feature: a scenario's name may hold what a file's cannot ("add <a> and <b>")
+    let open = dir.parent().unwrap().join(format!("open {feature}"));
     let file = dir.join("tests").join(feature);
     let text = std::fs::read_to_string(&file).unwrap();
-    let at = text.find(&format!("Scenario: {name}")).unwrap();
+    let at = text.find(&format!(": {name}")).unwrap();
     let end = at + text[at..].find('\n').unwrap() + 1;
     let text = format!(
         "{}  * def hold = function(p){{ var File = Java.type('java.io.File'); var Thread = Java.type('java.lang.Thread'); for (var i = 0; i < 1200 && !new File(p).exists(); i++) Thread.sleep(50) }}\n  * eval hold('{}')\n{}",
@@ -87,25 +88,36 @@ fn run_all(app: &App) {
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn run_all_with_live_progress() {
     let dir = project("clean").unwrap();
-    let first = gate(&dir, "basic.feature", "passing hello");
-    let slow = gate(&dir, "slow.feature", "slow loop");
+    // Karate takes the features in no fixed order on Linux: the first scenario of each is held, and the test opens
+    // them as the run reaches them
+    let gates = [
+        ("passing hello", gate(&dir, "basic.feature", "passing hello")),
+        ("add <a> and <b>", gate(&dir, "outline.feature", "add <a> and <b>")),
+        ("slow loop", gate(&dir, "slow.feature", "slow loop")),
+    ];
     let (_, app) = open(dir);
     open_features(&app);
     run_all(&app);
-    // the bar waits, with no values, until the first result (LV-05, LV-09)
-    app.wait_for("0 / 9, the bar with no value", RUN, |t| {
-        label(t, "0 / 9").is_some() && bar(t).is_some_and(|b| b.value.is_none())
-    })
-    .unwrap();
-    std::fs::write(first, "").unwrap();
-    app.wait_for("slow loop running, a scenario passed and one failed", RUN, |t| {
-        label(t, "Running…").is_some()
-            && says(t, "slow loop", "running")
-            && says(t, "passing hello", "passed")
-            && says(t, "failing match", "failed")
-    })
-    .unwrap();
-    std::fs::write(slow, "").unwrap();
+    let mut opened = Vec::new();
+    for round in 0..gates.len() {
+        let held = |t: &Node| (0..gates.len()).find(|i| !opened.contains(i) && says(t, gates[*i].0, "running"));
+        let tree = app
+            .wait_for("the run held at a feature's first scenario", RUN, |t| {
+                held(t).is_some()
+                    && label(t, "Running…").is_some()
+                    // the bar waits, with no values, until the first result (LV-05, LV-09); then the count moves
+                    // while the run goes on
+                    && if round == 0 {
+                        label(t, "0 / 9").is_some() && bar(t).is_some_and(|b| b.value.is_none())
+                    } else {
+                        label(t, "0 / 9").is_none() && bar(t).is_some_and(|b| b.value.is_some())
+                    }
+            })
+            .unwrap();
+        let at = held(&tree).unwrap();
+        std::fs::write(&gates[at].1, "").unwrap();
+        opened.push(at);
+    }
     // as Playwright's expect, which retries: the driver reads the tree node by node, so one read can hold a
     // node from before an update and one from after it
     app.wait_for("Finished with 8 passed and 1 failed", RUN, |t| {
