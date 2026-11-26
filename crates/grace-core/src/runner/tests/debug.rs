@@ -319,6 +319,29 @@ fn masks_a_secret_cut_at_the_end_of_a_long_value() {
     finished(done);
 }
 
+// Added (the plan's slice 10, left open by slice 9): Java cuts a value at 65,536 UTF-16 units, here between the two
+// halves of an emoji, and writes the half left as `?`, so the line is valid UTF-8 and the run pauses
+#[test]
+fn a_value_cut_through_an_emoji_pauses_with_its_half_as_a_question_mark() {
+    let (t, root) = open_with("debug", &[("cut.feature", 5)]);
+    fs::write(
+        root.join("cut.feature"),
+        "Feature: cut\n\n  Scenario: cut emoji\n    * def tail = karate.repeat(65535, function(){ return 'x' }).join('') + '\\uD83D\\uDE00'\n    * print 'after'\n",
+    )
+    .unwrap();
+    t.runner.refresh().unwrap();
+    t.runner.toggle_breakpoint("cut.feature", 5);
+    let done = debug(&t, &t.key("cut emoji"));
+    let tail = var(&t, 1, "tail");
+    let value = tail["value"].as_str().unwrap();
+    assert_eq!(tail["cut"], 1);
+    assert_eq!(value.len(), 65_536);
+    assert!(value.ends_with("x?"), "{}", &value[value.len() - 10..]);
+    t.runner.debug_command(DebugCommand::Continue);
+    finished(done);
+    assert_eq!(t.last("runFinished")["outcome"], "finished");
+}
+
 #[test]
 fn lists_a_tests_steps_before_any_run() {
     let (t, _root) = open("debug");
