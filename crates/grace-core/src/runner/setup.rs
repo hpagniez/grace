@@ -1,25 +1,8 @@
-//! The starting values a project's pom files give (`pom_start`), and the part of opening a project that phase P4 has
-//! still to port: the sub-folder offer (`karate/subfolders.ts`). The runner calls it where `runner.ts` does, through
-//! `ProjectSetup`; until it is ported, `NoSetup` has nothing to say.
+//! The starting values a project's pom files give (`pom_start`).
 use crate::karate::maven::maven_env;
 use crate::karate::pom::{PomEnv, read_pom};
 use crate::model::tags::FilterState;
 use std::path::Path;
-
-/// What phase P4 plugs into the runner. Every method has the answer of a project that needs none of it.
-pub trait ProjectSetup: Send + Sync {
-    /// `karateFolders`: folders below the project that look like a Karate project, offered when the tree has no test
-    /// (sub-folder offer R4).
-    fn karate_folders(&self, _root: &Path) -> Vec<String> {
-        Vec::new()
-    }
-}
-
-/// Phase P1's setup: no sub-folder offer.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct NoSetup;
-
-impl ProjectSetup for NoSetup {}
 
 /// `pomStart`: the starting values the project's pom files give (pom defaults R2, R3).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

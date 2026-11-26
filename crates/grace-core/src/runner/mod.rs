@@ -26,15 +26,14 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's parts still to port are a seam or left out: the sub-folder offer is `ProjectSetup`'s method
-//!   (`NoSetup` until then); watch mode and the step debugger are left out, each place they act marked `P4`. The events
-//!   stay those of a project that has neither: `watch` (as saved) and `breakpoints` (empty).
+//! - Phase P4's parts still to port, watch mode and the step debugger, are left out, each place they act marked `P4`.
+//!   The events stay those of a project that has neither: `watch` (as saved) and `breakpoints` (empty).
 mod run;
 mod setup;
 #[cfg(test)]
 mod tests;
 
-pub use setup::{NoSetup, PomStart, ProjectSetup, pom_start};
+pub use setup::{PomStart, pom_start};
 
 use crate::flaky::find_flaky;
 use crate::history::{self, ListedRun, clear_history, list_runs, read_run_record};
@@ -47,6 +46,7 @@ use crate::karate::environments::{feature_tag_envs, overlay_envs};
 use crate::karate::events::read_all_events;
 use crate::karate::libraries::{self, Goal, KeptLibraries, ToolEnv, ToolStart};
 use crate::karate::process::{Exit, KarateProcess, SpawnOptions, spawn_karate};
+use crate::karate::subfolders::karate_folders;
 use crate::karate::tree::{build_tree, leaf_keys, parse_ref_id, row_lines};
 use crate::model::env::{
     EnvView, PlainRow, PropertiesEdit, PropertyListsView, RowEdit, RowView, SecretRowView, SecretState, edit_errors,
@@ -279,8 +279,6 @@ pub struct RunnerOptions {
     pub home: Option<PathBuf>,
     /// The variables Maven and Gradle are looked for with (find-build-tools R1); `None` is Grace's own. A test seam.
     pub lookup_env: Option<Env>,
-    /// Phase P4's parts; `NoSetup` until then.
-    pub setup: Arc<dyn ProjectSetup>,
 }
 
 impl RunnerOptions {
@@ -293,7 +291,6 @@ impl RunnerOptions {
             fingerprint: None,
             home: None,
             lookup_env: None,
-            setup: Arc::new(NoSetup),
         }
     }
 }
@@ -321,7 +318,6 @@ struct Inner {
     walk: Walk,
     home: PathBuf,
     lookup_env: Option<Env>,
-    setup: Arc<dyn ProjectSetup>,
     pid_file: PathBuf,
     recent: Arc<RecentSender<LoadRecent, EmitRecent>>,
     state: Mutex<State>,
@@ -344,7 +340,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Runner {
-    /// The app's runner: the project fingerprint of `fingerprint.rs`, `~/.karate/ext` in the person's home, no P4 setup.
+    /// The app's runner: the project fingerprint of `fingerprint.rs` and `~/.karate/ext` in the person's home.
     pub fn new(
         data_dir: impl Into<PathBuf>,
         vendor: VendorPaths,
@@ -374,7 +370,6 @@ impl Runner {
                 .unwrap_or_else(|| Arc::new(crate::fingerprint::project_fingerprint)),
             home: o.home.or_else(std::env::home_dir).unwrap_or_default(),
             lookup_env: o.lookup_env,
-            setup: o.setup,
             recent: Arc::new(RecentSender::new(load, emit_recent)),
             state: Mutex::new(State::new()),
             idle: Condvar::new(),
@@ -395,6 +390,12 @@ impl Runner {
     /// Opens a folder of the recent list; refused if not listed, ignored while it is the one being opened.
     pub fn open_recent(&self, root: &str) -> io::Result<()> {
         self.0.open_recent(root)
+    }
+
+    /// Opens a folder the last tree offered, as the folder dialog would (sub-folder offer R4); refused if it was not
+    /// offered.
+    pub fn open_subfolder(&self, folder: &str) -> io::Result<()> {
+        self.0.open_subfolder(folder)
     }
 
     /// Drops a folder of the recent list; refused if not listed. Allowed while busy: it touches only settings.json.
@@ -741,6 +742,22 @@ impl Inner {
             return Ok(());
         }
         self.open(root).map(|_| ())
+    }
+
+    fn open_subfolder(&self, folder: &str) -> io::Result<()> {
+        let root = {
+            let s = self.state();
+            s.last
+                .as_ref()
+                .filter(|last| last.subfolders.iter().flatten().any(|f| f == folder))
+                .and_then(|last| last.project.as_ref())
+                .map(|p| p.root.clone())
+        };
+        let Some(root) = root else {
+            self.notice(INVALID);
+            return Ok(());
+        };
+        self.open(&text(&Path::new(&root).join(folder))).map(|_| ())
     }
 
     fn remove_recent(&self, root: &str) {
@@ -1707,7 +1724,7 @@ impl Inner {
             }
         };
         let subfolders = match &tree {
-            Some(t) if leaf_keys(t).is_empty() => self.setup.karate_folders(root),
+            Some(t) if leaf_keys(t).is_empty() => karate_folders(root),
             _ => Vec::new(),
         };
         if self.cancelled() {
