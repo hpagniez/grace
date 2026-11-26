@@ -6,12 +6,62 @@ use atspi::proxy::component::ComponentProxy;
 use atspi::proxy::text::TextProxy;
 use atspi::proxy::value::ValueProxy;
 use atspi::{AccessibilityConnection, CoordType, Interface, ObjectRefOwned, State};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::mpsc;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+
 use futures_lite::future::block_on;
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
 
 /// A whole read of Grace's window takes well under a second.
-const READ_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+const READ_LIMIT: Duration = Duration::from_secs(10);
+
+/// Ends at a time: a thread wakes it, since `futures-lite` brings no timer. Dropping it ends the thread at once.
+struct At {
+    at: Instant,
+    stop: Option<mpsc::Sender<()>>,
+}
+
+impl Future for At {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let left = self.at.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Poll::Ready(());
+        }
+        if self.stop.is_none() {
+            let (stop, stopped) = mpsc::channel();
+            let waker = cx.waker().clone();
+            std::thread::spawn(move || {
+                if stopped.recv_timeout(left) == Err(mpsc::RecvTimeoutError::Timeout) {
+                    waker.wake();
+                }
+            });
+            self.stop = Some(stop);
+        }
+        Poll::Pending
+    }
+}
+
+/// `what`, or an error once `limit` has passed with no answer.
+fn cut<T>(limit: Duration, what: impl Future<Output = Result<T>>) -> Result<T> {
+    let late = async {
+        At {
+            at: Instant::now() + limit,
+            stop: None,
+        }
+        .await;
+        Err(format!(
+            "the accessibility bus did not answer a read of the tree in {} ms",
+            limit.as_millis()
+        ))
+    };
+    block_on(futures_lite::future::or(what, late))
+}
 
 pub struct AtspiDriver {
     conn: AccessibilityConnection,
@@ -184,14 +234,7 @@ impl Driver for AtspiDriver {
             let window = self.window().await?;
             self.read(&window, vec![]).await
         };
-        let late = async {
-            async_io::Timer::after(READ_LIMIT).await;
-            Err(format!(
-                "the accessibility bus did not answer a read of the tree in {} s",
-                READ_LIMIT.as_secs()
-            ))
-        };
-        block_on(futures_lite::future::or(read, late))
+        cut(READ_LIMIT, read)
     }
 
     fn press(&self, node: &Node) -> Result<()> {
@@ -422,5 +465,27 @@ fn role(role: atspi::Role) -> Role {
         A::ToolTip => Role::Tooltip,
         A::Landmark => Role::Landmark,
         other => Role::Other(format!("{other:?}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_read_with_no_answer_is_cut_at_its_limit() {
+        let start = Instant::now();
+        let never = futures_lite::future::pending::<Result<()>>();
+        assert!(
+            cut(Duration::from_millis(100), never)
+                .unwrap_err()
+                .contains("did not answer")
+        );
+        assert!(start.elapsed() >= Duration::from_millis(100) && start.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_read_that_answers_is_not_cut() {
+        assert_eq!(cut(Duration::from_secs(10), async { Ok(1) }), Ok(1));
     }
 }
