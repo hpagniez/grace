@@ -1013,3 +1013,50 @@ Scenario: pays
     app.set_window_rect(at.x, at.y, 760, at.height).unwrap();
     shot(&app, &themed(&format!("{name}-narrow"), dark));
 }
+
+/// A test's steps before and after a run, with breakpoints set and the pointer on a toggle: the dots in Details and
+/// in the tree. A base that has no toggles shows the same states without them.
+#[test]
+#[ignore = "takes screenshots; run with scripts/e2e-gpui.sh screens_"]
+fn screens_breakpoints() {
+    for dark in [false, true] {
+        let dir = project("clean").unwrap();
+        let app = open(&dir, dark);
+        app.press_named(Role::Button, "Expand basic.feature").unwrap();
+        let tree = app
+            .wait_for("the test's row", WAIT, |t| starting(t, "failing match, ").is_some())
+            .unwrap();
+        app.click(starting(&tree, "failing match, ").unwrap()).unwrap();
+        app.wait_for("the test's details", WAIT, |t| {
+            starting(t, "tests/basic.feature:15").is_some()
+        })
+        .unwrap();
+        // the file's steps come a moment after the details; a base without them never shows the toggle
+        let toggle = |line: u32| format!("Add breakpoint at line {line}");
+        let toggles = app
+            .wait_for("the toggles", Duration::from_secs(5), |t| {
+                t.find(&Role::Button, &toggle(20)).is_some()
+            })
+            .is_ok();
+        if toggles {
+            for line in [4, 20] {
+                app.press_named(Role::Button, &toggle(line)).unwrap();
+                app.wait_for_node(Role::Button, &format!("Remove breakpoint at line {line}"))
+                    .unwrap();
+            }
+        }
+        shot(&app, &themed("breakpoints-before-run", dark));
+        if toggles {
+            let tree = app.tree().unwrap();
+            app.hover(tree.find(&Role::Button, &toggle(17)).unwrap()).unwrap();
+            app.wait_for_node(Role::Tooltip, &toggle(17)).unwrap();
+        }
+        shot(&app, &themed("breakpoints-hover", dark));
+        run_all(&app);
+        app.wait_for("the run's steps", WAIT, |t| {
+            starting(t, "Show log of method get").is_some()
+        })
+        .unwrap();
+        shot(&app, &themed("breakpoints-after-run", dark));
+    }
+}

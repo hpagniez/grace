@@ -3,6 +3,7 @@
 //! `virtual.ts`'s `drawnRange` is not here: GPUI's `uniform_list` draws only the rows in view itself.
 use std::collections::{HashMap, HashSet};
 
+use crate::model::events::Breakpoint;
 use crate::model::flaky::FlakyEnv;
 use crate::model::node::{NodeKind, Status, TestNode};
 use crate::model::tags::{FilterState, filter_on, matching_leaves};
@@ -84,6 +85,37 @@ pub fn status_label(s: Status) -> &'static str {
         Status::Failed => "Failed",
         Status::Interrupted => "Interrupted",
     }
+}
+
+/// The features and tests that hold a breakpoint (step debugger R5.2): a feature any of whose lines holds one, and
+/// each of its tests and outlines for the lines from its own up to the next one's. Rows have none of their own.
+pub fn breakpoint_keys(tree: &TestNode, breakpoints: &[Breakpoint]) -> HashSet<String> {
+    fn walk(n: &TestNode, breakpoints: &[Breakpoint], keys: &mut HashSet<String>) {
+        if n.kind != NodeKind::Feature {
+            n.children.iter().for_each(|c| walk(c, breakpoints, keys));
+            return;
+        }
+        let lines: Vec<u32> = breakpoints
+            .iter()
+            .filter(|b| b.file == n.file)
+            .map(|b| b.line)
+            .collect();
+        if lines.is_empty() {
+            return;
+        }
+        keys.insert(n.key.clone());
+        for (i, c) in n.children.iter().enumerate() {
+            let next = n.children.get(i + 1).and_then(|c| c.line).unwrap_or(u32::MAX);
+            if c.line.is_some_and(|from| lines.iter().any(|&l| l >= from && l < next)) {
+                keys.insert(c.key.clone());
+            }
+        }
+    }
+    let mut keys = HashSet::new();
+    if !breakpoints.is_empty() {
+        walk(tree, breakpoints, &mut keys);
+    }
+    keys
 }
 
 /// A row's accessible name (R5.2): label, status word in lower case, the flaky chip's words if any, then tags.

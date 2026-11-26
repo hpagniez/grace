@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Task};
 use grace_core::model::env::{ImportResult, PropertiesEdit};
-use grace_core::model::events::AppEvent;
+use grace_core::model::events::{AppEvent, FileStep};
 use grace_core::model::tags::FilterState;
 use grace_core::runner::{Runner, RunnerOptions};
 use grace_core::state::AppState;
@@ -65,6 +65,10 @@ pub trait Backend: Send + Sync + 'static {
     fn export_source(&self, id: &str) -> Option<grace_core::runner::ExportSource>;
     /// A tree path or an absolute path as a file of the open project that Open in VS Code may open (OE-05, OE-06).
     fn editor_file(&self, file: &str) -> Option<PathBuf>;
+    /// A test's steps as its feature file has them, before any run (step debugger R4.1).
+    fn steps(&self, key: &str) -> Option<Vec<FileStep>>;
+    /// Adds or removes a breakpoint; the runner sends the whole set back.
+    fn toggle_breakpoint(&self, file: &str, line: u32);
     /// The trend of the node `key` (the whole tree when None) over the stored runs of the environment picked now.
     fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint>;
 }
@@ -141,6 +145,12 @@ impl Backend for Runner {
     }
     fn editor_file(&self, file: &str) -> Option<PathBuf> {
         Runner::editor_file(self, file)
+    }
+    fn steps(&self, key: &str) -> Option<Vec<FileStep>> {
+        Runner::steps(self, key)
+    }
+    fn toggle_breakpoint(&self, file: &str, line: u32) {
+        Runner::toggle_breakpoint(self, file, line)
     }
     fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint> {
         Runner::trend(self, key)
@@ -529,6 +539,20 @@ impl Grace {
         .detach();
     }
 
+    /// A test's steps as its feature file has them, read off the UI thread (step debugger R4.1).
+    pub fn steps(&self, key: String, cx: &mut Context<Self>) -> gpui::Task<Option<Vec<FileStep>>> {
+        let backend = Arc::clone(&self.backend);
+        cx.background_spawn(async move { backend.steps(&key) })
+    }
+
+    /// A step's breakpoint toggle. The window never edits the set itself: the runner sends it back.
+    pub fn toggle_breakpoint(&mut self, file: String, line: u32, cx: &mut Context<Self>) {
+        self.background(cx, Order::End, move |b| {
+            b.toggle_breakpoint(&file, line);
+            Ok(())
+        });
+    }
+
     /// The trend of the node `key` (the whole tree when None) over the stored runs, read from disk off the UI thread
     /// (trends R5.4): the strip of the History tab asks it.
     pub fn trend(
@@ -659,6 +683,10 @@ pub mod fake {
         pub export_dir: Mutex<Option<PathBuf>>,
         /// What `trend` answers for a key, the whole tree being `None`; an empty trend for a key not set.
         pub trends: Mutex<std::collections::HashMap<Option<String>, Vec<grace_core::model::trends::TrendPoint>>>,
+        /// What `steps` answers for a test; none for a key not set, as for a file that cannot be read.
+        pub steps: Mutex<std::collections::HashMap<String, Vec<FileStep>>>,
+        /// The tests `steps` was asked for, apart from `calls`: Details asks as it shows a test.
+        pub steps_asked: Mutex<Vec<String>>,
     }
 
     impl FakeBackend {
@@ -769,6 +797,13 @@ pub mod fake {
         fn editor_file(&self, file: &str) -> Option<PathBuf> {
             self.record(format!("editor_file {file}"));
             (!self.refuse_editor.load(std::sync::atomic::Ordering::SeqCst)).then(|| PathBuf::from(file))
+        }
+        fn steps(&self, key: &str) -> Option<Vec<FileStep>> {
+            self.steps_asked.lock().unwrap().push(key.into());
+            self.steps.lock().unwrap().get(key).cloned()
+        }
+        fn toggle_breakpoint(&self, file: &str, line: u32) {
+            self.record(format!("toggle_breakpoint {file} {line}"));
         }
         fn trend(&self, key: Option<&str>) -> Vec<grace_core::model::trends::TrendPoint> {
             self.asked

@@ -392,7 +392,7 @@ Phase: the feature map puts "Flaky marks and proof" (`FlakyProof.tsx`, FL-*, `fl
 | Vitest test | Class | Rust test or reason |
 |---|---|---|
 | 83. a Debug button before Run, disabled during a run | later | P4: the debugger; Redesigns "phases". |
-| 84. marks the feature and the scenario holding a breakpoint | later | P4: the debugger (breakpoints); Redesigns "phases". |
+| 84. marks the feature and the scenario holding a breakpoint | ported | Since P4 slice 8: `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; the lines of each: `grace_core::rows::tests::breakpoint_keys::marks_the_feature_and_the_test_whose_lines_hold_a_breakpoint`; the dot's name: `grace-e2e/tests/details.rs::a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree` |
 | 85. shows the pause mark on the paused test and selects it | later | P4: the debugger. The selection half is core's `grace_core::state::tests::the_step_debugger::the_first_pause_shows_the_variables_tab_and_selects_the_paused_test_later_ones_keep_the_tab`; `tree.rs` already draws the Paused mark. |
 
 ##### tree: open in VS Code (open-in-editor-from-tree R1, R2)
@@ -597,10 +597,10 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | 11 the location whole in a tooltip only when cut | ported | `grace::details::tests::long_text::shows_the_location_whole_only_when_it_is_cut` |
 | 12 a step whole in a tooltip only when cut | ported | `grace::details::tests::long_text::shows_a_step_whole_in_a_tooltip_only_when_it_is_cut` ("Given ...") |
 | 13 no raw palette class, no `dark:`, no title | ported | `grace::theme::tests::colours_come_only_from_the_theme` (scans `details.rs` too); `dark:` and `title=` have no GPUI twin |
-| 14 lists the steps from the file before a run | P4 | Redesigns, `details` (E-details-01's first half waits for the file's steps) |
-| 15 toggles a breakpoint on a step | P4 | Breakpoints |
+| 14 lists the steps from the file before a run | ported | `grace::details::tests::breakpoints::lists_the_steps_from_the_file_before_a_run_with_no_status_or_time`; in the app: `grace-e2e/tests/details.rs::failure_details` |
+| 15 toggles a breakpoint on a step | ported | `grace::details::tests::breakpoints::toggles_a_breakpoint_on_a_step_and_shows_the_runners_set`; the names: `grace-e2e/tests/details.rs::a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree`. By eye: the dot's fill and outline (`screens_breakpoints`) |
 | 16 marks the step the run is paused before | P4 | Debugger |
-| 17 the run's steps replace the file's, same toggles | P4 | Breakpoint toggles |
+| 17 the run's steps replace the file's, same toggles | ported | `grace::details::tests::breakpoints::the_runs_steps_replace_the_files_with_the_same_toggles` |
 | 18 opens the test at its line, during a run too | ported | `grace::details::tests::open_in_vs_code::opens_the_test_at_its_line_during_a_run_too` |
 | 19 no button for a row with no line | ported | `grace::details::tests::open_in_vs_code::shows_no_button_for_a_row_with_no_line` |
 | 20 the place on the error's first line is a link | ported | `grace::details::tests::open_in_vs_code::makes_the_place_karate_names_on_the_errors_first_line_a_link`; bug #220: `grace::details::tests::open_in_vs_code::a_long_place_that_wraps_starts_at_the_left` |
@@ -613,7 +613,7 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | 26 Previous wraps round | P3 | |
 | 27 a lone failure has no stepping | P3 | |
 | 28 no stepping while a run goes on | P3 | |
-| 29 no breakpoint dot on a step below line 1 (#229 R1.4) | P4 | Breakpoints |
+| 29 no breakpoint dot on a step below line 1 (#229 R1.4) | ported | `grace::details::tests::breakpoints::has_no_toggle_on_a_step_below_line_1` |
 | 30 lists the folder's groups, largest first (#229 R5) | P3 | |
 | 31 Go to first selects the group's first test | P3 | |
 | 32 Go to first moves the focus to the test's heading | P3 | |
