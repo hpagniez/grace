@@ -1,8 +1,8 @@
 //! `Details.tsx`, its P2 part (WS-06): the selected test's name, status, place, time, tags, error and steps with
 //! their logs, or a group's status and counts per status, or the empty state. The failure groups and their stepping
-//! (#229) and the Examples table come with P3; the
-//! file's steps before a run, breakpoints and the paused step with P4 (the guide's phases). A call selected in the
-//! HTTP tab takes the pane from the node (`http::call_details`).
+//! (#229) and the Examples table came with P3, and with P4 the feature file's steps before a run and each step's
+//! breakpoint toggle; the paused step comes with the debug run. A call selected in the HTTP tab takes the pane from
+//! the node (`http::call_details`).
 use gpui::AppContext as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -19,7 +19,7 @@ use grace_core::flaky_proof::proof_boxes;
 use grace_core::history_list::locked;
 use grace_core::http_list::{CallText, call_text, find_call};
 use grace_core::karate::tree::find_node;
-use grace_core::model::events::Step;
+use grace_core::model::events::{FileStep, Step};
 use grace_core::model::node::{NodeKind, Status, TestNode};
 use grace_core::model::status::derive_status;
 use grace_core::rows::{leaves, node_name, status_label};
@@ -89,6 +89,11 @@ pub fn log_toggle_name(text: &str, open: bool) -> String {
     format!("{} log of {text}", if open { "Hide" } else { "Show" })
 }
 
+/// The breakpoint toggle's name: what a press does, and on which line.
+pub fn breakpoint_name(on: bool, line: u32) -> String {
+    format!("{} breakpoint at line {line}", if on { "Remove" } else { "Add" })
+}
+
 /// What Details shows for the state: a call of the HTTP tab, nothing selected, a test, or a group.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Shown {
@@ -115,6 +120,58 @@ pub fn shown(state: &AppState) -> Shown {
     }
 }
 
+/// A step as the pane draws it: a run's, or the feature file's before any run, which has no status, time or log.
+struct StepRow<'a> {
+    keyword: &'a str,
+    text: &'a str,
+    line: u32,
+    background: bool,
+    comments: &'a [String],
+    run: Option<&'a Step>,
+}
+
+impl<'a> From<&'a Step> for StepRow<'a> {
+    fn from(s: &'a Step) -> Self {
+        Self {
+            keyword: &s.keyword,
+            text: &s.text,
+            line: s.line,
+            background: s.background,
+            comments: s.comments.as_deref().unwrap_or_default(),
+            run: Some(s),
+        }
+    }
+}
+
+impl<'a> From<&'a FileStep> for StepRow<'a> {
+    fn from(s: &'a FileStep) -> Self {
+        Self {
+            keyword: &s.keyword,
+            text: &s.text,
+            line: s.line,
+            background: s.background,
+            comments: s.comments.as_deref().unwrap_or_default(),
+            run: None,
+        }
+    }
+}
+
+/// The test whose steps the file must give, and the listing of the tests they are read for: the selected test while
+/// it has no run's steps. A new listing may follow an edit of the file, so it reads again.
+fn file_wanted(state: &AppState) -> Option<(String, u64)> {
+    let key = state.selected.as_ref().filter(|k| !state.steps.contains_key(*k))?;
+    let node = find_node(state.tree.as_ref()?, key)?;
+    matches!(node.kind, NodeKind::Scenario | NodeKind::Row).then(|| (key.clone(), state.trees))
+}
+
+/// What the file gave, or is being asked for.
+struct FileSteps {
+    wanted: (String, u64),
+    steps: Option<Vec<FileStep>>,
+    /// Dropped with the answer it waits for once another test is wanted.
+    _read: Task<()>,
+}
+
 /// What `call_text` was worked out from.
 struct CallShown {
     at: CallRef,
@@ -135,6 +192,8 @@ pub struct Details {
     /// rows were made afresh.
     open_logs: HashSet<usize>,
     for_key: Option<String>,
+    /// The shown test's steps as its feature file has them, while it has none from a run (step debugger R4).
+    file: Option<FileSteps>,
     /// A call's text, worked out once while the call, its calls and its tree stay the same.
     call: Option<CallShown>,
     /// The call Copy as cURL was pressed on in the last two seconds, and the timer that ends it.
@@ -162,6 +221,7 @@ impl Details {
                 this.copied = None;
                 this.copy_timer = None;
             }
+            this.read_file(file_wanted(&state), cx);
             // #320: with nothing selected the pane says so whatever else changes, so a run's results do not draw it
             let nothing = shown(&state) == Shown::Nothing;
             if !std::mem::replace(&mut this.nothing, nothing) || !nothing {
@@ -170,18 +230,51 @@ impl Details {
         })];
         let state = grace.read(cx).state.clone();
         let examples = cx.new(|cx| crate::examples::Examples::new(grace.clone(), cx));
-        Self {
+        let mut details = Self {
             examples,
             grace,
             open_logs: HashSet::new(),
             for_key: state.selected.clone(),
+            file: None,
             call: None,
             copied: None,
             copy_timer: None,
             clock: Rc::new(clock),
             nothing: shown(&state) == Shown::Nothing,
             _subscriptions: subscriptions,
+        };
+        details.read_file(file_wanted(&state), cx);
+        details
+    }
+
+    /// Asks for the wanted test's steps once: never again while the same test stays wanted, so no redraw reads the
+    /// file (ADR 0030).
+    fn read_file(&mut self, wanted: Option<(String, u64)>, cx: &mut Context<Self>) {
+        if self.file.as_ref().map(|f| &f.wanted) == wanted.as_ref() {
+            return;
         }
+        let before = self.file.take();
+        let Some(wanted) = wanted else { return };
+        // the same test listed again keeps its steps until the file's new ones are in
+        let steps = before.filter(|f| f.wanted.0 == wanted.0).and_then(|f| f.steps);
+        let asked = self.grace.update(cx, |g, cx| g.steps(wanted.0.clone(), cx));
+        let read = cx.spawn(async move |this, cx| {
+            let steps = asked.await;
+            let _ = this.update(cx, |d, cx| {
+                // drawn again only when the answer changes what shows
+                if let Some(file) = &mut d.file
+                    && file.steps != steps
+                {
+                    file.steps = steps;
+                    cx.notify();
+                }
+            });
+        });
+        self.file = Some(FileSteps {
+            wanted,
+            steps,
+            _read: read,
+        });
     }
 
     /// The text of the call shown, if one is.
@@ -379,8 +472,18 @@ impl Details {
                     // R4: where the test sits among those that failed with this error
                     .children(crate::failures::stepper_for(&self.grace, state, &node.key, cx))
             });
-        let steps = match state.steps.get(&node.key) {
-            Some(steps) => self.steps(this, steps, cx).into_any_element(),
+        // R4: a run's steps, else the file's, to set breakpoints on before any run
+        let rows: Option<Vec<StepRow>> = match state.steps.get(&node.key) {
+            Some(steps) => Some(steps.iter().map(StepRow::from).collect()),
+            None => self
+                .file
+                .as_ref()
+                .filter(|f| f.wanted.0 == node.key)
+                .and_then(|f| f.steps.as_ref())
+                .map(|steps| steps.iter().map(StepRow::from).collect()),
+        };
+        let steps = match rows {
+            Some(rows) => self.steps(this, node, &rows, state, cx).into_any_element(),
             None => {
                 // the spinner turns only while the run lasts, and not with reduced motion (ADR 0030)
                 let spins = state.run.active && status != Status::NotRun;
@@ -446,7 +549,37 @@ impl Details {
             .collect()
     }
 
-    fn steps(&self, this: &Entity<Self>, steps: &[Step], cx: &App) -> impl IntoElement {
+    /// The breakpoint toggle at a step's left (step debugger R4.4), or its room: Karate's synthetic step of a failed
+    /// config has line 0 and takes no breakpoint (#229 R1.4).
+    fn breakpoint(&self, index: usize, node: &TestNode, line: u32, state: &AppState) -> gpui::AnyElement {
+        if line == 0 {
+            return div().flex_none().w(px(crate::elements::BREAKPOINT)).into_any_element();
+        }
+        let file = node.file.clone();
+        let on = state.breakpoints.iter().any(|b| b.line == line && b.file == file);
+        let grace = self.grace.clone();
+        let name = SharedString::from(breakpoint_name(on, line));
+        tooltip(("tip-breakpoint", index), Some(name.clone()))
+            .side(crate::tooltip::Side::Right)
+            .focusable(move |focus| {
+                crate::elements::breakpoint_button(index, name, on, focus)
+                    .track_focus(focus)
+                    .on_click(move |_, _, cx| {
+                        let file = file.clone();
+                        grace.update(cx, |g, cx| g.toggle_breakpoint(file, line, cx))
+                    })
+            })
+            .into_any_element()
+    }
+
+    fn steps(
+        &self,
+        this: &Entity<Self>,
+        node: &TestNode,
+        steps: &[StepRow],
+        state: &AppState,
+        cx: &App,
+    ) -> impl IntoElement {
         let t = Theme::global(cx).tokens;
         div()
             .id("steps")
@@ -457,11 +590,29 @@ impl Details {
             .children(steps.iter().enumerate().map(|(i, step)| {
                 let open = self.log_open(i);
                 let whole = format!("{} {}", step.keyword, step.text);
-                let mark = step_mark(&step.status);
-                let comments = step.comments.clone().unwrap_or_default();
-                let toggle = step.log.as_ref().map(|_| {
+                let comments = step.comments;
+                let mark = step.run.map(|run| {
+                    let mark = step_mark(&run.status);
+                    tooltip(("tip-step-mark", i), Some(SharedString::from(mark.label()))).child(
+                        div()
+                            .debug_selector(move || format!("step-mark-{i}"))
+                            .flex()
+                            .child(status_mark(("step-mark", i), mark, 14., false, cx.reduce_motion(), cx)),
+                    )
+                });
+                let time = step.run.map(|run| {
+                    div()
+                        .debug_selector(move || format!("step-time-{i}"))
+                        .flex_none()
+                        .font_family(MONO)
+                        .text_size(px(METRICS.text_xs.size))
+                        .text_color(Theme::color(t.muted))
+                        .child(format_millis(run.millis))
+                });
+                let run_log = step.run.and_then(|run| run.log.as_ref());
+                let toggle = run_log.map(|_| {
                     let this = this.clone();
-                    let name = log_toggle_name(&step.text, open);
+                    let name = log_toggle_name(step.text, open);
                     crate::a11y::aria(
                         crate::elements::icon_text_button(
                             ("step-toggle", i),
@@ -476,7 +627,7 @@ impl Details {
                     )
                     .on_click(move |_, _, cx| this.update(cx, |d, cx| d.toggle_log(i, cx)))
                 });
-                let log = step.log.clone().filter(|_| open).map(|log| {
+                let log = run_log.filter(|_| open).cloned().map(|log| {
                     div()
                         .id(("step-log", i))
                         .debug_selector(move || format!("step-log-{i}"))
@@ -502,12 +653,15 @@ impl Details {
                     .when(!comments.is_empty(), |d| {
                         d.child(
                             div()
+                                .id(("step-comments", i))
                                 .debug_selector(move || format!("step-comments-{i}"))
+                                .role(Role::Label)
+                                .aria_value(SharedString::from(comments.join("\n")))
                                 .ml_6()
                                 .font_family(MONO)
                                 .text_size(px(METRICS.text_xs.size))
                                 .text_color(Theme::color(t.muted))
-                                .children(comments.into_iter().map(|c| div().child(c))),
+                                .children(comments.iter().map(|c| div().child(c.clone()))),
                         )
                     })
                     .child(
@@ -517,10 +671,8 @@ impl Details {
                             .gap_2()
                             .min_h(px(24.))
                             .text_size(px(METRICS.text_sm.size))
-                            .child(
-                                tooltip(("tip-step-mark", i), Some(SharedString::from(mark.label())))
-                                    .child(status_mark(("step-mark", i), mark, 14., false, cx.reduce_motion(), cx)),
-                            )
+                            .child(self.breakpoint(i, node, step.line, state))
+                            .children(mark)
                             .when(step.background, |d| {
                                 d.child(
                                     crate::ui::tag_chip("Background", cx)
@@ -539,14 +691,7 @@ impl Details {
                                             .side(crate::tooltip::Side::Over),
                                     ),
                             )
-                            .child(
-                                div()
-                                    .flex_none()
-                                    .font_family(MONO)
-                                    .text_size(px(METRICS.text_xs.size))
-                                    .text_color(Theme::color(t.muted))
-                                    .child(format_millis(step.millis)),
-                            )
+                            .children(time)
                             .children(toggle),
                     )
                     .children(log)

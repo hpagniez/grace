@@ -8,18 +8,6 @@ fn selected(h: &Harness, cx: &mut VisualTestContext) -> Option<String> {
     h.grace.read_with(cx, |g, _| g.state.selected.clone())
 }
 
-/// Enter as GPUI Kit's button reads it: a key down, then its key up presses the focused button.
-fn press_enter(cx: &mut VisualTestContext) {
-    let keystroke = gpui::Keystroke::parse("enter").unwrap();
-    cx.simulate_event(gpui::KeyDownEvent {
-        keystroke: keystroke.clone(),
-        is_held: false,
-        prefer_character_input: false,
-    });
-    cx.simulate_event(gpui::KeyUpEvent { keystroke });
-    cx.run_until_parked();
-}
-
 /// The three tests of `finished()` all failed, with `errors` (a test's error is its reason).
 fn all_failed(errors: [&str; 3]) -> AppState {
     let mut s = finished();

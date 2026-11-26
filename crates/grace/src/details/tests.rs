@@ -1,7 +1,7 @@
 //! `Details.test.tsx`'s P2 tests, headless on the fake runner: a test, a group, nothing selected and long text.
 //! Classes have no GPUI twin, so the look is checked through the tokens a part takes and where the parts are drawn;
-//! what a screen reader reads is `grace-e2e/tests/details.rs`'s. The steps before a run, breakpoints
-//! and the failure groups come with their phases.
+//! what a screen reader reads is `grace-e2e/tests/details.rs`'s. The steps before a run and breakpoints are
+//! `breakpoints`'.
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
@@ -144,6 +144,19 @@ fn hover(h: &Harness, cx: &mut VisualTestContext, id: &str) -> Option<SharedStri
     tip
 }
 
+/// Enter as GPUI Kit's button reads it: a key down, then its key up presses the focused button.
+fn press_enter(cx: &mut VisualTestContext) {
+    let keystroke = gpui::Keystroke::parse("enter").unwrap();
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: keystroke.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke });
+    cx.run_until_parked();
+}
+
+mod breakpoints;
 mod failure_groups;
 
 mod a_test {

@@ -292,6 +292,59 @@ pub fn icon_button(
         .accessibility_label(label)
 }
 
+/// A step's breakpoint toggle (step debugger R4.4): a 16 px button with a `failed` dot while the breakpoint is set,
+/// and the dot's outline under the pointer or with the keyboard's focus. `label` is its accessible name; give it the
+/// same tooltip with `tooltip::tooltip(..).focusable(|f| breakpoint_button(..).track_focus(f))`, whose handle is
+/// `focus`. `index` tells the buttons of a list apart; the debug selectors are `breakpoint-{index}` and, while set,
+/// `breakpoint-dot-{index}`.
+pub fn breakpoint_button(index: usize, label: impl Into<SharedString>, on: bool, focus: &gpui::FocusHandle) -> Button {
+    let group = SharedString::from(format!("breakpoint-{index}"));
+    Button::new(("breakpoint", index))
+        .ghost()
+        .cursor_pointer()
+        .group(group.clone())
+        .w(px(BREAKPOINT))
+        .h(px(BREAKPOINT))
+        .flex_none()
+        .px_0()
+        .rounded_full()
+        .accessibility_label(label.into())
+        .debug_selector(move || format!("breakpoint-{index}"))
+        .child(BreakpointDot {
+            index,
+            on,
+            group,
+            focus: focus.clone(),
+        })
+}
+
+/// The side of a breakpoint toggle (`size-4`).
+pub const BREAKPOINT: f32 = 16.;
+
+/// The toggle's dot, an element of its own as only a drawing has the window to ask where the focus is.
+#[derive(IntoElement)]
+struct BreakpointDot {
+    index: usize,
+    on: bool,
+    group: SharedString,
+    focus: gpui::FocusHandle,
+}
+
+impl gpui::RenderOnce for BreakpointDot {
+    fn render(self, window: &mut gpui::Window, cx: &mut App) -> impl IntoElement {
+        let failed = Theme::color(Theme::global(cx).tokens.failed);
+        let index = self.index;
+        let dot = div().size(px(10.)).rounded_full().border_1().border_color(failed);
+        if self.on {
+            dot.bg(failed).debug_selector(move || format!("breakpoint-dot-{index}"))
+        } else if ring_shown(&self.focus, window) {
+            dot
+        } else {
+            dot.opacity(0.).group_hover(self.group, |s| s.opacity(1.))
+        }
+    }
+}
+
 /// A checkbox's box, as a browser draws `<input type="checkbox">`.
 pub const CHECKBOX: f32 = 13.;
 /// The check mark in a checked box: the Lucide check over the box inside its 1 px edge.
