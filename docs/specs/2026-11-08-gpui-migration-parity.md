@@ -542,19 +542,19 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
-| SD-01 | variables | | ☐ |
-| SD-02 | second | | ☐ |
-| SD-03 | A breakpoint pauses before its step, with the variables | | ☐ |
-| SD-04 | Step over stays at the same depth | | ☐ |
-| SD-05 | Step into enters a called feature | | ☐ |
-| SD-06 | Pause stops before the next step | | ☐ |
-| SD-07 | A debug run uses one thread and the listener; a normal run does not | | ☐ |
-| SD-08 | Only the token's connection is accepted | | ☐ |
-| SD-09 | Cancel while paused | | ☐ |
-| SD-10 | A broken socket does not stop the run | | ☐ |
-| SD-11 | Secrets are masked in variables | | ☐ |
-| SD-12 | A long value is cut | | ☐ |
-| SD-13 | Debug runs do not prove a test flaky | | ☐ |
+| SD-01 | variables | n/a: not a scenario of Grace but a `Scenario:` line of the fixture feature in the spec's Background, which the list's generator took as a row; nobody using Grace could notice it ([P4 plan, Rows to tick](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md#rows-to-tick)) | n/a |
+| SD-02 | second | n/a: not a scenario of Grace but a `Scenario:` line of the fixture feature in the spec's Background, which the list's generator took as a row; nobody using Grace could notice it ([P4 plan, Rows to tick](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md#rows-to-tick)) | n/a |
+| SD-03 | A breakpoint pauses before its step, with the variables | `grace_core::runner::tests::debug::a_breakpoint_pauses_before_its_step_with_the_variables` (the vendored `listener.jar` on Windows; on Linux the same source, compiled by `cargo xtask listener`) | ☑ |
+| SD-04 | Step over stays at the same depth | `grace_core::runner::tests::debug::step_over_stays_at_the_same_depth_step_into_enters_the_called_feature` | ☑ |
+| SD-05 | Step into enters a called feature | `grace_core::runner::tests::debug::step_over_stays_at_the_same_depth_step_into_enters_the_called_feature` (its second run) | ☑ |
+| SD-06 | Pause stops before the next step | `grace_core::runner::tests::debug::a_pause_asked_as_the_run_starts_stops_before_the_first_step`; sent with the first line: `grace_core::karate::debug::tests::debug_session::sends_the_breakpoints_and_a_pause_asked_before_the_listener_connected` | ☑ |
+| SD-07 | A debug run uses one thread and the listener; a normal run does not | `grace_core::runner::tests::debug::runs_on_one_thread_and_records_a_debug_run`, `grace_core::runner::tests::debug::a_command_without_a_debug_run_or_a_pause_does_nothing`; the arguments: `grace_core::karate::command::tests::build_args::adds_the_debug_listener_and_its_socket_to_a_debug_run_only` | ☑ |
+| SD-08 | Only the token's connection is accepted | `grace_core::karate::debug::tests::debug_session::closes_a_connection_with_a_wrong_token_and_serves_the_right_one`, `serves_only_the_first_connection_that_sends_the_token`, `stops_listening_once_the_listener_is_connected`; a silent one: `grace_core::runner::tests::debug::a_silent_connection_does_not_keep_the_listener_out`; the token in no event: `grace_core::runner::tests::debug::the_token_reaches_no_event` | ☑ |
+| SD-09 | Cancel while paused | `grace_core::runner::tests::debug::cancel_while_paused_ends_the_run_cancelled_and_leaves_no_java` | ☑ |
+| SD-10 | A broken socket does not stop the run | `grace_core::runner::tests::debug::a_socket_that_closes_while_paused_lets_the_run_go_on`; `grace_core::karate::debug::tests::debug_session::survives_the_listener_resetting_the_connection_and_says_it_ended`, `drops_a_listener_that_sends_a_bad_line` | ☑ |
+| SD-11 | Secrets are masked in variables | `grace_core::runner::tests::debug::masks_secrets_in_variables_and_cuts_a_long_value`; a secret cut at 64 KB: `grace_core::runner::tests::debug::masks_a_secret_cut_at_the_end_of_a_long_value` | ☑ |
+| SD-12 | A long value is cut | `grace_core::runner::tests::debug::masks_secrets_in_variables_and_cuts_a_long_value`; `grace_core::karate::debug::tests::parse_pause::keeps_a_cut_value_and_the_type_of_another_kind` | ☑ |
+| SD-13 | Debug runs do not prove a test flaky | `grace_core::runner::tests::debug::runs_on_one_thread_and_records_a_debug_run` (the record); left out of flaky detection: `grace_core::flaky::tests::find_flaky::a_debug_run_proves_nothing_a_long_pause_can_fail_a_test` | ☑ |
 | SD-14 | Steps before a run, from the feature file | `grace_core::runner::tests::debug::lists_a_tests_steps_before_any_run`; `grace::details::tests::breakpoints::lists_the_steps_from_the_file_before_a_run_with_no_status_or_time`; a doc string's steps left out: `grace_core::karate::steps::tests::file_steps::skips_doc_strings_tables_and_comments_and_stops_an_outline_at_its_examples` | ☑ |
 | SD-15 | Setting and removing a breakpoint | `grace::details::tests::breakpoints::toggles_a_breakpoint_on_a_step_and_shows_the_runners_set`; the rows' dots: `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; set and removed: `grace_core::runner::tests::debug::gives_a_reloaded_window_the_breakpoints_and_refuses_a_line_of_no_feature`; in the app, with their names: `grace-e2e/tests/details.rs::a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree` | ☑ |
 | SD-16 | A background breakpoint shows in every scenario | `grace::details::tests::breakpoints::a_background_breakpoint_shows_in_every_scenario` | ☑ |
@@ -1345,7 +1345,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/karate/argfile.test.ts` | 9 | `grace-core::karate::argfile::tests` (12 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/command.test.ts` | 46 | `grace-core::karate::command::tests` (51 tests: the 46 Vitest tests on the same strings, and 5 for paths and the Linux classpath) | ☑ |
 | `src/main/karate/compiled.test.ts` | 12 | `grace-core::karate::compiled::tests` (15 tests: the 12 of the Vitest file, one with its three runners apart, and 1 for a byte order mark and a source that is not UTF-8) | ☑ |
-| `src/main/karate/debug.test.ts` | 8 | `grace-core::karate::debug` | ☐ |
+| `src/main/karate/debug.test.ts` | 8 | `grace_core::karate::debug::tests` (12 tests: the 8 of the Vitest file, test for test in [P4 slice 9](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), and 4 added: a second connection with the token, a silent connection closed with the session, a close with no connection, the token's form) | ☑ |
 | `src/main/karate/environments.test.ts` | 10 | `grace-core::karate::environments::tests` (11 tests) | ☑ |
 | `src/main/karate/events.test.ts` | 7 | `grace-core::karate::events::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/karate/http.test.ts` | 19 | `grace-core::karate::http::tests` (20 tests, every Vitest test and the added ones) | ☑ |
@@ -1361,7 +1361,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/propertiesFile.test.ts` | 12 | `grace-core::properties_file::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/recent.test.ts` | 6 | `grace-core::recent::tests` (7 tests) | ☑ |
 | `src/main/report-zip.test.ts` | 6 | `grace_core::report_zip::tests` (10 tests: the 6 of the Vitest file, test for test, and 4 added: the destination that cannot be written, a secret in the files left out, a big report whole, Windows' own tar unpacking it) | ☑ |
-| `src/main/runner.debug.test.ts` | 11 | `grace-core::runner` (debug) | ☐ |
+| `src/main/runner.debug.test.ts` | 11 | `grace_core::runner::tests::debug` (16 tests: the 11 of the Vitest file, test for test, with the real Java, Karate and listener, 2 in [P4 slice 8](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md) and 9 in slice 9; and 5 added: a row's steps, a silent connection, the token in no event, a command with no debug run, a secret cut at 64 KB) | ☑ |
 | `src/main/runner.discovery.test.ts` | 11 | `grace-core::runner::tests::discovery` (11 tests, real Java and Karate) | ☑ |
 | `src/main/runner.editor.test.ts` | 2 | `grace_core::runner::tests::editor` (3 tests, real Java and Karate) | ☑ |
 | `src/main/runner.env.test.ts` | 12 | `grace-core::runner::tests::env` (12 tests, real Java and Karate) | ☑ |
