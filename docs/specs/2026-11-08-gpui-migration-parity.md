@@ -1390,7 +1390,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/updates/startup.test.ts` | 32 | `grace-core::updates::startup` | ☐ |
 | `src/main/updates/switch.test.ts` | 22 | `grace-core::updates::switch` | ☐ |
 | `src/main/updates/updater.test.ts` | 36 | `grace-core::updates::updater` | ☐ |
-| `src/main/watch.test.ts` | 14 | `grace-core::watch::tests` (23 tests on Windows, 18 on Linux: the 14 of the Vitest file as 15, its `it.each` 2, test for test in [P4 slice 6](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md); 2 of the batch, the idle test, and Windows' 5) | ☑ |
+| `src/main/watch.test.ts` | 14 | `grace-core::watch::tests` (24 tests on Windows, 19 on Linux: the 14 of the Vitest file as 15, its `it.each` 2, test for test in [P4 slice 6](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md); one for two roots, 2 of the batch, the idle test, and Windows' 5) | ☑ |
 | `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
 | `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
