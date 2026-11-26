@@ -1,5 +1,5 @@
 //! `e2e/project-setup.spec.ts`, through the accessibility tree: how a project's own setup shapes the tests Grace finds
-//! and runs. The sub-folder offer comes with phase P4's slice 5.
+//! and runs.
 //! They start the real app, so they are ignored by `cargo test --workspace`; `scripts/e2e-gpui.sh` runs them.
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -293,6 +293,52 @@ fn jars_in_karate_ext_are_on_the_classpath() {
 
     let app = open(&dir);
     run_scenario(&app, "lib.feature", "reads a library");
+    drop(app);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// E-project-setup-07
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn an_empty_folder_offers_the_karate_project_below_it() {
+    let dir = scratch("offer");
+    // another tool's pom.xml at the root, the Karate project in karate/ (#232)
+    write(
+        &dir,
+        &[
+            ("pom.xml", "<project/>"),
+            ("karate/karate-config.js", "function fn() { return {}; }"),
+            (
+                "karate/tests/basic.feature",
+                "Feature: basic\nScenario: one\n  * print 1\nScenario: two\n  * print 2\n",
+            ),
+        ],
+    );
+    let app = open(&dir);
+    // "Finding tests…" goes once the open is over: before that the button is off, and a press of it does nothing
+    app.wait_for("the empty tree, its offer and the open over", WAIT, |t| {
+        let said = |start: &str| t.all().iter().any(|n| n.name.starts_with(start));
+        said("No feature files found")
+            && said("0 tests · Not run yet")
+            && !said("Finding tests")
+            && t.find(&Role::Button, "Open karate/").is_some()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Open karate/").unwrap();
+    app.wait_for("karate's tests", WAIT, |t| {
+        t.find(&Role::Button, "Expand basic.feature").is_some() && t.find(&Role::Button, "Open karate/").is_none()
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Expand basic.feature").unwrap();
+    app.wait_for("its two scenarios", WAIT, |t| {
+        row(t, "one").is_some() && row(t, "two").is_some()
+    })
+    .unwrap();
+    let karate = dir.join("karate").to_string_lossy().into_owned();
+    app.wait_until("karate first in the recent list", WAIT, || {
+        app.settings()["recentProjects"][0] == json!(karate)
+    })
+    .unwrap();
     drop(app);
     let _ = std::fs::remove_dir_all(dir);
 }
