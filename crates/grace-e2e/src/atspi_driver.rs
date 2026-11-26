@@ -10,6 +10,9 @@ use futures_lite::future::block_on;
 
 use crate::{Driver, Key, Node, Rect, Result, Role, States};
 
+/// A whole read of Grace's window takes well under a second.
+const READ_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+
 pub struct AtspiDriver {
     conn: AccessibilityConnection,
     pid: u32,
@@ -174,11 +177,21 @@ impl AtspiDriver {
 }
 
 impl Driver for AtspiDriver {
+    /// A bus call that gets no answer ends only when the bus gives up, some 300 s later (#411): a read is given
+    /// `READ_LIMIT`, then fails, and `App::wait_for` reads again. Only a read: a press that is made again could act twice.
     fn tree(&self) -> Result<Node> {
-        block_on(async {
+        let read = async {
             let window = self.window().await?;
             self.read(&window, vec![]).await
-        })
+        };
+        let late = async {
+            async_io::Timer::after(READ_LIMIT).await;
+            Err(format!(
+                "the accessibility bus did not answer a read of the tree in {} s",
+                READ_LIMIT.as_secs()
+            ))
+        };
+        block_on(futures_lite::future::or(read, late))
     }
 
     fn press(&self, node: &Node) -> Result<()> {

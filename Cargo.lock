@@ -2834,6 +2834,7 @@ dependencies = [
 name = "grace-e2e"
 version = "0.0.0"
 dependencies = [
+ "async-io",
  "atspi",
  "chrono",
  "futures-lite",
