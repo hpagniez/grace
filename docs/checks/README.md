@@ -2,6 +2,7 @@
 
 # Checks
 
+- 2026-11-26 [GPUI Grace check: phase P4's exit](2026-11-26-gpui-p4-exit.md): P4 exit, in progress: #236 and the unchanged listener hold, no P4 row is open; the runs on the owner's machine are not done
 - 2026-11-25 [GPUI Grace check: phase P3's exit](2026-11-25-gpui-p3-exit.md): P3 exit: HTTP tab 33 ms at 10,000 tests; VS Code, save, cURL pass; Escape did not cancel a tab drag (fixed by #397); by-ear check not run
 - 2026-11-12 [GPUI Grace check: VL-29 after #351, on Windows](2026-11-12-gpui-p2-vl29.md): VL-29 passes: GPUI Grace's CPU in a 2,000-test run is 1,156 ms against Electron's 4,922 ms
 - 2026-11-10 [GPUI Grace check: phase P2's misses, rechecked on Windows](2026-11-10-gpui-p2-recheck.md): GPUI P2 recheck: snap and cursors now pass, but VL-29 still misses (app CPU 5,438 ms against Electron's 4,156) and the Light title bar differs
