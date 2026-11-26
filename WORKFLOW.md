@@ -51,7 +51,7 @@ Done means clean:
 
 - A task ends with its PR merged or closed, its branch deleted locally and on the remote, its worktree removed, the default branch up to date.
 - Nothing is parked: a branch has a PR within a day; a PR untouched for 7 days is finished or closed with a note.
-- Everything made outside the checkout goes under `<temp>/agent-work/<repository>/<task>/` and is removed when the task ends. Never make a junction or symbolic link.
+- Everything made outside the checkout goes under `<temp>/agent-work/<repository>/<task>/` and is removed when the task ends. Never make a junction or symbolic link, except within a test's own temp folders.
 - A leftover is something with no open PR behind it: a branch, a worktree, a stash, untracked files on the default branch, a scratch folder. Work in progress is not one. Run the project's tidy check, when it has one, at the start of a session.
 - Delete on your own only what cannot lose work: a merged branch (`git branch -d`), a clean worktree of a merged branch, an empty folder. Show anything else to the owner and ask.
 
