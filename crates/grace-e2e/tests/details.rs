@@ -1,5 +1,6 @@
-//! `e2e/details.spec.ts`, its run part, through the accessibility tree: a failed test's place, error, steps and a
-//! step's log after a real run. The steps from the file before a run come with phase P4.
+//! `e2e/details.spec.ts` through the accessibility tree: a test's steps and comments from its file before a run, then
+//! its place, error, steps and a step's log after a real run; and the breakpoint toggles and dots as a screen reader
+//! hears them.
 use std::time::Duration;
 
 use grace_e2e::{App, Node, Role, project};
@@ -19,6 +20,49 @@ fn row<'a>(tree: &'a Node, label: &str) -> Option<&'a Node> {
         .find(|n| n.role == Role::TreeItem && n.name.starts_with(&start))
 }
 
+/// The steps Details lists.
+fn step_items(tree: &Node) -> Vec<&Node> {
+    tree.find(&Role::List, "Steps").map_or_else(Vec::new, |steps| {
+        steps.all().into_iter().filter(|n| n.role == Role::ListItem).collect()
+    })
+}
+
+/// Whether the row of `label` says it holds a breakpoint.
+fn dotted(tree: &Node, label: &str) -> bool {
+    row(tree, label).is_some_and(|r| r.find(&Role::Image, "Has breakpoints").is_some())
+}
+
+/// SD-15's names: the toggle says what a press does and on which line, and the rows say they hold a breakpoint.
+#[test]
+#[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
+fn a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree() {
+    let dir = project("clean").unwrap();
+    let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    app.press_named(Role::Button, "Expand basic.feature").unwrap();
+    let tree = app
+        .wait_for("the test's row", WAIT, |t| row(t, "failing match").is_some())
+        .unwrap();
+    app.click(row(&tree, "failing match").unwrap()).unwrap();
+    app.press_named(Role::Button, "Add breakpoint at line 20").unwrap();
+    app.wait_for("the breakpoint set", WAIT, |t| {
+        t.find(&Role::Button, "Remove breakpoint at line 20").is_some()
+            && t.find(&Role::Button, "Add breakpoint at line 4").is_some()
+            && dotted(t, "basic.feature")
+            && dotted(t, "failing match")
+            && row(t, "passing hello").is_some()
+            && !dotted(t, "passing hello")
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Remove breakpoint at line 20").unwrap();
+    app.wait_for("no breakpoint", WAIT, |t| {
+        t.find(&Role::Button, "Add breakpoint at line 20").is_some()
+            && row(t, "failing match").is_some()
+            && !dotted(t, "basic.feature")
+            && !dotted(t, "failing match")
+    })
+    .unwrap();
+}
+
 #[test]
 #[ignore = "starts the app; run with scripts/e2e-gpui.sh"]
 fn failure_details() {
@@ -31,7 +75,20 @@ fn failure_details() {
     })
     .unwrap();
     app.press_named(Role::Button, "Expand basic.feature").unwrap();
-    app.press_named(Role::Button, "Run all").unwrap();
+    // before a run, the steps and their comments come from the file (step comments R1.2)
+    let tree = app
+        .wait_for("the test's row", WAIT, |t| row(t, "failing match").is_some())
+        .unwrap();
+    app.click(row(&tree, "failing match").unwrap()).unwrap();
+    let expected = "# expected greeting is wrong on purpose";
+    app.wait_for("the file's steps, one with its comment", WAIT, |t| {
+        step_items(t).len() == 5
+            && step_items(t)
+                .into_iter()
+                .any(|s| s.name.contains("response.message == 'goodbye'") && named(s, expected).is_some())
+    })
+    .unwrap();
+    app.press_named(Role::Button, "Run basic.feature").unwrap();
     let tree = app
         .wait_for("failing match failed", RUN, |t| {
             t.all().into_iter().any(|n| n.name.starts_with("Finished"))
@@ -72,8 +129,23 @@ fn failure_details() {
     let steps = details
         .find(&Role::List, "Steps")
         .unwrap_or_else(|| panic!("{}", details.dump()));
-    let items: Vec<_> = steps.all().into_iter().filter(|n| n.role == Role::ListItem).collect();
-    assert_eq!(items.len(), 5, "the background's url and 4 steps: {}", steps.dump());
+    assert_eq!(
+        step_items(&tree).len(),
+        5,
+        "the background's url and 4 steps: {}",
+        steps.dump()
+    );
+    // the run's comment is on the failed step alone, as the file's was
+    let commented: Vec<_> = step_items(&tree)
+        .into_iter()
+        .filter(|s| named(s, expected).is_some())
+        .collect();
+    assert_eq!(commented.len(), 1, "{}", steps.dump());
+    assert!(
+        commented[0].name.contains("response.message == 'goodbye'"),
+        "{}",
+        steps.dump()
+    );
 
     let toggle = steps
         .all()
