@@ -2,7 +2,7 @@
 // (docs/specs/2026-10-31-light-and-fast.md, R2).
 //
 //   node bench/bench.mjs [--b <exe>] [--a <exe>] [--a-zip <zip>] [--b-zip <zip>] [--label-a <text>] [--label-b <text>]
-//                        [--release] [--rounds <n>] [--out <dir>]
+//                        [--release] [--rounds <n>] [--out <dir>] [--watch]
 //   node bench/bench.mjs --limits-from <bench.json> --commit <sha>
 //
 // B is the build under test (out/Grace-win32-x64/Grace.exe unless given), A the one it is compared with. Rounds run
@@ -11,6 +11,8 @@
 // to measure does (exit 1). The windows open on the first screen that is not the main one, when there is one.
 // A GPUI build (ADR 0031; no resources/app.asar) is started without Playwright (gpui.mjs) and takes the size, start, idle
 // and wake-up measures only, its minimised ones in every mode, until its views come (migration guide R7).
+// `--watch`, for GPUI builds, takes the idle measures with the 2,000-test project open and watch mode on, in place of
+// the home screen (docs/specs/2026-11-03-watch-mode.md, Cost).
 // `--limits-from` measures nothing: it turns the rounds of a release-mode bench.json of build B into bench/limits.json.
 import { execFileSync } from "node:child_process";
 import {
@@ -188,7 +190,10 @@ async function launch(
  * open before it remembers its window (phase P2). A window that cannot be moved stays where it opened, and says so.
  * @returns {Promise<App & { paintMs: number }>}
  */
-async function launchGpui(/** @type {string} */ exe, /** @type {{ dataDir?: string }} */ opts) {
+async function launchGpui(
+  /** @type {string} */ exe,
+  /** @type {{ dataDir?: string, watch?: string }} */ opts,
+) {
   /** @type {number | undefined} */
   let pid;
   try {
@@ -244,7 +249,8 @@ const cpu = (/** @type {Awaited<ReturnType<typeof sample>>} */ s) => s.app.cpuMs
 
 /**
  * Idle on `dataDir` with no CDP: memory after 20 s, then the CPU over 60 s shown and, in release mode or for a GPUI
- * build, minimised, with the wake-ups of the tree's threads over that minute (ADR 0031).
+ * build, minimised, with the wake-ups of the tree's threads over that minute (ADR 0031). With `watch`, a GPUI build has
+ * `project` open with watch mode on, and the 20 s start once it is.
  */
 async function idle(
   /** @type {string} */ exe,
@@ -252,9 +258,10 @@ async function idle(
   /** @type {string} */ dataDir,
   /** @type {boolean} */ release,
   gpui = false,
+  watch = false,
 ) {
   const app = gpui
-    ? await launchGpui(exe, { dataDir })
+    ? await launchGpui(exe, { dataDir, watch: watch ? project : undefined })
     : await launch(exe, { project, dataDir, cdp: false });
   try {
     await sleep(SETTLE_MS);
@@ -508,9 +515,11 @@ function isAlive(/** @type {number} */ pid) {
  * @param {string} exe
  * @param {{ small: Project, large: Project | null }} projects
  * @param {boolean} release
+ * @param {boolean} [gpui]
+ * @param {boolean} [watch]
  * @returns {Promise<Values>}
  */
-async function measureRound(exe, { small, large }, release, gpui = false) {
+async function measureRound(exe, { small, large }, release, gpui = false, watch = false) {
   /** @type {Values} */
   const values = {};
   /** @type {string | undefined} */
@@ -525,7 +534,7 @@ async function measureRound(exe, { small, large }, release, gpui = false) {
     const reused = await starts(exe, small.dir, dataDir, gpui);
     values["start.paint.reused"] = reused.paintMs;
     values["start.tree.reused"] = reused.treeMs;
-    Object.assign(values, await idle(exe, small.dir, dataDir, release, gpui));
+    Object.assign(values, await idle(exe, small.dir, dataDir, release, gpui, watch));
   } finally {
     if (dataDir) rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
@@ -563,6 +572,7 @@ async function main() {
         out: { type: "string" },
         "limits-from": { type: "string" },
         commit: { type: "string" },
+        watch: { type: "boolean" },
       },
     }));
   } catch (e) {
@@ -585,6 +595,7 @@ async function main() {
   if (!Number.isInteger(rounds) || rounds < 1)
     return usage(`--rounds must be a whole number of 1 or more`);
   if (!args.a && (args["a-zip"] || args["label-a"])) return usage("--a-zip and --label-a need --a");
+  const watch = args.watch === true;
   const repo = path.resolve(import.meta.dirname, "..");
   const builds = {
     a: args.a
@@ -595,11 +606,13 @@ async function main() {
         }
       : null,
     b: {
-      label: String(args["label-b"] ?? "this build"),
+      label: String(args["label-b"] ?? (watch ? "this build, watch mode on" : "this build")),
       exe: String(args.b ?? path.join(repo, "out", "Grace-win32-x64", "Grace.exe")),
       zip: /** @type {string | undefined} */ (args["b-zip"]),
     },
   };
+  if (watch && Object.values(builds).some((build) => build && !isGpui(build.exe)))
+    return usage("--watch is for GPUI builds");
   const outDir = path.resolve(String(args.out ?? "bench-out"));
 
   const spot = await screens().then(windowSpot, (e) => {
@@ -653,7 +666,7 @@ async function main() {
     if (gpui) log(`build ${key} is GPUI Grace: size, start, idle and wake-ups only`);
     const values = {
       ...sizes[key],
-      ...(await measureRound(builds[key].exe, projects, release, gpui)),
+      ...(await measureRound(builds[key].exe, projects, release, gpui, watch)),
     };
     log(`run ${i + 1} took ${Math.round((Date.now() - started) / 1000)} s`);
     results.push({ build: key, warmup, load: round1(load), values });

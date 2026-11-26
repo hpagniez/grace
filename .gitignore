@@ -8,5 +8,6 @@ playwright-report/
 .obsidian/
 .impeccable/
 bench-out/
+bench-out-watch/
 target/
 patches/vendor/

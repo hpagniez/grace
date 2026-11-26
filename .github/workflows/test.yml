@@ -202,6 +202,19 @@ jobs:
               console.log(`::error::GPUI Grace woke ${w} times a second while minimised, over 5: is the idle patch (patches/series) still working?`);
               process.exit(1);
             }'
+      # the step above idles on the home screen; this one with the bench's 2,000-test project open and watch mode on
+      # (docs/specs/2026-11-03-watch-mode.md, Cost)
+      - name: minimised wake-ups, watch mode on
+        run: |
+          npm run bench:gpui -- --watch --out bench-out-watch
+          cat bench-out-watch/bench.md >> "$GITHUB_STEP_SUMMARY"
+          node -e '
+            const w = require("./bench-out-watch/bench.json").medians.b["idle.wakeups.minimised"];
+            console.log(`idle.wakeups.minimised, watch mode on: ${w} a second`);
+            if (w == null || w > 5) {
+              console.log(`::error::GPUI Grace with watch mode on woke ${w} times a second while minimised, over 5.`);
+              process.exit(1);
+            }'
 
   e2e:
     needs: scope

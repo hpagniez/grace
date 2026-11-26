@@ -197,6 +197,10 @@ impl Grace {
                 let applied = this.update(cx, |grace, cx| {
                     for e in &batch {
                         grace.state_mut().reduce(e);
+                        // the runner sends it once the watcher is on: `bench/gpui.mjs` waits for it under `--watch`
+                        if matches!(e, AppEvent::Watch { on: true }) {
+                            crate::probe::mark("watch_on");
+                        }
                     }
                     cx.notify();
                 });

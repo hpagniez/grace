@@ -2,13 +2,15 @@
 // folder, and the probe on, so it prints `PROBE <name> <unix ms>` lines on stderr (crates/grace/src/probe.rs). The
 // counterpart of app.mjs `startApp`, from the GPUI prototype's measure/windows/gpui-app.mjs.
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { killTree, removeDir } from "./app.mjs";
 
 /** How long a start may take until the first frame. */
 const START_LIMIT_MS = 60_000;
+/** How long it may take with watch mode on, which comes once the project is open, its dry run included. */
+const WATCH_LIMIT_MS = 180_000;
 
 /**
  * True for a GPUI build: Electron Grace keeps its app in `resources/app.asar` beside the exe, GPUI Grace has none.
@@ -28,16 +30,46 @@ export function parseProbe(line) {
 }
 
 /**
- * Starts GPUI Grace and waits for its first frame. Rejects when it cannot start, dies first or draws nothing in 60 s;
- * whatever it started is stopped then. The rest is as app.mjs `startApp`: `dataDir` is a fresh temp folder unless
+ * Writes the `settings.json` of a start with watch mode on: `project` as the last project, and watch on for it, keyed
+ * by the same string, as `grace_core::settings` reads it.
+ * @param {string} dataDir
+ * @param {string} project an absolute path
+ */
+export function seedWatch(dataDir, project) {
+  const settings = { lastProject: project, projects: { [project]: { watch: true } } };
+  writeFileSync(path.join(dataDir, "settings.json"), JSON.stringify(settings));
+}
+
+/**
+ * Takes the probes of a start one at a time: null until Grace is ready to be measured, then the first frame's time.
+ * Ready is the first frame drawn, and with `watch` also the project open and watch mode on (`watch_on`).
+ * @param {boolean} watch
+ * @returns {(probe: { name: string, ms: number }) => number | null}
+ */
+export function readiness(watch) {
+  /** @type {number | null} */
+  let frame = null;
+  let watching = !watch;
+  return ({ name, ms }) => {
+    if (name === "first_frame") frame ??= ms;
+    if (name === "watch_on") watching = true;
+    return watching ? frame : null;
+  };
+}
+
+/**
+ * Starts GPUI Grace and waits for its first frame, and with `watch`, a project's folder, for that project open with
+ * watch mode on. Rejects when it cannot start, dies first, or is not there in 60 s (180 s with `watch`); whatever it
+ * started is stopped then. The rest is as app.mjs `startApp`: `dataDir` is a fresh temp folder unless
  * given, and `onSpawn` gets the pid as soon as the process exists. `paintMs` is the first frame, from the spawn.
  * @param {string} exe
- * @param {{ dataDir?: string, onSpawn?: (pid: number) => void }} opts
+ * @param {{ dataDir?: string, watch?: string, onSpawn?: (pid: number) => void }} opts
  * @returns {Promise<import("./app.mjs").App & { paintMs: number }>}
  */
-export async function startGpui(exe, { dataDir, onSpawn } = {}) {
+export async function startGpui(exe, { dataDir, watch, onSpawn } = {}) {
   const dir = dataDir ?? mkdtempSync(path.join(tmpdir(), "grace-bench-"));
   mkdirSync(dir, { recursive: true });
+  if (watch !== undefined) seedWatch(dir, watch);
   const t0 = Date.now();
   // No windowsHide: it would hide the app's window as well as a console.
   const child = spawn(exe, [], {
@@ -59,17 +91,18 @@ export async function startGpui(exe, { dataDir, onSpawn } = {}) {
 
   /** @type {string[]} */
   const tail = [];
+  const limit = watch === undefined ? START_LIMIT_MS : WATCH_LIMIT_MS;
+  const awaited = watch === undefined ? "first frame" : "first frame with watch mode on";
   try {
     const firstFrame = await new Promise((resolve, reject) => {
       const timer = setTimeout(
         () =>
           reject(
-            new Error(
-              `no first frame in ${START_LIMIT_MS / 1000} s; the app said:\n${tail.join("\n")}`,
-            ),
+            new Error(`no ${awaited} in ${limit / 1000} s; the app said:\n${tail.join("\n")}`),
           ),
-        START_LIMIT_MS,
+        limit,
       );
+      const ready = readiness(watch !== undefined);
       const done = (/** @type {() => void} */ settle) => {
         clearTimeout(timer);
         settle();
@@ -77,7 +110,7 @@ export async function startGpui(exe, { dataDir, onSpawn } = {}) {
       child.on("error", (e) => done(() => reject(e)));
       child.on("exit", (code) =>
         done(() =>
-          reject(new Error(`${exe} exited (${code}) before its first frame:\n${tail.join("\n")}`)),
+          reject(new Error(`${exe} exited (${code}) before its ${awaited}:\n${tail.join("\n")}`)),
         ),
       );
       let buf = "";
@@ -88,7 +121,8 @@ export async function startGpui(exe, { dataDir, onSpawn } = {}) {
           tail.push(line);
           if (tail.length > 20) tail.shift();
           const probe = parseProbe(line);
-          if (probe?.name === "first_frame") done(() => resolve(probe.ms));
+          const frame = probe && ready(probe);
+          if (frame != null) done(() => resolve(frame));
         }
       });
     });
