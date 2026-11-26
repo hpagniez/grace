@@ -1,5 +1,5 @@
 diff --git a/src/events.rs b/src/events.rs
-index e00720b..3b5a14e 100644
+index 9f30675..ef0c8a7 100644
 --- a/src/events.rs
 +++ b/src/events.rs
 @@ -797,13 +797,17 @@ impl WindowsWindowInner {
