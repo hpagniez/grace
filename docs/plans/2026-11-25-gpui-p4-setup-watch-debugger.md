@@ -355,7 +355,7 @@ No row is handed on. The look does not change. `watch.test.ts` holds 14 tests wh
 3. `watch.rs` in `grace-e2e/tests`: E-watch-01 and WM-17, a save of the test's own fixture copy. `screens_watch`.
 4. The idle check of the watch spec's Cost, before the PR is ready: `npm run bench:gpui -- --watch`, a new option of `bench/gpui.mjs` that seeds the data folder's `settings.json` with the bench's project as `lastProject` and `projects[<root>].watch: true`, as `bench/app.mjs`'s `startApp` seeds Electron Grace's, so the idle measures (`idle.memory`, `idle.cpu.shown`, `idle.cpu.minimised`, `idle.wakeups.minimised`) are taken with watch mode on. `test.yml`'s `gpui-idle` job gets a second step that runs it and fails above 5 wake-ups a second, as its first does; the PR's `gh workflow run test.yml --ref <branch>` runs it on a Windows VM.
 
-What slice 7 built: the runner's `set_watch`, `arm` and `drain`, `Backend::set_watch`, `Grace::set_watch` and the toolbar's Watch toggle after Refresh, so GPUI Grace now has watch mode: a save of a feature runs its tests that match the filter, a save during a run waits, and the choice is saved per project. The look changes by the toggle. One Redesigns row (`runner` (watch)). No row is handed on. `runner::tests::watch` holds 4 tests more than the Vitest file: watch mode turned on again after an error watches, a Refresh watches the new feature roots (R2.4), the watcher's callbacks return while the locks of whoever closes it are held (slice 6's open item), and a save waiting starts nothing once watch mode is off or Grace is quitting (found by the branch review: a run could start between the toggle and the closing of the watcher). Each of the behaviours was broken in turn and its test seen failing. `screens_watch` takes the toolbar with watch mode on and off.
+What slice 7 built: the runner's `set_watch`, `arm` and `drain`, `Backend::set_watch`, `Grace::set_watch` and the toolbar's Watch toggle after Refresh, so GPUI Grace now has watch mode: a save of a feature runs its tests that match the filter, a save during a run waits, and the choice is saved per project. The look changes by the toggle. One Redesigns row (`runner` (watch)). No row is handed on. `runner::tests::watch` holds 4 tests more than the Vitest file: watch mode turned on again after an error watches, a Refresh watches the new feature roots (R2.4), the watcher's callbacks return while the locks of whoever closes it are held (slice 6's open item), and a save waiting starts nothing once watch mode is off or Grace is quitting (found by the branch review: a run could start between the toggle and the closing of the watcher). Each test was seen failing: against the runner without the behaviour, or, for those that passed there because nothing watched, with the behaviour broken. `screens_watch` takes the toolbar with watch mode on and off.
 
 What slice 6 left open, here:
 
@@ -364,6 +364,17 @@ What slice 6 left open, here:
 - A Refresh that changes the roots closes the watcher before, so a save still within its 300 ms quiet time then is lost, as in Electron Grace, whose `close` clears the batch; the saves already waiting are kept.
 
 The idle check: `npm run bench:gpui -- --watch` writes `settings.json` before the idle start (`gpui.mjs`'s `seedWatch`) and waits for the new probe `watch_on`, which Grace prints once the runner says watch mode is on, before the 20 s settle: a run whose watch mode did not come on fails instead of measuring without it, and the project's dry run stays out of the idle numbers. The starts are measured as before. The two steps of `gpui-idle` are not like for like: the first idles on the home screen, the second with the bench's 2,000-test project open and watch mode on.
+
+The idle numbers, from `gpui-idle` on a Windows VM at `c263fb7` ([run 45816749491](https://github.com/hpagniez/grace/actions/runs/45816749491)), each the median of 3 rounds after a warm-up; both steps passed:
+
+| Measure | Home screen | 2,000 tests, watch mode on |
+|---|---|---|
+| `idle.memory` (MB) | 23.1 | 34.7 |
+| `idle.cpu.shown` (ms in 60 s) | 157 | 94 |
+| `idle.cpu.minimised` (ms in 60 s) | 0 | 0 |
+| `idle.wakeups.minimised` (a second, fails above 5) | 0.1 | 0.1 |
+
+The two columns' memory differs by the project as much as by the watcher: watch mode off on the same project is slice 11's measure, on the owner's machine.
 
 #### `runner.watch.test.ts` (18) in `grace_core::runner::tests::watch`
 
