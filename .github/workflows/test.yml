@@ -138,9 +138,12 @@ jobs:
           key: vendor-rust-${{ runner.os }}-${{ hashFiles('scripts/fetch-vendor.mjs', 'scripts/vendor.json') }}
       - if: ${{ runner.os == 'Windows' }}
         run: node scripts/fetch-vendor.mjs
+      # the step debugger's listener, from the same source, compiled by the runner's JDK 21 (fetch-vendor.mjs compiles
+      # it on the Windows JRE only)
       - if: ${{ runner.os == 'Linux' }}
         run: |
           node scripts/fetch-vendor.mjs --jar
+          JAVA_HOME="$JAVA_HOME_21_X64" cargo xtask listener
           echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --locked

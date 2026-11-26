@@ -14,8 +14,8 @@
 //!
 //! The watcher's callbacks run on its own thread, which closing it waits for, so they only post: the saves go in
 //! `waiting` and a short-lived thread runs them once the runner is idle, and another takes the locks after an error.
-//! Locks are taken in the order `watcher`, `state`, then `waiting` or `ctl`, and a watcher is closed under `watcher`
-//! alone.
+//! Locks are taken in the order `watcher`, `state`, then `waiting`, `ctl` or `debug`, and a watcher is closed under
+//! `watcher` alone. The debug session's own lock comes after `debug`, and its callbacks take none of the runner's.
 //!
 //! `emit` is called on the thread that does the work (a run's events on the run's caller, the recent list and watch
 //! mode's own on short threads of their own), never under one of the runner's locks: it may call `cancel`, as a test of Electron Grace's
@@ -31,8 +31,10 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's part still to port, the debug run, is left out, each place it acts marked `P4`: breakpoints are
-//!   kept and sent, and nothing pauses on them yet.
+//! - A debug run's thread waits on one channel for Java's lines, the listener's pauses and the commands that resume it:
+//!   with a deadline only while Java runs, with none while paused (step debugger R2.4, ADR 0030). A command from the
+//!   window and the socket's end both go through `debug`'s `paused` flag, so a pause is resumed once
+//!   (`Inner::debug_command`).
 mod run;
 mod setup;
 #[cfg(test)]
@@ -43,10 +45,11 @@ pub use setup::{PomStart, pom_start};
 use crate::flaky::find_flaky;
 use crate::history::{self, ListedRun, clear_history, list_runs, read_run_record};
 use crate::karate::command::{
-    BuildArgs, Env, OUT_OF_MEMORY, ProjectLayout, absolute, build_args, child_env, detect_layout, extension_jars,
-    locate, out_of_memory, tag_args,
+    BuildArgs, DebugArgs, Env, OUT_OF_MEMORY, ProjectLayout, absolute, build_args, child_env, detect_layout,
+    extension_jars, locate, out_of_memory, tag_args,
 };
 use crate::karate::compiled;
+use crate::karate::debug::DebugSession;
 use crate::karate::environments::{feature_tag_envs, overlay_envs};
 use crate::karate::events::read_all_events;
 use crate::karate::libraries::{self, Goal, KeptLibraries, ToolEnv, ToolStart};
@@ -58,7 +61,7 @@ use crate::model::env::{
     EnvView, PlainRow, PropertiesEdit, PropertyListsView, RowEdit, RowView, SecretRowView, SecretState, edit_errors,
     property_value_error, sorted_unique, valid_env_name,
 };
-use crate::model::events::{AppEvent, Breakpoint, BuildTool, FileStep, Project};
+use crate::model::events::{AppEvent, Breakpoint, BuildTool, DebugCommand, FileStep, Project};
 use crate::model::history::{HistoryEntry, to_entry};
 use crate::model::js;
 use crate::model::tags::{FilterState, no_filter, project_tags, prune_filter};
@@ -84,7 +87,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -280,6 +283,14 @@ struct Armed {
     _watcher: Watcher,
 }
 
+/// The debug run going on: its session, whether it is paused, and the way to its thread.
+struct DebugRun {
+    session: Arc<DebugSession>,
+    /// Set by the run's thread as it sends `debugPaused`; cleared by the one command or socket end that resumes it.
+    paused: bool,
+    to_run: mpsc::Sender<run::Msg>,
+}
+
 /// The folder and proposed zip name of a run's report (export spec R2.3).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExportSource {
@@ -352,6 +363,8 @@ struct Inner {
     /// Signalled when the phase goes back to idle, for `dispose`.
     idle: Condvar,
     ctl: Mutex<Control>,
+    /// The debug run, while one goes on.
+    debug: Mutex<Option<DebugRun>>,
     /// The environment Java's is made from; None is Grace's own. Tests set it, never `std::env::set_var`.
     #[cfg(test)]
     parent_env: Mutex<Option<Env>>,
@@ -406,6 +419,7 @@ impl Runner {
             this: this.clone(),
             idle: Condvar::new(),
             ctl: Mutex::new(Control::default()),
+            debug: Mutex::new(None),
             #[cfg(test)]
             parent_env: Mutex::new(None),
             #[cfg(test)]
@@ -494,7 +508,28 @@ impl Runner {
 
     /// Runs the node `key` of the tree, after a discovery that finds it again.
     pub fn run(&self, key: &str) -> io::Result<()> {
-        self.0.run(key)
+        self.0.run(key, false)
+    }
+
+    /// A run of `key` on one thread with the step debugger's listener (step debugger R2): it pauses on the
+    /// breakpoints, sends `debugPaused`, and waits for `debug_command` with no deadline.
+    pub fn debug(&self, key: &str) -> io::Result<()> {
+        self.0.run(key, true)
+    }
+
+    /// Pause asks the listener to stop before the next step; the others resume a paused debug run, with
+    /// `debugResumed`. Ignored without a debug run, and a resume without a pause.
+    pub fn debug_command(&self, c: DebugCommand) {
+        self.0.debug_command(c);
+    }
+
+    /// Closes the debug run's session as a broken socket would.
+    #[cfg(test)]
+    pub(crate) fn close_debug_session(&self) {
+        let session = lock(&self.0.debug).as_ref().map(|d| Arc::clone(&d.session));
+        if let Some(s) = session {
+            s.close();
+        }
     }
 
     /// Re-run (R5): the run's selection on its environment and filter; a Re-run failed run's tests, all of them.
@@ -617,6 +652,8 @@ struct SpawnPlan<'a> {
     threads: u32,
     /// Set on Java's environment; none for a dry run.
     vars: &'a [PlainRow],
+    /// A debug run's listener and socket.
+    debug: Option<DebugArgs<'a>>,
 }
 
 /// The properties of a run with secrets decrypted, and the secret values to mask.
@@ -851,7 +888,7 @@ impl Inner {
             let files: Vec<PathBuf> = std::mem::take(&mut *waiting).into_iter().collect();
             (files, s.filter.clone())
         };
-        if let Err(e) = self.operate(|| self.run_target(RunTarget::Files(files), filter)) {
+        if let Err(e) = self.operate(|| self.run_target(RunTarget::Files(files), filter, false)) {
             self.notice(e.to_string());
         }
     }
@@ -1297,7 +1334,7 @@ impl Inner {
         })
     }
 
-    fn run(&self, key: &str) -> io::Result<()> {
+    fn run(&self, key: &str, debug: bool) -> io::Result<()> {
         if self.state().project.is_none() {
             return Ok(());
         }
@@ -1314,9 +1351,28 @@ impl Inner {
                     gone: "This test changed; the tree was refreshed",
                 },
                 filter,
+                debug,
             )
         })
         .map(|_| ())
+    }
+
+    /// The window's commands are refused while not paused, but for a pause: the flag is the run's, taken under the
+    /// lock, so a command and the socket's end never both resume one pause.
+    fn debug_command(&self, c: DebugCommand) {
+        let mut d = lock(&self.debug);
+        let Some(run) = d.as_mut() else {
+            return;
+        };
+        if c != DebugCommand::Pause {
+            if !run.paused {
+                return;
+            }
+            run.paused = false;
+            // before the command: the next pause, which the command lets come, reaches the run's thread after it
+            let _ = run.to_run.send(run::Msg::Resumed);
+        }
+        run.session.command(c);
     }
 
     fn rerun(&self, id: &str, failed_only: bool) -> io::Result<()> {
@@ -1484,14 +1540,20 @@ impl Inner {
         let _ = fs::remove_file(&self.pid_file);
     }
 
-    /// Changes the breakpoints under the lock, so two toggles never lose one, then sends the whole set.
+    /// Changes the breakpoints under the lock, so two toggles never lose one, then sends the whole set, to the debug
+    /// run's listener first (R2.3).
     fn send_breakpoints(&self, change: impl FnOnce(&mut Vec<Breakpoint>)) {
-        let breakpoints = {
-            let mut s = self.state();
-            change(&mut s.breakpoints);
-            s.breakpoints.clone()
-        };
-        // the debug session's breakpoints: P4
+        let mut s = self.state();
+        change(&mut s.breakpoints);
+        let breakpoints = s.breakpoints.clone();
+        // `debug` taken before `state` is let go keeps two toggles' writes in order; the write, which can wait for
+        // Java to read, holds `debug` alone
+        let d = lock(&self.debug);
+        drop(s);
+        if let Some(d) = d.as_ref() {
+            d.session.set_breakpoints(breakpoints.clone());
+        }
+        drop(d);
         self.emit(AppEvent::Breakpoints { breakpoints });
     }
 
@@ -1894,7 +1956,7 @@ impl Inner {
             arg_file: p.arg_file,
             threads: p.threads,
             config_dir: p.layout.config_dir.as_deref(),
-            debug: None,                                 // the step debugger: P4
+            debug: p.debug,
             junit_xml: !p.dry_run && p.layout.junit_xml, // the dry run's reports are never read
         });
         #[cfg(test)]
@@ -1963,6 +2025,7 @@ impl Inner {
                 filter: &no_filter(),
                 threads,   // build_args passes 1 to a dry run
                 vars: &[], // dry runs do not execute config (environment switcher R2)
+                debug: None,
             };
             let Some(proc) = self.spawn(plan, move |l| lock(&sink).extend(l)) else {
                 return Ok(Discovery::Cancelled);

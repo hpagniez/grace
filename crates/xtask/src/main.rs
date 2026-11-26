@@ -4,6 +4,7 @@
 
 mod audit;
 mod docs;
+mod listener;
 mod pr;
 mod rules;
 mod scope;
@@ -20,6 +21,7 @@ commands:
                EVENT_NAME and PR_BODY, without them it checks the branch in hand against origin/develop
   docs         writes the README.md index of each docs folder from the docs' frontmatter; fails, and
                writes nothing, when a doc lacks a field
+  listener     compiles listener/ into vendor/listener.jar with the JDK of JAVA_HOME, for the Linux tests
   scope        the areas of git diff <base>...HEAD as name=true|false lines for $GITHUB_OUTPUT; every area
                without a base (cargo xtask scope [<base>])
   tidy         what was left behind: branches, worktrees, stashes, links, scratch folders, idle PRs; prints
@@ -31,6 +33,7 @@ fn main() -> ExitCode {
         Some("check-rules") => ExitCode::from(rules::run()),
         Some("check-pr") => ExitCode::from(pr::run()),
         Some("docs") => ExitCode::from(docs::run()),
+        Some("listener") => ExitCode::from(listener::run()),
         Some("tidy") => ExitCode::from(tidy::run()),
         Some("scope") => ExitCode::from(scope::run(std::env::args().nth(2))),
         _ => {
