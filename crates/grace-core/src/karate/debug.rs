@@ -430,11 +430,12 @@ mod tests {
             self.socket.write_all(format!("{line}\n").as_bytes()).unwrap();
         }
 
-        /// The next line Grace wrote; panics if none comes within the limit.
-        fn line(&mut self) -> Value {
+        /// The next line Grace wrote, as written: its JSON keeps its keys in order, so it is compared as text.
+        /// Panics if none comes within the limit.
+        fn line(&mut self) -> String {
             let mut l = String::new();
             assert!(self.lines.read_line(&mut l).unwrap() > 0, "closed");
-            serde_json::from_str(&l).unwrap()
+            l.trim_end_matches('\n').to_string()
         }
 
         /// True once Grace has closed the connection (an end of stream or a reset), within the limit.
@@ -459,7 +460,7 @@ mod tests {
             c.send(s.token());
             assert_eq!(
                 c.line(),
-                json!({ "breakpoints": [{ "file": "debug.feature", "line": 8 }], "pause": true })
+                json!({ "breakpoints": [{ "file": "debug.feature", "line": 8 }], "pause": true }).to_string()
             );
         }
 
@@ -471,7 +472,10 @@ mod tests {
             assert!(bad.closed());
             let mut good = Client::connect(s.port());
             good.send(s.token());
-            assert_eq!(good.line()["pause"], json!(false));
+            assert_eq!(
+                good.line(),
+                r#"{"breakpoints":[{"file":"debug.feature","line":8}],"pause":false}"#
+            );
         }
 
         #[test]
@@ -516,10 +520,7 @@ mod tests {
             );
             s.command(DebugCommand::Over);
             s.set_breakpoints(Vec::new());
-            assert_eq!(
-                [c.line(), c.line()],
-                [json!({ "command": "over" }), json!({ "breakpoints": [] })]
-            );
+            assert_eq!([c.line(), c.line()], [r#"{"command":"over"}"#, r#"{"breakpoints":[]}"#]);
         }
 
         #[test]
@@ -559,7 +560,7 @@ mod tests {
             second.send(s.token());
             assert!(second.closed());
             s.command(DebugCommand::Continue);
-            assert_eq!(first.line(), json!({ "command": "continue" }));
+            assert_eq!(first.line(), r#"{"command":"continue"}"#);
         }
 
         // Added: a connection that sends nothing holds no other out, nor the close
