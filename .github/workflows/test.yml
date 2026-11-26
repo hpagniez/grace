@@ -158,7 +158,8 @@ jobs:
   gpui-idle:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: windows-latest
-    timeout-minutes: 60
+    # two benches, each waiting for a quiet machine up to 5 minutes a round
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
