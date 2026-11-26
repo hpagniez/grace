@@ -94,14 +94,18 @@ struct Conn {
 }
 
 impl Conn {
-    /// Writes a line of JSON to the listener; a write that fails drops it, as the run goes on unpaused (R2.6).
-    fn write(&mut self, msg: &Value) {
+    /// Writes a line of JSON to the listener; a write that fails drops it, as the run goes on unpaused (R2.6). True
+    /// when it dropped it: the caller then calls `on_end`, out of the lock.
+    #[must_use]
+    fn write(&mut self, msg: &Value) -> bool {
         if let Some(s) = &mut self.socket
             && s.write_all(format!("{msg}\n").as_bytes()).is_err()
         {
             let _ = s.shutdown(Shutdown::Both);
             self.socket = None;
+            return true;
         }
+        false
     }
 }
 
@@ -180,19 +184,22 @@ impl Shared {
                 let Some(p) = parse_pause(line.trim_end_matches(['\r', '\n'])) else {
                     break;
                 };
+                // nothing pauses once the listener was dropped (a close, a failed write)
+                if lock(&self.conn).socket.is_none() {
+                    break;
+                }
                 (self.on_pause)(p);
             }
         }
-        {
+        let ended = {
             let mut c = lock(&self.conn);
             if let Some(s) = c.open.remove(&id) {
                 let _ = s.shutdown(Shutdown::Both);
             }
-            if kept {
-                c.socket = None;
-            }
-        }
-        if kept {
+            // whoever takes the listener's socket says it ended, once
+            kept && c.socket.take().is_some()
+        };
+        if ended {
             (self.on_end)();
         }
     }
@@ -214,23 +221,38 @@ impl Shared {
         {
             join(h);
         }
-        let mut c = lock(&self.conn);
-        if c.closed {
-            return false;
-        }
-        for (_, s) in c.open.extract_if(|other, _| *other != id) {
-            let _ = s.shutdown(Shutdown::Both);
-        }
-        let Some(s) = c.open.get(&id).and_then(|s| s.try_clone().ok()) else {
-            return false;
+        let dropped = {
+            let mut c = lock(&self.conn);
+            if c.closed {
+                return false;
+            }
+            for (_, s) in c.open.extract_if(|other, _| *other != id) {
+                let _ = s.shutdown(Shutdown::Both);
+            }
+            let Some(s) = c.open.get(&id).and_then(|s| s.try_clone().ok()) else {
+                return false;
+            };
+            if s.set_read_timeout(None).is_err() || s.set_write_timeout(Some(WRITE_LIMIT)).is_err() {
+                return false;
+            }
+            c.socket = Some(s);
+            let first = json!({ "breakpoints": c.breakpoints, "pause": c.pause_first });
+            c.write(&first)
         };
-        if s.set_read_timeout(None).is_err() || s.set_write_timeout(Some(WRITE_LIMIT)).is_err() {
-            return false;
+        if dropped {
+            (self.on_end)();
         }
-        c.socket = Some(s);
-        let first = json!({ "breakpoints": c.breakpoints, "pause": c.pause_first });
-        c.write(&first);
-        c.socket.is_some()
+        true
+    }
+
+    /// `Conn::write` out of the session's lock's callers' way: `on_end` if the write dropped the listener.
+    fn write(&self, c: MutexGuard<'_, Conn>, msg: &Value) {
+        let mut c = c;
+        let dropped = c.write(msg);
+        drop(c);
+        if dropped {
+            (self.on_end)();
+        }
     }
 }
 
@@ -288,28 +310,30 @@ impl DebugSession {
         let mut c = lock(&self.shared.conn);
         c.breakpoints = b;
         let msg = json!({ "breakpoints": c.breakpoints });
-        c.write(&msg);
+        self.shared.write(c, &msg);
     }
 
     /// Before the listener connects, only a pause counts: it goes with the first line.
     pub fn command(&self, cmd: DebugCommand) {
         let mut c = lock(&self.shared.conn);
         if c.socket.is_some() {
-            c.write(&json!({ "command": cmd }));
+            self.shared.write(c, &json!({ "command": cmd }));
         } else if cmd == DebugCommand::Pause {
             c.pause_first = true;
         }
     }
 
-    /// Stops listening and closes every connection; nothing pauses or is written after it. Again does nothing.
+    /// Stops listening and closes every connection, calling `on_end` if the listener was connected; nothing pauses or
+    /// is written after it. Again does nothing.
     pub fn close(&self) {
-        let (accept, streams) = {
+        let (accept, streams, ended) = {
             let mut c = lock(&self.shared.conn);
             c.closed = true;
             c.listening = false;
             let socket = c.socket.take();
+            let ended = socket.is_some();
             let streams: Vec<_> = c.open.drain().map(|(_, s)| s).chain(socket).collect();
-            (c.accept.take(), streams)
+            (c.accept.take(), streams, ended)
         };
         for s in streams {
             let _ = s.shutdown(Shutdown::Both);
@@ -318,6 +342,9 @@ impl DebugSession {
             && self.shared.wake()
         {
             join(h);
+        }
+        if ended {
+            (self.shared.on_end)();
         }
     }
 }

@@ -1,16 +1,17 @@
 //! The run half of `runner.ts`: `runTarget`, `rerunGuarded`, `runProperties` and `runBody`, from the checks before
 //! a run to its `run.json`.
-use super::{Discovery, Inner, Props, SpawnPlan, at, join_notices, now_ms, text};
+use super::{DebugRun, Discovery, Inner, Props, SpawnPlan, at, join_notices, lock, now_ms, text};
 use crate::history::{self, RunDir, create_run_dir, prune_history, read_run_record, write_run_record};
 use crate::karate::argfile::{write_arg_file, write_target_file};
-use crate::karate::command::{OUT_OF_MEMORY, detect_layout, line_targets, out_of_memory, selection_targets};
+use crate::karate::command::{DebugArgs, OUT_OF_MEMORY, detect_layout, line_targets, out_of_memory, selection_targets};
+use crate::karate::debug::{DebugSession, ListenerPause};
 use crate::karate::events::{JsonlTail, POLL};
 use crate::karate::process::KarateProcess;
 use crate::karate::run_state::{LeafResult, RunState};
-use crate::karate::tree::{NodeRef, find_node, resolve_node, resolve_tests};
-use crate::mask::Masker;
+use crate::karate::tree::{NodeRef, find_node, leaf_index, resolve_node, resolve_tests};
+use crate::mask::{Masker, mask_cut_end};
 use crate::model::env::{PlainRow, effective_rows};
-use crate::model::events::{AppEvent, RunOutcome};
+use crate::model::events::{AppEvent, Paused, RunOutcome};
 use crate::model::history::{LeafKind, RunRecord, StoredSelection, StoredTest, TestStatusFinal};
 use crate::model::tags::{FilterState, matches, matching_leaves, project_tags, prune_filter};
 use crate::model::{NodeKind, TestNode};
@@ -21,6 +22,7 @@ use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::sync::Arc;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::Instant;
 
@@ -110,6 +112,40 @@ struct RunPlan<'t> {
     props: Props,
     selection: Option<&'t TestNode>,
     failed_of: Option<f64>,
+    /// A step debugger run: `threads` is then 1.
+    debug: bool,
+}
+
+/// What a run's thread waits for (step debugger R2.4): Java's lines and its end, and the debug session's news.
+pub(super) enum Msg {
+    Lines(Vec<String>),
+    /// Java's output has ended, its last line handed over: sent when the lines' callback is dropped.
+    Exited,
+    Paused(ListenerPause),
+    /// A command resumed the pause.
+    Resumed,
+    /// The listener's connection closed: nothing pauses any more, and a pause resumes.
+    Ended,
+}
+
+/// Sends `Exited` once Java's lines' callback, which owns it, is dropped.
+struct ExitSignal(mpsc::Sender<Msg>);
+
+impl Drop for ExitSignal {
+    fn drop(&mut self) {
+        let _ = self.0.send(Msg::Exited);
+    }
+}
+
+/// The debug run's session, closed and forgotten on every way out of the run.
+struct DebugGuard<'r>(&'r Inner, Arc<DebugSession>);
+
+impl Drop for DebugGuard<'_> {
+    fn drop(&mut self) {
+        // out of the lock: `close` calls the session's `on_end`, which only sends
+        drop(lock(&self.0.debug).take());
+        self.1.close();
+    }
 }
 
 /// The tests of run.json: each selected leaf with the final status and duration its run gave it.
@@ -224,7 +260,7 @@ impl Run<'_, '_> {
                 exit_code.map(js_exit_code)
             },
             tests: stored_tests(&p.leaves, &self.state.results()),
-            debug: false,
+            debug: p.debug,
         };
         match write_run_record(&self.out_dir, &record) {
             Ok(()) => {
@@ -235,6 +271,28 @@ impl Run<'_, '_> {
                 "The run could not be saved to the history: {}",
                 at(&self.out_dir.join("run.json"))(e)
             )),
+        }
+    }
+
+    /// The listener's pause as the window gets it: its test's key in the tree, and a value Java cut with its cut end
+    /// masked where that end starts a secret (R2.5); `emit` masks the rest.
+    fn paused(&self, p: ListenerPause) -> Paused {
+        let key = leaf_index(self.plan.tree)
+            .get(&format!("{}|{}", p.test.file, p.test.ref_id))
+            .map(|n| n.key.clone());
+        let mut vars = p.vars;
+        for v in vars.iter_mut().filter(|v| v.cut.is_some_and(|c| c > 0)) {
+            v.value = mask_cut_end(&v.value, &self.plan.props.secrets);
+        }
+        Paused {
+            key,
+            file: p.file,
+            line: p.line,
+            depth: p.depth,
+            prefix: p.prefix,
+            keyword: p.keyword,
+            text: p.text,
+            vars,
         }
     }
 
@@ -256,6 +314,29 @@ impl Run<'_, '_> {
 }
 
 impl Inner {
+    /// A debug run's session, its pauses and its end sent to the run's thread, with the breakpoints of now; set as
+    /// the runner's debug run under the breakpoints' lock, so a toggle reaches either the first line or the socket.
+    fn open_debug(&self, tx: &mpsc::Sender<Msg>) -> io::Result<Arc<DebugSession>> {
+        let (pauses, ends) = (tx.clone(), tx.clone());
+        let session = Arc::new(DebugSession::open(
+            Vec::new(),
+            move |p| {
+                let _ = pauses.send(Msg::Paused(p));
+            },
+            move || {
+                let _ = ends.send(Msg::Ended);
+            },
+        )?);
+        let s = self.state();
+        session.set_breakpoints(s.breakpoints.clone());
+        *lock(&self.debug) = Some(DebugRun {
+            session: Arc::clone(&session),
+            paused: false,
+            to_run: tx.clone(),
+        });
+        Ok(session)
+    }
+
     /// "Run cancelled" when the operation was cancelled.
     fn run_cancelled(&self) -> bool {
         let cancelled = self.cancelled();
@@ -359,12 +440,12 @@ impl Inner {
         } else {
             RunTarget::Tests { tests, failed_of }
         };
-        self.run_target(target, filter)
+        self.run_target(target, filter, false)
     }
 
     /// The pre-run checks of a target after the pre-run discovery, then its run. `filter` is the one saved, not
     /// pruned: a vanished included tag shrinks the run, never widens it.
-    pub(super) fn run_target(&self, target: RunTarget, filter: FilterState) -> io::Result<()> {
+    pub(super) fn run_target(&self, target: RunTarget, filter: FilterState, debug: bool) -> io::Result<()> {
         // a cancel or dispose before the pre-run discovery, e.g. after a re-run's switch: start no JVM
         if self.run_cancelled() {
             return Ok(());
@@ -394,7 +475,8 @@ impl Inner {
             targets,
             target_file,
             filter: filter.clone(),
-            threads,
+            threads: if debug { 1 } else { threads },
+            debug,
             env: env.clone(),
             props,
             selection,
@@ -570,8 +652,19 @@ impl Inner {
             Some(file) => vec![format!("@{}", text(file))],
             None => run.plan.targets.clone(),
         };
-        let (lines_tx, lines) = mpsc::channel::<Vec<String>>();
+        let (tx, msgs) = mpsc::channel::<Msg>();
+        // the session listens before Java starts, and is closed whatever ends the run (R2.6)
+        let guard = if run.plan.debug {
+            Some(DebugGuard(self, self.open_debug(&tx)?))
+        } else {
+            None
+        };
         let spawn = SpawnPlan {
+            debug: guard.as_ref().map(|g| DebugArgs {
+                jar: &self.vendor.listener,
+                port: g.1.port(),
+                token: g.1.token(),
+            }),
             root: &root,
             layout: &layout,
             out_dir: &run.out_dir,
@@ -583,8 +676,9 @@ impl Inner {
             threads: run.plan.threads,
             vars,
         };
+        let exited = ExitSignal(tx.clone());
         let Some(proc) = self.spawn(spawn, move |l| {
-            let _ = lines_tx.send(l);
+            let _ = exited.0.send(Msg::Lines(l));
         }) else {
             // Rust-native: a cancel that came after the walk's check, before Java started: none starts, and the
             // folder goes as an ended-early run's does. Parity: `cancel_during_the_walk_starts_no_java`.
@@ -611,29 +705,65 @@ impl Inner {
             total: u32::try_from(run.state.keys.len()).unwrap_or(u32::MAX),
             started_at: run.started_at,
             env: run.plan.env.clone(),
-            debug: false,
+            debug: run.plan.debug,
         });
 
         let mut tail = JsonlTail::new(run.out_dir.join("karate-json").join("karate-events.jsonl"));
         let mut fatal: Option<String> = None;
         let mut oom = false; // Java printed an OutOfMemoryError
         let mut next = Instant::now() + POLL;
+        let mut paused = false;
         loop {
-            let now = Instant::now();
-            if now >= next {
-                run.poll(&mut tail, &mut fatal, &proc);
-                next = now + POLL;
-            }
-            match lines.recv_timeout(next.saturating_duration_since(now)) {
-                Ok(l) => {
+            let msg = if paused {
+                // no deadline: nothing reads the events file until a command or the socket's end (R2.4)
+                msgs.recv().ok()
+            } else {
+                let now = Instant::now();
+                if now >= next {
+                    run.poll(&mut tail, &mut fatal, &proc);
+                    next = now + POLL;
+                }
+                match msgs.recv_timeout(next.saturating_duration_since(now)) {
+                    Ok(msg) => Some(msg),
+                    Err(RecvTimeoutError::Timeout) => continue,
+                    Err(RecvTimeoutError::Disconnected) => None,
+                }
+            };
+            match msg {
+                Some(Msg::Lines(l)) => {
                     oom |= out_of_memory(&l);
                     run.emit(AppEvent::Console { lines: l });
                 }
-                Err(RecvTimeoutError::Timeout) => {}
-                // Java's output has ended, its last line handed over, and it has exited
-                Err(RecvTimeoutError::Disconnected) => break,
+                // Java's output has ended, its last line handed over, and it has exited (`tx` lives here: never None)
+                Some(Msg::Exited) | None => break,
+                Some(Msg::Paused(p)) => {
+                    run.poll(&mut tail, &mut fatal, &proc); // the last read before the pause
+                    if let Some(d) = lock(&self.debug).as_mut() {
+                        d.paused = true;
+                    }
+                    paused = true;
+                    let p = run.paused(p);
+                    run.emit(AppEvent::DebugPaused { paused: p });
+                }
+                Some(Msg::Resumed) => {
+                    paused = false;
+                    next = Instant::now() + POLL;
+                    run.emit(AppEvent::DebugResumed);
+                }
+                // the listener is gone, Java runs on unpaused: a pause no command resumed resumes here
+                Some(Msg::Ended) => {
+                    let resumes = lock(&self.debug)
+                        .as_mut()
+                        .is_some_and(|d| std::mem::replace(&mut d.paused, false));
+                    if resumes {
+                        paused = false;
+                        next = Instant::now() + POLL;
+                        run.emit(AppEvent::DebugResumed);
+                    }
+                }
             }
         }
+        drop(guard);
         let code = proc.wait();
         let exited_at = now_ms(); // the run's end: the walk below is not part of its duration
         run.poll(&mut tail, &mut fatal, &proc);
