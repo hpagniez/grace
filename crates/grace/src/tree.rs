@@ -9,7 +9,8 @@
 //! A row's menu, "Open in VS Code", is GPUI Kit's `PopupMenu`, opened by the Tree itself: Kit's `ContextMenu` opens only
 //! on a right press, and the menu key must open it from the focus row (OT-01, P3 plan, Redesigns, `tree`).
 //!
-//! The debug button comes with phase P4's debug run (P2 plan, Redesigns).
+//! A row has its Debug button before its Run button (step debugger R5.1), and a pause opens the way to the paused
+//! test.
 use crate::elements::Off as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -54,7 +55,7 @@ pub const INDENT: f32 = 16.;
 /// What the breakpoint dot says to assistive technology.
 pub const HAS_BREAKPOINTS: &str = "Has breakpoints";
 /// What a row's keys do beside moving, said to assistive technology (VL-22).
-pub const SHORTCUTS: &str = "Control+Enter";
+pub const SHORTCUTS: &str = "Control+Enter Control+Shift+Enter";
 
 /// The run in progress, or the last: the features it may no longer open, and how many failed keys it has read
 /// (#224 R3).
@@ -415,18 +416,19 @@ impl Tree {
         }
     }
 
-    /// The tree's own keys on the focus row: Ctrl+Enter runs it (VL-10), Right and Left open, close and move to a
-    /// child or the parent (VL-08). True when handled.
+    /// The tree's own keys on the focus row: Ctrl+Enter runs it (VL-10) and with Shift debugs it (step debugger
+    /// R5.1), Right and Left open, close and move to a child or the parent (VL-08). True when handled.
     fn row_key(&mut self, e: &KeyDownEvent, f: usize, state: &AppState, cx: &mut Context<Self>) -> bool {
         let k = &e.keystroke;
         let m = k.modifiers;
         let row = self.rows[f].clone();
         let Some(tree) = &state.tree else { return false };
         let node = row.node(tree);
-        if m.control && !m.shift && k.key == "enter" {
-            // as the run button does: nothing where it is missing or disabled
+        if m.control && k.key == "enter" {
+            // as the run and Debug buttons do: nothing where they are missing or disabled
             if !busy(state) && row_matches(node, &state.filter) {
-                self.grace.update(cx, |g, cx| g.run(row.key.clone(), cx));
+                let press = if m.shift { Grace::debug } else { Grace::run };
+                self.grace.update(cx, |g, cx| press(g, row.key.clone(), cx));
             }
             return true;
         }
@@ -534,10 +536,21 @@ fn kind_icon(kind: NodeKind, open: bool) -> Option<Icon> {
     }
 }
 
-/// A row's run button is muted, and green on the selected row, the row under the pointer and the focus row
-/// (`Tree.tsx`'s `group-hover`, `group-focus-within`).
-fn run_is_green(selected: bool, hovered: bool, focus_row: bool) -> bool {
+/// A row's buttons are muted, and in their colour (Run green, Debug the running one) on the selected row, the row
+/// under the pointer and the focus row (`Tree.tsx`'s `group-hover`, `group-focus-within`).
+fn lit(selected: bool, hovered: bool, focus_row: bool) -> bool {
     selected || hovered || focus_row
+}
+
+/// One of a row's two buttons.
+struct RowAction {
+    /// The first word of the button's name: "Debug <name>", "Run <name>".
+    verb: &'static str,
+    keys: &'static str,
+    icon: Icon,
+    /// Its colour on a lit row.
+    lit: u32,
+    press: fn(&mut Grace, String, &mut Context<Grace>),
 }
 
 fn busy(state: &AppState) -> bool {
@@ -699,6 +712,30 @@ impl Render for Tree {
 }
 
 impl Tree {
+    /// A row's Debug or Run button with its tooltip, its icon in `color`; off while Grace is busy.
+    fn action(&self, a: RowAction, key: &str, label: &str, color: u32, off: bool, me: Entity<Tree>) -> AnyElement {
+        let grace = self.grace.clone();
+        let (verb, press) = (a.verb.to_ascii_lowercase(), a.press);
+        let selector = part(&verb, key);
+        let tip = format!("{} {label} ({})", a.verb, a.keys);
+        let key = key.to_owned();
+        tooltip(part(&format!("{verb}-tip"), &key), Some(SharedString::from(tip)))
+            .side(Side::Left)
+            .child(
+                row_button(selector.clone(), format!("{} {label}", a.verb))
+                    .debug_selector(move || selector.to_string())
+                    .child(crate::elements::glyph(a.icon, 14.).text_color(Theme::color(color)))
+                    .off(off)
+                    .on_click(move |_, window, cx| {
+                        cx.stop_propagation();
+                        me.update(cx, |tree, cx| tree.clicked(&key, window, cx));
+                        let key = key.clone();
+                        grace.update(cx, |g, cx| press(g, key, cx));
+                    }),
+            )
+            .into_any_element()
+    }
+
     /// Row `i`: what `Row` of `Tree.tsx` drew, as a tree item named from its status, flaky chip and tags.
     fn row(
         &self,
@@ -850,30 +887,29 @@ impl Tree {
                 badge.into_any_element()
             }
         });
-        let run = matches.then(|| {
-            let run_key = key.clone();
-            let me = cx.entity();
-            let grace = self.grace.clone();
-            let tip = format!("Run {label} (Ctrl+Enter)");
-            tooltip(part("run-tip", &key), Some(SharedString::from(tip)))
-                .side(Side::Left)
-                .child(
-                    run_button(part("run", &key), &label)
-                        .child(crate::elements::glyph(Icon::Play, 14.).text_color(Theme::color(
-                            if run_is_green(selected, hovered, ring) {
-                                t.passed
-                            } else {
-                                t.muted
-                            },
-                        )))
-                        .off(busy(state))
-                        .on_click(move |_, window, cx| {
-                            cx.stop_propagation();
-                            me.update(cx, |tree, cx| tree.clicked(&run_key, window, cx));
-                            let key = run_key.clone();
-                            grace.update(cx, |g, cx| g.run(key, cx));
-                        }),
-                )
+        let actions = matches.then(|| {
+            let lit = lit(selected, hovered, ring);
+            let off = busy(state);
+            [
+                RowAction {
+                    verb: "Debug",
+                    keys: "Ctrl+Shift+Enter",
+                    icon: Icon::Bug,
+                    lit: t.running,
+                    press: Grace::debug,
+                },
+                RowAction {
+                    verb: "Run",
+                    keys: "Ctrl+Enter",
+                    icon: Icon::Play,
+                    lit: t.passed,
+                    press: Grace::run,
+                },
+            ]
+            .map(|a| {
+                let color = if lit { a.lit } else { t.muted };
+                self.action(a, &key, &label, color, off, cx.entity())
+            })
         });
 
         let me = cx.entity();
@@ -947,7 +983,7 @@ impl Tree {
             .children(breakpoint)
             .children(tags)
             .children(flaky_badge)
-            .children(run);
+            .children(actions.into_iter().flatten());
         // A list lays its rows out alone, as wide as their content: the wrapper takes the list's width, so a long
         // label is cut, with its tooltip, rather than drawn past the window.
         div()
@@ -961,9 +997,9 @@ impl Tree {
     }
 }
 
-/// A row's run button: out of the Tab order (the row's Ctrl+Enter runs it), the row's height, and the hand under
+/// A row's Debug or Run button: out of the Tab order (the row's keys do the same), the row's height, and the hand under
 /// the pointer as on every button (`Tree.tsx`); `Off::off` turns it to the not-allowed sign during a run.
-fn run_button(id: impl Into<gpui::ElementId>, label: &str) -> Button {
+fn row_button(id: impl Into<gpui::ElementId>, name: String) -> Button {
     Button::new(id)
         .ghost()
         .tab_stop(false)
@@ -971,7 +1007,7 @@ fn run_button(id: impl Into<gpui::ElementId>, label: &str) -> Button {
         .h(px(ROW_HEIGHT))
         .px_0()
         .cursor_pointer()
-        .accessibility_label(format!("Run {label}"))
+        .accessibility_label(name)
 }
 
 #[cfg(test)]
