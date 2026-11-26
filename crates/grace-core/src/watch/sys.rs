@@ -51,7 +51,8 @@ impl Drop for Owned {
 
 // SAFETY: a kernel handle may be used and closed from any thread; each `Owned` is used by one thread at a time.
 unsafe impl Send for Owned {}
-// SAFETY: the stop event is only set (`SetEvent`) and waited on, which Windows allows from many threads at once.
+// SAFETY: `Owned` has no method; the one shared, the stop event, is only set and waited on, which Windows allows
+// from many threads at once.
 unsafe impl Sync for Owned {}
 
 /// A reader of one directory; dropping it stops its thread and returns once the thread has ended.

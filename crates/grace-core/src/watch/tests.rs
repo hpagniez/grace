@@ -33,13 +33,20 @@ struct Started {
 }
 
 fn start(roots: &[PathBuf]) -> Started {
+    start_quiet(roots, QUIET_TEST)
+}
+
+/// For a test whose two writes must fall in one window even on a loaded machine.
+const QUIET_LONG: Duration = Duration::from_secs(1);
+
+fn start_quiet(roots: &[PathBuf], quiet: Duration) -> Started {
     let (saved_tx, saved) = mpsc::channel();
     let (errors_tx, errors) = mpsc::channel();
     let w = watch_features(
         roots,
         move |files| saved_tx.send(files).unwrap(),
         move |reason| errors_tx.send(reason).unwrap(),
-        QUIET_TEST,
+        quiet,
     )
     .unwrap();
     Started { w, saved, errors }
@@ -114,12 +121,27 @@ mod watch_features {
     #[test]
     fn makes_two_saves_within_the_quiet_time_one_batch() {
         let (dir, root) = tmp();
-        let s = start(std::slice::from_ref(&root));
+        let s = start_quiet(std::slice::from_ref(&root), QUIET_LONG);
         let (a, b) = (root.join("a.feature"), root.join("b.feature"));
         feature(&a);
         thread::sleep(Duration::from_millis(20));
         feature(&b);
         assert_eq!(next(&s.saved), [a, b]);
+        drop(s);
+        dir.close().unwrap();
+    }
+
+    /// Added: one quiet window for all roots (R2.3), so a "Save all" across roots is one batch.
+    #[test]
+    fn makes_saves_in_two_roots_one_batch() {
+        let (dir, root) = tmp();
+        let other = dir.path().join("other");
+        fs::create_dir(&other).unwrap();
+        let s = start_quiet(&[root.clone(), other.clone()], QUIET_LONG);
+        let (a, b) = (root.join("a.feature"), other.join("b.feature"));
+        feature(&a);
+        feature(&b);
+        assert_eq!(next(&s.saved), sorted(vec![a, b]));
         drop(s);
         dir.close().unwrap();
     }
@@ -141,7 +163,7 @@ mod watch_features {
     #[test]
     fn drops_a_feature_deleted_before_its_batch() {
         let (dir, root) = tmp();
-        let s = start(std::slice::from_ref(&root));
+        let s = start_quiet(std::slice::from_ref(&root), QUIET_LONG);
         let a = root.join("a.feature");
         feature(&a);
         fs::remove_file(&a).unwrap();
@@ -287,20 +309,25 @@ mod batch {
     use super::*;
 
     #[test]
-    fn an_overflow_hands_over_every_feature_of_the_folder_roots_whose_time_moved() {
+    fn an_overflow_hands_over_every_feature_of_the_roots_whose_time_moved() {
         let (dir, root) = tmp();
-        let file_root = dir.path().join("one.feature");
+        let (file_root, old_file_root) = (dir.path().join("one.feature"), dir.path().join("two.feature"));
         feature(&file_root);
+        feature(&old_file_root);
         let old = root.join("old.feature");
         feature(&old);
-        set_modified(&old, SystemTime::now() - Duration::from_secs(3600));
-        let mut batch = Batch::new(&[(root.clone(), false), (file_root, true)]);
+        let hour_ago = SystemTime::now() - Duration::from_secs(3600);
+        set_modified(&old, hour_ago);
+        set_modified(&old_file_root, hour_ago);
+        let roots = [(root.clone(), false), (file_root.clone(), true), (old_file_root, true)];
+        let mut batch = Batch::new(&roots);
         let (a, b) = (root.join("a.feature"), root.join("x").join("b.feature"));
         feature(&a);
         feature(&b);
         feature(&root.join("node_modules").join("c.feature"));
         batch.take(Msg::Overflow);
-        assert_eq!(sorted(batch.flush()), [a, b]);
+        // a file root too: Linux has one event queue for all roots
+        assert_eq!(sorted(batch.flush()), sorted(vec![a, b, file_root]));
         dir.close().unwrap();
     }
 
@@ -327,13 +354,19 @@ fn its_threads_use_no_cpu_while_no_file_changes() {
     // one event, so every thread has run once (Linux learns notify's thread from it), then a quiet batch
     feature(&root.join("a.feature"));
     assert_eq!(next(&s.saved), [root.join("a.feature")]);
+    // settled once two readings 100 ms apart agree; a thread that never settles is the failure
     let mut before = s.w.cpu();
+    let end = Instant::now() + LIMIT;
     loop {
         thread::sleep(Duration::from_millis(100));
         let now = s.w.cpu();
         if now == before {
             break;
         }
+        assert!(
+            Instant::now() < end,
+            "the threads never settled: {before:?} then {now:?}"
+        );
         before = now;
     }
     assert!(before.len() >= if cfg!(windows) { 4 } else { 2 }, "{before:?}");
@@ -412,6 +445,8 @@ mod windows {
             first
         })
         .unwrap();
+        // declared after `reader`, so a failed assert drops it first and the reader's thread is let go
+        let hold_tx = hold_tx;
         feature(&root.join("first.feature"));
         assert!(!kinds.recv_timeout(LIMIT).unwrap());
         for i in 0..300 {

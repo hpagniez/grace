@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -69,6 +70,7 @@ enum Msg {
 /// The saves waiting for the quiet window to end, and the modified time last counted per feature.
 struct Batch {
     folders: Vec<PathBuf>,
+    files: Vec<PathBuf>,
     started: SystemTime,
     seen: HashMap<PathBuf, SystemTime>,
     pending: HashSet<PathBuf>,
@@ -80,6 +82,7 @@ impl Batch {
     fn new(roots: &[(PathBuf, bool)]) -> Batch {
         Batch {
             folders: roots.iter().filter(|(_, file)| !file).map(|(r, _)| r.clone()).collect(),
+            files: roots.iter().filter(|(_, file)| *file).map(|(r, _)| r.clone()).collect(),
             started: SystemTime::now() - SLACK,
             seen: HashMap::new(),
             pending: HashSet::new(),
@@ -106,6 +109,8 @@ impl Batch {
             for root in &self.folders {
                 features(root, &mut found);
             }
+            // Linux has one queue for every root, so its overflow may have lost a file root's event too
+            found.extend(self.files.iter().cloned());
         }
         for dir in std::mem::take(&mut self.walks) {
             features(&dir, &mut found);
@@ -137,8 +142,9 @@ type Source = notify::INotifyWatcher;
 /// once `quiet` passed with no counted event (`on_saved`, on the watcher's own thread). A burst too big for the OS
 /// loses its names: the batch then takes every feature of the folder roots that the modified-time check keeps. Each
 /// folder root's parent is watched too, without its subfolders, as a renamed or moved root may report nothing itself.
-/// Fails, having closed what it opened, if a root cannot be watched. After `on_error`, called once, nothing more is
-/// called; nor after `close`.
+/// Fails, having closed what it opened, if a root cannot be watched; a read Windows refuses later is an `on_error`.
+/// After `on_error`, called once, nothing more is called; nor after `close`. The callbacks must only send or post,
+/// never wait on what `close`'s caller may hold: `close` waits for a callback that is running.
 pub fn watch_features(
     roots: &[PathBuf],
     mut on_saved: impl FnMut(Vec<PathBuf>) + Send + 'static,
@@ -160,6 +166,8 @@ pub fn watch_features(
         &threads,
     )?));
     let held = Arc::clone(&sources);
+    let closed = Arc::new(AtomicBool::new(false));
+    let seen_closed = Arc::clone(&closed);
     #[cfg(all(test, target_os = "linux"))]
     let quiet_threads = Arc::clone(&threads);
     let quiet_thread = thread::Builder::new().name("grace-watch".into()).spawn(move || {
@@ -173,7 +181,7 @@ pub fn watch_features(
                     Err(RecvTimeoutError::Timeout) => {
                         open = false;
                         let saved = batch.flush();
-                        if !saved.is_empty() {
+                        if !saved.is_empty() && !seen_closed.load(Ordering::SeqCst) {
                             on_saved(saved);
                         }
                         continue;
@@ -197,9 +205,13 @@ pub fn watch_features(
             }
         };
         drop(std::mem::take(&mut *held.lock().unwrap()));
-        on_error(failure);
+        // `close` from inside `on_saved` may land before a `Gone` already queued
+        if !seen_closed.load(Ordering::SeqCst) {
+            on_error(failure);
+        }
     })?;
     Ok(Watcher {
+        closed,
         tx,
         quiet: Some(quiet_thread),
         sources,
@@ -210,6 +222,7 @@ pub fn watch_features(
 
 /// A running watcher; `close` or a drop stops it.
 pub struct Watcher {
+    closed: Arc<AtomicBool>,
     tx: mpsc::Sender<Msg>,
     quiet: Option<thread::JoinHandle<()>>,
     sources: Arc<Mutex<Vec<Source>>>,
@@ -223,6 +236,7 @@ impl Watcher {
     /// Stops every source and the quiet thread, and returns once nothing more can be called. From `on_saved` or
     /// `on_error` it returns without waiting for the thread it runs on.
     pub fn close(&mut self) {
+        self.closed.store(true, Ordering::SeqCst);
         let _ = self.tx.send(Msg::Stop);
         drop(std::mem::take(&mut *self.sources.lock().unwrap()));
         if let Some(quiet) = self.quiet.take()
@@ -452,13 +466,17 @@ mod platform {
                 }
             }
         };
-        let mut w = notify::INotifyWatcher::new(handler, Config::default()).map_err(io::Error::other)?;
-        for (root, file) in roots {
-            let parent = root.parent();
-            if !file {
-                w.watch(root, RecursiveMode::Recursive).map_err(io::Error::other)?;
-            }
-            if let Some(parent) = parent {
+        // links not followed, as `features` follows none
+        let config = Config::default().with_follow_symlinks(false);
+        let mut w = notify::INotifyWatcher::new(handler, config).map_err(io::Error::other)?;
+        let folders: Vec<&PathBuf> = roots.iter().filter(|(_, file)| !file).map(|(r, _)| r).collect();
+        for root in &folders {
+            w.watch(root, RecursiveMode::Recursive).map_err(io::Error::other)?;
+        }
+        // A parent or a file root's folder inside a folder root is watched already: watching it again without its
+        // subfolders would make notify drop the subfolders of the root's watch there.
+        for parent in roots.iter().filter_map(|(r, _)| r.parent()) {
+            if !folders.iter().any(|f| parent.starts_with(f)) {
                 w.watch(parent, RecursiveMode::NonRecursive).map_err(io::Error::other)?;
             }
         }
