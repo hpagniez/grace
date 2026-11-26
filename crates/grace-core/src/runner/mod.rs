@@ -31,8 +31,8 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's part still to port, the step debugger, is left out, each place it acts marked `P4`. The events stay
-//!   those of a project that has none: `breakpoints` (empty).
+//! - Phase P4's part still to port, the debug run, is left out, each place it acts marked `P4`: breakpoints are
+//!   kept and sent, and nothing pauses on them yet.
 mod run;
 mod setup;
 #[cfg(test)]
@@ -51,13 +51,14 @@ use crate::karate::environments::{feature_tag_envs, overlay_envs};
 use crate::karate::events::read_all_events;
 use crate::karate::libraries::{self, Goal, KeptLibraries, ToolEnv, ToolStart};
 use crate::karate::process::{Exit, KarateProcess, SpawnOptions, spawn_karate};
+use crate::karate::steps::file_steps;
 use crate::karate::subfolders::karate_folders;
-use crate::karate::tree::{build_tree, leaf_keys, parse_ref_id, row_lines};
+use crate::karate::tree::{build_tree, find_node, leaf_keys, parent_of, parse_ref_id, row_lines};
 use crate::model::env::{
     EnvView, PlainRow, PropertiesEdit, PropertyListsView, RowEdit, RowView, SecretRowView, SecretState, edit_errors,
     property_value_error, sorted_unique, valid_env_name,
 };
-use crate::model::events::{AppEvent, Breakpoint, BuildTool, Project};
+use crate::model::events::{AppEvent, Breakpoint, BuildTool, FileStep, Project};
 use crate::model::history::{HistoryEntry, to_entry};
 use crate::model::js;
 use crate::model::tags::{FilterState, no_filter, project_tags, prune_filter};
@@ -198,7 +199,7 @@ struct State {
     /// The build tool running, and whether it lists the project's libraries or builds its Java code.
     listing: Option<(BuildTool, Goal)>,
     report: Option<PathBuf>,
-    /// The open project's breakpoints, in memory only (step debugger R3.1); always empty until P4 ports the debugger.
+    /// The open project's breakpoints, in memory only (step debugger R3.1).
     breakpoints: Vec<Breakpoint>,
     /// Whether watch mode is on for the open project (watch mode R1).
     watching: bool,
@@ -527,6 +528,18 @@ impl Runner {
             locate(&detect_layout(root).bases, file)
         };
         crate::editor::project_file(root, &abs)
+    }
+
+    /// A scenario's or row's steps as its feature file has them (step debugger R4.1); None for any other node or an
+    /// unreadable file. Reads the file.
+    pub fn steps(&self, key: &str) -> Option<Vec<FileStep>> {
+        self.0.steps(key)
+    }
+
+    /// Adds or removes a breakpoint on a line of a feature of the tree (step debugger R3), and sends the whole set.
+    /// Allowed while busy.
+    pub fn toggle_breakpoint(&self, file: &str, line: u32) {
+        self.0.toggle_breakpoint(file, line);
     }
 
     /// The report of a listed run of the open project (R4); None if it has none. Never takes a path.
@@ -908,7 +921,7 @@ impl Inner {
             self.state().report = report;
             return Ok(false);
         }
-        self.send_breakpoints(Vec::new()); // another project's lines mean nothing here
+        self.send_breakpoints(Vec::clear); // another project's lines mean nothing here
         // the watcher of the project open before goes, with its saves
         self.disarm(&mut lock(&self.watcher));
         let watching = load_project_watch(&self.data_dir, root);
@@ -1017,7 +1030,7 @@ impl Inner {
             error: None,
             subfolders: None,
         });
-        self.send_breakpoints(Vec::new());
+        self.send_breakpoints(Vec::clear);
         self.arm();
         self.send_watch();
         if let Err(e) = forget_last_project(&self.data_dir) {
@@ -1291,11 +1304,7 @@ impl Inner {
         self.guarded(|| {
             let (old, filter) = {
                 let s = self.state();
-                let old = s
-                    .tree
-                    .as_deref()
-                    .and_then(|t| crate::karate::tree::find_node(t, key))
-                    .map(OldNode::from);
+                let old = s.tree.as_deref().and_then(|t| find_node(t, key)).map(OldNode::from);
                 (old, s.filter.clone())
             };
             self.run_target(
@@ -1345,6 +1354,47 @@ impl Inner {
             (s.project.clone(), s.tree.clone(), s.envs.env.clone())
         };
         find_trend(&self.listed(project.as_ref()), tree.as_deref(), key, env.as_deref())
+    }
+
+    fn steps(&self, key: &str) -> Option<Vec<FileStep>> {
+        let (root, file, line) = {
+            let s = self.state();
+            let tree = s.tree.as_deref()?;
+            let node = find_node(tree, key)?;
+            let section = match node.kind {
+                NodeKind::Scenario => node,
+                NodeKind::Row => parent_of(tree, key)?, // a row runs its outline's steps
+                _ => return None,
+            };
+            (s.project.as_ref()?.root.clone(), node.file.clone(), section.line?)
+        };
+        // read with the lock free: a file on a slow disk holds up no event
+        let bytes = fs::read(locate(&detect_layout(Path::new(&root)).bases, &file)).ok()?;
+        Some(file_steps(&String::from_utf8_lossy(&bytes), line))
+    }
+
+    fn toggle_breakpoint(&self, file: &str, line: u32) {
+        let feature = format!("f:{file}");
+        let known = line >= 1
+            && self
+                .state()
+                .tree
+                .as_deref()
+                .is_some_and(|t| find_node(t, &feature).is_some());
+        if !known {
+            self.notice(INVALID);
+            return;
+        }
+        self.send_breakpoints(|all| {
+            let before = all.len();
+            all.retain(|b| b.file != file || b.line != line);
+            if all.len() == before {
+                all.push(Breakpoint {
+                    file: file.to_owned(),
+                    line,
+                });
+            }
+        });
     }
 
     fn run_report_path(&self, id: &str) -> Option<PathBuf> {
@@ -1434,8 +1484,13 @@ impl Inner {
         let _ = fs::remove_file(&self.pid_file);
     }
 
-    fn send_breakpoints(&self, breakpoints: Vec<Breakpoint>) {
-        self.state().breakpoints.clone_from(&breakpoints);
+    /// Changes the breakpoints under the lock, so two toggles never lose one, then sends the whole set.
+    fn send_breakpoints(&self, change: impl FnOnce(&mut Vec<Breakpoint>)) {
+        let breakpoints = {
+            let mut s = self.state();
+            change(&mut s.breakpoints);
+            s.breakpoints.clone()
+        };
         // the debug session's breakpoints: P4
         self.emit(AppEvent::Breakpoints { breakpoints });
     }
