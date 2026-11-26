@@ -769,7 +769,11 @@ mod tests {
         cx: &mut TestAppContext,
         state: grace_core::state::AppState,
     ) -> (crate::testing::Harness, gpui::VisualTestContext) {
-        let (h, _) = crate::testing::open(cx, 1200., state, |_, _, _| div().into_any_element());
+        // a data folder outside the checkout: a test that lets the clock run saves the window's bounds there
+        let data_dir = std::env::temp_dir().join(format!("grace-window-{}", std::process::id()));
+        let (h, _) = crate::testing::open_in(cx, data_dir, 1200., state, |_, _, _| {
+            Box::new(|_, _, _| div().into_any_element())
+        });
         let grace = h.grace.clone();
         let window = cx.add_window(move |window, cx| GraceWindow::with_grace(grace, window, cx));
         let vcx = gpui::VisualTestContext::from_window(window.into(), cx);
