@@ -310,6 +310,24 @@ fn dispose_stops_it_before_a_waiting_batch_runs() {
     assert!(!watcher_armed(&t));
 }
 
+// a drain that gets in between the toggle, or a quit, and the closing of the watcher
+#[test]
+fn a_save_waiting_starts_nothing_once_watch_mode_is_off_or_grace_is_quitting() {
+    let Watching { t, root } = watching();
+    let before = starts(&t);
+    let drain_with_a_save = || {
+        lock(&t.runner.0.waiting).insert(root.join("tests/tags.feature"));
+        t.runner.0.drain();
+    };
+    lock(&t.runner.0.state).watching = false;
+    drain_with_a_save();
+    assert_eq!(starts(&t), before, "off");
+    lock(&t.runner.0.state).watching = true;
+    lock(&t.runner.0.ctl).disposing = true;
+    drain_with_a_save();
+    assert_eq!(starts(&t), before, "quitting");
+}
+
 // R1.3 on: a watcher that failed is gone, so turning watch mode on again watches
 #[test]
 fn turned_on_again_after_an_error_it_watches() {
@@ -365,5 +383,6 @@ fn the_watchers_callbacks_never_wait_on_a_lock_its_closer_holds() {
     });
     rx.recv_timeout(Duration::from_secs(10))
         .expect("close returned while its caller held both locks");
+    lock(&t.runner.0.waiting).clear(); // no run of it as the test ends
     drop((slot, state));
 }

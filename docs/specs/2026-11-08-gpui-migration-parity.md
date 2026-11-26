@@ -1379,7 +1379,7 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/runner.tags.test.ts` | 13 | `grace-core::runner::tests::tags` (13 tests, real Java and Karate) | ☑ |
 | `src/main/runner.threads.test.ts` | 8 | `grace-core::runner::tests::threads` (8 tests, real Java and Karate) | ☑ |
 | `src/main/runner.trends.test.ts` | 2 | `grace-core::runner::tests::trends` (2 tests, real Java and Karate) | ☑ |
-| `src/main/runner.watch.test.ts` | 18 | `grace-core::runner::tests::watch` (20 tests: 17 of the Vitest file's 18, test for test in [P4 slice 7](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), real Java and Karate, 1 `n/a` with WM-02, and 3 added) | ☑ |
+| `src/main/runner.watch.test.ts` | 18 | `grace-core::runner::tests::watch` (21 tests: 17 of the Vitest file's 18, test for test in [P4 slice 7](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), real Java and Karate, 1 `n/a` with WM-02, and 4 added) | ☑ |
 | `src/main/secrets.test.ts` | 6 | `grace-core::secrets::tests` (10 tests, every Vitest test and the added ones) | ☑ |
 | `src/main/settings.test.ts` | 62 | `grace-core::settings::tests` (80 tests: every Vitest case, `it.each` rows one test each, and the bytes Node writes) | ☑ |
 | `src/main/trends.test.ts` | 10 | `grace-core::trends::tests` (11 tests) | ☑ |

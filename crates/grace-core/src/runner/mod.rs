@@ -824,7 +824,8 @@ impl Inner {
     fn drain(&self) {
         let (files, filter) = {
             let mut s = self.state();
-            if s.busy() || s.settling > 0 || s.project.is_none() {
+            // off: turned off, or its watcher failed, and the saves are not dropped yet
+            if s.busy() || s.settling > 0 || !s.watching || s.project.is_none() {
                 return;
             }
             let mut waiting = lock(&self.waiting);
