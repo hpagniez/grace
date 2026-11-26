@@ -155,21 +155,6 @@ jobs:
         if: ${{ runner.os == 'Linux' || github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
         run: sh scripts/e2e-gpui.sh
 
-  # Temporary, for P4's exit check (plan, open question 1): real Maven and Gradle. Removed once it has run.
-  real-tools:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: windows-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: rustup show active-toolchain || rustup toolchain install
-      - run: node scripts/fetch-vendor.mjs
-      - run: export JAVA_HOME="$JAVA_HOME_21_X64" && mvn -version && gradle -version
-      - run: JAVA_HOME="$JAVA_HOME_21_X64" cargo test -p grace-core --lib --locked real_tools -- --ignored --nocapture --test-threads=1
-
   # GPUI Grace's minimised idle on Windows (ADR 0030, ADR 0032): the release build through the bench, which fails the
   # job when Grace's own threads wake more than 5 times a second while minimised, as they do without the idle patch.
   # Only on runs by hand, which cargo-updates starts on every bump. The reference machine's numbers still need a person.
