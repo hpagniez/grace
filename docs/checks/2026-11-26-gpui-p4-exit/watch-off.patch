@@ -1,0 +1,29 @@
+diff --git a/bench/bench.mjs b/bench/bench.mjs
+index 2b0a23b..7dddbc3 100644
+--- a/bench/bench.mjs
++++ b/bench/bench.mjs
+@@ -260,10 +260,24 @@ async function idle(
+   gpui = false,
+   watch = false,
+ ) {
++  // P4's exit check, the other side of `--watch`: the same project open, watch mode off
++  const off = gpui && !watch;
++  if (off) {
++    const settings = { lastProject: project, projects: { [project]: { watch: false } } };
++    writeFileSync(path.join(dataDir, "settings.json"), JSON.stringify(settings));
++  }
+   const app = gpui
+     ? await launchGpui(exe, { dataDir, watch: watch ? project : undefined })
+     : await launch(exe, { project, dataDir, cdp: false });
+   try {
++    if (off) {
++      // no probe says the project is open: give its dry run 30 s, then see that it ran and its Java has ended
++      await sleep(30_000);
++      const { java } = await sample(app.pid);
++      if (!existsSync(path.join(dataDir, "projects")) || java.privateMB > 0)
++        throw new Error("the project is not open and quiet 30 s after the first frame");
++      log("watch mode off: the project's dry run has run and its Java has ended");
++    }
+     await sleep(SETTLE_MS);
+     const first = await sample(app.pid);
+     /** @type {Values} */
