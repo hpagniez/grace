@@ -26,15 +26,26 @@ sha2 = "=0.11.1"
 sha1_smol = "=1.0.1"
 
 # Windows' side of the platform seams (migration guide R5.3): DPAPI for the current user (secrets.rs); the job object,
-# the priority class and a process's executable (karate/process.rs). The version GPUI's Windows backend links, so the
-# exe gains no second copy.
+# the priority class and a process's executable (karate/process.rs); `ReadDirectoryChangesW` (watch.rs). The version
+# GPUI's Windows backend links, with features it already compiles, so the exe gains no second copy.
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = [
   "Win32_Foundation",
   "Win32_Security_Cryptography",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
   "Win32_System_JobObjects",
   "Win32_System_Threading",
 ] }
+
+# `QueryThreadCycleTime` for watch.rs's idle test only; GPUI's Windows backend compiles this feature too.
+[target.'cfg(windows)'.dev-dependencies]
+windows = { version = "=0.62.2", features = ["Win32_System_WindowsProgramming"] }
+
+# Watch mode's file events on Linux (watch.rs): its inotify backend blocks with no timeout and flags an overflow. The
+# version GPUI Kit links: no new crate.
+[target.'cfg(target_os = "linux")'.dependencies]
+notify = { version = "=8.2.2", default-features = false }
 
 # Linux's side of karate/process.rs: `setpriority` (nice 10) and `kill` of a process group, which std has no call for.
 # The version already in the lock through GPUI: no new crate.
