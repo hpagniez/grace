@@ -6,8 +6,8 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 crate=gpui-pre-windows
 # the version and the checksum of the published .crate, as the crates.io index gives it; scripts/bump-cargo.mjs sets both
-version=0.3.12
-sha256=7201762420222d5b5ce5bdf0056996199212a3349bfb2457a3a0238c688681f3
+version=0.3.14
+sha256=8badbaa4129a88e4d2fdaa1615fc61b2a59d4ebb2ac36e5de51f75598f0dd992
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 curl -sSfL -o "$work/$crate.crate" "https://static.crates.io/crates/$crate/$crate-$version.crate"
