@@ -1,10 +1,10 @@
 //! `Toolbar.tsx`: the row above the sheet (toolbar spec, premium UI R13.1). Home, the project's name and layout,
-//! Env, Threads, Properties…, Refresh, Open…, Report, Re-run failed with its count, Cancel and Run all, in that order,
-//! Run all last and the only primary button. Below 1280 px the labels of Properties…, Open…, Report, Re-run failed and
+//! Env, Threads, Properties…, Refresh, Watch, Open…, Report, Re-run failed with its count, Cancel and Run all, in
+//! that order, Run all last and the only primary button. Below 1280 px the labels of Properties…, Open…, Report, Re-run failed and
 //! Cancel go from sight, not from the buttons' names, and say themselves in a tooltip instead (`narrow.ts`).
 //!
 //! The environment and threads boxes are `env_picker`'s and `threads_box`'s, the Properties dialog `properties`'; the
-//! Watch toggle and the step debugger's buttons come with the runner's watch and debug runs in phase P4 (P2 plan).
+//! step debugger's buttons come with the runner's debug run in phase P4 (P2 plan).
 use crate::elements::Off as _;
 use gpui::accesskit::Role;
 use gpui::{
@@ -24,6 +24,8 @@ use crate::tooltip::{cut_middle, tooltip};
 
 pub const HOME: &str = "Home";
 pub const REFRESH: &str = "Refresh";
+pub const WATCH: &str = "Watch";
+pub const WATCH_TIP: &str = "Watch: run a feature when it is saved";
 pub const OPEN: &str = "Open…";
 pub const REPORT: &str = "Report";
 pub const RERUN_FAILED: &str = "Re-run failed";
@@ -92,6 +94,23 @@ pub fn actions(state: &AppState) -> Actions {
     }
 }
 
+/// The Watch toggle (watch mode R1): on and off differ by shape, not only by fill. It is on during a run, as it
+/// touches only the watcher, and off while a project is being opened.
+#[derive(Clone, Copy)]
+pub struct WatchToggle {
+    pub icon: Icon,
+    pub pressed: bool,
+    pub enabled: bool,
+}
+
+pub fn watch_toggle(state: &AppState) -> WatchToggle {
+    WatchToggle {
+        icon: if state.watch { Icon::Eye } else { Icon::EyeOff },
+        pressed: state.watch,
+        enabled: state.project.is_some() && state.opening.is_none(),
+    }
+}
+
 /// Whether the window is narrow enough for the icon-only buttons.
 pub fn narrow(window: &Window) -> bool {
     f32::from(window.viewport_size().width) < NARROW_BELOW
@@ -142,6 +161,17 @@ pub fn render(
             .track_focus(f)
             .off(!a.refresh)
             .on_click(move |_, _, cx| g.update(cx, |g, cx| g.refresh(cx)))
+    });
+
+    let g = grace.clone();
+    let w = watch_toggle(state);
+    let watch = tooltip("tip-watch", Some(WATCH_TIP.into())).focusable(move |f| {
+        crate::elements::icon_button("watch-button", w.icon, 16., WATCH, false)
+            .track_focus(f)
+            .toggled(w.pressed)
+            .when(w.pressed, |b| b.bg(Theme::color(t.selected)))
+            .off(!w.enabled)
+            .on_click(move |_, _, cx| g.update(cx, |g, cx| g.set_watch(!w.pressed, cx)))
     });
 
     // one 20 px line that wraps and hides the second: once the name and the chip no longer fit side by side, the
@@ -269,6 +299,7 @@ pub fn render(
         .child(properties)
         .child(divider("divider-actions", cx))
         .child(div().debug_selector(|| "refresh-button".into()).child(refresh))
+        .child(div().debug_selector(|| "watch-button".into()).child(watch))
         .child(open)
         .child(divider("divider-run", cx))
         .child(report)

@@ -45,7 +45,7 @@ Grace is moving to Rust and GPUI ([ADR 0031](../../docs/decisions/0031-move-grac
 | `cargo run -p grace` | Run GPUI Grace, the port in `crates/` |
 | `cargo test --workspace` | GPUI Grace's tests: `grace-core` and the headless views |
 | `npm run package:gpui` | Build GPUI Grace in release and lay it out as the release zip (ADR 0019) in `out/gpui/`; Windows, after `npm run vendor`. Not released until phase P5 |
-| `npm run bench:gpui` | The bench on GPUI Grace: size, start, idle and `idle.wakeups.minimised` (no Playwright). `-- --a <exe>` compares it with another build, such as Electron Grace's |
+| `npm run bench:gpui` | The bench on GPUI Grace: size, start, idle and `idle.wakeups.minimised` (no Playwright). `-- --a <exe>` compares it with another build, such as Electron Grace's; `-- --watch` takes the idle measures with the 2,000-test project open and watch mode on, in place of the home screen |
 | `npm run cargo:bump` | Move GPUI Grace to the newest `gpui-pre`, GPUI Kit and Rust, the Windows patches rebased, then `cargo update` (ADR 0032); prints what moved. `cargo-updates` runs it weekly |
 | `sh scripts/e2e-gpui.sh` | GPUI Grace's end-to-end tests through the accessibility tree (`crates/grace-e2e`); on Linux it starts Xvfb and AT-SPI itself |
 | `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo fmt --all` | GPUI Grace's lint and format |

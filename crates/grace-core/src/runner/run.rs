@@ -68,7 +68,7 @@ impl OldNode {
 }
 
 /// What a run selects: a tree node (a click or a Re-run), found again after the pre-run discovery or refused with
-/// `gone`; or stored tests (Re-run failed, or a Re-run of one). Watch mode's saved features come with P4.
+/// `gone`; stored tests (Re-run failed, or a Re-run of one); or the features saved while watch mode is on.
 pub(super) enum RunTarget {
     Node {
         key: String,
@@ -79,6 +79,21 @@ pub(super) enum RunTarget {
         tests: Vec<StoredTest>,
         failed_of: Option<f64>,
     },
+    /// Absolute paths (watch mode R3).
+    Files(Vec<PathBuf>),
+}
+
+/// The tree's node of a saved feature: its path from one of the bases, as the tree keys it.
+fn saved_feature<'t>(tree: &'t TestNode, bases: &[PathBuf], file: &Path) -> Option<&'t TestNode> {
+    bases.iter().find_map(|base| {
+        let parts: Vec<_> = file
+            .strip_prefix(base)
+            .ok()?
+            .iter()
+            .map(|p| p.to_string_lossy())
+            .collect();
+        find_node(tree, &format!("f:{}", parts.join("/")))
+    })
 }
 
 /// `runBody`'s `o`: what one run runs, and with what.
@@ -387,6 +402,27 @@ impl Inner {
         };
 
         let node = match target {
+            RunTarget::Files(files) => {
+                // a saved feature the tree lacks (a called one) or with nothing to run is skipped quietly (R3.2)
+                let nodes: Vec<&TestNode> = files
+                    .iter()
+                    .filter_map(|file| saved_feature(&tree, bases, file))
+                    .filter(|n| !matching_leaves(n, &filter).is_empty())
+                    .collect();
+                if nodes.is_empty() {
+                    return Ok(());
+                }
+                let leaves = nodes.iter().flat_map(|n| matching_leaves(n, &filter)).collect();
+                // a feature always has a target
+                let targets = nodes
+                    .iter()
+                    .filter_map(|n| selection_targets(n, bases, feature_roots, &filter))
+                    .flatten()
+                    .collect();
+                // several go through the targets file, so a git checkout never meets Windows' command line limit
+                let selection = (nodes.len() == 1).then(|| nodes[0]);
+                return self.run_body(plan(leaves, targets, nodes.len() > 1, selection, None));
+            }
             RunTarget::Tests { tests, failed_of } => {
                 // file:LINE targets ignore -t: the found tests run whatever their tags are now (R6)
                 let resolved = resolve_tests(&tree, &tests);

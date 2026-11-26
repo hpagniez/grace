@@ -1,6 +1,6 @@
 //! Watch mode's watcher (docs/specs/2026-11-03-watch-mode.md, R2): each platform's file events on the feature roots,
 //! never a poll. Its threads block in the OS with no timeout until a file changes; the quiet window waits on a
-//! channel with a timeout only while a batch is open (ADR 0030). Nothing in the app uses it until the runner does.
+//! channel with a timeout only while a batch is open (ADR 0030).
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;

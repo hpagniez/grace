@@ -473,7 +473,7 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | Vitest test | Class | Rust test or reason |
 |---|---|---|
 | 1 is one 44 px row on the ground | ported | `grace::toolbar::tests::order_and_shape_r13_1::is_one_44_px_row_on_the_ground`. By eye: ground fill |
-| 2 puts the controls in the order of the spec, Run all last | ported | `grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`, `...::properties::sits_after_the_boxes_and_before_refresh`; with Env and Threads: `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height`. Watch with P4 |
+| 2 puts the controls in the order of the spec, Run all last | ported | `grace::toolbar::tests::order_and_shape_r13_1::puts_the_controls_in_the_order_of_the_spec_run_all_last`, `...::properties::sits_after_the_boxes_and_before_refresh`; with Env and Threads: `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height`; Watch's place since P4 slice 7: the first of these |
 | 3 separates Properties from Refresh and Open from Report with 1 px dividers | ported | `...::separates_the_project_from_refresh_and_open_from_report_with_1_px_dividers` (1 px, 20 px high, between) |
 | 4 every button keeps its label, 28 px tall or a 28 px icon | ported | `...::every_button_is_28_px_tall_and_the_icon_buttons_square`; labels as names: `grace-e2e/tests/open.rs::a_narrow_window_keeps_every_toolbar_button_on_screen_with_its_name` (the `TOOLBAR` list) |
 | 5 never wraps a button's label | n/a | CSS class `whitespace-nowrap`; a wrapped label would break the 28 px height asserted in `...::every_button_is_28_px_tall_...` and the widths in `a_narrow_window::*` |
@@ -504,10 +504,10 @@ All six: LATER, P3. The feature map lists "Open in VS Code, from details and the
 | 30 Env and Threads use the shared input style | ported | `grace::window::tests::the_toolbar_keeps_its_items_in_order_and_its_boxes_at_the_controls_height` (both boxes 28 px, fixed here). By eye: border, fill, radius |
 | 31 a normal run keeps Run all; a debug run shows Pause | P4 | Step debugger (Redesigns, `toolbar`) |
 | 32 paused: Continue, Step over, Step into; F5, F10, F11 | P4 | Step debugger |
-| 33 Watch: icon button named Watch, off until main says on | P4 | Watch (Redesigns, `toolbar`) |
-| 34 Watch asks main for the other state | P4 | Watch |
-| 35 Watch says what it does in its tooltip | P4 | Watch |
-| 36 Watch stays enabled during a run, off during an open | P4 | Watch |
+| 33 Watch: icon button named Watch, off until main says on | ported | `grace::toolbar::tests::the_watch_toggle_watch_mode_r1::is_an_icon_button_off_until_the_runner_says_on_with_its_own_icon_when_on`; its name and pressed state: `grace-e2e/tests/watch.rs`. By eye: the selected fill (`screens_watch`) |
+| 34 Watch asks main for the other state | ported | `grace::toolbar::tests::the_watch_toggle_watch_mode_r1::asks_the_runner_for_the_other_state_on_a_click` |
+| 35 Watch says what it does in its tooltip | ported | `grace::toolbar::tests::the_watch_toggle_watch_mode_r1::says_what_it_does_in_its_tooltip` |
+| 36 Watch stays enabled during a run, off during an open | ported | `grace::toolbar::tests::the_watch_toggle_watch_mode_r1::stays_on_during_a_run_and_is_off_during_an_open_and_with_no_project` |
 
 #### `StatusBar.test.tsx` (18)
 
