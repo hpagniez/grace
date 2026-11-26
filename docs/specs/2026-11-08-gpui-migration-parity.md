@@ -558,13 +558,13 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | SD-14 | Steps before a run, from the feature file | `grace_core::runner::tests::debug::lists_a_tests_steps_before_any_run`; `grace::details::tests::breakpoints::lists_the_steps_from_the_file_before_a_run_with_no_status_or_time`; a doc string's steps left out: `grace_core::karate::steps::tests::file_steps::skips_doc_strings_tables_and_comments_and_stops_an_outline_at_its_examples` | ☑ |
 | SD-15 | Setting and removing a breakpoint | `grace::details::tests::breakpoints::toggles_a_breakpoint_on_a_step_and_shows_the_runners_set`; the rows' dots: `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; set and removed: `grace_core::runner::tests::debug::gives_a_reloaded_window_the_breakpoints_and_refuses_a_line_of_no_feature`; in the app, with their names: `grace-e2e/tests/details.rs::a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree` | ☑ |
 | SD-16 | A background breakpoint shows in every scenario | `grace::details::tests::breakpoints::a_background_breakpoint_shows_in_every_scenario` | ☑ |
-| SD-17 | Debugging from the tree, paused, stepping, finished (e2e) | | ☐ |
-| SD-18 | The keyboard starts a debug run or a normal run | | ☐ |
-| SD-19 | Nothing spins while paused | | ☐ |
-| SD-20 | Pause while running | | ☐ |
-| SD-21 | Paused in a called feature | | ☐ |
-| SD-22 | Between pauses the variables wait | | ☐ |
-| SD-23 | The debug controls at 760 px (e2e) | | ☐ |
+| SD-17 | Debugging from the tree, paused, stepping, finished (e2e) | `grace-e2e/tests/debug.rs::debugging_from_the_tree_paused_stepping_and_finished` | ☑ |
+| SD-18 | The keyboard starts a debug run or a normal run | `grace::tree::tests::step_debugger::ctrl_shift_enter_debugs_the_focus_row_and_ctrl_enter_alone_still_runs_it` | ☑ |
+| SD-19 | Nothing spins while paused | The whole window asks for no next step and draws nothing again: `grace::window::tests::a_paused_debug_run_leaves_the_window_idle`; the pause mark: `grace::details::tests::step_debugger::the_paused_tests_mark_is_the_pause`, and in the app on the row, `grace-e2e/tests/debug.rs::debugging_from_the_tree_paused_stepping_and_finished`; the progress line and its stopped clock: `grace::progress::tests::a_paused_debug_run_says_paused_turns_nothing_and_stops_the_clock` | ☑ |
+| SD-20 | Pause while running | `grace::toolbar::tests::step_debugger::a_normal_run_keeps_run_all_and_a_debug_run_shows_pause_until_it_pauses`; the pause before the next step: `grace_core::karate::debug::tests::debug_session::passes_a_pause_on_and_writes_commands_and_breakpoints`, `grace_core::runner::tests::debug::a_pause_asked_as_the_run_starts_stops_before_the_first_step` | ☑ |
+| SD-21 | Paused in a called feature | `grace::details::tests::step_debugger::marks_the_step_the_run_is_paused_before_with_its_comments_or_names_the_called_feature` | ☑ |
+| SD-22 | Between pauses the variables wait | `grace::variables::tests::dims_the_last_variables_while_the_run_goes_on` | ☑ |
+| SD-23 | The debug controls at 760 px (e2e) | `grace-e2e/tests/debug.rs::the_debug_controls_at_760_px`; `grace::toolbar::tests::step_debugger::at_760_px_the_debug_controls_are_icons_inside_the_window_that_say_their_label` | ☑ |
 
 ### TB · A toolbar that stays readable with a long project path
 
@@ -706,7 +706,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | SC-03 | Background steps keep their comments | `grace-core::karate::steps::tests::file_steps::attaches_the_comments_above_a_step_as_karate_does_step_comments_r1` (the file); `grace-core::karate::steps::tests::extract_steps::keeps_the_comments_karate_attached_to_a_step_backgrounds_too_step_comments_r1` (a run) | ☑ |
 | SC-04 | A comment attached to no step is not shown | `grace-core::karate::steps::tests::file_steps::attaches_the_comments_above_a_step_as_karate_does_step_comments_r1` (the six places of the table) | ☑ |
 | SC-05 | Comments show above their step | `grace::details::tests::a_test::shows_a_steps_comments_above_it` | ☑ |
-| SC-06 | The paused step shows its comments | Waits for the step debugger, phase P4: a pause needs it | ☐ |
+| SC-06 | The paused step shows its comments | `grace::details::tests::step_debugger::marks_the_step_the_run_is_paused_before_with_its_comments_or_names_the_called_feature` | ☑ |
 | SC-07 | Comments are masked | `grace-core::mask::tests::mask_event::masks_the_run_text_of_every_event` (a secret in a step comment) | ☑ |
 | SC-08 | Comments before and after a run (e2e) | `grace-e2e/tests/details.rs::failure_details` (before the run, the file's step with its comment; after it, the failed step's comment and the error box: place, comment, step) | ☑ |
 
@@ -731,7 +731,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | TO-13 | A run opens a feature inside a closed folder, and leaves the folder closed | `grace::tree::tests::a_run_opens_a_feature_inside_a_closed_folder_and_leaves_the_folder_closed` | ☑ |
 | TO-14 | A failure leaves a closed outline closed | `grace::tree::tests::a_failure_leaves_a_closed_outline_closed` | ☑ |
 | TO-15 | What a run opened stays open | `grace::tree::tests::run_all_opens_only_the_features_with_a_failure_and_never_one_closed_during_it` | ☑ |
-| TO-16 | A pause still opens the way to the paused test | Waits for the step debugger, phase P4: a pause needs it | ☐ |
+| TO-16 | A pause still opens the way to the paused test | `grace::tree::tests::step_debugger::a_pause_in_an_outlines_row_opens_its_feature_and_selects_it`, `a_pause_in_a_closed_feature_opens_it_and_scrolls_to_the_test_on_each_pause` | ☑ |
 | TO-17 | Statuses do not move rows | `grace::tree::tests::statuses_do_not_build_the_rows_again` | ☑ |
 | TO-18 | A feature opening above the view does not move it | `grace::tree::tests::a_feature_opening_above_the_view_does_not_move_it` | ☑ |
 
@@ -869,7 +869,7 @@ GPUI Grace's CI is `test.yml`'s `rust` job ([guide R6.5](2026-11-08-gpui-migrati
 | ID | Scenario | Proof in GPUI Grace | Ported |
 |---|---|---|---|
 | RP-01 | The tabs start in their usual order | `grace::bottom_panel::tests::tabs::start_with_console_history_http`; `grace-e2e/tests/panel.rs::the_tabs_move_with_alt_left_and_alt_right_and_their_order_survives_a_restart` (the names in the accessibility tree) | ☑ |
-| RP-02 | Variables stays after the three | `grace-core::panel_tabs::tests::falls_back_to_the_default` (an order naming "variables" is unusable, and `TabId` holds only the three). The Variables tab itself, and "cannot be dragged", come with the step debugger, phase P4 | ☑ |
+| RP-02 | Variables stays after the three | `grace-core::panel_tabs::tests::falls_back_to_the_default` (an order naming "variables" is unusable, and `TabId` holds only the three). The Variables tab stays last, cannot be dragged and takes no drop or Alt+arrow: `grace::bottom_panel::tests::tabs::variables_cannot_be_dragged`, `a_tab_dropped_on_variables_moves_nothing`, `alt_left_does_not_move_variables` | ☑ |
 | RP-03 | Dragging a tab onto another takes its place | `grace::bottom_panel::tests::tabs::a_dragged_tab_takes_the_place_of_the_tab_it_is_dropped_on_and_is_saved` (HTTP onto Console); `grace-core::panel_tabs::tests::puts_the_tab_in_the_place_asked_and_shifts_the_ones_between` (the three examples) | ☑ |
 | RP-04 | A drop marker shows where the tab will land | `grace::bottom_panel::tests::tabs::a_drop_bar_shows_on_the_side_the_tab_will_land_and_not_over_the_dragged_tab` | ☑ |
 | RP-05 | Dragging "HTTP" over "History" marks the left side | `grace::bottom_panel::tests::tabs::dragging_a_tab_from_the_right_marks_the_left_side` | ☑ |
@@ -984,8 +984,8 @@ Phase P4 · 2 tests
 
 | ID | Test | Ported as | Ported |
 |---|---|---|---|
-| E-debug-01 | Debugging from the tree: paused, stepping, finished | | ☐ |
-| E-debug-02 | The debug controls at 760 px | | ☐ |
+| E-debug-01 | Debugging from the tree: paused, stepping, finished | `grace-e2e/tests/debug.rs::debugging_from_the_tree_paused_stepping_and_finished` | ☑ |
+| E-debug-02 | The debug controls at 760 px | `grace-e2e/tests/debug.rs::the_debug_controls_at_760_px` | ☑ |
 
 ### e2e/details.spec.ts
 
@@ -1393,11 +1393,11 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/main/watch.test.ts` | 14 | `grace-core::watch::tests` (24 tests on Windows, 19 on Linux: the 14 of the Vitest file as 15, its `it.each` 2, test for test in [P4 slice 6](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md); one for two roots, 2 of the batch, the idle test, and Windows' 5) | ☑ |
 | `src/main/window.test.ts` | 5 | `grace-core::window::tests` (13 tests, every Vitest test and the added ones) | ☑ |
 | `src/renderer/Banner.test.tsx` | 10 | view `Banner` (`grace::ui`), headless: `console::tests::banner`; `banner::tests` (the states) | ☑ |
-| `src/renderer/BottomPanel.test.tsx` | 17 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6 | ☑ |
+| `src/renderer/BottomPanel.test.tsx` | 19 | view `BottomPanel` (`grace::ui`), headless: `bottom_panel::tests` (the tabs, the drag, the keys, the saved order); the look tests with PR 6; the Variables tab in P4 slice 10: "shows only while a debug run is going" in `bottom_panel::tests::tabs::variables_shows_only_while_a_debug_run_is_going`, the Variables halves of "makes the three tabs draggable, and not Variables" and "allows the drop only over the three tabs" in `variables_cannot_be_dragged` and `a_tab_dropped_on_variables_moves_nothing`, and "does not move Variables with the keys" in `alt_left_does_not_move_variables` | ☑ |
 | `src/renderer/CallDetails.test.tsx` | 16 | `grace::http::call_details::tests` (12 tests: 10 for 12 Vitest tests, 2 added) and `grace_core::http_list::tests::call_text` (7 tests, the rules the view only draws), test for test in [P3 plan, slice 4](../plans/2026-11-12-gpui-p3-panels.md#calldetailstesttsx-16-in-gracehttpcall_detailstests); 2 `n/a` (a clipboard write that fails), 2 by eye (Tailwind classes) | ☑ |
 | `src/renderer/ConfigBanner.test.tsx` | 6 | `grace::failures::tests` (6 tests, one added) and `grace::window::tests::the_config_banner_sits_on_the_sheet_under_the_notice`, test for test in [P3 plan, slice 10](../plans/2026-11-12-gpui-p3-panels.md#configbannertesttsx-6-tests-in-gracefailurestests) | ☑ |
 | `src/renderer/Console.test.tsx` | 30 | view `Console` (`grace::ui`), headless: `console::tests` (25 tests: the lines, find, errors); the highlight-API tests go (plan, Redesigns) | ☑ |
-| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 22 ported, 1 `n/a` that counts Solid memo calls; 11 were the failure groups, ported in [P3 slice 10](../plans/2026-11-12-gpui-p3-panels.md#detailstesttsx-23-to-34-the-failure-groups-p2-left-for-this-slice-in-gracedetailstestsfailure_groups) (10 ported, 1 `n/a` for the focus); tests 14, 15, 17 and 29 in [P4 slice 8](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::details::tests::breakpoints`; 1 waits for P4's debug run) | ☑ |
+| `src/renderer/Details.test.tsx` | 33 | `grace::details::tests` and `grace-e2e/tests/details.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (35 runs with the `it.each` cases: 22 ported, 1 `n/a` that counts Solid memo calls; 11 were the failure groups, ported in [P3 slice 10](../plans/2026-11-12-gpui-p3-panels.md#detailstesttsx-23-to-34-the-failure-groups-p2-left-for-this-slice-in-gracedetailstestsfailure_groups) (10 ported, 1 `n/a` for the focus); tests 14, 15, 17 and 29 in [P4 slice 8](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::details::tests::breakpoints`; test 16 in [P4 slice 10](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::details::tests::step_debugger`) | ☑ |
 | `src/renderer/EmptyState.test.tsx` | 3 | `grace::ui::tests` (2 tests; "has no test id unless given one" is `n/a`: a DOM test id) | ☑ |
 | `src/renderer/EnvPicker.test.tsx` | 18 | view `EnvPicker` (`grace::ui`), headless; ported in `grace::env_picker::tests` (18: the 3 `words` tests and 15 views) | ☑ |
 | `src/renderer/Examples.test.tsx` | 10 | `grace::examples::tests` and `grace_core::examples::tests`, test for test in [P3 plan, Slice 9](../plans/2026-11-12-gpui-p3-panels.md#slice-9-the-data-driven-view) | ☑ |
@@ -1416,13 +1416,13 @@ Every Vitest file under `src/` at the go decision, with its number of tests. Log
 | `src/renderer/StatusMark.test.tsx` | 8 | `grace::elements::tests` (the statuses, shapes, colours, turning and sizes); [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) | ☑ |
 | `src/renderer/SwitchDialog.test.tsx` | 12 | view `SwitchDialog` (`grace::ui`), headless | ☐ |
 | `src/renderer/Threads.test.tsx` | 6 | view `Threads` (`grace::ui`), headless; ported in `grace::threads_box::tests` (14) | ☑ |
-| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (30 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; 2 wait for P4's step debugger) | ☑ |
+| `src/renderer/Toolbar.test.tsx` | 36 | `grace::toolbar::tests` and `grace::window::tests`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (30 ported, 2 by eye in PR 6d, 2 `n/a`: a CSS class and `title=`; tests 33 to 36 in P4 slice 7; tests 31 and 32 in [P4 slice 10](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::toolbar::tests::step_debugger` and, for the keys, `grace::window::tests`) | ☑ |
 | `src/renderer/Tooltip.test.tsx` | 46 | `grace::tooltip::tests` (23 tests) and the toolbar's and tags' tests, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 12 are `n/a` (the DOM's `popover`, CSS classes, Solid, describedby ids) | ☑ |
-| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; test 84 in P4 slice 8, `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; 5 wait for P4's debug run) | ☑ |
+| `src/renderer/Tree.test.tsx` | 86 | `grace::tree::tests`, `grace_core::rows::tests` and `grace-e2e/tests/tree.rs`, test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests) (92 runs with the `it.each` cases: 80 ported, test 28 in [P3 slice 8](../plans/2026-11-12-gpui-p3-panels.md), `grace::tree::tests::a_flaky_test_has_its_mark_counted_above_and_explained_on_its_left`; the look of the selected row by eye in PR 6d, 3 `n/a` that count Solid memo calls; test 25 in [P4 slice 4](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), `grace::window::tests::offers_build_in_a_notice_that_asks_for_it_off_while_busy`; test 22 in P4 slice 5, `grace::tree::tests::offers_the_folders_below_an_empty_project`; test 84 in P4 slice 8, `grace::tree::tests::marks_the_feature_and_the_scenario_holding_a_breakpoint`; tests 41, 65, 73, 83 and 85 in P4 slice 10, `grace::tree::tests::step_debugger` and `grace-e2e/tests/debug.rs`) | ☑ |
 | `src/renderer/Trends.test.tsx` | 15 | `grace::trends::tests` (headless, on the fake runner), test for test in [P3 plan, slice 7](../plans/2026-11-12-gpui-p3-panels.md#trendstesttsx-15-tests-in-gracetrendstests); 9 added | ☑ |
 | `src/renderer/UpdateModal.test.tsx` | 13 | view `UpdateModal` (`grace::ui`), headless | ☐ |
 | `src/renderer/UpdateProgress.test.tsx` | 13 | view `UpdateProgress` (`grace::ui`), headless | ☐ |
-| `src/renderer/Variables.test.tsx` | 4 | view `Variables` (`grace::ui`), headless | ☐ |
+| `src/renderer/Variables.test.tsx` | 4 | `grace::variables::tests`, test for test in [P4 slice 10](../plans/2026-11-25-gpui-p4-setup-watch-debugger.md), and `grace_core::variables::tests` | ☑ |
 | `src/renderer/VirtualList.test.tsx` | 28 | `grace::tree::tests` and `grace-e2e/tests/tree.rs` (the tree is the list), test for test in [P2 plan, The component tests](../plans/2026-11-09-gpui-p2-main-screen.md#the-component-tests); 3 `n/a` (a Solid prop and memo, DOM node identity); 1 (test 9, the table's arrow keys) is `grace::examples::tests::the_arrow_keys_move_without_opening_and_enter_opens`; test 23 is the HTTP tab's | ☑ |
 | `src/renderer/bannerText.test.ts` | 15 | `grace::ui::bannerText`: `grace-core::banner::tests` | ☑ |
 | `src/renderer/buttons.test.ts` | 2 | `grace::elements::tests::draws_buttons_icons_and_marks_at_their_sizes` | ☑ |
