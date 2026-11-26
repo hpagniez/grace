@@ -354,11 +354,12 @@ fn its_threads_use_no_cpu_while_no_file_changes() {
     // one event, so every thread has run once (Linux learns notify's thread from it), then a quiet batch
     feature(&root.join("a.feature"));
     assert_eq!(next(&s.saved), [root.join("a.feature")]);
-    // settled once two readings 100 ms apart agree; a thread that never settles is the failure
+    // settled once two readings agree that are further apart than a quiet window: a late second event opens one, and
+    // the quiet thread sleeps through it before it runs again. A thread that never settles is the failure
     let mut before = s.w.cpu();
     let end = Instant::now() + LIMIT;
     loop {
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(QUIET_TEST * 2);
         let now = s.w.cpu();
         if now == before {
             break;
