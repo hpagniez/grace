@@ -9,7 +9,7 @@
 //! A row's menu, "Open in VS Code", is GPUI Kit's `PopupMenu`, opened by the Tree itself: Kit's `ContextMenu` opens only
 //! on a right press, and the menu key must open it from the focus row (OT-01, P3 plan, Redesigns, `tree`).
 //!
-//! The debug button and the breakpoint dot come with phase P4 (P2 plan, Redesigns).
+//! The debug button comes with phase P4's debug run (P2 plan, Redesigns).
 use crate::elements::Off as _;
 use gpui_component::scroll::ScrollableElement as _;
 use std::collections::HashSet;
@@ -26,13 +26,14 @@ use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{PopupMenu, PopupMenuItem};
 use grace_core::editor::editor_place;
 use grace_core::karate::tree::find_node;
+use grace_core::model::events::Breakpoint;
 use grace_core::model::flaky::FLAKY_TITLE;
 use grace_core::model::node::{NodeKind, Status};
 use grace_core::model::status::derive_status;
 use grace_core::model::tags::FilterState;
 use grace_core::rows::{
-    TreeRow, Turned, View, ancestors, anchored_scroll_top, feature_of, flaky_chip, label_of, leaves, page_rows,
-    row_matches, row_name, status_label, survivor, tree_rows,
+    TreeRow, Turned, View, ancestors, anchored_scroll_top, breakpoint_keys, feature_of, flaky_chip, label_of, leaves,
+    page_rows, row_matches, row_name, status_label, survivor, tree_rows,
 };
 use grace_core::state::AppState;
 
@@ -50,6 +51,8 @@ const EMPTY_HINT: &str = "Grace looks for .feature files under the project folde
 pub const PAD: f32 = 8.;
 /// px a level indents its rows.
 pub const INDENT: f32 = 16.;
+/// What the breakpoint dot says to assistive technology.
+pub const HAS_BREAKPOINTS: &str = "Has breakpoints";
 /// What a row's keys do beside moving, said to assistive technology (VL-22).
 pub const SHORTCUTS: &str = "Control+Enter";
 
@@ -92,6 +95,9 @@ pub struct Tree {
     seen_reveals: u32,
     seen_pause: (Option<String>, u32),
     seen_filter: Option<FilterState>,
+    /// The rows with the breakpoint dot, and the tree count and breakpoints they were worked out from.
+    dotted: HashSet<String>,
+    dotted_from: (u64, Vec<Breakpoint>),
     /// The selected row scrolls into view once the rows are built (VL-20, a pause, a reveal).
     reveal_selected: bool,
     menu: Option<RowMenu>,
@@ -124,6 +130,8 @@ impl Tree {
             seen_reveals: state.reveals,
             seen_pause: (None, 0),
             seen_filter: None,
+            dotted: HashSet::new(),
+            dotted_from: (0, Vec::new()),
             reveal_selected: false,
             menu: None,
             _observe: observe,
@@ -194,6 +202,21 @@ impl Tree {
             self.seen_filter = Some(state.filter.clone());
         }
         self.build(state);
+        self.mark_breakpoints(state);
+    }
+
+    /// The rows with the breakpoint dot, found again only when the tests or the breakpoints changed (step debugger
+    /// R5.2), never as a row is drawn.
+    fn mark_breakpoints(&mut self, state: &AppState) {
+        let (trees, breakpoints) = &self.dotted_from;
+        if *trees == state.trees && *breakpoints == state.breakpoints {
+            return;
+        }
+        self.dotted = state
+            .tree
+            .as_ref()
+            .map_or_else(HashSet::new, |t| breakpoint_keys(t, &state.breakpoints));
+        self.dotted_from = (state.trees, state.breakpoints.clone());
     }
 
     /// A run opens the feature it started in, and each feature where one of its tests fails, once (#224 R3). The
@@ -780,6 +803,19 @@ impl Tree {
                         .child(title),
                 )
             });
+        // one of its lines holds a breakpoint (step debugger R5.2)
+        let breakpoint = self.dotted.contains(&key).then(|| {
+            let key = key.clone();
+            div()
+                .id(part("breakpoint-mark", &key))
+                .debug_selector(move || format!("breakpoint-mark:{key}"))
+                .role(Role::Image)
+                .aria_label(HAS_BREAKPOINTS)
+                .flex_none()
+                .size(px(8.))
+                .rounded_full()
+                .bg(Theme::color(t.failed))
+        });
         let tags = node.tags.iter().map(|tag| crate::ui::tag_chip(tag.clone(), cx));
         let flaky_badge = flaky.clone().map(|words| {
             let badge = div()
@@ -908,6 +944,7 @@ impl Tree {
             .child(mark)
             .when_some(kind_icon, |d, k| d.child(icon(k, 14., Theme::color(t.muted))))
             .child(name)
+            .children(breakpoint)
             .children(tags)
             .children(flaky_badge)
             .children(run);

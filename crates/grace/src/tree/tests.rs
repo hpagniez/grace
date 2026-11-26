@@ -1086,3 +1086,43 @@ fn scrolls_to_the_offers_that_do_not_fit(cx: &mut TestAppContext) {
     let shown = cx.debug_bounds(last).unwrap();
     assert!(area.contains(&shown.center()), "{area:?} {shown:?}");
 }
+
+// `Tree.test.tsx` 84: the feature and the scenario holding a breakpoint have the dot
+#[gpui::test]
+fn marks_the_feature_and_the_scenario_holding_a_breakpoint(cx: &mut TestAppContext) {
+    let mut s = state("/p", &["a", "b"]);
+    for (i, line) in [(0, 3), (1, 6)] {
+        s.tree.as_mut().unwrap().children[0].children[0].children[i].line = Some(line);
+    }
+    let (h, mut cx, tree) = setup(cx, s);
+    toggle(&tree, "f:tests/a.feature", &mut cx);
+    let dotted = |cx: &mut VisualTestContext| -> Vec<String> {
+        keys(&tree, cx)
+            .into_iter()
+            .filter(|k| {
+                cx.debug_bounds(Box::leak(format!("breakpoint-mark:{k}").into_boxed_str()))
+                    .is_some()
+            })
+            .collect()
+    };
+    assert!(dotted(&mut cx).is_empty());
+    let set = vec![grace_core::model::events::Breakpoint {
+        file: "tests/a.feature".into(),
+        line: 7,
+    }];
+    h.update(&mut cx, |s| s.breakpoints = set);
+    assert_eq!(dotted(&mut cx), ["f:tests/a.feature", "s:tests/a.feature#1"]);
+    // after the name
+    let at = |cx: &mut VisualTestContext, id: &'static str| cx.debug_bounds(id).unwrap();
+    let row = at(&mut cx, "tree-row:s:tests/a.feature#1");
+    let mark = at(&mut cx, "breakpoint-mark:s:tests/a.feature#1");
+    assert!(mark.left() > row.left() + gpui::px(40.) && mark.right() < row.right());
+    // a new listing of the tests moves the dot with the lines
+    h.update(&mut cx, |s| {
+        s.tree.as_mut().unwrap().children[0].children[0].children[1].line = Some(8);
+        s.trees += 1;
+    });
+    assert_eq!(dotted(&mut cx), ["f:tests/a.feature", "s:tests/a.feature#0"]);
+    h.update(&mut cx, |s| s.breakpoints.clear());
+    assert!(dotted(&mut cx).is_empty());
+}

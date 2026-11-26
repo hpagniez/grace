@@ -344,3 +344,50 @@ fn the_flaky_chip_counts_the_flaky_tests_under_a_row() {
         Some("flaky")
     );
 }
+
+mod breakpoint_keys {
+    use super::*;
+    use crate::model::events::Breakpoint;
+
+    fn on(file: &str, lines: &[u32]) -> Vec<String> {
+        let set: Vec<_> = lines
+            .iter()
+            .map(|&line| Breakpoint {
+                file: file.into(),
+                line,
+            })
+            .collect();
+        let mut t = tree();
+        t.children[0].children[1].children[0].line = Some(3); // the outline's own line
+        let mut keys: Vec<_> = breakpoint_keys(&t, &set).into_iter().collect();
+        keys.sort();
+        keys
+    }
+
+    // `breakpointKeys` of `nodes.ts` (step debugger R5.2): a test holds the lines from its own up to the next test's
+    #[test]
+    fn marks_the_feature_and_the_test_whose_lines_hold_a_breakpoint() {
+        let basic = "tests/basic.feature";
+        let (feature, first, second) = (
+            "f:tests/basic.feature",
+            "s:tests/basic.feature#1",
+            "s:tests/basic.feature#2",
+        );
+        for line in [6, 13] {
+            assert_eq!(on(basic, &[line]), [feature, first], "line {line}");
+        }
+        for line in [14, 99] {
+            assert_eq!(on(basic, &[line]), [feature, second], "line {line}");
+        }
+        assert_eq!(on(basic, &[7, 15]), [feature, first, second]);
+        // a background's line is the feature's alone
+        assert_eq!(on(basic, &[4]), [feature]);
+        // an outline is a test of its feature; its rows are not marked
+        assert_eq!(
+            on("tests/outline.feature", &[4]),
+            ["f:tests/outline.feature", "o:tests/outline.feature#1"]
+        );
+        assert!(on(basic, &[]).is_empty());
+        assert!(on("tests/gone.feature", &[6]).is_empty());
+    }
+}
