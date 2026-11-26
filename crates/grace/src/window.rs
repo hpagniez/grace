@@ -64,6 +64,7 @@ pub struct GraceWindow {
     /// The Settings page while it covers the view; made afresh each time it opens, as Electron Grace's was.
     pub settings: Option<Entity<crate::settings::SettingsPage>>,
     _motion: Option<gpui::Subscription>,
+    _debug_keys: Option<gpui::Subscription>,
 }
 
 impl GraceWindow {
@@ -86,6 +87,7 @@ impl GraceWindow {
             details: None,
             settings: None,
             _motion: None,
+            _debug_keys: None,
         }
     }
 
@@ -115,6 +117,7 @@ impl GraceWindow {
         me.panel = Some(cx.new(|cx| crate::bottom_panel::BottomPanel::new(grace.clone(), window, cx)));
         me.details = Some(cx.new(|cx| crate::details::Details::new(grace.clone(), cx)));
         me._motion = Some(a11y::follow_reduced_motion(window, cx));
+        me._debug_keys = Some(debug_keys(grace.clone(), window, cx));
         me.grace = Some(grace);
         me
     }
@@ -201,6 +204,24 @@ pub fn save_bounds(data_dir: &Path, state: &WindowState) {
     if let Err(e) = save_window_state(data_dir, state) {
         eprintln!("the window's bounds could not be saved: {e}");
     }
+}
+
+/// F5, F10 and F11 while a debug run waits (step debugger R6.3): anywhere in the window, so an interceptor, ahead of
+/// whatever has the focus. Only the plain keys, so Shift+F10 stays the tree's row menu, and only while paused: a
+/// press otherwise goes on as it was. It runs on a keystroke alone.
+fn debug_keys(grace: Entity<Grace>, window: &Window, cx: &mut App) -> gpui::Subscription {
+    let id = window.window_handle().window_id();
+    cx.intercept_keystrokes(move |e, window, cx| {
+        let k = &e.keystroke;
+        let Some(step) = crate::toolbar::DEBUG_STEPS.iter().find(|s| s.key == k.key) else {
+            return;
+        };
+        if k.modifiers.modified() || window.window_handle().window_id() != id || grace.read(cx).state.paused.is_none() {
+            return;
+        }
+        cx.stop_propagation();
+        grace.update(cx, |g, cx| g.debug_command(step.command, cx));
+    })
 }
 
 /// The rem, in px: Tailwind's root size, which Electron Grace keeps.
@@ -1160,5 +1181,100 @@ mod tests {
             let gone_max = bounds(Some(state(-50_000., -50_000., 900., 600., true)), cx);
             assert!(matches!(gone_max, WindowBounds::Maximized(_)));
         });
+    }
+
+    /// A project whose debug run waits, with a feature the tree's menu can open.
+    fn paused_state() -> grace_core::state::AppState {
+        use grace_core::model::node::Layout;
+        let mut state = crate::testing::project(r"D:\api", Layout::Maven, 2);
+        if let Some(tree) = &mut state.tree {
+            tree.children[0].file = "a.feature".into();
+        }
+        state.run.active = true;
+        state.run.debug = true;
+        state.paused = Some(crate::testing::paused("s:a.feature#0"));
+        state
+    }
+
+    fn commands(h: &crate::testing::Harness) -> Vec<String> {
+        h.backend
+            .calls()
+            .into_iter()
+            .filter(|c| c.starts_with("debug_command "))
+            .collect()
+    }
+
+    fn press(vcx: &mut gpui::VisualTestContext, keys: &str) {
+        vcx.simulate_keystrokes(keys);
+        vcx.run_until_parked();
+    }
+
+    const THREE: [&str; 3] = ["debug_command Continue", "debug_command Over", "debug_command Into"];
+
+    /// `Toolbar.test.tsx` 32's keys (step debugger R6.3): while paused F5, F10 and F11 work anywhere in the window,
+    /// the Console's search box and the Settings page included; once the run goes on they do nothing.
+    #[gpui::test]
+    fn f5_f10_and_f11_command_a_paused_run_from_anywhere_in_the_window(cx: &mut TestAppContext) {
+        let (h, mut vcx) = window_on(cx, paused_state());
+        press(&mut vcx, "f5 f10 f11");
+        assert_eq!(commands(&h), THREE, "with nothing focused");
+        // Ctrl+F is an action of the window's: the focus rests on its root, as after a click on nothing
+        vcx.update(|window, cx| {
+            let me = window.root::<GraceWindow>().flatten().expect("Grace's window");
+            let focus = me.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        });
+        vcx.run_until_parked();
+        press(&mut vcx, "ctrl-f");
+        assert!(vcx.debug_bounds("find-bar").is_some(), "the search box has the focus");
+        press(&mut vcx, "f5 f10 f11");
+        assert_eq!(commands(&h)[3..], THREE, "from a text box");
+        h.grace.update(&mut vcx, |g, cx| {
+            g.state_mut().reduce(&grace_core::model::events::AppEvent::DebugResumed);
+            cx.notify();
+        });
+        vcx.run_until_parked();
+        press(&mut vcx, "f5 f10 f11");
+        assert_eq!(commands(&h).len(), 6, "nothing while the run goes on");
+    }
+
+    #[gpui::test]
+    fn the_debug_keys_work_on_the_settings_page_too(cx: &mut TestAppContext) {
+        let (h, mut vcx) = window_on(cx, paused_state());
+        let window = vcx.update(|window, _| window.window_handle());
+        let window = window.downcast::<GraceWindow>().expect("Grace's window");
+        window.update(&mut vcx, |w, _, cx| w.open_settings(cx)).unwrap();
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("toolbar").is_none(), "the page covers the view");
+        press(&mut vcx, "f10");
+        assert_eq!(commands(&h), ["debug_command Over"]);
+    }
+
+    /// The keys are the plain ones: Shift+F10 stays the tree's row menu, and no other modifier steps the run.
+    #[gpui::test]
+    fn a_modified_debug_key_steps_nothing_and_shift_f10_opens_the_rows_menu(cx: &mut TestAppContext) {
+        let (h, mut vcx) = window_on(cx, paused_state());
+        let tree = vcx.update(|window, cx| {
+            let me = window.root::<GraceWindow>().flatten().expect("Grace's window");
+            me.read(cx).tree.clone().expect("the tree")
+        });
+        vcx.update(|window, cx| {
+            let focus = tree.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        });
+        vcx.run_until_parked();
+        press(&mut vcx, "shift-f10");
+        assert!(vcx.debug_bounds("row-menu").is_some(), "the row's menu");
+        press(&mut vcx, "escape ctrl-f5 alt-f11 shift-f5");
+        assert!(commands(&h).is_empty(), "{:?}", commands(&h));
+    }
+
+    #[gpui::test]
+    fn the_debug_keys_do_nothing_with_no_pause(cx: &mut TestAppContext) {
+        let mut state = paused_state();
+        state.paused = None;
+        let (h, mut vcx) = window_on(cx, state);
+        press(&mut vcx, "f5 f10 f11");
+        assert!(commands(&h).is_empty());
     }
 }

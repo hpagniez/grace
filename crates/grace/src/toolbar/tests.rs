@@ -451,3 +451,5 @@ mod properties {
         assert!(at(&mut cx, "properties-button").origin.x < at(&mut cx, "refresh-button").origin.x);
     }
 }
+
+mod step_debugger;

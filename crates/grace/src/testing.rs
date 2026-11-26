@@ -9,7 +9,7 @@ use gpui::{
     AnyElement, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
     TestAppContext, VisualTestContext, Window, div, px, size,
 };
-use grace_core::model::events::{Project, RunOutcome};
+use grace_core::model::events::{Paused, Project, RunOutcome};
 use grace_core::model::history::HistoryEntry;
 use grace_core::model::node::{Layout, NodeKind, TestNode};
 use grace_core::model::tags::no_filter;
@@ -279,4 +279,18 @@ pub fn text_width(window: &Window, text: &str, size: f32, weight: gpui::FontWeig
             .shape_line(text.to_owned().into(), gpui::px(size), &[run], None)
             .width,
     )
+}
+
+/// A debug run's pause before line 3 of `a.feature`, in the test `key`.
+pub fn paused(key: &str) -> Paused {
+    Paused {
+        key: Some(key.into()),
+        file: "a.feature".into(),
+        line: 3,
+        depth: 0,
+        prefix: "*".into(),
+        keyword: "def".into(),
+        text: "x = 1".into(),
+        vars: vec![],
+    }
 }
