@@ -38,6 +38,9 @@ fn dotted(tree: &Node, label: &str) -> bool {
 fn a_breakpoint_set_before_a_run_shows_on_its_step_and_in_the_tree() {
     let dir = project("clean").unwrap();
     let app = App::launch_with_settings(&json!({ "lastProject": dir.to_string_lossy() }), &[]).unwrap();
+    // the tree comes with the dry run, which takes longer than a press waits
+    app.wait_for("the tests found", WAIT, |t| named(t, "9 tests · Not run yet").is_some())
+        .unwrap();
     app.press_named(Role::Button, "Expand basic.feature").unwrap();
     let tree = app
         .wait_for("the test's row", WAIT, |t| row(t, "failing match").is_some())
