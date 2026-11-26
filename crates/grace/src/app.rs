@@ -36,6 +36,8 @@ pub trait Backend: Send + Sync + 'static {
     fn replay(&self) -> Vec<AppEvent>;
     /// Lists the open project's tests again.
     fn refresh(&self) -> std::io::Result<()>;
+    /// Turns watch mode on or off; the runner sends the choice in force.
+    fn set_watch(&self, on: bool);
     /// Builds the open project's Java code with its own build tool, then lists the tests again.
     fn build(&self) -> std::io::Result<()>;
     /// Runs the tests under a node: the tree's root for Run all.
@@ -94,6 +96,9 @@ impl Backend for Runner {
     }
     fn refresh(&self) -> std::io::Result<()> {
         Runner::refresh(self)
+    }
+    fn set_watch(&self, on: bool) {
+        Runner::set_watch(self, on)
     }
     fn build(&self) -> std::io::Result<()> {
         Runner::build(self)
@@ -358,6 +363,14 @@ impl Grace {
     /// Refresh: lists the tests again.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         self.background(cx, Order::Start, |b| b.refresh());
+    }
+
+    /// The toolbar's Watch toggle (watch mode R1). Allowed during a run.
+    pub fn set_watch(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.background(cx, Order::End, move |b| {
+            b.set_watch(on);
+            Ok(())
+        });
     }
 
     /// The notice's Build button: builds the project's Java code (build from the notice R1).
@@ -684,6 +697,9 @@ pub mod fake {
         fn replay(&self) -> Vec<AppEvent> {
             self.record("replay".into());
             vec![AppEvent::Opening { root: None }, AppEvent::Busy { busy: false }]
+        }
+        fn set_watch(&self, on: bool) {
+            self.record(format!("set_watch {on}"));
         }
         fn refresh(&self) -> std::io::Result<()> {
             self.record("refresh".into());

@@ -222,11 +222,12 @@ fn the_last_project_folder_was_deleted() {
     assert_eq!(first_dialog(&app), None);
 }
 
-/// The toolbar's buttons, in their order (`TOOLBAR_BUTTONS`; Watch comes with phase P4).
-const TOOLBAR: [&str; 8] = [
+/// The toolbar's buttons, in their order (`TOOLBAR_BUTTONS`).
+const TOOLBAR: [&str; 9] = [
     "Home",
     "Properties…",
     "Refresh",
+    "Watch",
     "Open…",
     "Report",
     "Re-run failed",

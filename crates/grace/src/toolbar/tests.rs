@@ -1,6 +1,6 @@
 //! `Toolbar.test.tsx`, for the toolbar of P2's second PR: order and shape, the narrow window, Home and Refresh, the
-//! project and the actions. Its Env, Threads and Properties tests come with those boxes (P2 PR 4), its step debugger
-//! and Watch tests with phase P4.
+//! project and the actions, and the Watch toggle (P4). Its Env, Threads and Properties tests come with those boxes (P2
+//! PR 4), its step debugger tests with the debugger (P4).
 use super::*;
 use crate::testing::{Harness, open, project, run};
 use gpui::{Bounds, Modifiers, Pixels, TestAppContext, VisualTestContext, point};
@@ -8,9 +8,10 @@ use std::time::Duration;
 
 const WIDE: f32 = 1400.;
 const NARROW: f32 = 1000.;
-const BUTTONS: [&str; 7] = [
+const BUTTONS: [&str; 8] = [
     "home-button",
     "refresh-button",
+    "watch-button",
     "open-button",
     "report-button",
     "rerun-failed-button",
@@ -89,7 +90,7 @@ mod order_and_shape_r13_1 {
         for id in BUTTONS {
             assert_eq!(at(&mut cx, id).size.height, px(28.), "{id} {:?}", at(&mut cx, id));
         }
-        for id in ["home-button", "refresh-button"] {
+        for id in ["home-button", "refresh-button", "watch-button"] {
             assert_eq!(at(&mut cx, id).size.width, px(28.), "{id}");
         }
     }
@@ -363,6 +364,60 @@ mod the_actions {
         let mut no_tree = idle();
         no_tree.tree = None;
         assert!(!actions(&no_tree).run_all);
+    }
+}
+
+mod the_watch_toggle_watch_mode_r1 {
+    use super::*;
+
+    #[gpui::test]
+    fn is_an_icon_button_off_until_the_runner_says_on_with_its_own_icon_when_on(cx: &mut TestAppContext) {
+        let mut s = idle();
+        let off = watch_toggle(&s);
+        assert_eq!((off.icon, off.pressed), (Icon::EyeOff, false));
+        s.watch = true;
+        let on = watch_toggle(&s);
+        assert_eq!((on.icon, on.pressed), (Icon::Eye, true));
+        let (_, mut cx) = toolbar(cx, WIDE, s);
+        assert_eq!(at(&mut cx, "watch-button").size, gpui::size(px(28.), px(28.)));
+    }
+
+    #[gpui::test]
+    fn asks_the_runner_for_the_other_state_on_a_click(cx: &mut TestAppContext) {
+        let (h, mut cx) = toolbar(cx, WIDE, idle());
+        click(&mut cx, "watch-button");
+        assert_eq!(h.backend.calls(), ["set_watch true"]);
+        h.update(&mut cx, |s| s.watch = true);
+        click(&mut cx, "watch-button");
+        assert_eq!(h.backend.calls(), ["set_watch true", "set_watch false"]);
+    }
+
+    #[gpui::test]
+    fn says_what_it_does_in_its_tooltip(cx: &mut TestAppContext) {
+        let (h, mut cx) = toolbar(cx, WIDE, idle());
+        assert_eq!(
+            hover(&h, &mut cx, "watch-button").as_deref(),
+            Some("Watch: run a feature when it is saved")
+        );
+    }
+
+    #[gpui::test]
+    fn stays_on_during_a_run_and_is_off_during_an_open_and_with_no_project(cx: &mut TestAppContext) {
+        let mut s = idle();
+        s.busy = true;
+        s.run.active = true;
+        assert!(watch_toggle(&s).enabled);
+        s.opening = Some("/other".into());
+        assert!(!watch_toggle(&s).enabled);
+        let (h, mut cx) = toolbar(cx, WIDE, s);
+        click(&mut cx, "watch-button");
+        assert_eq!(h.backend.calls(), Vec::<String>::new());
+        h.update(&mut cx, |s| {
+            s.opening = None;
+            s.project = None;
+        });
+        click(&mut cx, "watch-button");
+        assert_eq!(h.backend.calls(), Vec::<String>::new());
     }
 }
 
