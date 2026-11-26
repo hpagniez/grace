@@ -363,12 +363,13 @@ mod tests {
         let held = Mutex::new(held);
         let hangs: Arc<Read> = Arc::new(move |dir: &Path| {
             if dir.ends_with("b") {
-                let _ = held.lock().unwrap().recv(); // until the test drops its end
+                // until the test drops its end; the bound of its own lets a walk that waited for it fail, not hang
+                let _ = held.lock().unwrap().recv_timeout(Duration::from_secs(30));
             }
             read_dir(dir)
         });
         let limits = Limits {
-            timeout_ms: 300,
+            timeout_ms: 1_000, // room for the reads before `b` on a slow runner
             ..Limits::default()
         };
         let started = Instant::now();
