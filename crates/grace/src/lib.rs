@@ -39,6 +39,7 @@ pub mod tooltip;
 pub mod tree;
 pub mod trends;
 pub mod ui;
+pub mod variables;
 pub mod window;
 
 use std::path::PathBuf;
