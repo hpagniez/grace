@@ -41,6 +41,7 @@ mod subfolders;
 mod tags;
 mod threads;
 mod trends;
+mod watch;
 
 pub(super) const SECRET: &str = "s3cret-token-123";
 

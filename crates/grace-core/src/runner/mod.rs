@@ -10,10 +10,15 @@
 //! them works, the runner is busy: any other of them, and every change that a run would see, is refused with "A run is
 //! already in progress", as in Electron Grace; `cancel`, `replay`, `current` and the other reads answer at once from
 //! any thread. Nothing of the runner runs or wakes while it is idle (ADR 0030): a run's thread reads its events file
-//! every 100 ms only while Java runs.
+//! every 100 ms only while Java runs, and watch mode's threads sleep in the OS until a file changes.
 //!
-//! `emit` is called on the thread that does the work (a run's events on the run's caller, the recent list on a short
-//! thread of its own), never under one of the runner's locks: it may call `cancel`, as a test of Electron Grace's
+//! The watcher's callbacks run on its own thread, which closing it waits for, so they only post: the saves go in
+//! `waiting` and a short-lived thread runs them once the runner is idle, and another takes the locks after an error.
+//! Locks are taken in the order `watcher`, `state`, then `waiting` or `ctl`, and a watcher is closed under `watcher`
+//! alone.
+//!
+//! `emit` is called on the thread that does the work (a run's events on the run's caller, the recent list and watch
+//! mode's own on short threads of their own), never under one of the runner's locks: it may call `cancel`, as a test of Electron Grace's
 //! does. It should only queue the event (`batch::batched`) and return.
 //!
 //! # Where this differs from a line-for-line port
@@ -26,8 +31,8 @@
 //!   between, in place of a readline callback and a `setInterval`: one thread emits a run's events, in order.
 //! - Errors are `io::Result`s where the TypeScript threw; P2 shows them as notices, as `main.ts`'s `handle` did.
 //! - The window's untyped requests (`setThreads(n: unknown)`) keep their checks where the type allows them.
-//! - Phase P4's parts still to port, watch mode and the step debugger, are left out, each place they act marked `P4`.
-//!   The events stay those of a project that has neither: `watch` (as saved) and `breakpoints` (empty).
+//! - Phase P4's part still to port, the step debugger, is left out, each place it acts marked `P4`. The events stay
+//!   those of a project that has none: `breakpoints` (empty).
 mod run;
 mod setup;
 #[cfg(test)]
@@ -65,18 +70,20 @@ use crate::settings::{
     EnvSettings, SavedControls, StoredLists, StoredRow, StoredValue, forget_last_project, load_project_env,
     load_project_filter, load_project_threads, load_project_watch, load_recent_projects, remove_recent_project,
     save_opened_project, save_project_env, save_project_filter, save_project_properties, save_project_threads,
-    saved_controls, skipped_properties,
+    save_project_watch, saved_controls, skipped_properties,
 };
 use crate::trends::find_trend;
 use crate::vendor::VendorPaths;
+use crate::watch::{QUIET, Watcher, watch_features};
 use indexmap::IndexMap;
 use run::{OldNode, RunTarget};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -193,8 +200,10 @@ struct State {
     report: Option<PathBuf>,
     /// The open project's breakpoints, in memory only (step debugger R3.1); always empty until P4 ports the debugger.
     breakpoints: Vec<Breakpoint>,
-    /// Watch mode as saved for the open project (watch mode R1); the watcher itself ports in P4.
+    /// Whether watch mode is on for the open project (watch mode R1).
     watching: bool,
+    /// Operations that have ended and not yet said so: a watch run waits for them, so its `busy` comes after theirs.
+    settling: u32,
 }
 
 impl State {
@@ -213,6 +222,7 @@ impl State {
             report: None,
             breakpoints: Vec::new(),
             watching: false,
+            settling: 0,
         }
     }
 
@@ -258,6 +268,15 @@ struct Start {
 enum Discovery {
     Cancelled,
     Found(Option<Arc<TestNode>>),
+}
+
+/// Watch mode's watcher (watch mode R2).
+struct Armed {
+    /// Tells a late error of this watcher from those of one that took its place.
+    id: u64,
+    roots: Vec<PathBuf>,
+    /// Closed when dropped.
+    _watcher: Watcher,
 }
 
 /// The folder and proposed zip name of a run's report (export spec R2.3).
@@ -321,6 +340,14 @@ struct Inner {
     pid_file: PathBuf,
     recent: Arc<RecentSender<LoadRecent, EmitRecent>>,
     state: Mutex<State>,
+    /// The watcher, None while nothing is watched.
+    watcher: Mutex<Option<Armed>>,
+    /// The id of the next watcher.
+    watchers: AtomicU64,
+    /// Saved features waiting for the runner to be idle (R4.1).
+    waiting: Mutex<BTreeSet<PathBuf>>,
+    /// This runner, for the watcher's callbacks and the threads they start; weak, as the watcher is its own.
+    this: Weak<Inner>,
     /// Signalled when the phase goes back to idle, for `dispose`.
     idle: Condvar,
     ctl: Mutex<Control>,
@@ -359,7 +386,7 @@ impl Runner {
             let emit = Arc::clone(&o.emit);
             Box::new(move |e| emit(e))
         };
-        Self(Arc::new(Inner {
+        Self(Arc::new_cyclic(|this| Inner {
             pid_file: o.data_dir.join("running.pid"),
             data_dir: o.data_dir,
             vendor: o.vendor,
@@ -372,6 +399,10 @@ impl Runner {
             lookup_env: o.lookup_env,
             recent: Arc::new(RecentSender::new(load, emit_recent)),
             state: Mutex::new(State::new()),
+            watcher: Mutex::new(None),
+            watchers: AtomicU64::new(0),
+            waiting: Mutex::default(),
+            this: this.clone(),
             idle: Condvar::new(),
             ctl: Mutex::new(Control::default()),
             #[cfg(test)]
@@ -437,6 +468,13 @@ impl Runner {
     /// saved.
     pub fn set_filter(&self, f: FilterState) {
         self.0.set_filter(f);
+    }
+
+    /// Turns watch mode on or off (watch mode R1): also during a run, as it touches only the watcher and
+    /// `settings.json`. Refused while a project is being opened (the choice in force is re-sent); ignored with no
+    /// project. Applied even if it cannot be saved, as the thread count is.
+    pub fn set_watch(&self, on: bool) {
+        self.0.set_watch(on);
     }
 
     /// Refused while busy or for anything but a whole number from 1 to 32 (the count in force is re-sent); ignored
@@ -626,19 +664,182 @@ impl Inner {
             // under the state lock, which `cancel` takes first: a cancel of this operation cannot come before it
             self.ctl().cancelled = false;
         }
+        self.operate(work).map(Some)
+    }
+
+    /// The operation its caller has made the runner busy with: `busy` events around `work`, then the saves waiting.
+    fn operate<T>(&self, work: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
         self.emit(AppEvent::Busy { busy: true });
         // idle again however `work` ends, a panic included
         struct Idle<'a>(&'a Inner);
         impl Drop for Idle<'_> {
             fn drop(&mut self) {
-                self.0.state().phase = Phase::Idle;
+                {
+                    let mut s = self.0.state();
+                    s.phase = Phase::Idle;
+                    s.settling += 1;
+                }
                 self.0.idle.notify_all();
                 self.0.emit(AppEvent::Busy { busy: false });
-                // drain(): watch mode's saves waiting, P4
+                self.0.state().settling -= 1;
+                self.0.drain_later();
             }
         }
         let _idle = Idle(self);
-        work().map(Some)
+        work()
+    }
+
+    fn set_watch(&self, on: bool) {
+        let root = {
+            let mut s = self.state();
+            if s.opening().is_some() {
+                drop(s);
+                self.notice(BUSY);
+                self.send_watch();
+                return;
+            }
+            let Some(project) = &s.project else {
+                return;
+            };
+            let root = project.root.clone();
+            s.watching = on;
+            root
+        };
+        if let Err(e) = save_project_watch(&self.data_dir, &root, on) {
+            self.notice(format!("Watch mode could not be saved: {e}"));
+        }
+        self.arm();
+        self.send_watch();
+    }
+
+    /// Watches the open project's feature roots while watch mode is on, keeping a watcher already on the same roots;
+    /// stops watching and drops the saves waiting otherwise (R1.5, R2). A watcher that cannot start turns watch mode
+    /// off in memory only, so the next open tries again (R2.5).
+    fn arm(&self) {
+        let failed = {
+            let mut slot = lock(&self.watcher);
+            let root = {
+                let s = self.state();
+                s.project.as_ref().filter(|_| s.watching).map(|p| p.root.clone())
+            };
+            let Some(root) = root.filter(|_| !self.disposing()) else {
+                self.disarm(&mut slot);
+                return;
+            };
+            let roots = detect_layout(Path::new(&root)).feature_roots;
+            if slot.as_ref().is_some_and(|armed| armed.roots == roots) {
+                return;
+            }
+            *slot = None; // closed before the next one starts; the saves waiting are kept
+            if roots.is_empty() {
+                return;
+            }
+            match self.watch_roots(roots) {
+                Ok(armed) => {
+                    *slot = Some(armed);
+                    return;
+                }
+                Err(e) => {
+                    self.state().watching = false;
+                    self.disarm(&mut slot);
+                    e
+                }
+            }
+        };
+        self.say_watch_stopped(&failed.to_string());
+    }
+
+    fn watch_roots(&self, roots: Vec<PathBuf>) -> io::Result<Armed> {
+        let id = self.watchers.fetch_add(1, Ordering::Relaxed);
+        let (saved, failed) = (self.this.clone(), self.this.clone());
+        let watcher = watch_features(
+            &roots,
+            move |files| {
+                if let Some(runner) = saved.upgrade() {
+                    runner.saved(files);
+                }
+            },
+            move |reason| {
+                // no thread: watch mode stays shown as on over a watcher that says nothing more
+                let _ = thread::Builder::new().name("grace-watch-error".into()).spawn(move || {
+                    if let Some(runner) = failed.upgrade() {
+                        runner.watch_failed(id, &reason);
+                    }
+                });
+            },
+            QUIET,
+        )?;
+        Ok(Armed {
+            id,
+            roots,
+            _watcher: watcher,
+        })
+    }
+
+    /// Closes the watcher and drops the saves waiting, in that order: none can come after.
+    fn disarm(&self, slot: &mut Option<Armed>) {
+        *slot = None;
+        lock(&self.waiting).clear();
+    }
+
+    /// The watcher `id` stopped (R2.5): watch mode goes off in memory, unless another has taken its place.
+    fn watch_failed(&self, id: u64, reason: &str) {
+        {
+            let mut slot = lock(&self.watcher);
+            if slot.as_ref().is_none_or(|armed| armed.id != id) {
+                return;
+            }
+            self.state().watching = false;
+            self.disarm(&mut slot);
+        }
+        self.say_watch_stopped(reason);
+    }
+
+    fn say_watch_stopped(&self, reason: &str) {
+        self.send_watch();
+        self.notice(format!("Watch mode stopped: {reason}"));
+    }
+
+    /// The watcher's saves, on its own thread: it takes `waiting` alone.
+    fn saved(&self, files: Vec<PathBuf>) {
+        lock(&self.waiting).extend(files);
+        self.drain_later();
+    }
+
+    /// Runs the saves waiting on a thread of their own; none starts when none waits.
+    fn drain_later(&self) {
+        if lock(&self.waiting).is_empty() {
+            return;
+        }
+        if let Some(runner) = self.this.upgrade() {
+            // no thread: the saves wait for the next operation to end
+            let _ = thread::Builder::new()
+                .name("grace-watch-run".into())
+                .spawn(move || runner.drain());
+        }
+    }
+
+    /// Runs the saved features waiting, if nothing else runs (R3.1, R4.1). The check, the claim of the runner and the
+    /// taking of the saves are one step, so a click in between neither loses a save nor draws a notice.
+    fn drain(&self) {
+        let (files, filter) = {
+            let mut s = self.state();
+            if s.busy() || s.settling > 0 || s.project.is_none() {
+                return;
+            }
+            let mut waiting = lock(&self.waiting);
+            let mut c = self.ctl();
+            if waiting.is_empty() || c.disposing {
+                return;
+            }
+            c.cancelled = false;
+            s.phase = Phase::Busy { opening: None };
+            let files: Vec<PathBuf> = std::mem::take(&mut *waiting).into_iter().collect();
+            (files, s.filter.clone())
+        };
+        if let Err(e) = self.operate(|| self.run_target(RunTarget::Files(files), filter)) {
+            self.notice(e.to_string());
+        }
     }
 
     fn set_opening(&self, root: Option<String>) {
@@ -658,7 +859,7 @@ impl Inner {
                     s.tree = None;
                     s.watching = false;
                 }
-                // arm(): watch mode, P4
+                self.arm();
                 self.send_watch();
                 self.publish(LastProject {
                     project: None,
@@ -707,10 +908,11 @@ impl Inner {
             return Ok(false);
         }
         self.send_breakpoints(Vec::new()); // another project's lines mean nothing here
-        // waiting.clear(): watch mode's saves of the project open before, P4
+        // the watcher of the project open before goes, with its saves
+        self.disarm(&mut lock(&self.watcher));
         let watching = load_project_watch(&self.data_dir, root);
         self.state().watching = watching;
-        // arm(): watch mode, P4
+        self.arm();
         self.send_watch();
         let (code, build) = self.java_code(root, layout);
         let mut notice = Vec::new();
@@ -815,7 +1017,7 @@ impl Inner {
             subfolders: None,
         });
         self.send_breakpoints(Vec::new());
-        // arm(): watch mode, P4
+        self.arm();
         self.send_watch();
         if let Err(e) = forget_last_project(&self.data_dir) {
             // after the project event: the window clears its notice on every project event
@@ -853,7 +1055,7 @@ impl Inner {
         if !self.rediscover(project, start)? {
             return Ok(());
         }
-        // arm(): karate-pom.json may have changed the feature roots (watch mode R2.4), P4
+        self.arm(); // karate-pom.json may have changed the feature roots (watch mode R2.4)
         let (code, build) = self.java_code(&root, layout);
         let said: Vec<String> = libraries.into_iter().chain(code).collect();
         if !said.is_empty() {
@@ -1153,9 +1355,9 @@ impl Inner {
     }
 
     fn cancel(&self) {
-        // waiting.clear(): Cancel means stop (watch mode R4.2), P4
         let proc = {
             let s = self.state();
+            lock(&self.waiting).clear(); // Cancel means stop (watch mode R4.2)
             if !s.busy() {
                 return;
             }
@@ -1216,7 +1418,7 @@ impl Inner {
             c.cancelled = true;
             c.proc.clone()
         };
-        // the watcher and the saves waiting: P4
+        self.disarm(&mut lock(&self.watcher));
         // The kill ends the run's process; the run then writes its record before the operation ends.
         if let Some(proc) = proc {
             proc.kill();
