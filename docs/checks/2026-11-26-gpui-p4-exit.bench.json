@@ -1,0 +1,87 @@
+{
+  "mode": "pr",
+  "machine": "Windows 11 Pro, AMD Ryzen 7 5800X 8-Core Processor (16 threads), 32 GB",
+  "screen": "DISPLAY1, not the main screen (work area 2048 x 1104 at 2048, 0)",
+  "builds": {
+    "a": null,
+    "b": {
+      "label": "this build",
+      "exe": "~/AppData/Local/Temp/agent-work/grace/p4-exit/wt/out/gpui/Grace-win32-x64/Grace.exe"
+    }
+  },
+  "rounds": [
+    {
+      "build": "b",
+      "warmup": true,
+      "load": 14.8,
+      "values": {
+        "size.unpacked": 197.8,
+        "start.paint.reused": 310,
+        "start.tree.reused": null,
+        "idle.memory": 21.1,
+        "idle.cpu.shown": 578,
+        "idle.cpu.minimised": 16,
+        "idle.wakeups.minimised": 0,
+        "idle.wakeups.gpu": 64.1
+      }
+    },
+    {
+      "build": "b",
+      "warmup": false,
+      "load": 4,
+      "values": {
+        "size.unpacked": 197.8,
+        "start.paint.reused": 309,
+        "start.tree.reused": null,
+        "idle.memory": 21.1,
+        "idle.cpu.shown": 719,
+        "idle.cpu.minimised": 0,
+        "idle.wakeups.minimised": 0,
+        "idle.wakeups.gpu": 64.1
+      }
+    },
+    {
+      "build": "b",
+      "warmup": false,
+      "load": 3.1,
+      "values": {
+        "size.unpacked": 197.8,
+        "start.paint.reused": 318,
+        "start.tree.reused": null,
+        "idle.memory": 21.6,
+        "idle.cpu.shown": 171,
+        "idle.cpu.minimised": 0,
+        "idle.wakeups.minimised": 0,
+        "idle.wakeups.gpu": 64
+      }
+    },
+    {
+      "build": "b",
+      "warmup": false,
+      "load": 2.4,
+      "values": {
+        "size.unpacked": 197.8,
+        "start.paint.reused": 295,
+        "start.tree.reused": null,
+        "idle.memory": 21.2,
+        "idle.cpu.shown": 31,
+        "idle.cpu.minimised": 0,
+        "idle.wakeups.minimised": 0,
+        "idle.wakeups.gpu": 64.1
+      }
+    }
+  ],
+  "medians": {
+    "a": null,
+    "b": {
+      "size.unpacked": 197.8,
+      "start.paint.reused": 309,
+      "start.tree.reused": null,
+      "idle.memory": 21.2,
+      "idle.cpu.shown": 171,
+      "idle.cpu.minimised": 0,
+      "idle.wakeups.minimised": 0,
+      "idle.wakeups.gpu": 64.1
+    }
+  }
+}
